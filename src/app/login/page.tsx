@@ -7,6 +7,7 @@ import { AlertCircle, ArrowRight, Eye, EyeOff } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { AuthAside, AuthShell } from '@/components/marketing/AuthShell';
 import { GoogleButton } from '@/components/marketing/GoogleButton';
+import { isProviderEnabled, useProviderEnabled } from '@/lib/auth/providers';
 
 function LoginForm() {
   const router = useRouter();
@@ -19,6 +20,9 @@ function LoginForm() {
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // undefined while we ask Supabase which providers are switched on.
+  const googleEnabled = useProviderEnabled('google');
 
   // Check for error parameters in URL (e.g. from OAuth redirect)
   useEffect(() => {
@@ -58,6 +62,16 @@ function LoginForm() {
 
   const handleGoogleLogin = async () => {
     setGoogleLoading(true);
+    setErrorMsg(null);
+
+    if (!(await isProviderEnabled('google'))) {
+      setGoogleLoading(false);
+      setErrorMsg(
+        'Google sign-in is not enabled for this workspace yet. Enable Google under Authentication → Providers in your Supabase project, then try again. You can sign in with email below in the meantime.'
+      );
+      return;
+    }
+
     setErrorMsg(null);
 
     try {
@@ -123,23 +137,26 @@ function LoginForm() {
         </div>
       )}
 
-      {/* Google 1-Click Sign-In */}
-      <GoogleButton
-        onClick={handleGoogleLogin}
-        loading={googleLoading}
-        disabled={loading}
-        text="Continue with Google"
-      />
+      {/* Only offered when the provider is actually configured. */}
+      {googleEnabled && (
+        <>
+          <GoogleButton
+            onClick={handleGoogleLogin}
+            loading={googleLoading}
+            disabled={loading}
+            text="Continue with Google"
+          />
 
-      {/* Separator */}
-      <div className="relative my-6 text-center text-[12px] text-ink-3">
-        <div className="absolute inset-0 flex items-center">
-          <div className="w-full border-t border-line-2" />
-        </div>
-        <span className="relative bg-surface px-3 text-ink-3">
-          or continue with email
-        </span>
-      </div>
+          <div className="relative my-6 text-center text-[12px] text-ink-3">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-line-2" />
+            </div>
+            <span className="relative bg-surface px-3 text-ink-3">
+              or continue with email
+            </span>
+          </div>
+        </>
+      )}
 
       <form onSubmit={handleLogin} className="space-y-4">
         <div>

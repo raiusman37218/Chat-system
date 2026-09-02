@@ -16,6 +16,7 @@ import {
 import { createClient } from '@/lib/supabase/client';
 import { AuthAside, AuthShell } from '@/components/marketing/AuthShell';
 import { GoogleButton } from '@/components/marketing/GoogleButton';
+import { isProviderEnabled, useProviderEnabled } from '@/lib/auth/providers';
 
 function SignupForm() {
   const router = useRouter();
@@ -32,6 +33,9 @@ function SignupForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+
+  // undefined while we ask Supabase which providers are switched on.
+  const googleEnabled = useProviderEnabled('google');
   const [errorMsg, setErrorMsg] = useState<string | null>(() => {
     return searchParams.get('error_description') || searchParams.get('error') || null;
   });
@@ -56,6 +60,16 @@ function SignupForm() {
   // Google OAuth Signup
   const handleGoogleSignup = async () => {
     setGoogleLoading(true);
+    setErrorMsg(null);
+
+    if (!(await isProviderEnabled('google'))) {
+      setGoogleLoading(false);
+      setErrorMsg(
+        'Google sign-up is not enabled for this workspace yet. Enable Google under Authentication → Providers in your Supabase project, then try again. You can register with email below in the meantime.'
+      );
+      return;
+    }
+
     setErrorMsg(null);
 
     try {
@@ -388,23 +402,26 @@ function SignupForm() {
         </div>
       )}
 
-      {/* Google 1-Click Sign-Up */}
-      <GoogleButton
-        onClick={handleGoogleSignup}
-        loading={googleLoading}
-        disabled={loading}
-        text="Sign up with Google"
-      />
+      {/* Only offered when the provider is actually configured. */}
+      {googleEnabled && (
+        <>
+          <GoogleButton
+            onClick={handleGoogleSignup}
+            loading={googleLoading}
+            disabled={loading}
+            text="Sign up with Google"
+          />
 
-      {/* Separator */}
-      <div className="relative my-6 text-center text-[12px] text-ink-3">
-        <div className="absolute inset-0 flex items-center">
-          <div className="w-full border-t border-line-2" />
-        </div>
-        <span className="relative bg-surface px-3 text-ink-3">
-          or register with work email
-        </span>
-      </div>
+          <div className="relative my-6 text-center text-[12px] text-ink-3">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-line-2" />
+            </div>
+            <span className="relative bg-surface px-3 text-ink-3">
+              or register with work email
+            </span>
+          </div>
+        </>
+      )}
 
       <form onSubmit={handleRegister} className="space-y-4">
         <div>
