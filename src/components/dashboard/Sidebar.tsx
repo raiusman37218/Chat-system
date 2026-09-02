@@ -13,7 +13,8 @@ import {
   Bell, 
   LogOut, 
   ShieldCheck,
-  ChevronDown
+  ChevronDown,
+  ExternalLink
 } from 'lucide-react';
 import { Agent, AgentStatus, ConversationStatus, Workspace } from '@/types/database';
 import { sound } from '@/lib/sound';
@@ -94,6 +95,29 @@ export function Sidebar({
               <p className="text-[11px] text-slate-400 truncate">{workspace?.website_url || 'Live Workspace'}</p>
             </div>
           </div>
+        </div>
+
+        {/* Customer Simulator Quick Launch */}
+        <div className="px-3 pt-3">
+          <a
+            href={`/demo.html?workspaceId=${workspace?.id || ''}&name=${encodeURIComponent(workspace?.name || 'Chatify')}`}
+            target="_blank"
+            rel="noreferrer"
+            className="flex items-center justify-between p-2.5 rounded-xl bg-gradient-to-r from-blue-600/15 via-indigo-600/10 to-blue-600/15 border border-blue-500/30 hover:border-blue-400 text-blue-300 hover:text-white transition-all group shadow-sm"
+          >
+            <div className="flex items-center gap-2.5 min-w-0">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse flex-shrink-0" />
+              <div className="truncate">
+                <div className="text-xs font-bold leading-none flex items-center gap-1">
+                  <span>Customer Simulator</span>
+                </div>
+                <div className="text-[10px] text-slate-400 mt-1 truncate">
+                  Test live chat as visitor
+                </div>
+              </div>
+            </div>
+            <ExternalLink className="w-3.5 h-3.5 text-blue-400 group-hover:translate-x-0.5 transition-transform flex-shrink-0" />
+          </a>
         </div>
 
         {/* Navigation Sections */}

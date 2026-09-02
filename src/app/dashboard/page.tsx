@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import { Agent, Conversation, Message, Visitor, Workspace, AgentStatus, ConversationStatus } from '@/types/database';
+import { Agent, Conversation, Message, Visitor, Workspace, AgentStatus, ConversationStatus, ConversationPriority } from '@/types/database';
 import { Sidebar } from '@/components/dashboard/Sidebar';
 import { ConversationList } from '@/components/dashboard/ConversationList';
 import { ChatThread } from '@/components/dashboard/ChatThread';
@@ -319,7 +319,7 @@ export default function DashboardPage() {
   }, [supabase]);
 
   // 6. Action Handlers
-  const handleSendMessage = async (content: string) => {
+  const handleSendMessage = async (content: string, isInternal: boolean = false) => {
     if (!selectedConversationId || !currentAgent) return;
 
     const { error } = await supabase.from('messages').insert({
@@ -327,6 +327,7 @@ export default function DashboardPage() {
       sender_type: 'agent',
       sender_id: currentAgent.id,
       content,
+      is_internal: isInternal,
     });
 
     if (error) {
@@ -338,6 +339,42 @@ export default function DashboardPage() {
       .from('conversations')
       .update({ updated_at: new Date().toISOString() })
       .eq('id', selectedConversationId);
+  };
+
+  const handleUpdatePriority = async (priority: ConversationPriority) => {
+    if (!selectedConversationId) return;
+
+    const { error } = await supabase
+      .from('conversations')
+      .update({ priority, updated_at: new Date().toISOString() })
+      .eq('id', selectedConversationId);
+
+    if (error) {
+      console.error('Error updating conversation priority:', error);
+      return;
+    }
+
+    setConversations((prev) =>
+      prev.map((c) => (c.id === selectedConversationId ? { ...c, priority } : c))
+    );
+  };
+
+  const handleUpdateTags = async (tags: string[]) => {
+    if (!selectedConversationId) return;
+
+    const { error } = await supabase
+      .from('conversations')
+      .update({ tags, updated_at: new Date().toISOString() })
+      .eq('id', selectedConversationId);
+
+    if (error) {
+      console.error('Error updating conversation tags:', error);
+      return;
+    }
+
+    setConversations((prev) =>
+      prev.map((c) => (c.id === selectedConversationId ? { ...c, tags } : c))
+    );
   };
 
   const handleUpdateStatus = async (status: ConversationStatus) => {
@@ -492,6 +529,8 @@ export default function DashboardPage() {
                 onSendMessage={handleSendMessage}
                 onUpdateStatus={handleUpdateStatus}
                 onAssignAgent={handleAssignAgent}
+                onUpdatePriority={handleUpdatePriority}
+                onUpdateTags={handleUpdateTags}
               />
 
               <VisitorDetailsSidebar

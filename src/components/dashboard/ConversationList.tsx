@@ -138,6 +138,30 @@ export function ConversationList({
                     )}
                   </p>
 
+                  {/* Priority & Tags Pills */}
+                  {((conv.priority && conv.priority !== 'normal') || (conv.tags && conv.tags.length > 0)) && (
+                    <div className="mt-1 flex items-center gap-1 flex-wrap">
+                      {conv.priority === 'urgent' && (
+                        <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/30">
+                          🔴 URGENT
+                        </span>
+                      )}
+                      {conv.priority === 'high' && (
+                        <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                          🟠 HIGH
+                        </span>
+                      )}
+                      {conv.tags && conv.tags.slice(0, 2).map((t) => (
+                        <span key={t} className="px-1.5 py-0.2 rounded text-[9px] font-medium bg-slate-800/80 text-blue-300 border border-slate-700/60">
+                          #{t}
+                        </span>
+                      ))}
+                      {conv.tags && conv.tags.length > 2 && (
+                        <span className="text-[9px] text-slate-500">+{conv.tags.length - 2}</span>
+                      )}
+                    </div>
+                  )}
+
                   {/* Badges footer */}
                   <div className="mt-2 flex items-center justify-between text-[10px]">
                     <div className="flex items-center gap-1.5">
@@ -164,6 +188,12 @@ export function ConversationList({
                         </span>
                       ) : (
                         <span className="text-slate-400">Unassigned</span>
+                      )}
+
+                      {conv.csat_rating && (
+                        <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/10 text-amber-300 border border-amber-500/20 flex items-center gap-0.5">
+                          ★ {conv.csat_rating}/5
+                        </span>
                       )}
                     </div>
 

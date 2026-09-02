@@ -236,15 +236,25 @@ export default function RootLayout({ children }) {
         </div>
 
         {/* Live Verification box */}
-        <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800 flex items-center justify-between text-xs">
+        <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800 flex items-center justify-between text-xs gap-4 flex-wrap">
           <div className="flex items-center gap-2.5">
-            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+            <CheckCircle2 className={`w-4 h-4 ${hasVisitors ? 'text-emerald-400' : 'text-slate-500'}`} />
             <span className="text-slate-300">
               {hasVisitors
-                ? `Last visitor connection detected: ${latestVisitorUrl || 'Live Site'}`
-                : 'Waiting for traffic. Open your website after installing the code to verify connection.'}
+                ? `Active traffic connected: ${latestVisitorUrl || 'Live Visitor Session'}`
+                : 'Waiting for website traffic. Click "Test in Simulator" to verify immediately.'}
             </span>
           </div>
+
+          <a
+            href={`/demo.html?workspaceId=${workspaceId}&name=${encodeURIComponent(workspace?.name || 'Workspace')}`}
+            target="_blank"
+            rel="noreferrer"
+            className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs flex items-center gap-1.5 transition-colors shadow-sm"
+          >
+            <span>Test in Simulator</span>
+            <ExternalLink className="w-3.5 h-3.5" />
+          </a>
         </div>
       </div>
     </div>

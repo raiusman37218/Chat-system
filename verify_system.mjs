@@ -1,4 +1,4 @@
-import { createClient } from './dashboard/node_modules/@supabase/supabase-js/dist/main/index.js';
+import { createClient } from '@supabase/supabase-js';
 
 const SUPABASE_URL = 'https://vfjsaynnubxywdbevxtx.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZmanNheW5udWJ4eXdkYmV2eHR4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgyNTA5MDEsImV4cCI6MjEwMzgyNjkwMX0.YyBCXMqwrOk5BRhQafYLFw8tiM5PC8lc8Yocodw9wf0';
@@ -45,6 +45,7 @@ async function runTests() {
     p_user_agent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
     p_ip_address: '127.0.0.1',
     p_location: 'Los Angeles, US',
+    p_workspace_id: 'a0000000-0000-0000-0000-000000000001',
   });
 
   if (vErr) {
@@ -56,6 +57,7 @@ async function runTests() {
   // Create or get conversation
   const { data: convData, error: cErr } = await supabase.rpc('fn_get_or_create_conversation', {
     p_visitor_id: testVisitorId,
+    p_workspace_id: 'a0000000-0000-0000-0000-000000000001',
   });
 
   if (cErr) {

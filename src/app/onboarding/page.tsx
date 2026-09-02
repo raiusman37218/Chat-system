@@ -433,13 +433,13 @@ export default function OnboardingPage() {
               {/* Bottom Actions */}
               <div className="pt-4 flex items-center justify-between border-t border-slate-800">
                 <a
-                  href="/demo.html"
+                  href={`/demo.html?workspaceId=${createdWorkspaceId || ''}&name=${encodeURIComponent(businessName)}`}
                   target="_blank"
                   rel="noreferrer"
-                  className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-white transition-colors"
+                  className="flex items-center gap-1.5 text-xs text-blue-400 hover:text-blue-300 font-semibold transition-colors"
                 >
                   <ExternalLink className="w-3.5 h-3.5" />
-                  <span>Preview in Demo Site</span>
+                  <span>Test in Customer Simulator</span>
                 </a>
 
                 <button

@@ -4,8 +4,8 @@
   "description": "Embeddable Live Chat Support Widget for Chatify",
   "main": "dist/widget.js",
   "scripts": {
-    "build": "esbuild src/index.ts --bundle --minify --format=iife --outfile=../dashboard/public/widget.js --target=es2020",
-    "watch": "esbuild src/index.ts --bundle --watch --format=iife --outfile=../dashboard/public/widget.js --target=es2020"
+    "build": "esbuild src/index.ts --bundle --minify --format=iife --outfile=../public/widget.js --target=es2020",
+    "watch": "esbuild src/index.ts --bundle --watch --format=iife --outfile=../public/widget.js --target=es2020"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.49.1"

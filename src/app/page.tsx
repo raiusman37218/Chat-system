@@ -42,9 +42,9 @@ export default function HomePage() {
             <a href="#how-it-works" className="hover:text-white transition-colors">How It Works</a>
             <a href="#features" className="hover:text-white transition-colors">Features</a>
             <a href="#integration" className="hover:text-white transition-colors">Integration</a>
-            <Link href="/demo.html" target="_blank" className="hover:text-white transition-colors flex items-center gap-1">
-              <span>Customer Demo</span>
-              <ExternalLink className="w-3 h-3 opacity-60" />
+            <Link href="/demo.html" target="_blank" className="hover:text-white transition-colors flex items-center gap-1 text-blue-400 font-medium">
+              <span>Visitor Simulator</span>
+              <ExternalLink className="w-3 h-3 opacity-80" />
             </Link>
           </nav>
 
@@ -111,10 +111,10 @@ export default function HomePage() {
             <Link
               href="/demo.html"
               target="_blank"
-              className="px-5 py-2.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-slate-300 border border-slate-800 text-xs font-semibold flex items-center gap-1.5 transition-all"
+              className="px-5 py-2.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-blue-300 border border-blue-500/30 text-xs font-semibold flex items-center gap-1.5 transition-all shadow-sm"
             >
-              <span>Try Interactive Demo</span>
-              <ExternalLink className="w-3 h-3 opacity-60" />
+              <span>🧪 Test Visitor Simulator</span>
+              <ExternalLink className="w-3 h-3 opacity-80" />
             </Link>
 
             <Link
@@ -408,7 +408,7 @@ export default function HomePage() {
           <div className="flex items-center gap-6 text-slate-400">
             <Link href="/signup" className="hover:text-white transition-colors">Register Business</Link>
             <Link href="/login" className="hover:text-white transition-colors">Agent Sign In</Link>
-            <Link href="/demo.html" target="_blank" className="hover:text-white transition-colors">Customer Demo</Link>
+            <Link href="/demo.html" target="_blank" className="hover:text-white transition-colors">Visitor Simulator</Link>
           </div>
         </div>
       </footer>
