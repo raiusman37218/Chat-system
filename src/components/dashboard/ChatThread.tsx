@@ -8,6 +8,7 @@ import {
   Check,
   CheckCheck,
   CheckCircle2,
+  ChevronDown,
   Clock,
   ExternalLink,
   FileText,
@@ -230,9 +231,14 @@ export function ChatThread({
   // Suggestions are fetched on demand from the AI Suggest button, not on every
   // open and every incoming message — that pushed a panel over the composer
   // unasked and spent an API call per keystroke-worth of traffic.
-  useEffect(() => {
+  // Reset during render (React's documented "adjust state on prop change"
+  // pattern) rather than in an effect, which would render stale suggestions
+  // for a frame after switching conversations.
+  const [suggestionsFor, setSuggestionsFor] = useState(conversation.id);
+  if (suggestionsFor !== conversation.id) {
+    setSuggestionsFor(conversation.id);
     setSuggestedReplies([]);
-  }, [conversation.id]);
+  }
 
   // Trigger background sentiment & tag analysis on new visitor message
   useEffect(() => {
@@ -724,10 +730,14 @@ export function ChatThread({
   }
 
   return (
-    <div className="flex-1 min-w-0 h-screen flex flex-col bg-canvas">
-      {/* ── Header ── */}
-      <header className="shrink-0 px-5 h-16 flex items-center justify-between gap-4 border-b border-line bg-surface">
-        <div className="flex items-center gap-2.5 min-w-0">
+    <div className="@container/thread flex-1 min-w-0 h-screen flex flex-col bg-canvas">
+      {/* ── Header ──
+          min-h rather than a fixed h: a fixed height clipped its own content
+          the moment anything wrapped. The identity block takes the remaining
+          width (flex-1) instead of collapsing, and the name line never wraps —
+          secondary details live on the line below. */}
+      <header className="shrink-0 px-5 py-2.5 min-h-16 flex items-center justify-between gap-3 border-b border-line bg-surface">
+        <div className="flex items-center gap-2.5 min-w-0 flex-1">
           {onBack && (
             <button
               onClick={onBack}
@@ -744,15 +754,16 @@ export function ChatThread({
             online={isOnline}
             muted={!visitor?.name && !visitor?.email}
           />
-          <div className="min-w-0">
-            <div className="flex items-center gap-2 min-w-0 flex-wrap">
-              <h2 className="text-[15px] font-semibold tracking-tight truncate">
+          <div className="min-w-0 flex-1">
+            {/* Line 1: identity only, always one line. */}
+            <div className="flex items-center gap-2 min-w-0">
+              <h2 className="text-[15px] font-semibold tracking-tight truncate min-w-0">
                 {displayName}
               </h2>
               {conversation.channel && conversation.channel !== 'web' && (
                 <ChannelBadge
                   channel={conversation.channel}
-                  showLabel={true}
+                  showLabel={false}
                   size="xs"
                 />
               )}
@@ -762,7 +773,7 @@ export function ChatThread({
                 conversation.sentiment === 'negative') && (
                 <span
                   className={cn(
-                    'pill',
+                    'pill shrink-0',
                     conversation.sentiment === 'positive'
                       ? 'pill-success'
                       : 'pill-danger'
@@ -770,29 +781,18 @@ export function ChatThread({
                   title={`Visitor tone: ${conversation.sentiment}`}
                 >
                   {conversation.sentiment === 'positive' ? (
-                    <>
-                      <Smile className="w-3 h-3" />
-                      Positive
-                    </>
+                    <Smile className="w-3 h-3" />
                   ) : (
-                    <>
-                      <Frown className="w-3 h-3" />
-                      Frustrated
-                    </>
+                    <Frown className="w-3 h-3" />
                   )}
-                </span>
-              )}
-              {conversation.channel_user_id && conversation.channel !== 'web' && (
-                <span className="text-[11px] font-mono text-ink-3 truncate hidden sm:inline">
-                  {conversation.channel_user_id}
-                </span>
-              )}
-              {visitor?.email && (
-                <span className="text-[12px] text-ink-3 truncate hidden lg:inline">
-                  {visitor.email}
+                  {conversation.sentiment === 'positive'
+                    ? 'Positive'
+                    : 'Frustrated'}
                 </span>
               )}
             </div>
+
+            {/* Line 2: everything secondary, truncated rather than wrapped. */}
             <div className="flex items-center gap-2 text-[11.5px] text-ink-3 min-w-0">
               {isOnline ? (
                 <span className="inline-flex items-center gap-1.5 text-success font-medium shrink-0">
@@ -801,17 +801,35 @@ export function ChatThread({
                 </span>
               ) : (
                 <span className="shrink-0">
-                  Active {formatTimeAgo(visitor?.last_seen || conversation.updated_at)}
+                  Active{' '}
+                  {formatTimeAgo(visitor?.last_seen || conversation.updated_at)}
                 </span>
               )}
+
+              {visitor?.email && (
+                <>
+                  <span aria-hidden className="shrink-0">
+                    ·
+                  </span>
+                  <a
+                    href={`mailto:${visitor.email}`}
+                    className="truncate hover:text-accent transition-colors"
+                  >
+                    {visitor.email}
+                  </a>
+                </>
+              )}
+
               {visitor?.current_url && (
                 <>
-                  <span aria-hidden>·</span>
+                  <span aria-hidden className="shrink-0 hidden @xl/thread:inline">
+                    ·
+                  </span>
                   <a
                     href={visitor.current_url}
                     target="_blank"
                     rel="noreferrer"
-                    className="inline-flex items-center gap-1 hover:text-accent transition-colors truncate max-w-[240px]"
+                    className="hidden @xl/thread:inline-flex items-center gap-1 min-w-0 hover:text-accent transition-colors"
                   >
                     <span className="truncate">{visitor.current_url}</span>
                     <ExternalLink className="w-2.5 h-2.5 shrink-0" />
@@ -831,6 +849,27 @@ export function ChatThread({
             options={STATUS_OPTIONS}
             label="Status"
             onChange={(v) => onUpdateStatus(v)}
+            trigger={({ active, open }) => (
+              <span
+                className={cn(
+                  'btn btn-sm btn-secondary gap-1.5',
+                  open && 'bg-surface-3'
+                )}
+                title={`Status: ${active?.label ?? ''}`}
+              >
+                <span
+                  className="w-1.5 h-1.5 rounded-full shrink-0"
+                  style={{ background: active?.dot }}
+                />
+                <span className="hidden @xl/thread:inline">{active?.label}</span>
+                <ChevronDown
+                  className={cn(
+                    'w-3.5 h-3.5 text-ink-3 transition-transform duration-150',
+                    open && 'rotate-180'
+                  )}
+                />
+              </span>
+            )}
           />
 
           {conversation.status !== 'closed' ? (
@@ -840,7 +879,7 @@ export function ChatThread({
               title="Close and resolve this conversation"
             >
               <CheckCircle2 className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Resolve</span>
+              <span className="hidden @2xl/thread:inline">Resolve</span>
             </button>
           ) : (
             <button
@@ -848,7 +887,7 @@ export function ChatThread({
               className="btn btn-sm btn-secondary"
             >
               <RotateCcw className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Reopen</span>
+              <span className="hidden @2xl/thread:inline">Reopen</span>
             </button>
           )}
 
@@ -916,9 +955,12 @@ export function ChatThread({
         </div>
       </header>
 
-      {/* ── Meta bar: priority, assignment, tags ── */}
-      <div className="shrink-0 px-5 py-2 flex items-center justify-between gap-3 flex-wrap border-b border-line bg-surface-2">
-        <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+      {/* ── Meta bar ──
+          A single row that scrolls sideways when it runs out of room. It used
+          to wrap, which grew it to three stacked rows and pushed the actual
+          conversation down the screen. */}
+      <div className="shrink-0 px-5 py-2 flex items-center gap-2 border-b border-line bg-surface-2 overflow-x-auto scrollbar-none">
+        <div className="flex items-center gap-1.5 min-w-0">
           <Menu<ConversationPriority>
             value={currentPriority}
             options={PRIORITY_OPTIONS}
@@ -1029,14 +1071,16 @@ export function ChatThread({
         </div>
 
         {conversation.csat_rating && (
-          <span className="pill pill-warn shrink-0">
+          <span
+            className="pill pill-warn shrink-0 ml-auto"
+            title={
+              conversation.csat_feedback
+                ? `CSAT ${conversation.csat_rating}/5 — ${conversation.csat_feedback}`
+                : `CSAT ${conversation.csat_rating}/5`
+            }
+          >
             <Star className="w-3 h-3 fill-current" />
-            CSAT {conversation.csat_rating}/5
-            {conversation.csat_feedback && (
-              <span className="font-normal opacity-80">
-                · {conversation.csat_feedback}
-              </span>
-            )}
+            {conversation.csat_rating}/5
           </span>
         )}
       </div>
@@ -1206,8 +1250,8 @@ export function ChatThread({
           </div>
         )}
 
-        <div className="flex items-center justify-between mb-2.5">
-          <div className="inline-flex items-center gap-0.5 p-0.5 rounded-lg bg-surface-2 border border-line">
+        <div className="flex items-center justify-between gap-2 mb-2.5 min-w-0">
+          <div className="inline-flex items-center gap-0.5 p-0.5 rounded-lg bg-surface-2 border border-line shrink-0">
             {(
               [
                 ['reply', 'Reply'],
@@ -1232,7 +1276,7 @@ export function ChatThread({
             ))}
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 min-w-0">
             <button
               type="button"
               onClick={handleGenerateAiSuggestion}
@@ -1241,7 +1285,7 @@ export function ChatThread({
               title="Ask LangGraph AI Copilot to draft a response"
             >
               <Sparkles className={`w-3.5 h-3.5 ${aiDrafting ? 'animate-spin' : ''}`} />
-              <span className="hidden sm:inline">
+              <span className="hidden @xl/thread:inline">
                 {aiDrafting ? 'Drafting…' : 'AI Suggest'}
               </span>
             </button>
@@ -1251,9 +1295,9 @@ export function ChatThread({
               className="btn btn-sm btn-ghost"
             >
               <Zap className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Saved replies</span>
+              <span className="hidden @lg/thread:inline">Saved replies</span>
             </button>
-            <span className="text-[11.5px] text-ink-3 hidden md:inline">
+            <span className="text-[11.5px] text-ink-3 hidden @3xl/thread:inline shrink-0 truncate max-w-[140px]">
               as{' '}
               <span className="font-medium text-ink-2">
                 {currentAgent?.name || 'Agent'}
@@ -1425,7 +1469,7 @@ export function ChatThread({
             {/* Other Conversations from this Visitor */}
             <div className="space-y-2">
               <label className="block text-[11px] font-semibold text-ink-3 uppercase tracking-wider">
-                Visitor's other conversations
+                Visitor&apos;s other conversations
               </label>
 
               {mergeCandidates.length === 0 ? (
