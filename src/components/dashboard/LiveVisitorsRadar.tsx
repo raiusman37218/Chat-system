@@ -1,19 +1,19 @@
 'use client';
 
 import React from 'react';
-import { 
-  Radio, 
-  Globe, 
-  ExternalLink, 
-  MapPin, 
-  Monitor, 
-  MessageSquare, 
+import {
   Clock,
-  ShieldCheck,
-  RefreshCw
+  ExternalLink,
+  Globe,
+  MapPin,
+  MessageSquare,
+  Monitor,
+  Radio,
+  RefreshCw,
 } from 'lucide-react';
 import { Visitor } from '@/types/database';
 import { formatTimeAgo, parseUserAgent } from '@/lib/utils';
+import { Avatar } from '@/components/ui/Avatar';
 
 interface LiveVisitorsRadarProps {
   visitors: Visitor[];
@@ -21,141 +21,156 @@ interface LiveVisitorsRadarProps {
   onRefresh: () => void;
 }
 
+/** A visitor counts as "live" while their heartbeat is under 90s old. */
+const LIVE_WINDOW_SECONDS = 90;
+
 export function LiveVisitorsRadar({
   visitors,
   onOpenConversationForVisitor,
   onRefresh,
 }: LiveVisitorsRadarProps) {
-  // Active visitors within last 90 seconds
-  const activeVisitors = visitors.filter((v) => {
-    const diff = (new Date().getTime() - new Date(v.last_seen).getTime()) / 1000;
-    return diff < 90;
-  });
+  const activeVisitors = visitors.filter(
+    (v) => (Date.now() - new Date(v.last_seen).getTime()) / 1000 < LIVE_WINDOW_SECONDS
+  );
 
   return (
-    <div className="flex-1 flex flex-col h-screen bg-[#0b101d] overflow-hidden">
-      {/* Radar Header */}
-      <div className="px-8 py-5 border-b border-slate-800/80 bg-[#0d1424] flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
-            <Radio className="w-5 h-5 animate-pulse" />
-          </div>
-          <div>
-            <h2 className="text-base font-bold text-white tracking-tight flex items-center gap-2">
-              Live Visitors Radar
-              <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
-                {activeVisitors.length} Online Now
-              </span>
-            </h2>
-            <p className="text-xs text-slate-400">
-              Real-time heartbeat monitoring of users currently active on your websites.
-            </p>
-          </div>
+    <div className="flex-1 min-w-0 h-screen flex flex-col bg-canvas">
+      {/* Header */}
+      <header className="shrink-0 px-7 h-16 flex items-center justify-between gap-4 border-b border-line bg-surface">
+        <div className="min-w-0">
+          <h1 className="text-[15px] font-semibold tracking-tight flex items-center gap-2.5">
+            Live visitors
+            <span className="pill pill-success">
+              <span className="live-dot" />
+              {activeVisitors.length} online
+            </span>
+          </h1>
+          <p className="text-[12px] text-ink-3 mt-0.5">
+            Everyone browsing a page where your widget is installed, right now.
+          </p>
         </div>
 
-        <button
-          onClick={onRefresh}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-850 text-slate-300 text-xs border border-slate-700/60 transition-colors"
-        >
+        <button onClick={onRefresh} className="btn btn-sm btn-secondary shrink-0">
           <RefreshCw className="w-3.5 h-3.5" />
-          <span>Refresh</span>
+          Refresh
         </button>
-      </div>
+      </header>
 
-      {/* Visitors List / Cards */}
-      <div className="flex-1 overflow-y-auto p-8">
+      {/* Grid */}
+      <div className="flex-1 overflow-y-auto p-7">
         {activeVisitors.length === 0 ? (
-          <div className="h-full flex flex-col items-center justify-center text-center text-slate-400 max-w-md mx-auto space-y-4">
-            <div className="w-16 h-16 rounded-full bg-slate-800/50 border border-slate-700/60 flex items-center justify-center text-slate-400">
-              <Radio className="w-8 h-8 opacity-40" />
+          <div className="h-full flex flex-col items-center justify-center text-center max-w-md mx-auto gap-5">
+            <div className="relative w-16 h-16 flex items-center justify-center">
+              <span className="absolute inset-0 rounded-full border border-line" />
+              <span className="absolute inset-3 rounded-full border border-line" />
+              <Radio className="w-6 h-6 text-ink-3" />
             </div>
-            <div className="space-y-1">
-              <h3 className="text-sm font-semibold text-slate-200">No active visitors right now</h3>
-              <p className="text-xs text-slate-400 leading-relaxed">
-                When visitors browse any site where the Chatify script is installed, they will show up here live with their current URL, device info, and location.
+
+            <div>
+              <h2 className="text-[15px] font-semibold">
+                Nobody on the site right now
+              </h2>
+              <p className="mt-1.5 text-[13px] leading-relaxed text-ink-2">
+                As soon as someone loads a page carrying your script, they appear
+                here with their current URL, device and location.
               </p>
             </div>
-            <div className="p-3 bg-slate-900 border border-slate-800 rounded-xl text-left text-xs text-slate-400 space-y-1 w-full">
-              <div className="text-slate-200 font-semibold flex items-center gap-1.5">
-                <ShieldCheck className="w-4 h-4 text-blue-400" />
-                <span>Tip to test live radar:</span>
-              </div>
-              <p>Open the demo page in a new browser tab and navigate around to see real-time updates.</p>
+
+            <div className="panel p-4 text-left w-full">
+              <p className="text-[12.5px] font-semibold">Want to see it work?</p>
+              <p className="mt-1 text-[12px] leading-relaxed text-ink-2">
+                Open the customer simulator in another tab and click around — the
+                radar updates live.
+              </p>
+              <a
+                href="/demo.html"
+                target="_blank"
+                rel="noreferrer"
+                className="btn btn-sm btn-secondary mt-3"
+              >
+                <ExternalLink className="w-3.5 h-3.5" />
+                Open simulator
+              </a>
             </div>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 gap-4">
             {activeVisitors.map((visitor) => {
               const { browser, os } = parseUserAgent(visitor.user_agent);
               const displayName =
                 visitor.name ||
-                (visitor.email ? visitor.email.split('@')[0] : `Visitor #${visitor.id.slice(0, 6)}`);
+                (visitor.email
+                  ? visitor.email.split('@')[0]
+                  : `Visitor ${visitor.id.slice(0, 6)}`);
 
               return (
                 <div
                   key={visitor.id}
-                  className="bg-[#0f172a] border border-slate-800 rounded-xl p-5 hover:border-slate-700 transition-all shadow-sm flex flex-col justify-between space-y-4"
+                  className="card card-hover p-5 flex flex-col gap-4"
                 >
-                  {/* Top Bar */}
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-blue-600/20 border border-blue-500/30 text-blue-400 flex items-center justify-center font-bold text-sm">
-                        {displayName.charAt(0).toUpperCase()}
-                      </div>
-                      <div>
-                        <div className="text-sm font-semibold text-white">{displayName}</div>
-                        <div className="text-[11px] text-slate-400 truncate max-w-[140px]">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <Avatar name={displayName} seed={visitor.id} size="md" />
+                      <div className="min-w-0">
+                        <div className="text-[13.5px] font-semibold truncate">
+                          {displayName}
+                        </div>
+                        <div className="text-[11.5px] text-ink-3 truncate">
                           {visitor.email || 'Anonymous'}
                         </div>
                       </div>
                     </div>
 
+                    <span className="pill pill-success shrink-0">
+                      <span className="live-dot" />
+                      Live
+                    </span>
+                  </div>
+
+                  <a
+                    href={visitor.current_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="panel p-3 group"
+                  >
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <Globe className="w-3 h-3 text-ink-3" />
+                      <span className="eyebrow">Viewing</span>
+                    </div>
                     <div className="flex items-center gap-1.5">
-                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
-                      <span className="text-[10px] text-emerald-400 font-semibold">Active</span>
+                      <span className="font-mono text-[11.5px] text-accent truncate group-hover:underline underline-offset-2">
+                        {visitor.current_url}
+                      </span>
+                      <ExternalLink className="w-3 h-3 text-ink-3 shrink-0" />
                     </div>
+                  </a>
+
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-[12px] text-ink-2">
+                    <span className="flex items-center gap-1.5 truncate">
+                      <MapPin className="w-3.5 h-3.5 text-ink-3 shrink-0" />
+                      <span className="truncate">
+                        {visitor.location || 'Unknown'}
+                      </span>
+                    </span>
+                    <span className="flex items-center gap-1.5 truncate">
+                      <Monitor className="w-3.5 h-3.5 text-ink-3 shrink-0" />
+                      <span className="truncate">
+                        {browser} · {os}
+                      </span>
+                    </span>
+                    <span className="col-span-2 flex items-center gap-1.5 text-[11.5px] text-ink-3 truncate">
+                      <Clock className="w-3 h-3 shrink-0" />
+                      First seen {formatTimeAgo(visitor.first_seen)} · heartbeat{' '}
+                      {formatTimeAgo(visitor.last_seen)}
+                    </span>
                   </div>
 
-                  {/* Current Page */}
-                  <div className="p-2.5 rounded-lg bg-slate-900/90 border border-slate-800/80 text-xs">
-                    <div className="text-[10px] uppercase font-semibold text-slate-400 mb-1 flex items-center gap-1">
-                      <Globe className="w-3 h-3 text-blue-400" />
-                      <span>Browsing Page:</span>
-                    </div>
-                    <a
-                      href={visitor.current_url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-blue-400 hover:underline font-mono text-[11px] truncate flex items-center justify-between"
-                    >
-                      <span className="truncate">{visitor.current_url}</span>
-                      <ExternalLink className="w-3 h-3 flex-shrink-0 ml-1 opacity-70" />
-                    </a>
-                  </div>
-
-                  {/* Metadata */}
-                  <div className="grid grid-cols-2 gap-2 text-xs text-slate-400">
-                    <div className="flex items-center gap-1.5 truncate">
-                      <MapPin className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
-                      <span className="truncate text-slate-300">{visitor.location || 'Unknown'}</span>
-                    </div>
-                    <div className="flex items-center gap-1.5 truncate">
-                      <Monitor className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
-                      <span className="truncate text-slate-300">{browser}</span>
-                    </div>
-                    <div className="flex items-center gap-1.5 truncate col-span-2 text-[11px]">
-                      <Clock className="w-3 h-3 text-slate-400 flex-shrink-0" />
-                      <span>First seen {formatTimeAgo(visitor.first_seen)} • Heartbeat {formatTimeAgo(visitor.last_seen)}</span>
-                    </div>
-                  </div>
-
-                  {/* Action */}
                   <button
                     onClick={() => onOpenConversationForVisitor(visitor.id)}
-                    className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-medium text-xs shadow-md shadow-blue-600/20 transition-all"
+                    className="btn btn-primary w-full"
                   >
                     <MessageSquare className="w-3.5 h-3.5" />
-                    <span>Open Conversation</span>
+                    Start conversation
                   </button>
                 </div>
               );

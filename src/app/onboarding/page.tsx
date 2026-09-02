@@ -2,29 +2,31 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { 
-  Building2, 
-  Globe, 
-  Palette, 
-  Check, 
-  Copy, 
-  ArrowRight, 
-  MessageSquare, 
+import Link from 'next/link';
+import {
+  ArrowLeft,
+  ArrowRight,
+  Check,
+  Copy,
   ExternalLink,
-  Code2,
+  MessageSquare,
+  Send,
   Sparkles,
-  HelpCircle
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+import { ThemeToggle } from '@/components/ui/ThemeToggle';
+import { Logo } from '@/components/ui/Logo';
 
 const PRESET_COLORS = [
-  { name: 'Electric Blue', hex: '#2563eb' },
-  { name: 'Emerald', hex: '#059669' },
-  { name: 'Royal Violet', hex: '#7c3aed' },
+  { name: 'Electric Blue', hex: '#2e5bff' },
+  { name: 'Deep Ink', hex: '#0b0b0f' },
+  { name: 'Jade', hex: '#0f9d76' },
+  { name: 'Violet', hex: '#7c5cff' },
   { name: 'Rose', hex: '#e11d48' },
-  { name: 'Amber Gold', hex: '#d97706' },
-  { name: 'Slate Dark', hex: '#334155' },
+  { name: 'Amber', hex: '#d97706' },
 ];
+
+const STEP_LABELS = ['Business', 'Branding', 'Install'] as const;
 
 export default function OnboardingPage() {
   const router = useRouter();
@@ -37,9 +39,11 @@ export default function OnboardingPage() {
   // Form State
   const [businessName, setBusinessName] = useState('');
   const [websiteUrl, setWebsiteUrl] = useState('');
-  const [brandColor, setBrandColor] = useState('#2563eb');
+  const [brandColor, setBrandColor] = useState('#2e5bff');
   const [greetingTitle, setGreetingTitle] = useState('Support Team');
-  const [greetingMessage, setGreetingMessage] = useState('We typically reply in under 5 minutes');
+  const [greetingMessage, setGreetingMessage] = useState(
+    'We typically reply in under 5 minutes'
+  );
 
   // Created Workspace State
   const [createdWorkspaceId, setCreatedWorkspaceId] = useState<string | null>(null);
@@ -99,9 +103,9 @@ export default function OnboardingPage() {
   const getEmbedSnippet = () => {
     const origin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000';
     return `<!-- Chatify Live Chat Support -->
-<script 
-  src="${origin}/widget.js" 
-  data-workspace-id="${createdWorkspaceId || 'YOUR_WORKSPACE_ID'}" 
+<script
+  src="${origin}/widget.js"
+  data-workspace-id="${createdWorkspaceId || 'YOUR_WORKSPACE_ID'}"
   defer>
 </script>`;
   };
@@ -113,348 +117,387 @@ export default function OnboardingPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#070b14] text-white flex flex-col items-center justify-center p-6 selection:bg-blue-600 selection:text-white">
-      {/* Background glow */}
-      <div className="fixed inset-0 pointer-events-none bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-blue-900/20 via-transparent to-transparent" />
-
-      <div className="w-full max-w-3xl relative z-10">
-        {/* Header */}
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-500 shadow-xl shadow-blue-600/30 text-white mb-3">
-            <MessageSquare className="w-6 h-6" />
-          </div>
-          <h1 className="text-2xl font-bold tracking-tight">Set up your Business Workspace</h1>
-          <p className="text-sm text-slate-400 mt-1">
-            Connect Chatify to your website and start receiving live customer inquiries
-          </p>
-
-          {/* Stepper Progress */}
-          <div className="flex items-center justify-center gap-3 mt-6">
-            <div className={`flex items-center gap-2 text-xs font-semibold px-3 py-1 rounded-full ${step >= 1 ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30' : 'text-slate-500'}`}>
-              <span className="w-4 h-4 rounded-full bg-blue-600 text-white flex items-center justify-center text-[10px]">1</span>
-              <span>Business Info</span>
-            </div>
-            <div className="w-6 h-[1px] bg-slate-800" />
-            <div className={`flex items-center gap-2 text-xs font-semibold px-3 py-1 rounded-full ${step >= 2 ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30' : 'text-slate-500'}`}>
-              <span className="w-4 h-4 rounded-full bg-blue-600 text-white flex items-center justify-center text-[10px]">2</span>
-              <span>Widget Branding</span>
-            </div>
-            <div className="w-6 h-[1px] bg-slate-800" />
-            <div className={`flex items-center gap-2 text-xs font-semibold px-3 py-1 rounded-full ${step === 3 ? 'bg-emerald-600/20 text-emerald-400 border border-emerald-500/30' : 'text-slate-500'}`}>
-              <span className="w-4 h-4 rounded-full bg-emerald-600 text-white flex items-center justify-center text-[10px]">3</span>
-              <span>Install & Launch</span>
-            </div>
-          </div>
+    <div className="min-h-screen flex flex-col bg-canvas">
+      <header className="border-b border-line">
+        <div className="u-container h-16 flex items-center justify-between">
+          <Link href="/" className="flex items-center">
+            <Logo size={32} />
+          </Link>
+          <ThemeToggle />
         </div>
+      </header>
 
-        {/* Content Box */}
-        <div className="bg-[#0f172a] border border-slate-800 rounded-2xl p-8 shadow-2xl backdrop-blur-xl">
+      <main className="flex-1 flex items-start justify-center px-6 py-12 sm:py-16">
+        <div className="w-full max-w-3xl">
+          {/* Stepper */}
+          <div className="flex items-center gap-2 mb-10">
+            {STEP_LABELS.map((label, i) => {
+              const n = (i + 1) as 1 | 2 | 3;
+              const done = step > n;
+              const current = step === n;
+              return (
+                <React.Fragment key={label}>
+                  <div className="flex items-center gap-2.5">
+                    <span
+                      className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-semibold transition-colors ${
+                        done
+                          ? 'bg-success text-white'
+                          : current
+                          ? 'bg-ink text-ink-inv'
+                          : 'bg-surface-3 text-ink-3'
+                      }`}
+                    >
+                      {done ? <Check className="w-3.5 h-3.5" /> : n}
+                    </span>
+                    <span
+                      className={`text-[13px] font-medium ${
+                        current ? 'text-ink' : 'text-ink-3'
+                      }`}
+                    >
+                      {label}
+                    </span>
+                  </div>
+                  {i < STEP_LABELS.length - 1 && (
+                    <span
+                      className={`flex-1 h-px ${
+                        step > n ? 'bg-success' : 'bg-line-2'
+                      }`}
+                    />
+                  )}
+                </React.Fragment>
+              );
+            })}
+          </div>
+
           {/* STEP 1: Business Info */}
           {step === 1 && (
-            <div className="space-y-6">
-              <div>
-                <h2 className="text-base font-semibold text-white">Tell us about your business</h2>
-                <p className="text-xs text-slate-400 mt-0.5">We will generate your dedicated workspace and isolated chat database.</p>
-              </div>
+            <div className="animate-rise">
+              <h1 className="text-[1.9rem] leading-tight font-semibold">
+                Tell us about your business
+              </h1>
+              <p className="mt-2 text-[14.5px] text-ink-2">
+                We&apos;ll provision a dedicated, isolated workspace for your
+                conversations.
+              </p>
 
-              <div className="space-y-4">
+              <div className="mt-8 card p-7 space-y-5">
                 <div>
-                  <label className="block text-xs font-medium text-slate-300 mb-1.5">
-                    Company / Business Name *
+                  <label htmlFor="biz" className="field-label">
+                    Company name <span className="text-danger">*</span>
                   </label>
-                  <div className="relative">
-                    <Building2 className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                    <input
-                      type="text"
-                      required
-                      placeholder="e.g. Apex Apparel or Nova Cloud"
-                      value={businessName}
-                      onChange={(e) => {
-                        setBusinessName(e.target.value);
-                        if (!greetingTitle || greetingTitle === 'Support Team') {
-                          setGreetingTitle(`${e.target.value} Support`);
-                        }
-                      }}
-                      className="w-full pl-9 pr-3 py-2 bg-slate-900 border border-slate-700/80 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 transition-colors"
-                    />
-                  </div>
+                  <input
+                    id="biz"
+                    type="text"
+                    required
+                    placeholder="Northwind Studio"
+                    value={businessName}
+                    onChange={(e) => {
+                      setBusinessName(e.target.value);
+                      if (!greetingTitle || greetingTitle === 'Support Team') {
+                        setGreetingTitle(`${e.target.value} Support`);
+                      }
+                    }}
+                    className="input"
+                  />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-medium text-slate-300 mb-1.5">
-                    Website URL (Where the chat widget will be embedded)
+                  <label htmlFor="site" className="field-label">
+                    Website URL
                   </label>
-                  <div className="relative">
-                    <Globe className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                    <input
-                      type="url"
-                      placeholder="https://yourwebsite.com"
-                      value={websiteUrl}
-                      onChange={(e) => setWebsiteUrl(e.target.value)}
-                      className="w-full pl-9 pr-3 py-2 bg-slate-900 border border-slate-700/80 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 transition-colors"
-                    />
-                  </div>
+                  <input
+                    id="site"
+                    type="url"
+                    placeholder="https://northwind.com"
+                    value={websiteUrl}
+                    onChange={(e) => setWebsiteUrl(e.target.value)}
+                    className="input"
+                  />
+                  <p className="mt-1.5 text-[12px] text-ink-3">
+                    Where the chat widget will live. You can change this later.
+                  </p>
                 </div>
               </div>
 
-              <div className="pt-4 flex justify-end">
+              <div className="mt-6 flex justify-end">
                 <button
                   type="button"
                   disabled={!businessName.trim()}
                   onClick={() => setStep(2)}
-                  className="py-2.5 px-5 bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs rounded-xl shadow-lg shadow-blue-600/30 flex items-center gap-2 transition-all disabled:opacity-40 cursor-pointer"
+                  className="btn btn-lg btn-primary"
                 >
-                  <span>Next: Customize Widget Branding</span>
+                  Continue
                   <ArrowRight className="w-4 h-4" />
                 </button>
               </div>
             </div>
           )}
 
-          {/* STEP 2: Widget Branding & Customizer */}
+          {/* STEP 2: Branding */}
           {step === 2 && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
-              {/* Left: Customizer controls */}
-              <div className="space-y-5">
-                <div>
-                  <h2 className="text-base font-semibold text-white">Customize your Live Chat</h2>
-                  <p className="text-xs text-slate-400 mt-0.5">Match the widget with your company&apos;s brand look and feel.</p>
-                </div>
+            <div className="animate-rise">
+              <h1 className="text-[1.9rem] leading-tight font-semibold">
+                Make it look like you
+              </h1>
+              <p className="mt-2 text-[14.5px] text-ink-2">
+                Everything below updates the preview in real time.
+              </p>
 
-                {/* Color presets */}
-                <div>
-                  <label className="block text-xs font-medium text-slate-300 mb-2">
-                    Primary Brand Color
-                  </label>
-                  <div className="flex items-center gap-2.5 flex-wrap">
-                    {PRESET_COLORS.map((c) => (
-                      <button
-                        key={c.hex}
-                        type="button"
-                        onClick={() => setBrandColor(c.hex)}
-                        className={`w-7 h-7 rounded-full flex items-center justify-center transition-transform ${brandColor === c.hex ? 'scale-125 ring-2 ring-white ring-offset-2 ring-offset-slate-900' : 'hover:scale-110'}`}
-                        style={{ backgroundColor: c.hex }}
-                        title={c.name}
-                      >
-                        {brandColor === c.hex && <Check className="w-3.5 h-3.5 text-white" />}
-                      </button>
-                    ))}
-                    <div className="flex items-center gap-1.5 ml-2 bg-slate-900 border border-slate-700/80 rounded-lg px-2 py-1">
-                      <input
-                        type="color"
-                        value={brandColor}
-                        onChange={(e) => setBrandColor(e.target.value)}
-                        className="w-5 h-5 bg-transparent border-0 cursor-pointer rounded"
-                      />
-                      <span className="font-mono text-xs text-slate-300">{brandColor}</span>
+              <div className="mt-8 grid md:grid-cols-[1fr_280px] gap-6 items-start">
+                <div className="card p-7 space-y-6">
+                  <div>
+                    <span className="field-label">Brand colour</span>
+                    <div className="flex items-center gap-2.5 flex-wrap">
+                      {PRESET_COLORS.map((c) => (
+                        <button
+                          key={c.hex}
+                          type="button"
+                          onClick={() => setBrandColor(c.hex)}
+                          title={c.name}
+                          aria-label={c.name}
+                          aria-pressed={brandColor === c.hex}
+                          className={`w-8 h-8 rounded-full flex items-center justify-center transition-transform duration-150 ${
+                            brandColor === c.hex
+                              ? 'ring-2 ring-offset-2 ring-ink ring-offset-[var(--ds-surface)]'
+                              : 'hover:scale-110'
+                          }`}
+                          style={{ backgroundColor: c.hex }}
+                        >
+                          {brandColor === c.hex && (
+                            <Check className="w-3.5 h-3.5 text-white" />
+                          )}
+                        </button>
+                      ))}
+
+                      <label className="flex items-center gap-2 h-9 px-2.5 rounded-lg border border-line-2 bg-surface-2 cursor-pointer">
+                        <input
+                          type="color"
+                          value={brandColor}
+                          onChange={(e) => setBrandColor(e.target.value)}
+                          className="w-5 h-5 bg-transparent border-0 cursor-pointer rounded p-0"
+                          aria-label="Custom brand colour"
+                        />
+                        <span className="font-mono text-[12px] text-ink-2 uppercase">
+                          {brandColor}
+                        </span>
+                      </label>
                     </div>
+                  </div>
+
+                  <div>
+                    <label htmlFor="gt" className="field-label">
+                      Messenger title
+                    </label>
+                    <input
+                      id="gt"
+                      type="text"
+                      value={greetingTitle}
+                      onChange={(e) => setGreetingTitle(e.target.value)}
+                      className="input"
+                    />
+                  </div>
+
+                  <div>
+                    <label htmlFor="gm" className="field-label">
+                      Subtitle
+                    </label>
+                    <input
+                      id="gm"
+                      type="text"
+                      value={greetingMessage}
+                      onChange={(e) => setGreetingMessage(e.target.value)}
+                      className="input"
+                    />
                   </div>
                 </div>
 
-                {/* Header Title */}
-                <div>
-                  <label className="block text-xs font-medium text-slate-300 mb-1.5">
-                    Widget Header Title
-                  </label>
-                  <input
-                    type="text"
-                    value={greetingTitle}
-                    onChange={(e) => setGreetingTitle(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-900 border border-slate-700/80 rounded-xl text-sm text-white focus:outline-none focus:border-blue-500"
-                  />
-                </div>
+                {/* Live preview */}
+                <div className="panel p-4">
+                  <div className="eyebrow mb-3 flex items-center gap-1.5">
+                    <Sparkles className="w-3 h-3" />
+                    Live preview
+                  </div>
 
-                {/* Subtitle / Greeting */}
-                <div>
-                  <label className="block text-xs font-medium text-slate-300 mb-1.5">
-                    Welcome Subtitle
-                  </label>
-                  <input
-                    type="text"
-                    value={greetingMessage}
-                    onChange={(e) => setGreetingMessage(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-900 border border-slate-700/80 rounded-xl text-sm text-white focus:outline-none focus:border-blue-500"
-                  />
-                </div>
+                  <div className="rounded-2xl border border-line bg-surface shadow-lg overflow-hidden">
+                    <div
+                      className="px-4 pt-4 pb-5 text-white"
+                      style={{ backgroundColor: brandColor }}
+                    >
+                      <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-[12px] font-bold mb-2.5">
+                        {greetingTitle.charAt(0) || 'S'}
+                      </div>
+                      <div className="text-[14px] font-semibold leading-tight truncate">
+                        {greetingTitle || 'Support Team'}
+                      </div>
+                      <div className="text-[11px] opacity-80 mt-0.5 line-clamp-2">
+                        {greetingMessage}
+                      </div>
+                    </div>
 
-                <div className="pt-3 flex items-center justify-between">
-                  <button
-                    type="button"
-                    onClick={() => setStep(1)}
-                    className="text-xs text-slate-400 hover:text-white transition-colors"
-                  >
-                    ← Back
-                  </button>
-                  <button
-                    type="button"
-                    disabled={loading}
-                    onClick={handleCreateWorkspace}
-                    className="py-2.5 px-5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-semibold text-xs rounded-xl shadow-lg shadow-blue-600/30 flex items-center gap-2 transition-all cursor-pointer"
-                  >
-                    <span>{loading ? 'Creating Workspace...' : 'Finish & Generate Embed Code'}</span>
-                    <Sparkles className="w-4 h-4" />
-                  </button>
+                    <div className="p-3 space-y-2 min-h-[128px] flex flex-col justify-end">
+                      <div className="self-start max-w-[85%] rounded-2xl rounded-bl-md bg-surface-2 border border-line px-3 py-2 text-[11.5px] leading-relaxed">
+                        Hi! How can we help today?
+                      </div>
+                      <div
+                        className="self-end max-w-[85%] rounded-2xl rounded-br-md px-3 py-2 text-[11.5px] leading-relaxed text-white"
+                        style={{ backgroundColor: brandColor }}
+                      >
+                        A question about your plans!
+                      </div>
+                    </div>
+
+                    <div className="p-2.5 border-t border-line flex items-center gap-2">
+                      <div className="flex-1 h-8 rounded-lg border border-line bg-surface-2 flex items-center px-2.5 text-[11px] text-ink-3">
+                        Type a message…
+                      </div>
+                      <div
+                        className="w-8 h-8 rounded-lg flex items-center justify-center text-white shrink-0"
+                        style={{ backgroundColor: brandColor }}
+                      >
+                        <Send className="w-3.5 h-3.5" />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 flex items-center justify-between">
+                    <span className="text-[11.5px] text-ink-3">Launcher</span>
+                    <div
+                      className="w-12 h-12 rounded-full flex items-center justify-center p-2.5 shadow-lg transition-transform hover:scale-105"
+                      style={{ backgroundColor: brandColor }}
+                    >
+                      <img
+                        src="/chat-icon.png"
+                        alt="Chat"
+                        className="w-full h-full object-contain filter drop-shadow-sm"
+                      />
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              {/* Right: Live Interactive Widget Preview */}
-              <div className="bg-[#090d16] border border-slate-800 rounded-2xl p-4 flex flex-col items-center justify-center select-none">
-                <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-1.5">
-                  <Sparkles className="w-3.5 h-3.5 text-blue-400" />
-                  <span>Live Preview</span>
-                </div>
-
-                {/* Mock Widget Card */}
-                <div className="w-full max-w-[280px] bg-[#0f172a] border border-slate-700/60 rounded-2xl shadow-xl overflow-hidden flex flex-col">
-                  {/* Header */}
-                  <div className="p-3.5 border-b border-slate-800 flex items-center justify-between bg-slate-900/60">
-                    <div className="flex items-center gap-2.5">
-                      <div
-                        className="w-8 h-8 rounded-xl flex items-center justify-center font-bold text-white text-xs shadow"
-                        style={{ backgroundColor: brandColor }}
-                      >
-                        {greetingTitle.charAt(0)}
-                      </div>
-                      <div>
-                        <div className="text-xs font-bold text-white truncate max-w-[150px]">
-                          {greetingTitle}
-                        </div>
-                        <div className="text-[10px] text-slate-400 truncate max-w-[150px]">
-                          {greetingMessage}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Body Preview */}
-                  <div className="p-3 space-y-2 bg-[#090d16] min-h-[140px] flex flex-col justify-end text-[11px]">
-                    <div className="bg-slate-800 text-slate-200 p-2 rounded-xl rounded-bl-none max-w-[85%] border border-slate-700/50">
-                      Hello! How can we help your business today?
-                    </div>
-                    <div
-                      className="text-white p-2 rounded-xl rounded-br-none max-w-[85%] self-end shadow"
-                      style={{ backgroundColor: brandColor }}
-                    >
-                      I have a question about your plans!
-                    </div>
-                  </div>
-
-                  {/* Input Mock */}
-                  <div className="p-2 border-t border-slate-800 bg-[#0f172a] flex items-center gap-1.5 text-xs text-slate-500">
-                    <div className="flex-1 bg-slate-900 px-2.5 py-1.5 rounded-lg border border-slate-800 text-[11px]">
-                      Send a message...
-                    </div>
-                    <div
-                      className="w-7 h-7 rounded-lg flex items-center justify-center text-white"
-                      style={{ backgroundColor: brandColor }}
-                    >
-                      <ArrowRight className="w-3.5 h-3.5" />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Mock Floating Bubble */}
-                <div className="mt-4 flex items-center gap-2">
-                  <span className="text-[11px] text-slate-400">Floating Button:</span>
-                  <div
-                    className="w-10 h-10 rounded-full flex items-center justify-center text-white shadow-lg"
-                    style={{ backgroundColor: brandColor }}
-                  >
-                    <MessageSquare className="w-5 h-5" />
-                  </div>
-                </div>
+              <div className="mt-6 flex items-center justify-between">
+                <button
+                  type="button"
+                  onClick={() => setStep(1)}
+                  className="btn btn-ghost"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                  Back
+                </button>
+                <button
+                  type="button"
+                  disabled={loading}
+                  onClick={handleCreateWorkspace}
+                  className="btn btn-lg btn-primary"
+                >
+                  {loading ? (
+                    <>
+                      <span className="w-4 h-4 rounded-full border-2 border-current border-t-transparent animate-spin-slow" />
+                      Creating workspace…
+                    </>
+                  ) : (
+                    <>
+                      Create workspace
+                      <ArrowRight className="w-4 h-4" />
+                    </>
+                  )}
+                </button>
               </div>
             </div>
           )}
 
-          {/* STEP 3: Embed Script & Platform Guides */}
+          {/* STEP 3: Install */}
           {step === 3 && (
-            <div className="space-y-6">
-              <div className="text-center py-2">
-                <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 mb-2">
-                  <Check className="w-6 h-6" />
-                </div>
-                <h2 className="text-lg font-bold text-white">Your Workspace is Ready!</h2>
-                <p className="text-xs text-slate-400 max-w-md mx-auto mt-1">
-                  Install this 1-line script tag on <span className="text-blue-400 font-semibold">{businessName}</span> to launch live chat immediately.
-                </p>
+            <div className="animate-rise">
+              <div className="w-11 h-11 rounded-xl bg-success-soft border border-success-line text-success flex items-center justify-center">
+                <Check className="w-5 h-5" />
               </div>
+              <h1 className="mt-5 text-[1.9rem] leading-tight font-semibold">
+                {businessName} is ready
+              </h1>
+              <p className="mt-2 text-[14.5px] text-ink-2 max-w-lg">
+                Paste this snippet on your site — anywhere before the closing{' '}
+                <code className="font-mono text-[13px] text-ink">
+                  &lt;/body&gt;
+                </code>{' '}
+                tag — and live chat is on.
+              </p>
 
-              {/* Code Box */}
-              <div className="relative">
-                <div className="flex items-center justify-between px-3 py-2 bg-slate-900 border-t border-x border-slate-700/80 rounded-t-xl text-xs text-slate-400">
-                  <div className="flex items-center gap-2">
-                    <Code2 className="w-4 h-4 text-blue-400" />
-                    <span className="font-mono">HTML Embed Code (Paste in &lt;head&gt; or &lt;body&gt;)</span>
-                  </div>
+              <div className="mt-8 card overflow-hidden">
+                <div className="h-11 px-4 flex items-center justify-between border-b border-line bg-surface-2">
+                  <span className="font-mono text-[11.5px] text-ink-3">
+                    Embed code
+                  </span>
                   <button
                     onClick={copyToClipboard}
-                    className="flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300 font-semibold transition-colors"
+                    className="btn btn-sm btn-secondary"
                   >
-                    {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                    <span>{copied ? 'Copied!' : 'Copy Code'}</span>
+                    {copied ? (
+                      <>
+                        <Check className="w-3.5 h-3.5 text-success" />
+                        Copied
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-3.5 h-3.5" />
+                        Copy
+                      </>
+                    )}
                   </button>
                 </div>
-                <pre className="p-4 bg-[#070b14] border border-slate-700/80 rounded-b-xl text-xs font-mono text-blue-300 overflow-x-auto selection:bg-blue-600 selection:text-white">
+                <pre className="code-block rounded-none border-0">
                   {getEmbedSnippet()}
                 </pre>
               </div>
 
-              {/* Installation CMS Cards */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
-                <div className="p-3.5 rounded-xl bg-slate-900/80 border border-slate-800 space-y-1">
-                  <div className="font-bold text-white flex items-center gap-1.5">
-                    <span>WordPress</span>
+              <div className="mt-4 grid sm:grid-cols-3 gap-3">
+                {[
+                  {
+                    h: 'WordPress',
+                    b: 'Use any "Insert Headers and Footers" plugin, or your child theme\'s footer.php.',
+                  },
+                  {
+                    h: 'Shopify',
+                    b: 'Online Store → Themes → Edit code → paste before </body> in theme.liquid.',
+                  },
+                  {
+                    h: 'Next.js / React',
+                    b: 'Add a <Script src="…" /> tag inside your root layout.tsx.',
+                  },
+                ].map((c) => (
+                  <div key={c.h} className="panel p-4">
+                    <div className="text-[13px] font-semibold">{c.h}</div>
+                    <p className="mt-1.5 text-[12px] leading-relaxed text-ink-2">
+                      {c.b}
+                    </p>
                   </div>
-                  <p className="text-[11px] text-slate-400">
-                    Use any &quot;Insert Headers and Footers&quot; plugin or paste into your child theme&apos;s <code className="text-slate-300 font-mono">footer.php</code>.
-                  </p>
-                </div>
-
-                <div className="p-3.5 rounded-xl bg-slate-900/80 border border-slate-800 space-y-1">
-                  <div className="font-bold text-white flex items-center gap-1.5">
-                    <span>Shopify</span>
-                  </div>
-                  <p className="text-[11px] text-slate-400">
-                    Go to Online Store &gt; Themes &gt; Edit Code, and paste before the <code className="text-slate-300 font-mono">&lt;/body&gt;</code> tag in <code className="text-slate-300 font-mono">theme.liquid</code>.
-                  </p>
-                </div>
-
-                <div className="p-3.5 rounded-xl bg-slate-900/80 border border-slate-800 space-y-1">
-                  <div className="font-bold text-white flex items-center gap-1.5">
-                    <span>Next.js / React</span>
-                  </div>
-                  <p className="text-[11px] text-slate-400">
-                    Add via Next.js <code className="text-slate-300 font-mono">&lt;Script src=&quot;...&quot; /&gt;</code> component inside your root <code className="text-slate-300 font-mono">layout.tsx</code>.
-                  </p>
-                </div>
+                ))}
               </div>
 
-              {/* Bottom Actions */}
-              <div className="pt-4 flex items-center justify-between border-t border-slate-800">
+              <div className="mt-8 pt-6 border-t border-line flex flex-col sm:flex-row items-center justify-between gap-3">
                 <a
                   href={`/demo.html?workspaceId=${createdWorkspaceId || ''}&name=${encodeURIComponent(businessName)}`}
                   target="_blank"
                   rel="noreferrer"
-                  className="flex items-center gap-1.5 text-xs text-blue-400 hover:text-blue-300 font-semibold transition-colors"
+                  className="btn btn-secondary w-full sm:w-auto"
                 >
                   <ExternalLink className="w-3.5 h-3.5" />
-                  <span>Test in Customer Simulator</span>
+                  Test in simulator
                 </a>
 
                 <button
                   type="button"
                   onClick={() => router.push('/dashboard')}
-                  className="py-2.5 px-6 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-semibold text-xs rounded-xl shadow-lg shadow-blue-600/30 flex items-center gap-2 transition-all cursor-pointer"
+                  className="btn btn-lg btn-primary w-full sm:w-auto"
                 >
-                  <span>Go to Agent Inbox</span>
+                  Go to inbox
                   <ArrowRight className="w-4 h-4" />
                 </button>
               </div>
             </div>
           )}
         </div>
-      </div>
+      </main>
     </div>
   );
 }

@@ -461,8 +461,9 @@
       <button class="sim-action-btn" onclick="resetVisitorSession()" title="Clears visitor cookie & localStorage so you can test as a brand new visitor">
         🔄 New Visitor Session
       </button>
-      <button class="sim-action-btn" onclick="openChatBubble()">
-        💬 Open Chat Bubble
+      <button class="sim-action-btn" onclick="openChatBubble()" style="display:inline-flex;align-items:center;gap:6px;">
+        <img src="/chat-icon.png" alt="Chat" style="width:16px;height:16px;object-fit:contain;" />
+        <span>Open Chat Bubble</span>
       </button>
       <a href="/dashboard" class="sim-action-btn sim-btn-dash">
         ← Agent Dashboard
@@ -474,7 +475,9 @@
   <header>
     <div class="nav-container">
       <a href="#" class="brand" id="simBrandName">
-        <div class="brand-logo" id="simBrandLogo">💬</div>
+        <div class="brand-logo" id="simBrandLogo" style="display:flex;align-items:center;justify-content:center;padding:3px;">
+          <img src="/chat-icon.png" alt="Logo" style="width:24px;height:24px;object-fit:contain;" />
+        </div>
         <span id="simBrandTitle">Nova Cloud Platform</span>
       </a>
 

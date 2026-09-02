@@ -1,31 +1,32 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
-import { 
-  Send, 
-  UserCheck, 
-  Clock, 
-  CheckCircle2, 
-  ExternalLink, 
-  Sparkles, 
-  Bot, 
-  Globe, 
-  MessageSquareQuote,
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import {
   Check,
   CheckCheck,
+  CheckCircle2,
+  ExternalLink,
   Lock,
-  EyeOff,
-  Zap,
-  Tag,
-  Flag,
-  AlertTriangle,
-  Star,
   Plus,
-  X
+  RotateCcw,
+  Send,
+  Sparkles,
+  Star,
+  Tag,
+  X,
+  Zap,
 } from 'lucide-react';
-import { Conversation, Message, Agent, ConversationStatus, ConversationPriority } from '@/types/database';
-import { formatTime, formatTimeAgo } from '@/lib/utils';
+import {
+  Agent,
+  Conversation,
+  ConversationPriority,
+  ConversationStatus,
+  Message,
+} from '@/types/database';
+import { formatTime, formatTimeAgo, cn } from '@/lib/utils';
 import { sound } from '@/lib/sound';
+import { Avatar } from '@/components/ui/Avatar';
+import { Menu } from '@/components/ui/Menu';
 
 interface ChatThreadProps {
   conversation: Conversation;
@@ -46,14 +47,45 @@ interface CannedItem {
 }
 
 const DEFAULT_MACROS: CannedItem[] = [
-  { shortcut: 'hello', title: 'Warm Greeting', content: 'Hello! Welcome to our support desk. How can I help you today?' },
-  { shortcut: 'pricing', title: 'Pricing Overview', content: 'Our plans start at $29/mo with unlimited chats. You can view all features on our pricing page!' },
+  { shortcut: 'hello', title: 'Warm greeting', content: 'Hello! Welcome to our support desk. How can I help you today?' },
+  { shortcut: 'pricing', title: 'Pricing overview', content: 'Our plans start at $29/mo with unlimited chats. You can view all features on our pricing page!' },
   { shortcut: 'wait', title: 'Investigating', content: 'Thank you for your patience! I am looking into your inquiry right now and will update you in just a moment.' },
-  { shortcut: 'solved', title: 'Issue Resolved', content: 'I have resolved this issue for you! Please let me know if there is anything else I can assist with today.' },
-  { shortcut: 'refund', title: 'Refund Policy', content: 'We offer a 100% money-back guarantee within 14 days of purchase. Would you like me to process that for you?' },
+  { shortcut: 'solved', title: 'Issue resolved', content: 'I have resolved this issue for you! Please let me know if there is anything else I can assist with today.' },
+  { shortcut: 'refund', title: 'Refund policy', content: 'We offer a 100% money-back guarantee within 14 days of purchase. Would you like me to process that for you?' },
 ];
 
-const PRESET_TAGS = ['VIP', 'Billing', 'Bug', 'Sales Lead', 'Feature Request', 'Urgent'];
+const PRESET_TAGS = ['VIP', 'Billing', 'Bug', 'Sales lead', 'Feature request', 'Urgent'];
+
+const PRIORITY_OPTIONS: { value: ConversationPriority; label: string; dot: string }[] = [
+  { value: 'low', label: 'Low', dot: 'var(--ds-line-3)' },
+  { value: 'normal', label: 'Normal', dot: 'var(--ds-accent)' },
+  { value: 'high', label: 'High', dot: 'var(--ds-warn)' },
+  { value: 'urgent', label: 'Urgent', dot: 'var(--ds-danger)' },
+];
+
+const STATUS_OPTIONS: { value: ConversationStatus; label: string; dot: string }[] = [
+  { value: 'open', label: 'Open', dot: 'var(--ds-success)' },
+  { value: 'pending', label: 'Pending', dot: 'var(--ds-warn)' },
+  { value: 'closed', label: 'Resolved', dot: 'var(--ds-line-3)' },
+];
+
+/** Groups consecutive messages into calendar days for the date separators. */
+function dayKey(iso: string) {
+  return new Date(iso).toDateString();
+}
+
+function dayLabel(iso: string) {
+  const d = new Date(iso);
+  const today = new Date().toDateString();
+  const yesterday = new Date(Date.now() - 86_400_000).toDateString();
+  if (d.toDateString() === today) return 'Today';
+  if (d.toDateString() === yesterday) return 'Yesterday';
+  return d.toLocaleDateString(undefined, {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+  });
+}
 
 export function ChatThread({
   conversation,
@@ -66,40 +98,47 @@ export function ChatThread({
   onUpdatePriority,
   onUpdateTags,
 }: ChatThreadProps) {
-  // Composer Mode: 'reply' (sent to customer) vs 'internal' (yellow team note)
   const [composerMode, setComposerMode] = useState<'reply' | 'internal'>('reply');
   const [inputText, setInputText] = useState('');
   const [isSending, setIsSending] = useState(false);
 
-  // Canned Responses / Macro popover
   const [showMacros, setShowMacros] = useState(false);
   const [macroSearch, setMacroSearch] = useState('');
 
-  // Tag manager popover
   const [showTagPicker, setShowTagPicker] = useState(false);
   const [customTagInput, setCustomTagInput] = useState('');
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
+  const tagPickerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    scrollToBottom();
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Handle keyboard typing & detect `#` shortcut for macros
+  // Close the tag popover on an outside click.
+  useEffect(() => {
+    if (!showTagPicker) return;
+    const onDown = (e: MouseEvent) => {
+      if (!tagPickerRef.current?.contains(e.target as Node)) setShowTagPicker(false);
+    };
+    document.addEventListener('mousedown', onDown);
+    return () => document.removeEventListener('mousedown', onDown);
+  }, [showTagPicker]);
+
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const val = e.target.value;
     setInputText(val);
 
-    // If user types `#` as first character or after space, open macro popover
+    // `#` at the end opens the saved-reply palette.
     if (val.endsWith('#')) {
       setShowMacros(true);
       setMacroSearch('');
     }
+
+    const el = e.target;
+    el.style.height = 'auto';
+    el.style.height = `${Math.min(el.scrollHeight, 160)}px`;
   };
 
   const handleSend = async () => {
@@ -130,15 +169,17 @@ export function ChatThread({
       e.preventDefault();
       handleSend();
     }
+    if (e.key === 'Escape') setShowMacros(false);
   };
 
   const insertMacro = (macro: CannedItem) => {
-    // If text ends with `#`, replace the `#` with the content
-    if (inputText.endsWith('#')) {
-      setInputText((prev) => prev.slice(0, -1) + macro.content);
-    } else {
-      setInputText((prev) => (prev ? `${prev} ${macro.content}` : macro.content));
-    }
+    setInputText((prev) =>
+      prev.endsWith('#')
+        ? prev.slice(0, -1) + macro.content
+        : prev
+        ? `${prev} ${macro.content}`
+        : macro.content
+    );
     setShowMacros(false);
     textareaRef.current?.focus();
   };
@@ -146,240 +187,333 @@ export function ChatThread({
   const handleToggleTag = (tag: string) => {
     if (!onUpdateTags) return;
     const currentTags = conversation.tags || [];
-    let updated: string[];
-    if (currentTags.includes(tag)) {
-      updated = currentTags.filter((t) => t !== tag);
-    } else {
-      updated = [...currentTags, tag];
-    }
-    onUpdateTags(updated);
+    onUpdateTags(
+      currentTags.includes(tag)
+        ? currentTags.filter((t) => t !== tag)
+        : [...currentTags, tag]
+    );
   };
 
   const handleAddCustomTag = () => {
     if (!customTagInput.trim() || !onUpdateTags) return;
     const clean = customTagInput.trim();
     const currentTags = conversation.tags || [];
-    if (!currentTags.includes(clean)) {
-      onUpdateTags([...currentTags, clean]);
-    }
+    if (!currentTags.includes(clean)) onUpdateTags([...currentTags, clean]);
     setCustomTagInput('');
     setShowTagPicker(false);
   };
 
   const visitor = conversation.visitor;
-  const displayName = visitor?.name || (visitor?.email ? visitor.email.split('@')[0] : `Visitor #${conversation.visitor_id.slice(0, 6)}`);
-  
-  const isOnline = visitor?.last_seen 
-    ? (new Date().getTime() - new Date(visitor.last_seen).getTime()) / 1000 < 60
+  const displayName =
+    visitor?.name ||
+    (visitor?.email
+      ? visitor.email.split('@')[0]
+      : `Visitor ${conversation.visitor_id.slice(0, 6)}`);
+
+  const isOnline = visitor?.last_seen
+    ? (Date.now() - new Date(visitor.last_seen).getTime()) / 1000 < 60
     : false;
 
   const currentPriority: ConversationPriority = conversation.priority || 'normal';
+  const isInternalMode = composerMode === 'internal';
 
-  const filteredMacros = DEFAULT_MACROS.filter(
-    (m) =>
-      m.shortcut.toLowerCase().includes(macroSearch.toLowerCase()) ||
-      m.title.toLowerCase().includes(macroSearch.toLowerCase()) ||
-      m.content.toLowerCase().includes(macroSearch.toLowerCase())
+  const filteredMacros = useMemo(() => {
+    const q = macroSearch.toLowerCase();
+    return DEFAULT_MACROS.filter(
+      (m) =>
+        m.shortcut.toLowerCase().includes(q) ||
+        m.title.toLowerCase().includes(q) ||
+        m.content.toLowerCase().includes(q)
+    );
+  }, [macroSearch]);
+
+  const assignOptions = useMemo(
+    () => [
+      { value: '', label: 'Unassigned' },
+      ...agentsList.map((a) => ({
+        value: a.id,
+        label: a.id === currentAgent?.id ? `${a.name} (you)` : a.name,
+        dot:
+          a.status === 'online'
+            ? 'var(--ds-success)'
+            : a.status === 'away'
+            ? 'var(--ds-warn)'
+            : 'var(--ds-line-3)',
+      })),
+    ],
+    [agentsList, currentAgent?.id]
   );
 
-  return (
-    <div className="flex-1 flex flex-col h-screen bg-[#0b101d] overflow-hidden">
-      {/* Thread Header */}
-      <div className="px-6 py-3 border-b border-slate-800/80 bg-[#0d1424] flex items-center justify-between gap-4">
-        {/* Left: Visitor Identity & URL */}
-        <div className="flex items-center gap-3 min-w-0">
-          <div className="relative flex-shrink-0">
-            <div className="w-10 h-10 rounded-full bg-blue-600/20 border border-blue-500/30 text-blue-400 flex items-center justify-center font-bold text-sm">
-              {displayName.charAt(0).toUpperCase()}
-            </div>
-            {isOnline && (
-              <span className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-emerald-500 ring-2 ring-[#0d1424]" />
+  // Render list with day separators injected between calendar days.
+  const rendered: React.ReactNode[] = [];
+  let lastDay = '';
+
+  messages.forEach((msg) => {
+    const key = dayKey(msg.created_at);
+    if (key !== lastDay) {
+      lastDay = key;
+      rendered.push(
+        <div key={`day-${key}`} className="flex items-center gap-3 py-2">
+          <span className="flex-1 h-px bg-line" />
+          <span className="text-[11px] font-medium text-ink-3">
+            {dayLabel(msg.created_at)}
+          </span>
+          <span className="flex-1 h-px bg-line" />
+        </div>
+      );
+    }
+
+    if (msg.is_internal) {
+      rendered.push(
+        <div
+          key={msg.id}
+          className="rounded-xl border border-warn-line bg-warn-soft px-4 py-3"
+        >
+          <div className="flex items-center justify-between gap-3 mb-1.5">
+            <span className="inline-flex items-center gap-1.5 text-[11.5px] font-semibold text-warn">
+              <Lock className="w-3.5 h-3.5" />
+              Internal note · {msg.agent?.name || 'Teammate'}
+            </span>
+            <span className="text-[11px] text-warn/70 tabular-nums">
+              {formatTime(msg.created_at)}
+            </span>
+          </div>
+          <p className="whitespace-pre-wrap text-[13.5px] leading-relaxed text-ink">
+            {msg.content}
+          </p>
+          <p className="mt-2 text-[11px] text-warn/80">
+            Only visible to your team — never sent to the visitor.
+          </p>
+        </div>
+      );
+      return;
+    }
+
+    const isAgent = msg.sender_type === 'agent';
+    const isAI = msg.sender_type === 'ai';
+
+    rendered.push(
+      <div
+        key={msg.id}
+        className={cn('flex gap-2.5', isAgent ? 'justify-end' : 'justify-start')}
+      >
+        {!isAgent && (
+          <Avatar
+            name={isAI ? 'AI' : displayName}
+            seed={isAI ? 'chatify-ai' : conversation.visitor_id}
+            size="xs"
+            className="mt-auto mb-1"
+          />
+        )}
+
+        <div className={cn('max-w-[min(560px,72%)]', isAgent && 'items-end')}>
+          <div
+            className={cn(
+              'px-4 py-2.5 text-[13.5px] leading-relaxed whitespace-pre-wrap break-words',
+              isAgent
+                ? 'rounded-2xl rounded-br-md bg-bubble-out text-bubble-out-ink shadow-sm'
+                : isAI
+                ? 'rounded-2xl rounded-bl-md bg-accent-soft border border-accent-line text-ink'
+                : 'rounded-2xl rounded-bl-md bg-surface-2 border border-line text-ink'
             )}
+          >
+            {isAI && (
+              <span className="flex items-center gap-1 mb-1 text-[10.5px] font-bold uppercase tracking-wide text-accent">
+                <Sparkles className="w-3 h-3" />
+                Chatify bot
+              </span>
+            )}
+            {msg.content}
           </div>
 
+          <div
+            className={cn(
+              'mt-1 flex items-center gap-1 px-1 text-[10.5px] text-ink-3',
+              isAgent && 'justify-end'
+            )}
+          >
+            <span className="tabular-nums">{formatTime(msg.created_at)}</span>
+            {isAgent &&
+              (msg.read_at ? (
+                <CheckCheck className="w-3 h-3 text-accent" aria-label="Read" />
+              ) : (
+                <Check className="w-3 h-3" aria-label="Delivered" />
+              ))}
+          </div>
+        </div>
+      </div>
+    );
+  });
+
+  return (
+    <div className="flex-1 min-w-0 h-screen flex flex-col bg-canvas">
+      {/* ── Header ── */}
+      <header className="shrink-0 px-5 h-16 flex items-center justify-between gap-4 border-b border-line bg-surface">
+        <div className="flex items-center gap-3 min-w-0">
+          <Avatar
+            name={displayName}
+            seed={conversation.visitor_id}
+            size="md"
+            online={isOnline}
+          />
           <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <h3 className="text-sm font-bold text-white tracking-tight truncate">{displayName}</h3>
+            <div className="flex items-center gap-2 min-w-0">
+              <h2 className="text-[15px] font-semibold tracking-tight truncate">
+                {displayName}
+              </h2>
               {visitor?.email && (
-                <span className="text-xs text-slate-400 font-normal truncate">({visitor.email})</span>
+                <span className="text-[12px] text-ink-3 truncate hidden lg:inline">
+                  {visitor.email}
+                </span>
               )}
             </div>
-            <div className="flex items-center gap-3 text-xs text-slate-400 mt-0.5 flex-wrap">
-              {visitor?.current_url && (
-                <a
-                  href={visitor.current_url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="flex items-center gap-1 text-slate-400 hover:text-blue-400 transition-colors max-w-[220px] truncate"
-                >
-                  <Globe className="w-3 h-3 text-slate-500 flex-shrink-0" />
-                  <span className="truncate">{visitor.current_url}</span>
-                  <ExternalLink className="w-2.5 h-2.5 opacity-60 flex-shrink-0" />
-                </a>
+            <div className="flex items-center gap-2 text-[11.5px] text-ink-3 min-w-0">
+              {isOnline ? (
+                <span className="inline-flex items-center gap-1.5 text-success font-medium shrink-0">
+                  <span className="live-dot" />
+                  Active now
+                </span>
+              ) : (
+                <span className="shrink-0">
+                  Active {formatTimeAgo(visitor?.last_seen || conversation.updated_at)}
+                </span>
               )}
-              <span>•</span>
-              <span className="text-[11px] text-slate-400">
-                {isOnline ? (
-                  <span className="text-emerald-400 font-medium">Active now</span>
-                ) : (
-                  <span>Active {formatTimeAgo(visitor?.last_seen || conversation.updated_at)}</span>
-                )}
-              </span>
+              {visitor?.current_url && (
+                <>
+                  <span aria-hidden>·</span>
+                  <a
+                    href={visitor.current_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1 hover:text-accent transition-colors truncate max-w-[240px]"
+                  >
+                    <span className="truncate">{visitor.current_url}</span>
+                    <ExternalLink className="w-2.5 h-2.5 shrink-0" />
+                  </a>
+                </>
+              )}
             </div>
           </div>
         </div>
 
-        {/* Right: Intercom Header Actions (Priority, Tags, Assign, Resolve) */}
-        <div className="flex items-center gap-2.5 flex-shrink-0">
-          {/* Priority Dropdown */}
-          <div className="relative">
-            <select
-              value={currentPriority}
-              onChange={(e) => onUpdatePriority && onUpdatePriority(e.target.value as ConversationPriority)}
-              className={`rounded-lg px-2.5 py-1 text-xs font-semibold focus:outline-none transition-all cursor-pointer border ${
-                currentPriority === 'urgent'
-                  ? 'bg-rose-500/15 text-rose-300 border-rose-500/40'
-                  : currentPriority === 'high'
-                  ? 'bg-amber-500/15 text-amber-300 border-amber-500/40'
-                  : currentPriority === 'low'
-                  ? 'bg-slate-800 text-slate-400 border-slate-700'
-                  : 'bg-blue-500/10 text-blue-300 border-blue-500/30'
-              }`}
-            >
-              <option value="low">⚪ Low Priority</option>
-              <option value="normal">🔵 Normal</option>
-              <option value="high">🟠 High Priority</option>
-              <option value="urgent">🔴 Urgent</option>
-            </select>
-          </div>
+        {/* Only status and the resolve action live up here. Priority and
+            assignment sit in the meta bar below, which can wrap — the header
+            cannot, and overflowed at common laptop widths. */}
+        <div className="flex items-center gap-2 shrink-0">
+          <Menu<ConversationStatus>
+            value={conversation.status}
+            options={STATUS_OPTIONS}
+            label="Status"
+            onChange={(v) => onUpdateStatus(v)}
+          />
 
-          {/* Assign Agent Dropdown */}
-          <div className="relative">
-            <select
-              value={conversation.agent_id || ''}
-              onChange={(e) => onAssignAgent(e.target.value || null)}
-              className="bg-slate-900 border border-slate-700/80 rounded-lg px-2.5 py-1 text-xs text-slate-200 focus:outline-none focus:border-blue-500 transition-colors cursor-pointer"
-            >
-              <option value="">Unassigned</option>
-              {agentsList.map((ag) => (
-                <option key={ag.id} value={ag.id}>
-                  {ag.name} {ag.id === currentAgent?.id ? '(Me)' : ''}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Status Dropdown */}
-          <div className="relative">
-            <select
-              value={conversation.status}
-              onChange={(e) => onUpdateStatus(e.target.value as ConversationStatus)}
-              className={`rounded-lg px-2.5 py-1 text-xs font-semibold focus:outline-none transition-all cursor-pointer border ${
-                conversation.status === 'open'
-                  ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
-                  : conversation.status === 'pending'
-                  ? 'bg-amber-500/10 text-amber-400 border-amber-500/30'
-                  : 'bg-slate-800 text-slate-300 border-slate-700'
-              }`}
-            >
-              <option value="open">🟢 Open</option>
-              <option value="pending">🟡 Pending</option>
-              <option value="closed">⚪ Closed</option>
-            </select>
-          </div>
-
-          {/* 1-Click Resolve Button */}
           {conversation.status !== 'closed' ? (
             <button
               onClick={() => onUpdateStatus('closed')}
-              className="px-3 py-1 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 border border-emerald-500/30 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
-              title="Close and resolve conversation"
+              className="btn btn-sm btn-primary"
+              title="Close and resolve this conversation"
             >
               <CheckCircle2 className="w-3.5 h-3.5" />
-              <span>Resolve</span>
+              <span className="hidden sm:inline">Resolve</span>
             </button>
           ) : (
             <button
               onClick={() => onUpdateStatus('open')}
-              className="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+              className="btn btn-sm btn-secondary"
             >
-              <span>Reopen</span>
+              <RotateCcw className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Reopen</span>
             </button>
           )}
         </div>
-      </div>
+      </header>
 
-      {/* Tags Bar */}
-      <div className="px-6 py-1.5 bg-[#0a0f1d] border-b border-slate-800/60 flex items-center justify-between text-xs">
-        <div className="flex items-center gap-1.5 flex-wrap">
-          <Tag className="w-3.5 h-3.5 text-slate-500 flex-shrink-0" />
-          <span className="text-[11px] text-slate-500 font-medium">Tags:</span>
+      {/* ── Meta bar: priority, assignment, tags ── */}
+      <div className="shrink-0 px-5 py-2 flex items-center justify-between gap-3 flex-wrap border-b border-line bg-surface-2">
+        <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+          <Menu<ConversationPriority>
+            value={currentPriority}
+            options={PRIORITY_OPTIONS}
+            label="Priority"
+            align="start"
+            className="shrink-0"
+            onChange={(v) => onUpdatePriority?.(v)}
+          />
 
-          {(conversation.tags && conversation.tags.length > 0) ? (
+          <Menu<string>
+            value={conversation.agent_id || ''}
+            options={assignOptions}
+            label="Assignee"
+            align="start"
+            className="shrink-0"
+            onChange={(v) => onAssignAgent(v || null)}
+          />
+
+          <span className="w-px h-4 bg-line-2 mx-1" />
+
+          <Tag className="w-3.5 h-3.5 text-ink-3 shrink-0" />
+
+          {conversation.tags?.length ? (
             conversation.tags.map((t) => (
-              <span
-                key={t}
-                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-blue-500/15 border border-blue-500/30 text-blue-300 text-[11px] font-medium"
-              >
-                <span>#{t}</span>
+              <span key={t} className="pill pill-accent group">
+                {t}
                 <button
                   onClick={() => handleToggleTag(t)}
-                  className="hover:text-white"
-                  title="Remove tag"
+                  aria-label={`Remove tag ${t}`}
+                  className="opacity-50 hover:opacity-100 transition-opacity"
                 >
                   <X className="w-2.5 h-2.5" />
                 </button>
               </span>
             ))
           ) : (
-            <span className="text-[11px] text-slate-500 italic">No tags</span>
+            <span className="text-[11.5px] text-ink-3">No tags</span>
           )}
 
-          {/* Add Tag Popover Toggle */}
-          <div className="relative">
+          <div ref={tagPickerRef} className="relative">
             <button
-              onClick={() => setShowTagPicker(!showTagPicker)}
-              className="px-1.5 py-0.5 rounded hover:bg-slate-800 text-slate-400 hover:text-slate-200 text-[11px] font-medium flex items-center gap-0.5 transition-colors"
+              onClick={() => setShowTagPicker((s) => !s)}
+              className="inline-flex items-center gap-1 h-[22px] px-2 rounded-full border border-dashed border-line-2 text-[11px] font-medium text-ink-3 hover:text-ink hover:border-line-3 transition-colors"
             >
               <Plus className="w-3 h-3" />
-              <span>Add</span>
+              Add
             </button>
 
             {showTagPicker && (
-              <div className="absolute top-full left-0 mt-1 w-48 bg-slate-900 border border-slate-800 rounded-xl shadow-2xl p-2 z-50 text-xs">
-                <div className="font-semibold text-slate-400 text-[10px] uppercase mb-1.5">
-                  Select or Type Tag
-                </div>
-                <div className="space-y-1 mb-2">
+              <div className="absolute top-[calc(100%+6px)] left-0 z-50 w-56 p-2 rounded-xl border border-line bg-surface shadow-lg animate-pop">
+                <div className="eyebrow px-1.5 pb-1.5">Tags</div>
+                <div className="space-y-0.5 mb-2">
                   {PRESET_TAGS.map((pt) => {
                     const active = (conversation.tags || []).includes(pt);
                     return (
                       <button
                         key={pt}
                         onClick={() => handleToggleTag(pt)}
-                        className={`w-full text-left px-2 py-1 rounded text-xs transition-colors flex items-center justify-between ${
-                          active ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-slate-800'
-                        }`}
+                        className={cn(
+                          'w-full flex items-center justify-between px-2 py-1.5 rounded-lg text-[12.5px] transition-colors',
+                          active
+                            ? 'bg-accent-soft text-accent font-medium'
+                            : 'text-ink hover:bg-surface-3'
+                        )}
                       >
-                        <span>#{pt}</span>
-                        {active && <Check className="w-3 h-3" />}
+                        {pt}
+                        {active && <Check className="w-3.5 h-3.5" />}
                       </button>
                     );
                   })}
                 </div>
-
-                <div className="pt-1.5 border-t border-slate-800 flex items-center gap-1">
+                <div className="pt-2 border-t border-line flex items-center gap-1.5">
                   <input
                     type="text"
-                    placeholder="Custom tag..."
+                    placeholder="Custom tag"
                     value={customTagInput}
                     onChange={(e) => setCustomTagInput(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && handleAddCustomTag()}
-                    className="w-full bg-slate-950 border border-slate-800 rounded px-2 py-1 text-[11px] text-slate-200 focus:outline-none focus:border-blue-500"
+                    className="input input-sm flex-1"
                   />
                   <button
                     onClick={handleAddCustomTag}
-                    className="px-2 py-1 bg-blue-600 hover:bg-blue-500 text-white rounded text-[11px] font-semibold"
+                    className="btn btn-sm btn-primary shrink-0"
                   >
                     Add
                   </button>
@@ -389,148 +523,76 @@ export function ChatThread({
           </div>
         </div>
 
-        {/* Post-Chat CSAT rating badge if present */}
         {conversation.csat_rating && (
-          <div className="flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-300 text-[11px] font-semibold">
-            <Star className="w-3 h-3 text-amber-400 fill-amber-400" />
-            <span>CSAT: {conversation.csat_rating}/5</span>
+          <span className="pill pill-warn shrink-0">
+            <Star className="w-3 h-3 fill-current" />
+            CSAT {conversation.csat_rating}/5
             {conversation.csat_feedback && (
-              <span className="font-normal italic text-amber-200/80">({conversation.csat_feedback})</span>
+              <span className="font-normal opacity-80">
+                · {conversation.csat_feedback}
+              </span>
             )}
-          </div>
+          </span>
         )}
       </div>
 
-      {/* Messages Stream */}
-      <div className="flex-1 overflow-y-auto p-6 space-y-4">
-        <div className="text-center py-2">
-          <span className="text-[11px] text-slate-400 bg-slate-900/60 border border-slate-800/80 px-3 py-1 rounded-full">
-            Conversation opened • {formatTimeAgo(conversation.created_at)}
+      {/* ── Messages ── */}
+      <div className="flex-1 overflow-y-auto px-5 py-5 space-y-3.5">
+        <div className="flex justify-center">
+          <span className="pill pill-neutral">
+            Conversation opened {formatTimeAgo(conversation.created_at)}
           </span>
         </div>
-
-        {messages.map((msg) => {
-          // Intercom Internal Note (Yellow Team Note)
-          if (msg.is_internal) {
-            return (
-              <div
-                key={msg.id}
-                className="w-full my-2.5 p-3.5 rounded-xl bg-gradient-to-r from-amber-500/10 via-amber-600/10 to-amber-500/10 border border-amber-500/40 text-amber-100 shadow-sm"
-              >
-                <div className="flex items-center justify-between mb-1.5 text-amber-400 font-semibold text-xs">
-                  <span className="flex items-center gap-1.5">
-                    <Lock className="w-3.5 h-3.5" />
-                    <span>Internal Note • {msg.agent?.name || 'Teammate'}</span>
-                  </span>
-                  <span className="text-amber-400/70 font-normal text-[11px]">
-                    {formatTime(msg.created_at)}
-                  </span>
-                </div>
-                <p className="whitespace-pre-wrap leading-relaxed text-amber-100/90 text-sm font-normal">
-                  {msg.content}
-                </p>
-                <div className="mt-2 text-[10px] text-amber-400/60 flex items-center gap-1.5 pt-1.5 border-t border-amber-500/20">
-                  <EyeOff className="w-3 h-3" />
-                  <span>Hidden from visitor • Only visible to logged-in agents</span>
-                </div>
-              </div>
-            );
-          }
-
-          const isAgent = msg.sender_type === 'agent';
-          const isAI = msg.sender_type === 'ai';
-
-          return (
-            <div
-              key={msg.id}
-              className={`flex flex-col ${isAgent ? 'items-end' : 'items-start'}`}
-            >
-              <div className="flex items-end gap-2 max-w-[75%]">
-                {/* Visitor / AI Avatar */}
-                {!isAgent && (
-                  <div className="w-7 h-7 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-xs text-slate-300 flex-shrink-0 mb-1">
-                    {isAI ? <Bot className="w-4 h-4 text-purple-400" /> : displayName.charAt(0)}
-                  </div>
-                )}
-
-                <div
-                  className={`p-3.5 rounded-2xl text-sm leading-relaxed ${
-                    isAgent
-                      ? 'bg-gradient-to-tr from-blue-600 to-indigo-600 text-white rounded-br-none shadow-md shadow-blue-600/10'
-                      : isAI
-                      ? 'bg-purple-950/40 text-purple-200 border border-purple-800/40 rounded-bl-none'
-                      : 'bg-slate-800/90 text-slate-100 border border-slate-700/60 rounded-bl-none'
-                  }`}
-                >
-                  {isAI && (
-                    <div className="text-[10px] uppercase font-bold text-purple-400 mb-1 flex items-center gap-1">
-                      <Sparkles className="w-3 h-3" /> Chatify Bot
-                    </div>
-                  )}
-
-                  <p className="whitespace-pre-wrap break-words">{msg.content}</p>
-
-                  <div
-                    className={`mt-1.5 flex items-center justify-end gap-1 text-[10px] ${
-                      isAgent ? 'text-blue-200/80' : 'text-slate-400'
-                    }`}
-                  >
-                    <span>{formatTime(msg.created_at)}</span>
-                    {isAgent && (
-                      msg.read_at ? (
-                        <span title="Read by customer"><CheckCheck className="w-3 h-3 text-blue-200" /></span>
-                      ) : (
-                        <span title="Delivered"><Check className="w-3 h-3 text-blue-200/60" /></span>
-                      )
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-          );
-        })}
+        {rendered}
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Intercom Dual-Mode Composer Section */}
-      <div className="p-4 border-t border-slate-800/80 bg-[#0d1424] relative">
-        {/* Quick Canned Macros Popover */}
+      {/* ── Composer ── */}
+      <div className="shrink-0 px-5 py-3.5 border-t border-line bg-surface relative">
         {showMacros && (
-          <div className="absolute bottom-full mb-2 left-4 right-4 bg-slate-900 border border-slate-800 rounded-xl shadow-2xl p-3 z-50">
-            <div className="flex items-center justify-between mb-2">
-              <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
-                <Zap className="w-3.5 h-3.5 text-amber-400" />
-                <span>Quick Macros &amp; Saved Replies</span>
-              </div>
-              <span className="text-[10px] text-slate-500">Shortcut: Type #</span>
+          <div className="absolute bottom-[calc(100%-4px)] left-5 right-5 z-50 rounded-xl border border-line bg-surface shadow-xl p-2.5 animate-pop">
+            <div className="flex items-center justify-between mb-2 px-1">
+              <span className="eyebrow flex items-center gap-1.5">
+                <Zap className="w-3 h-3" />
+                Saved replies
+              </span>
+              <span className="text-[11px] text-ink-3">
+                Type <span className="kbd">#</span> to open
+              </span>
             </div>
 
             <input
               type="text"
-              placeholder="Search macros (e.g. pricing, refund, hello)..."
+              placeholder="Search replies…"
               value={macroSearch}
               onChange={(e) => setMacroSearch(e.target.value)}
-              className="w-full mb-2 px-2.5 py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+              className="input input-sm mb-2"
               autoFocus
             />
 
-            <div className="divide-y divide-slate-800/60 max-h-48 overflow-y-auto">
+            <div className="max-h-56 overflow-y-auto space-y-0.5">
               {filteredMacros.length === 0 ? (
-                <div className="py-3 text-center text-xs text-slate-500">No matching macros found</div>
+                <p className="py-4 text-center text-[12.5px] text-ink-3">
+                  No matching replies
+                </p>
               ) : (
                 filteredMacros.map((macro) => (
                   <button
                     key={macro.shortcut}
                     onClick={() => insertMacro(macro)}
-                    className="w-full text-left px-3 py-2 text-xs hover:bg-slate-800 rounded transition-colors group"
+                    className="w-full text-left px-2.5 py-2 rounded-lg hover:bg-surface-3 transition-colors group"
                   >
-                    <div className="flex items-center justify-between mb-0.5">
-                      <span className="font-semibold text-white group-hover:text-blue-400 transition-colors">
+                    <div className="flex items-baseline justify-between gap-2">
+                      <span className="text-[12.5px] font-semibold text-ink group-hover:text-accent transition-colors">
                         #{macro.shortcut}
                       </span>
-                      <span className="text-[10px] text-slate-500">{macro.title}</span>
+                      <span className="text-[11px] text-ink-3 shrink-0">
+                        {macro.title}
+                      </span>
                     </div>
-                    <p className="text-[11px] text-slate-400 truncate">{macro.content}</p>
+                    <p className="mt-0.5 text-[11.5px] text-ink-3 truncate">
+                      {macro.content}
+                    </p>
                   </button>
                 ))
               )}
@@ -538,90 +600,98 @@ export function ChatThread({
           </div>
         )}
 
-        {/* Dual Mode Tabs & Action Bar */}
-        <div className="flex items-center justify-between mb-2">
-          {/* Dual-Mode Selector: Reply vs Internal Note */}
-          <div className="flex items-center p-0.5 bg-slate-900 border border-slate-800 rounded-lg">
-            <button
-              onClick={() => setComposerMode('reply')}
-              className={`flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-medium transition-all ${
-                composerMode === 'reply'
-                  ? 'bg-blue-600 text-white shadow-sm'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              <span>💬 Reply</span>
-            </button>
-            <button
-              onClick={() => setComposerMode('internal')}
-              className={`flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-medium transition-all ${
-                composerMode === 'internal'
-                  ? 'bg-amber-600 text-white shadow-sm'
-                  : 'text-slate-400 hover:text-amber-400'
-              }`}
-            >
-              <Lock className="w-3 h-3" />
-              <span>Note (Internal)</span>
-            </button>
+        <div className="flex items-center justify-between mb-2.5">
+          <div className="inline-flex items-center gap-0.5 p-0.5 rounded-lg bg-surface-2 border border-line">
+            {(
+              [
+                ['reply', 'Reply'],
+                ['internal', 'Note'],
+              ] as const
+            ).map(([mode, label]) => (
+              <button
+                key={mode}
+                onClick={() => setComposerMode(mode)}
+                className={cn(
+                  'h-7 px-3 rounded-md text-[12px] font-semibold transition-colors inline-flex items-center gap-1.5',
+                  composerMode === mode
+                    ? mode === 'internal'
+                      ? 'bg-warn-soft text-warn shadow-xs'
+                      : 'bg-surface text-ink shadow-xs'
+                    : 'text-ink-3 hover:text-ink'
+                )}
+              >
+                {mode === 'internal' && <Lock className="w-3 h-3" />}
+                {label}
+              </button>
+            ))}
           </div>
 
-          {/* Right Toolbar: Quick macros button & Agent Indicator */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2.5">
             <button
-              onClick={() => setShowMacros(!showMacros)}
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-slate-900 hover:bg-slate-800 text-slate-300 text-xs transition-colors border border-slate-700/60"
+              onClick={() => setShowMacros((s) => !s)}
+              className="btn btn-sm btn-ghost"
             >
-              <Zap className="w-3.5 h-3.5 text-amber-400" />
-              <span>Macros (#)</span>
+              <Zap className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Saved replies</span>
             </button>
-
-            <span className="text-[11px] text-slate-500">
-              as <strong className="text-slate-300 font-semibold">{currentAgent?.name || 'Agent'}</strong>
+            <span className="text-[11.5px] text-ink-3 hidden md:inline">
+              as{' '}
+              <span className="font-medium text-ink-2">
+                {currentAgent?.name || 'Agent'}
+              </span>
             </span>
           </div>
         </div>
 
-        {/* Composer Input Box */}
         <div
-          className={`relative flex items-end gap-2 rounded-xl p-2.5 transition-all border ${
-            composerMode === 'internal'
-              ? 'bg-amber-950/20 border-amber-500/50 focus-within:border-amber-400'
-              : 'bg-slate-900 border-slate-700/80 focus-within:border-blue-500'
-          }`}
+          className={cn(
+            'flex items-end gap-2 p-2 rounded-xl border transition-colors',
+            isInternalMode
+              ? 'bg-warn-soft border-warn-line focus-within:border-warn'
+              : 'bg-surface-2 border-line-2 focus-within:border-accent'
+          )}
         >
           <textarea
             ref={textareaRef}
-            rows={2}
+            rows={1}
             value={inputText}
             onChange={handleInputChange}
             onKeyDown={handleKeyDown}
             placeholder={
-              composerMode === 'internal'
-                ? 'Type an internal team note... Only your teammates can see this (hidden from customer).'
-                : `Reply to ${displayName}... (Press Enter to send, Shift+Enter for new line, # for macros)`
+              isInternalMode
+                ? 'Write a note for your team — the visitor never sees this…'
+                : `Reply to ${displayName}…`
             }
-            className="flex-1 bg-transparent text-sm text-slate-100 placeholder-slate-500 resize-none focus:outline-none max-h-32"
+            className="flex-1 min-h-[42px] max-h-40 px-2 py-2.5 bg-transparent text-[13.5px] leading-relaxed text-ink resize-none focus:outline-none"
           />
 
           <button
             onClick={handleSend}
             disabled={!inputText.trim() || isSending}
-            className={`p-2.5 rounded-lg flex items-center justify-center transition-all ${
-              inputText.trim() && !isSending
-                ? composerMode === 'internal'
-                  ? 'bg-amber-600 hover:bg-amber-500 text-white shadow-md shadow-amber-600/30 cursor-pointer'
-                  : 'bg-blue-600 hover:bg-blue-500 text-white shadow-md shadow-blue-600/30 cursor-pointer'
-                : 'bg-slate-800 text-slate-600 cursor-not-allowed'
-            }`}
-            title={composerMode === 'internal' ? 'Post Internal Note' : 'Send Reply'}
+            title={isInternalMode ? 'Post internal note' : 'Send reply'}
+            className={cn(
+              'shrink-0 w-9 h-9 rounded-lg flex items-center justify-center transition-all',
+              !inputText.trim() || isSending
+                ? 'bg-surface-3 text-ink-3 cursor-not-allowed'
+                : isInternalMode
+                ? 'bg-warn text-white hover:opacity-90 shadow-sm'
+                : 'bg-ink text-ink-inv hover:bg-primary-hover shadow-sm'
+            )}
           >
-            {composerMode === 'internal' ? (
+            {isInternalMode ? (
               <Lock className="w-4 h-4" />
             ) : (
               <Send className="w-4 h-4" />
             )}
           </button>
         </div>
+
+        <p className="mt-2 text-[11px] text-ink-3">
+          <span className="kbd">↵</span> to send ·{' '}
+          <span className="kbd">⇧</span>
+          <span className="kbd">↵</span> for a new line ·{' '}
+          <span className="kbd">#</span> for saved replies
+        </p>
       </div>
     </div>
   );

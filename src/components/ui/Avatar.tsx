@@ -1,0 +1,90 @@
+import React from 'react';
+import { cn } from '@/lib/utils';
+
+/**
+ * Six-way palette picked deterministically from the seed, so the same visitor
+ * always gets the same colour across the list, the thread and the radar.
+ */
+const PALETTE = [
+  { bg: '#2e5bff', fg: '#ffffff' },
+  { bg: '#0f9d76', fg: '#ffffff' },
+  { bg: '#7c5cff', fg: '#ffffff' },
+  { bg: '#d97706', fg: '#ffffff' },
+  { bg: '#e11d48', fg: '#ffffff' },
+  { bg: '#0891b2', fg: '#ffffff' },
+];
+
+function hash(seed: string) {
+  let h = 0;
+  for (let i = 0; i < seed.length; i++) {
+    h = (h << 5) - h + seed.charCodeAt(i);
+    h |= 0;
+  }
+  return Math.abs(h);
+}
+
+export function avatarColors(seed: string) {
+  return PALETTE[hash(seed) % PALETTE.length];
+}
+
+const SIZES = {
+  xs: 'w-6 h-6 text-[10px]',
+  sm: 'w-8 h-8 text-[12px]',
+  md: 'w-10 h-10 text-[14px]',
+  lg: 'w-14 h-14 text-[19px]',
+} as const;
+
+const DOT = {
+  xs: 'w-2 h-2',
+  sm: 'w-2.5 h-2.5',
+  md: 'w-3 h-3',
+  lg: 'w-3.5 h-3.5',
+} as const;
+
+export function Avatar({
+  name,
+  seed,
+  size = 'sm',
+  online,
+  color,
+  className,
+}: {
+  name: string;
+  /** Stable identifier for colour selection; falls back to the name. */
+  seed?: string;
+  size?: keyof typeof SIZES;
+  online?: boolean;
+  /** Overrides the derived colour — used for workspace brand avatars. */
+  color?: string;
+  className?: string;
+}) {
+  const picked = avatarColors(seed || name || '?');
+  const bg = color || picked.bg;
+
+  return (
+    // The size lives on the wrapper too. Without an explicit height it would
+    // stretch to the row in an `align-items: stretch` flex parent, dragging
+    // the absolutely-positioned presence dot down with it.
+    <div className={cn('relative shrink-0', SIZES[size], className)}>
+      <div
+        className={cn(
+          'w-full h-full rounded-full flex items-center justify-center font-semibold uppercase select-none',
+          SIZES[size]
+        )}
+        style={{ backgroundColor: bg, color: picked.fg }}
+      >
+        {(name || '?').charAt(0)}
+      </div>
+      {online !== undefined && (
+        <span
+          title={online ? 'Active now' : 'Away'}
+          className={cn(
+            'absolute -bottom-px -right-px rounded-full ring-2 ring-[var(--ds-surface)]',
+            DOT[size],
+            online ? 'bg-success' : 'bg-line-3'
+          )}
+        />
+      )}
+    </div>
+  );
+}

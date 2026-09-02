@@ -1,19 +1,33 @@
 'use client';
 
-import React, { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import React, { useState, useEffect, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { MessageSquare, Lock, Mail, ArrowRight, ShieldCheck } from 'lucide-react';
+import { AlertCircle, ArrowRight, Eye, EyeOff } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+import { AuthAside, AuthShell } from '@/components/marketing/AuthShell';
+import { GoogleButton } from '@/components/marketing/GoogleButton';
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const supabase = createClient();
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  const supabase = createClient();
+  // Check for error parameters in URL (e.g. from OAuth redirect)
+  useEffect(() => {
+    const err = searchParams.get('error');
+    const desc = searchParams.get('error_description');
+    if (err || desc) {
+      setErrorMsg(desc || err);
+    }
+  }, [searchParams]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -42,123 +56,223 @@ export default function LoginPage() {
     }
   };
 
+  const handleGoogleLogin = async () => {
+    setGoogleLoading(true);
+    setErrorMsg(null);
+
+    try {
+      const origin =
+        typeof window !== 'undefined'
+          ? window.location.origin
+          : 'http://localhost:3000';
+
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${origin}/auth/callback?next=/dashboard`,
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent',
+          },
+        },
+      });
+
+      if (error) {
+        if (
+          error.message.toLowerCase().includes('not enabled') ||
+          error.message.toLowerCase().includes('unsupported provider')
+        ) {
+          setErrorMsg(
+            'Google Sign-In is not enabled yet in your Supabase project. Please enable Google in Supabase Dashboard > Authentication > Providers > Google, or sign in with email below.'
+          );
+        } else {
+          setErrorMsg(error.message);
+        }
+        setGoogleLoading(false);
+      }
+    } catch (err: any) {
+      console.error('Google login error:', err);
+      setErrorMsg(err.message || 'Failed to initiate Google sign-in.');
+      setGoogleLoading(false);
+    }
+  };
+
   const handleDemoFill = () => {
     setEmail('agent@chatify.io');
     setPassword('ChatifyDemo2026!');
   };
 
   return (
-    <div className="min-h-screen bg-[#070b14] flex flex-col items-center justify-center p-4 selection:bg-blue-600 selection:text-white">
-      {/* Background radial glow */}
-      <div className="fixed inset-0 pointer-events-none bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-blue-900/20 via-transparent to-transparent" />
+    <div>
+      <div className="mb-7">
+        <h1 className="text-[1.75rem] leading-tight font-semibold">
+          Welcome back
+        </h1>
+        <p className="mt-2 text-[14px] text-ink-2">
+          Sign in to your support inbox.
+        </p>
+      </div>
 
-      <div className="w-full max-w-md relative z-10">
-        {/* Back link */}
-        <div className="mb-6">
-          <Link
-            href="/"
-            className="inline-flex items-center gap-1.5 text-xs text-slate-400 hover:text-white transition-colors"
-          >
-            <span>← Back to Chatify Homepage</span>
-          </Link>
+      {errorMsg && (
+        <div
+          role="alert"
+          className="mb-5 flex items-start gap-2.5 rounded-xl border border-danger-line bg-danger-soft px-3.5 py-3 text-[12.5px] text-danger animate-pop"
+        >
+          <AlertCircle className="w-4 h-4 shrink-0 mt-px" />
+          <span>{errorMsg}</span>
+        </div>
+      )}
+
+      {/* Google 1-Click Sign-In */}
+      <GoogleButton
+        onClick={handleGoogleLogin}
+        loading={googleLoading}
+        disabled={loading}
+        text="Continue with Google"
+      />
+
+      {/* Separator */}
+      <div className="relative my-6 text-center text-[12px] text-ink-3">
+        <div className="absolute inset-0 flex items-center">
+          <div className="w-full border-t border-line-2" />
+        </div>
+        <span className="relative bg-surface px-3 text-ink-3">
+          or continue with email
+        </span>
+      </div>
+
+      <form onSubmit={handleLogin} className="space-y-4">
+        <div>
+          <label htmlFor="email" className="field-label">
+            Work email
+          </label>
+          <input
+            id="email"
+            type="email"
+            required
+            autoComplete="email"
+            placeholder="you@company.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className="input"
+          />
         </div>
 
-        {/* Brand */}
-        <div className="text-center mb-6">
-          <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-500 shadow-xl shadow-blue-600/30 text-white mb-3">
-            <MessageSquare className="w-6 h-6" />
-          </div>
-          <h1 className="text-2xl font-bold text-white tracking-tight">Agent Workspace Sign In</h1>
-          <p className="text-xs text-slate-400 mt-1">
-            Access your live customer support inbox and visitor radar
-          </p>
-        </div>
-
-        {/* Login Card */}
-        <div className="bg-[#0f172a] border border-slate-800 rounded-2xl p-8 shadow-2xl shadow-black/60 backdrop-blur-xl">
-          <div className="mb-6">
-            <h2 className="text-base font-semibold text-white">Sign In</h2>
-            <p className="text-xs text-slate-400 mt-0.5">Enter your email and password to enter the dashboard.</p>
-          </div>
-
-          {errorMsg && (
-            <div className="mb-4 p-3 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2">
-              <ShieldCheck className="w-4 h-4 text-rose-400 flex-shrink-0" />
-              <span>{errorMsg}</span>
-            </div>
-          )}
-
-          <form onSubmit={handleLogin} className="space-y-4">
-            <div>
-              <label className="block text-xs font-medium text-slate-300 mb-1.5">
-                Agent Email Address
-              </label>
-              <div className="relative">
-                <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                <input
-                  type="email"
-                  required
-                  placeholder="agent@company.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2 bg-slate-900 border border-slate-700/80 rounded-xl text-sm text-white placeholder-slate-400 focus:outline-none focus:border-blue-500 transition-colors"
-                />
-              </div>
-            </div>
-
-            <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <label className="block text-xs font-medium text-slate-300">
-                  Password
-                </label>
-              </div>
-              <div className="relative">
-                <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                <input
-                  type="password"
-                  required
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2 bg-slate-900 border border-slate-700/80 rounded-xl text-sm text-white placeholder-slate-400 focus:outline-none focus:border-blue-500 transition-colors"
-                />
-              </div>
-            </div>
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full mt-2 py-2.5 px-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-sm font-semibold rounded-xl shadow-lg shadow-blue-600/30 flex items-center justify-center gap-2 transition-all disabled:opacity-50 cursor-pointer"
-            >
-              <span>{loading ? 'Authenticating...' : 'Sign In to Dashboard'}</span>
-              <ArrowRight className="w-4 h-4" />
-            </button>
-          </form>
-
-          {/* Quick Demo Pre-fill for easy testing */}
-          <div className="mt-5 pt-4 border-t border-slate-800 flex items-center justify-between text-xs">
+        <div>
+          <label htmlFor="password" className="field-label">
+            Password
+          </label>
+          <div className="relative">
+            <input
+              id="password"
+              type={showPassword ? 'text' : 'password'}
+              required
+              autoComplete="current-password"
+              placeholder="••••••••••"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="input pr-11"
+            />
             <button
               type="button"
-              onClick={handleDemoFill}
-              className="text-blue-400 hover:text-blue-300 font-medium transition-colors"
+              onClick={() => setShowPassword((s) => !s)}
+              aria-label={showPassword ? 'Hide password' : 'Show password'}
+              className="absolute right-1.5 top-1/2 -translate-y-1/2 w-8 h-8 rounded-lg flex items-center justify-center text-ink-3 hover:text-ink hover:bg-surface-3 transition-colors"
             >
-              Auto-fill Demo Credentials
+              {showPassword ? (
+                <EyeOff className="w-4 h-4" />
+              ) : (
+                <Eye className="w-4 h-4" />
+              )}
             </button>
-            <Link
-              href="/signup"
-              className="text-slate-400 hover:text-slate-200 transition-colors"
-            >
-              Need an account? <span className="text-blue-400">Sign Up</span>
-            </Link>
           </div>
         </div>
 
-        {/* System info badge */}
-        <div className="text-center mt-6 text-xs text-slate-400 flex items-center justify-center gap-1.5">
-          <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-          <span>Connected to Supabase Realtime Backend</span>
-        </div>
+        <button
+          type="submit"
+          disabled={loading || googleLoading}
+          className="btn btn-lg btn-primary w-full !mt-6"
+        >
+          {loading ? (
+            <>
+              <span className="w-4 h-4 rounded-full border-2 border-current border-t-transparent animate-spin-slow" />
+              Signing in…
+            </>
+          ) : (
+            <>
+              Sign in
+              <ArrowRight className="w-4 h-4" />
+            </>
+          )}
+        </button>
+      </form>
+
+      <div className="mt-6 hairline" />
+
+      <div className="mt-5 flex items-center justify-between text-[12.5px]">
+        <button
+          type="button"
+          onClick={handleDemoFill}
+          className="font-medium text-accent hover:underline underline-offset-4"
+        >
+          Use demo credentials
+        </button>
+        <span className="text-ink-3">
+          No account?{' '}
+          <Link
+            href="/signup"
+            className="font-medium text-ink hover:underline underline-offset-4"
+          >
+            Sign up
+          </Link>
+        </span>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <AuthShell
+      aside={
+        <AuthAside
+          eyebrow="Agent workspace"
+          headline={
+            <>
+              One inbox for every
+              <br />
+              conversation on your site.
+            </>
+          }
+          points={[
+            {
+              title: 'Live visitor radar',
+              body: 'See who is browsing, which page they are on, and how long they have been there.',
+            },
+            {
+              title: 'Sub-second delivery',
+              body: 'Messages, typing indicators and read receipts stream over WebSockets.',
+            },
+            {
+              title: 'Private team notes',
+              body: 'Leave context for a teammate inside the thread. The customer never sees it.',
+            },
+          ]}
+        />
+      }
+    >
+      <Suspense
+        fallback={
+          <div className="space-y-4 animate-pulse">
+            <div className="h-8 w-2/3 rounded-lg bg-surface-3" />
+            <div className="h-11 w-full rounded-xl bg-surface-3" />
+            <div className="h-11 w-full rounded-xl bg-surface-3" />
+            <div className="h-11 w-full rounded-xl bg-surface-3" />
+          </div>
+        }
+      >
+        <LoginForm />
+      </Suspense>
+    </AuthShell>
   );
 }

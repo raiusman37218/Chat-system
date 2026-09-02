@@ -1,19 +1,16 @@
 'use client';
 
 import React, { useState } from 'react';
-import { 
-  Code2, 
-  Copy, 
-  Check, 
-  Globe, 
-  ExternalLink, 
-  Sparkles, 
-  CheckCircle2, 
-  AlertCircle,
-  Layers,
-  Palette
+import {
+  Check,
+  Copy,
+  ExternalLink,
+  Globe,
+  Palette,
 } from 'lucide-react';
 import { Workspace } from '@/types/database';
+import { cn } from '@/lib/utils';
+import { Avatar } from '@/components/ui/Avatar';
 
 interface InstallationGuideProps {
   workspace: Workspace | null;
@@ -21,17 +18,31 @@ interface InstallationGuideProps {
   latestVisitorUrl?: string;
 }
 
-export function InstallationGuide({ workspace, hasVisitors, latestVisitorUrl }: InstallationGuideProps) {
-  const [copied, setCopied] = useState(false);
-  const [activePlatform, setActivePlatform] = useState<'html' | 'wordpress' | 'shopify' | 'react'>('html');
+type Platform = 'html' | 'wordpress' | 'shopify' | 'react';
 
-  const origin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000';
+const PLATFORM_LABEL: Record<Platform, string> = {
+  html: 'HTML',
+  wordpress: 'WordPress',
+  shopify: 'Shopify',
+  react: 'React / Next.js',
+};
+
+export function InstallationGuide({
+  workspace,
+  hasVisitors,
+  latestVisitorUrl,
+}: InstallationGuideProps) {
+  const [copied, setCopied] = useState(false);
+  const [activePlatform, setActivePlatform] = useState<Platform>('html');
+
+  const origin =
+    typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000';
   const workspaceId = workspace?.id || 'YOUR_WORKSPACE_ID';
 
   const embedScript = `<!-- Chatify Live Chat Support -->
-<script 
-  src="${origin}/widget.js" 
-  data-workspace-id="${workspaceId}" 
+<script
+  src="${origin}/widget.js"
+  data-workspace-id="${workspaceId}"
   defer>
 </script>`;
 
@@ -41,179 +52,66 @@ export function InstallationGuide({ workspace, hasVisitors, latestVisitorUrl }: 
     setTimeout(() => setCopied(false), 2500);
   };
 
-  return (
-    <div className="flex-1 flex flex-col h-screen bg-[#0b101d] overflow-y-auto">
-      {/* Header */}
-      <div className="px-8 py-5 border-b border-slate-800/80 bg-[#0d1424] flex items-center justify-between">
-        <div>
-          <h2 className="text-base font-bold text-white tracking-tight flex items-center gap-2">
-            <span>Widget Installation &amp; Embed Code</span>
-            <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-500/15 text-blue-400 border border-blue-500/30">
-              1-Line Setup
+  const GUIDES: Record<Platform, React.ReactNode> = {
+    html: (
+      <ol className="space-y-2.5">
+        {[
+          'Open your site\'s main HTML template or master layout file.',
+          'Scroll to the bottom and find the closing </body> tag.',
+          'Paste the Chatify snippet directly above it.',
+          'Save and deploy — the launcher appears for every visitor.',
+        ].map((s, i) => (
+          <li key={i} className="flex gap-3">
+            <span className="shrink-0 w-5 h-5 rounded-md bg-surface-3 text-ink-2 text-[11px] font-semibold flex items-center justify-center">
+              {i + 1}
             </span>
-          </h2>
-          <p className="text-xs text-slate-400 mt-0.5">
-            Integrate live chat on your website. Paste the snippet once and we handle the rest.
-          </p>
-        </div>
-
-        {/* Live status badge */}
-        <div className="flex items-center gap-2">
-          {hasVisitors ? (
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-medium">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span>Widget Connected &amp; Receiving Traffic</span>
-            </div>
-          ) : (
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs font-medium">
-              <span className="w-2 h-2 rounded-full bg-amber-500" />
-              <span>Awaiting First Website Visit</span>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Main Content */}
-      <div className="p-8 max-w-4xl space-y-6">
-        {/* Workspace Card Summary */}
-        <div className="p-5 rounded-2xl bg-[#0f172a] border border-slate-800 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <div
-              className="w-12 h-12 rounded-xl flex items-center justify-center text-white font-bold text-lg shadow-md"
-              style={{ backgroundColor: workspace?.brand_color || '#2563eb' }}
-            >
-              {workspace?.name?.charAt(0) || 'W'}
-            </div>
-            <div>
-              <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                <span>{workspace?.name || 'My Business Workspace'}</span>
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-400">
-                  ID: {workspaceId.slice(0, 13)}...
-                </span>
-              </h3>
-              <div className="text-xs text-slate-400 flex items-center gap-3 mt-1">
-                {workspace?.website_url && (
-                  <span className="flex items-center gap-1">
-                    <Globe className="w-3.5 h-3.5 text-slate-500" />
-                    <span>{workspace.website_url}</span>
-                  </span>
-                )}
-                <span className="flex items-center gap-1.5">
-                  <Palette className="w-3.5 h-3.5 text-slate-500" />
-                  <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: workspace?.brand_color || '#2563eb' }} />
-                  <span className="font-mono">{workspace?.brand_color || '#2563eb'}</span>
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <a
-            href={`/demo.html`}
-            target="_blank"
-            rel="noreferrer"
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-200 transition-colors"
-          >
-            <ExternalLink className="w-3.5 h-3.5" />
-            <span>Open Demo Site</span>
-          </a>
-        </div>
-
-        {/* 1-Line Embed Snippet */}
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <label className="text-xs font-semibold uppercase tracking-wider text-slate-300 flex items-center gap-2">
-              <Code2 className="w-4 h-4 text-blue-400" />
-              <span>Your Unique Website Embed Code</span>
-            </label>
-            <button
-              onClick={copyCode}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs rounded-lg transition-all shadow-md shadow-blue-600/20 cursor-pointer"
-            >
-              {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-              <span>{copied ? 'Copied to Clipboard!' : 'Copy Snippet'}</span>
-            </button>
-          </div>
-
-          <div className="relative">
-            <pre className="p-4 bg-[#070b14] border border-slate-700/80 rounded-xl text-xs font-mono text-blue-300 overflow-x-auto leading-relaxed selection:bg-blue-600 selection:text-white">
-              {embedScript}
-            </pre>
-          </div>
-          <p className="text-[11px] text-slate-400">
-            Paste this snippet immediately before the closing <code className="text-slate-300 font-mono">&lt;/body&gt;</code> or <code className="text-slate-300 font-mono">&lt;/head&gt;</code> tag on any webpage where you want live support.
-          </p>
-        </div>
-
-        {/* CMS / Platform Guides Tabs */}
-        <div className="space-y-4 pt-4">
-          <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-            <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-400">
-              Platform-Specific Integration Guides
-            </h4>
-            <div className="flex items-center gap-1 bg-slate-900 border border-slate-800 rounded-lg p-1">
-              {(['html', 'wordpress', 'shopify', 'react'] as const).map((p) => (
-                <button
-                  key={p}
-                  onClick={() => setActivePlatform(p)}
-                  className={`px-3 py-1 rounded text-xs font-medium capitalize transition-colors ${
-                    activePlatform === p ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-400 hover:text-white'
-                  }`}
-                >
-                  {p === 'react' ? 'React / Next.js' : p}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Guide Content */}
-          <div className="p-5 rounded-2xl bg-[#0f172a] border border-slate-800 text-xs space-y-3">
-            {activePlatform === 'html' && (
-              <div className="space-y-2">
-                <h5 className="font-bold text-white text-sm">Static HTML / Custom Web Applications</h5>
-                <ol className="list-decimal list-inside space-y-1.5 text-slate-300 leading-relaxed">
-                  <li>Open your website&apos;s main HTML template or master layout file.</li>
-                  <li>Scroll down to the bottom of the file to find the closing <code className="text-blue-400 font-mono">&lt;/body&gt;</code> tag.</li>
-                  <li>Paste your unique Chatify snippet directly above the <code className="text-blue-400 font-mono">&lt;/body&gt;</code> tag.</li>
-                  <li>Save and deploy. The floating chat bubble will appear automatically for all visitors.</li>
-                </ol>
-              </div>
-            )}
-
-            {activePlatform === 'wordpress' && (
-              <div className="space-y-2">
-                <h5 className="font-bold text-white text-sm">WordPress Installation</h5>
-                <ol className="list-decimal list-inside space-y-1.5 text-slate-300 leading-relaxed">
-                  <li>Log in to your WordPress Admin Dashboard.</li>
-                  <li>Go to <strong>Plugins &gt; Add New</strong> and install the free plugin <em>&quot;WPCode&quot;</em> or <em>&quot;Insert Headers and Footers&quot;</em>.</li>
-                  <li>Navigate to <strong>Code Snippets &gt; Header &amp; Footer</strong>.</li>
-                  <li>Paste your Chatify embed snippet into the <strong>Footer</strong> box.</li>
-                  <li>Click <strong>Save Changes</strong>. Your WordPress site is now connected!</li>
-                </ol>
-              </div>
-            )}
-
-            {activePlatform === 'shopify' && (
-              <div className="space-y-2">
-                <h5 className="font-bold text-white text-sm">Shopify Storefront</h5>
-                <ol className="list-decimal list-inside space-y-1.5 text-slate-300 leading-relaxed">
-                  <li>Log in to your Shopify store admin.</li>
-                  <li>Click on <strong>Online Store &gt; Themes</strong>.</li>
-                  <li>Next to your current live theme, click <strong>Actions (...) &gt; Edit code</strong>.</li>
-                  <li>In the left sidebar, click on <code className="text-blue-400 font-mono">theme.liquid</code> under Layout.</li>
-                  <li>Search for the closing <code className="text-blue-400 font-mono">&lt;/body&gt;</code> tag and paste your snippet directly above it.</li>
-                  <li>Click <strong>Save</strong>.</li>
-                </ol>
-              </div>
-            )}
-
-            {activePlatform === 'react' && (
-              <div className="space-y-2">
-                <h5 className="font-bold text-white text-sm">Next.js 14/15 App Router</h5>
-                <p className="text-slate-400">
-                  Inside your root <code className="text-blue-400 font-mono">app/layout.tsx</code>, import Next.js Script:
-                </p>
-                <pre className="p-3 bg-slate-900 rounded-lg text-[11px] font-mono text-slate-200 border border-slate-800">
-{`import Script from 'next/script';
+            <span className="text-[13px] leading-relaxed text-ink-2">{s}</span>
+          </li>
+        ))}
+      </ol>
+    ),
+    wordpress: (
+      <ol className="space-y-2.5">
+        {[
+          'Log in to your WordPress admin dashboard.',
+          'Install a free header/footer plugin such as WPCode.',
+          'Go to Code Snippets → Header & Footer.',
+          'Paste the snippet into the Footer box and save.',
+        ].map((s, i) => (
+          <li key={i} className="flex gap-3">
+            <span className="shrink-0 w-5 h-5 rounded-md bg-surface-3 text-ink-2 text-[11px] font-semibold flex items-center justify-center">
+              {i + 1}
+            </span>
+            <span className="text-[13px] leading-relaxed text-ink-2">{s}</span>
+          </li>
+        ))}
+      </ol>
+    ),
+    shopify: (
+      <ol className="space-y-2.5">
+        {[
+          'Open your Shopify store admin.',
+          'Go to Online Store → Themes.',
+          'Next to your live theme: Actions (…) → Edit code.',
+          'Open theme.liquid, paste above </body>, then Save.',
+        ].map((s, i) => (
+          <li key={i} className="flex gap-3">
+            <span className="shrink-0 w-5 h-5 rounded-md bg-surface-3 text-ink-2 text-[11px] font-semibold flex items-center justify-center">
+              {i + 1}
+            </span>
+            <span className="text-[13px] leading-relaxed text-ink-2">{s}</span>
+          </li>
+        ))}
+      </ol>
+    ),
+    react: (
+      <div className="space-y-3">
+        <p className="text-[13px] leading-relaxed text-ink-2">
+          Render the script from your root{' '}
+          <code className="font-mono text-[12px] text-ink">app/layout.tsx</code>{' '}
+          using the Next.js Script component:
+        </p>
+        <pre className="code-block">{`import Script from 'next/script';
 
 export default function RootLayout({ children }) {
   return (
@@ -228,33 +126,181 @@ export default function RootLayout({ children }) {
       </body>
     </html>
   );
-}`}
-                </pre>
-              </div>
-            )}
-          </div>
+}`}</pre>
+      </div>
+    ),
+  };
+
+  return (
+    <div className="flex-1 min-w-0 h-screen flex flex-col bg-canvas">
+      {/* Header */}
+      <header className="shrink-0 px-7 h-16 flex items-center justify-between gap-4 border-b border-line bg-surface">
+        <div className="min-w-0">
+          <h1 className="text-[15px] font-semibold tracking-tight">
+            Install the widget
+          </h1>
+          <p className="text-[12px] text-ink-3 mt-0.5">
+            One script tag. Works on any site, no build step required.
+          </p>
         </div>
 
-        {/* Live Verification box */}
-        <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800 flex items-center justify-between text-xs gap-4 flex-wrap">
-          <div className="flex items-center gap-2.5">
-            <CheckCircle2 className={`w-4 h-4 ${hasVisitors ? 'text-emerald-400' : 'text-slate-500'}`} />
-            <span className="text-slate-300">
-              {hasVisitors
-                ? `Active traffic connected: ${latestVisitorUrl || 'Live Visitor Session'}`
-                : 'Waiting for website traffic. Click "Test in Simulator" to verify immediately.'}
-            </span>
+        <span
+          className={cn('pill shrink-0', hasVisitors ? 'pill-success' : 'pill-warn')}
+        >
+          {hasVisitors ? (
+            <>
+              <span className="live-dot" />
+              Connected — receiving traffic
+            </>
+          ) : (
+            'Awaiting first visit'
+          )}
+        </span>
+      </header>
+
+      <div className="flex-1 overflow-y-auto p-7">
+        <div className="max-w-3xl space-y-6">
+          {/* Workspace summary */}
+          <div className="card p-5 flex items-center justify-between gap-4 flex-wrap">
+            <div className="flex items-center gap-4 min-w-0">
+              <Avatar
+                name={workspace?.name || 'W'}
+                seed={workspace?.id || 'workspace'}
+                color={workspace?.brand_color || undefined}
+                size="md"
+              />
+              <div className="min-w-0">
+                <h2 className="text-[14px] font-semibold truncate">
+                  {workspace?.name || 'My workspace'}
+                </h2>
+                <div className="mt-1 flex items-center gap-3 flex-wrap text-[12px] text-ink-3">
+                  {workspace?.website_url && (
+                    <span className="inline-flex items-center gap-1.5 truncate">
+                      <Globe className="w-3.5 h-3.5" />
+                      {workspace.website_url}
+                    </span>
+                  )}
+                  <span className="inline-flex items-center gap-1.5">
+                    <Palette className="w-3.5 h-3.5" />
+                    <span
+                      className="w-2.5 h-2.5 rounded-full border border-line"
+                      style={{
+                        backgroundColor: workspace?.brand_color || '#2e5bff',
+                      }}
+                    />
+                    <span className="font-mono uppercase">
+                      {workspace?.brand_color || '#2e5bff'}
+                    </span>
+                  </span>
+                  <span className="font-mono truncate">
+                    id: {workspaceId.slice(0, 13)}…
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <a
+              href="/demo.html"
+              target="_blank"
+              rel="noreferrer"
+              className="btn btn-sm btn-secondary shrink-0"
+            >
+              <ExternalLink className="w-3.5 h-3.5" />
+              Open demo site
+            </a>
           </div>
 
-          <a
-            href={`/demo.html?workspaceId=${workspaceId}&name=${encodeURIComponent(workspace?.name || 'Workspace')}`}
-            target="_blank"
-            rel="noreferrer"
-            className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs flex items-center gap-1.5 transition-colors shadow-sm"
-          >
-            <span>Test in Simulator</span>
-            <ExternalLink className="w-3.5 h-3.5" />
-          </a>
+          {/* Snippet */}
+          <div>
+            <div className="flex items-baseline justify-between mb-2.5">
+              <h2 className="text-[14px] font-semibold">Your embed code</h2>
+              <button onClick={copyCode} className="btn btn-sm btn-primary">
+                {copied ? (
+                  <>
+                    <Check className="w-3.5 h-3.5" />
+                    Copied
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-3.5 h-3.5" />
+                    Copy snippet
+                  </>
+                )}
+              </button>
+            </div>
+
+            <pre className="code-block">{embedScript}</pre>
+
+            <p className="mt-2.5 text-[12.5px] leading-relaxed text-ink-3">
+              Paste it immediately before the closing{' '}
+              <code className="font-mono text-ink-2">&lt;/body&gt;</code> or{' '}
+              <code className="font-mono text-ink-2">&lt;/head&gt;</code> tag on
+              every page that should offer live support.
+            </p>
+          </div>
+
+          {/* Platform guides */}
+          <div>
+            <div className="flex items-center justify-between gap-4 mb-3 flex-wrap">
+              <h2 className="text-[14px] font-semibold">
+                Platform-specific steps
+              </h2>
+              <div className="inline-flex items-center gap-0.5 p-0.5 rounded-lg bg-surface-2 border border-line">
+                {(Object.keys(PLATFORM_LABEL) as Platform[]).map((p) => (
+                  <button
+                    key={p}
+                    onClick={() => setActivePlatform(p)}
+                    className={cn(
+                      'h-7 px-3 rounded-md text-[12px] font-medium transition-colors',
+                      activePlatform === p
+                        ? 'bg-surface text-ink shadow-xs'
+                        : 'text-ink-3 hover:text-ink'
+                    )}
+                  >
+                    {PLATFORM_LABEL[p]}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="card p-5">{GUIDES[activePlatform]}</div>
+          </div>
+
+          {/* Verify */}
+          <div className="panel p-4 flex items-center justify-between gap-4 flex-wrap">
+            <div className="flex items-start gap-2.5 min-w-0">
+              <Check
+                className={cn(
+                  'w-4 h-4 mt-px shrink-0',
+                  hasVisitors ? 'text-success' : 'text-ink-3'
+                )}
+              />
+              <span className="text-[12.5px] leading-relaxed text-ink-2 min-w-0">
+                {hasVisitors ? (
+                  <>
+                    Traffic detected on{' '}
+                    <span className="font-mono text-ink">
+                      {latestVisitorUrl || 'your site'}
+                    </span>
+                  </>
+                ) : (
+                  'No traffic yet. Open the simulator to verify your install in seconds.'
+                )}
+              </span>
+            </div>
+
+            <a
+              href={`/demo.html?workspaceId=${workspaceId}&name=${encodeURIComponent(
+                workspace?.name || 'Workspace'
+              )}`}
+              target="_blank"
+              rel="noreferrer"
+              className="btn btn-sm btn-secondary shrink-0"
+            >
+              Test in simulator
+              <ExternalLink className="w-3.5 h-3.5" />
+            </a>
+          </div>
         </div>
       </div>
     </div>

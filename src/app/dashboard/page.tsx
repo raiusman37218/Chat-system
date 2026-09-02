@@ -485,17 +485,21 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <div className="h-screen w-screen bg-[#090d16] flex flex-col items-center justify-center text-slate-400 gap-3">
-        <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center text-white animate-bounce">
-          <MessageSquare className="w-5 h-5" />
+      <div className="h-screen w-screen bg-canvas flex flex-col items-center justify-center gap-4">
+        <div className="w-14 h-14 flex items-center justify-center animate-breathe">
+          <img
+            src="/logo.png"
+            alt="Loading"
+            className="w-full h-full object-contain filter drop-shadow-sm"
+          />
         </div>
-        <p className="text-sm font-medium">Loading Workspace...</p>
+        <p className="text-[13px] font-medium text-ink-3">Loading workspace…</p>
       </div>
     );
   }
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-[#090d16]">
+    <div className="flex h-screen w-screen overflow-hidden bg-canvas">
       {/* 1. Left Sidebar Navigation */}
       <Sidebar
         currentAgent={currentAgent}
@@ -539,16 +543,29 @@ export default function DashboardPage() {
               />
             </>
           ) : (
-            <div className="flex-1 flex flex-col items-center justify-center text-slate-500 space-y-3 bg-[#0b101d]">
-              <div className="w-14 h-14 rounded-2xl bg-slate-800/40 border border-slate-700/60 flex items-center justify-center text-slate-400">
-                <MessageSquare className="w-7 h-7 opacity-60" />
+            <div className="flex-1 flex flex-col items-center justify-center gap-4 bg-canvas px-8 text-center">
+              <div className="w-14 h-14 rounded-2xl bg-surface-2 border border-line flex items-center justify-center p-2.5 text-ink-3 shadow-xs">
+                <img
+                  src="/chat-icon.png"
+                  alt="Chatify"
+                  className="w-full h-full object-contain opacity-85"
+                />
               </div>
-              <div className="text-center space-y-1">
-                <p className="text-sm font-semibold text-slate-300">No conversation selected</p>
-                <p className="text-xs text-slate-400 max-w-sm">
-                  Select an active customer conversation from the list or install the widget on your site to receive visitors.
+              <div className="max-w-sm">
+                <p className="text-[14px] font-semibold">
+                  No conversation selected
+                </p>
+                <p className="mt-1.5 text-[13px] leading-relaxed text-ink-2">
+                  Pick a thread from the list, or install the widget on your site
+                  so visitors can start one.
                 </p>
               </div>
+              <button
+                onClick={() => setActiveView('installation')}
+                className="btn btn-sm btn-secondary"
+              >
+                Get the embed code
+              </button>
             </div>
           )}
         </>

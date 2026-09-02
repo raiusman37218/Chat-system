@@ -1,4 +1,5 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { CHATIFY_ICON_DATA_URI } from './icon';
 
 const DEFAULT_SUPABASE_URL = 'https://vfjsaynnubxywdbevxtx.supabase.co';
 const DEFAULT_SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZmanNheW5udWJ4eXdkYmV2eHR4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgyNTA5MDEsImV4cCI6MjEwMzgyNjkwMX0.YyBCXMqwrOk5BRhQafYLFw8tiM5PC8lc8Yocodw9wf0';
@@ -114,7 +115,7 @@ class ChatifyWidget {
       workspaceId: urlWs || script?.getAttribute('data-workspace-id') || null,
       title: script?.getAttribute('data-title') || 'Support Team',
       subtitle: script?.getAttribute('data-subtitle') || 'We reply in under 5 minutes',
-      primaryColor: script?.getAttribute('data-color') || '#2563eb',
+      primaryColor: script?.getAttribute('data-color') || '#2e5bff',
       position: (script?.getAttribute('data-position') as 'bottom-right' | 'bottom-left') || 'bottom-right',
     };
   }
@@ -407,9 +408,7 @@ class ChatifyWidget {
     launcher.id = 'chatifyLauncherBtn';
     launcher.innerHTML = `
       <div class="chatify-badge" id="chatifyBadge">0</div>
-      <svg id="chatifyIconOpen" viewBox="0 0 24 24">
-        <path d="M20 2H4c-1.1 0-1.99.9-1.99 2L2 22l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zM6 9h12v2H6V9zm8 5H6v-2h8v2zm4-6H6V6h12v2z"/>
-      </svg>
+      <img id="chatifyIconOpen" src="${CHATIFY_ICON_DATA_URI}" alt="Chat" class="chatify-launcher-icon" />
       <svg id="chatifyIconClose" style="display:none;" viewBox="0 0 24 24">
         <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
       </svg>
@@ -427,7 +426,7 @@ class ChatifyWidget {
         <div class="chatify-home-hero">
           <div class="chatify-brand-row">
             <div class="chatify-home-avatar" id="homeBrandAvatar">
-              ${this.config.title.charAt(0)}
+              <img src="${CHATIFY_ICON_DATA_URI}" alt="Chatify" style="width:100%;height:100%;object-fit:contain;" />
             </div>
             <button class="chatify-icon-btn" id="homeCloseBtn" title="Close">✕</button>
           </div>
@@ -440,8 +439,8 @@ class ChatifyWidget {
           <div class="chatify-card chatify-card-action" id="cardStartChat">
             <div class="chatify-card-head">
               <div class="chatify-avatars-stack">
-                <div class="chatify-mini-avatar" style="background:#2563eb;">A</div>
-                <div class="chatify-mini-avatar" style="background:#7c3aed;">S</div>
+                <div class="chatify-mini-avatar" style="background:var(--w-brand);">A</div>
+                <div class="chatify-mini-avatar" style="background:var(--w-brand-deep);">S</div>
               </div>
               <span class="chatify-status-pill">● Typically replies in 5m</span>
             </div>
@@ -472,7 +471,7 @@ class ChatifyWidget {
           <!-- Help Center Quick Search -->
           <div class="chatify-card chatify-card-help" id="cardHelpSearch">
             <div class="chatify-section-title">Knowledge Base</div>
-            <p style="font-size:12px; color:#94a3b8; margin-bottom:8px;">Search common answers and documentation:</p>
+            <p style="font-size:13px; color:var(--w-ink-2);">Search common answers and documentation:</p>
             <div class="chatify-search-box" id="homeSearchTrigger">
               <span>🔍 Search for help articles...</span>
             </div>
@@ -486,7 +485,7 @@ class ChatifyWidget {
           <div class="chatify-header-info">
             <button class="chatify-back-btn" id="btnBackToHome" title="Back to Home">←</button>
             <div class="chatify-avatar" id="chatifyHeaderAvatar">
-              ${this.config.title.charAt(0)}
+              <img src="${CHATIFY_ICON_DATA_URI}" alt="Chatify" style="width:100%;height:100%;object-fit:contain;" />
               <span class="chatify-online-dot"></span>
             </div>
             <div class="chatify-header-text">
@@ -690,162 +689,342 @@ class ChatifyWidget {
 
     const brandAvatar = this.shadow?.getElementById('homeBrandAvatar');
     if (brandAvatar) brandAvatar.textContent = this.config.title.charAt(0);
+
+    // Carry the workspace's own greeting through to the Home tab, so the
+    // messenger opens speaking in the customer's voice rather than ours.
+    const homeSub = this.shadow?.getElementById('homeGreetingSub');
+    if (homeSub && this.config.subtitle) homeSub.textContent = this.config.subtitle;
+  }
+
+  /* ---------------------------------------------------------------- theme */
+
+  /** Parses #rgb / #rrggbb into an [r,g,b] triple. Falls back to the default blue. */
+  private rgb(hex: string): [number, number, number] {
+    let h = (hex || '').trim().replace('#', '');
+    if (h.length === 3) h = h.split('').map((c) => c + c).join('');
+    if (!/^[0-9a-fA-F]{6}$/.test(h)) h = '2e5bff';
+    return [
+      parseInt(h.slice(0, 2), 16),
+      parseInt(h.slice(2, 4), 16),
+      parseInt(h.slice(4, 6), 16),
+    ];
+  }
+
+  /** Relative luminance, used to decide black-vs-white text on the brand colour. */
+  private luminance(hex: string): number {
+    const [r, g, b] = this.rgb(hex).map((v) => {
+      const s = v / 255;
+      return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
+    });
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  }
+
+  /** Mixes the brand colour toward black (amount < 0) or white (amount > 0). */
+  private shade(hex: string, amount: number): string {
+    const [r, g, b] = this.rgb(hex);
+    const target = amount > 0 ? 255 : 0;
+    const t = Math.abs(amount);
+    const mix = (c: number) => Math.round(c + (target - c) * t);
+    return `rgb(${mix(r)}, ${mix(g)}, ${mix(b)})`;
+  }
+
+  private alpha(hex: string, a: number): string {
+    const [r, g, b] = this.rgb(hex);
+    return `rgba(${r}, ${g}, ${b}, ${a})`;
   }
 
   private generateCSS(): string {
+    const brand = this.config.primaryColor || '#2e5bff';
+    // White text on anything but a very light brand colour.
+    const onBrand = this.luminance(brand) > 0.62 ? '#0b0b0f' : '#ffffff';
+    const brandDeep = this.shade(brand, -0.34);
+    const left = this.config.position === 'bottom-left';
+
     return `
+      :host {
+        --w-brand: ${brand};
+        --w-brand-deep: ${brandDeep};
+        --w-on-brand: ${onBrand};
+        --w-brand-a08: ${this.alpha(brand, 0.08)};
+        --w-brand-a16: ${this.alpha(brand, 0.16)};
+        --w-brand-a28: ${this.alpha(brand, 0.28)};
+
+        --w-surface: #ffffff;
+        --w-surface-2: #f7f7f5;
+        --w-surface-3: #efefec;
+        --w-canvas: #fbfbf9;
+
+        --w-ink: #0b0b0f;
+        --w-ink-2: #56575e;
+        --w-ink-3: #8b8c93;
+
+        --w-line: #e7e7e3;
+        --w-line-2: #d6d6d1;
+
+        --w-success: #0f9d76;
+
+        --w-r-sm: 10px;
+        --w-r-md: 14px;
+        --w-r-lg: 18px;
+        --w-r-xl: 22px;
+
+        --w-shadow-sm: 0 1px 3px rgba(11,11,15,.07), 0 1px 2px rgba(11,11,15,.04);
+        --w-shadow-md: 0 6px 18px rgba(11,11,15,.09), 0 2px 6px rgba(11,11,15,.05);
+        --w-shadow-xl: 0 32px 68px rgba(11,11,15,.18), 0 12px 26px rgba(11,11,15,.10);
+
+        --w-ease: cubic-bezier(.22,.61,.36,1);
+        --w-spring: cubic-bezier(.34,1.4,.64,1);
+
+        color-scheme: light;
+      }
+
+      /* Follows the host site's colour scheme so the messenger never looks
+         pasted onto a dark page. */
+      @media (prefers-color-scheme: dark) {
+        :host {
+          --w-surface: #101013;
+          --w-surface-2: #17171b;
+          --w-surface-3: #202026;
+          --w-canvas: #0b0b0e;
+
+          --w-ink: #f5f5f3;
+          --w-ink-2: #a2a2aa;
+          --w-ink-3: #6e6e78;
+
+          --w-line: #232329;
+          --w-line-2: #2f2f37;
+
+          --w-success: #34d9a7;
+
+          --w-shadow-sm: 0 1px 3px rgba(0,0,0,.5);
+          --w-shadow-md: 0 6px 18px rgba(0,0,0,.55);
+          --w-shadow-xl: 0 32px 68px rgba(0,0,0,.7), 0 12px 26px rgba(0,0,0,.5);
+
+          color-scheme: dark;
+        }
+      }
+
       * {
         box-sizing: border-box;
         margin: 0;
         padding: 0;
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+          "Helvetica Neue", Arial, sans-serif;
+        -webkit-font-smoothing: antialiased;
       }
+
+      button { font: inherit; cursor: pointer; }
+
+      ::-webkit-scrollbar { width: 8px; }
+      ::-webkit-scrollbar-track { background: transparent; }
+      ::-webkit-scrollbar-thumb {
+        background: var(--w-line-2);
+        border-radius: 999px;
+        border: 2px solid transparent;
+        background-clip: content-box;
+      }
+
+      /* ── Launcher ─────────────────────────────────────────────────── */
 
       .chatify-launcher {
         position: fixed;
-        ${this.config.position === 'bottom-left' ? 'left: 24px;' : 'right: 24px;'}
-        bottom: 24px;
-        width: 60px;
-        height: 60px;
+        ${left ? 'left: 20px;' : 'right: 20px;'}
+        bottom: 20px;
+        width: 56px;
+        height: 56px;
         border-radius: 50%;
-        background: ${this.config.primaryColor};
-        color: white;
         border: none;
-        cursor: pointer;
-        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4), 0 8px 10px -6px rgba(0, 0, 0, 0.3);
+        background: var(--w-brand);
+        color: var(--w-on-brand);
         display: flex;
         align-items: center;
         justify-content: center;
-        z-index: 999999;
-        transition: transform 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.2s ease;
+        box-shadow: 0 8px 24px var(--w-brand-a28), 0 2px 8px rgba(11,11,15,.16);
+        z-index: 2147483000;
+        transition: transform .28s var(--w-spring), box-shadow .2s var(--w-ease);
       }
 
       .chatify-launcher:hover {
-        transform: scale(1.06) translateY(-2px);
-        box-shadow: 0 14px 28px -5px rgba(0, 0, 0, 0.5);
+        transform: scale(1.06);
+        box-shadow: 0 12px 32px var(--w-brand-a28), 0 4px 12px rgba(11,11,15,.2);
+      }
+
+      .chatify-launcher:active { transform: scale(.97); }
+
+      .chatify-launcher-icon {
+        width: 36px;
+        height: 36px;
+        object-fit: contain;
+        display: block;
+        pointer-events: none;
+        transition: transform .25s var(--w-ease), opacity .18s var(--w-ease);
+        filter: drop-shadow(0 2px 4px rgba(0,0,0,0.22));
+      }
+
+      .chatify-launcher:hover .chatify-launcher-icon {
+        transform: scale(1.1);
       }
 
       .chatify-launcher svg {
-        width: 26px;
-        height: 26px;
+        width: 25px;
+        height: 25px;
         fill: currentColor;
+        transition: transform .25s var(--w-ease), opacity .18s var(--w-ease);
       }
 
       .chatify-badge {
         position: absolute;
-        top: -4px;
-        right: -4px;
-        background: #ef4444;
-        color: white;
-        border-radius: 9999px;
-        font-size: 11px;
-        font-weight: 700;
+        top: -2px;
+        ${left ? 'left: -2px;' : 'right: -2px;'}
         min-width: 20px;
         height: 20px;
-        padding: 0 6px;
+        padding: 0 5px;
+        border-radius: 999px;
+        background: #e11d48;
+        color: #fff;
+        font-size: 11px;
+        font-weight: 700;
         display: none;
         align-items: center;
         justify-content: center;
-        border: 2px solid #0f172a;
+        border: 2px solid var(--w-surface);
+        animation: w-pop .28s var(--w-spring);
       }
+
+      /* ── Window ───────────────────────────────────────────────────── */
 
       .chatify-window {
         position: fixed;
-        ${this.config.position === 'bottom-left' ? 'left: 24px;' : 'right: 24px;'}
-        bottom: 96px;
-        width: 380px;
-        max-width: calc(100vw - 32px);
-        height: 600px;
+        ${left ? 'left: 20px;' : 'right: 20px;'}
+        bottom: 88px;
+        width: 396px;
+        max-width: calc(100vw - 40px);
+        height: 640px;
         max-height: calc(100vh - 120px);
-        background: #0b101d;
-        border: 1px solid #1e293b;
-        border-radius: 20px;
-        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7), 0 0 1px 1px rgba(255, 255, 255, 0.08);
-        z-index: 999999;
+        background: var(--w-surface);
+        border: 1px solid var(--w-line);
+        border-radius: var(--w-r-xl);
+        box-shadow: var(--w-shadow-xl);
         display: none;
         flex-direction: column;
         overflow: hidden;
+        z-index: 2147483000;
+        animation: w-window-in .34s var(--w-ease) both;
+      }
+
+      @media (max-width: 480px) {
+        .chatify-window {
+          left: 0; right: 0; bottom: 0;
+          width: 100vw;
+          max-width: 100vw;
+          height: 100dvh;
+          max-height: 100dvh;
+          border-radius: 0;
+          border: none;
+        }
       }
 
       .chatify-tab-pane {
         flex: 1;
-        display: flex;
+        min-height: 0;
         flex-direction: column;
         overflow: hidden;
+        animation: w-fade .22s var(--w-ease);
       }
 
-      /* Home Tab Styles */
+      /* ── Home tab ─────────────────────────────────────────────────── */
+
       .chatify-home-hero {
-        background: linear-gradient(135deg, ${this.config.primaryColor}, #4338ca);
-        padding: 24px 20px 20px;
-        color: white;
+        position: relative;
+        padding: 22px 22px 50px;
+        background:
+          radial-gradient(120% 90% at 12% 0%, ${this.alpha(brand, 0.55)}, transparent 62%),
+          linear-gradient(150deg, var(--w-brand), var(--w-brand-deep));
+        color: var(--w-on-brand);
+        flex-shrink: 0;
       }
 
       .chatify-brand-row {
         display: flex;
         align-items: center;
         justify-content: space-between;
-        margin-bottom: 16px;
+        margin-bottom: 26px;
       }
 
       .chatify-home-avatar {
-        width: 36px;
-        height: 36px;
-        border-radius: 10px;
-        background: rgba(255, 255, 255, 0.2);
-        color: white;
+        width: 34px;
+        height: 34px;
+        border-radius: 50%;
+        background: rgba(255,255,255,.2);
+        border: 1px solid rgba(255,255,255,.26);
         display: flex;
         align-items: center;
         justify-content: center;
-        font-weight: 800;
-        font-size: 16px;
-        backdrop-filter: blur(8px);
+        font-size: 14px;
+        font-weight: 700;
+        text-transform: uppercase;
+        backdrop-filter: blur(6px);
       }
 
       .chatify-icon-btn {
-        background: transparent;
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
         border: none;
-        color: rgba(255, 255, 255, 0.8);
-        font-size: 16px;
-        cursor: pointer;
-        padding: 4px;
-        border-radius: 6px;
+        background: rgba(255,255,255,.14);
+        color: inherit;
+        font-size: 14px;
+        line-height: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: background .16s var(--w-ease), transform .16s var(--w-ease);
       }
 
       .chatify-icon-btn:hover {
-        background: rgba(255, 255, 255, 0.15);
-        color: white;
+        background: rgba(255,255,255,.26);
+        transform: rotate(90deg);
       }
 
       .chatify-home-title {
-        font-size: 20px;
-        font-weight: 800;
-        letter-spacing: -0.5px;
-        margin-bottom: 4px;
+        font-size: 25px;
+        font-weight: 600;
+        letter-spacing: -.024em;
+        line-height: 1.2;
       }
 
       .chatify-home-sub {
-        font-size: 13px;
-        color: rgba(255, 255, 255, 0.85);
+        margin-top: 6px;
+        font-size: 14px;
+        line-height: 1.5;
+        opacity: .82;
       }
 
+      /* The whole sheet lifts over the gradient hero. Lifting only the first
+         card instead would put it outside this scroll box, which clips it. */
       .chatify-home-content {
         flex: 1;
+        min-height: 0;
         overflow-y: auto;
+        margin-top: -26px;
         padding: 16px;
+        background: var(--w-canvas);
+        border-radius: var(--w-r-lg) var(--w-r-lg) 0 0;
         display: flex;
         flex-direction: column;
-        gap: 16px;
-        background: #090d16;
+        gap: 14px;
       }
 
       .chatify-card {
-        background: #0f172a;
-        border: 1px solid #1e293b;
-        border-radius: 16px;
+        background: var(--w-surface);
+        border: 1px solid var(--w-line);
+        border-radius: var(--w-r-md);
         padding: 16px;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        box-shadow: var(--w-shadow-sm);
       }
+
+      .chatify-card-action { transition: box-shadow .2s var(--w-ease), transform .2s var(--w-ease); }
+      .chatify-card-action:hover { box-shadow: var(--w-shadow-md); transform: translateY(-1px); }
 
       .chatify-card-head {
         display: flex;
@@ -854,75 +1033,83 @@ class ChatifyWidget {
         margin-bottom: 12px;
       }
 
-      .chatify-avatars-stack {
-        display: flex;
-        align-items: center;
-      }
+      .chatify-avatars-stack { display: flex; }
 
       .chatify-mini-avatar {
         width: 26px;
         height: 26px;
         border-radius: 50%;
-        color: white;
+        color: #fff;
         font-size: 11px;
         font-weight: 700;
         display: flex;
         align-items: center;
         justify-content: center;
-        border: 2px solid #0f172a;
-        margin-right: -6px;
+        border: 2px solid var(--w-surface);
+        margin-left: -8px;
       }
+      .chatify-mini-avatar:first-child { margin-left: 0; }
 
       .chatify-status-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        height: 22px;
+        padding: 0 9px;
+        border-radius: 999px;
+        background: var(--w-surface-2);
+        border: 1px solid var(--w-line);
         font-size: 11px;
-        color: #34d399;
-        background: rgba(16, 185, 129, 0.1);
-        padding: 3px 8px;
-        border-radius: 9999px;
         font-weight: 600;
+        color: var(--w-ink-2);
+        white-space: nowrap;
       }
 
       .chatify-card h4 {
-        font-size: 14px;
-        font-weight: 700;
-        color: white;
-        margin-bottom: 4px;
+        font-size: 15px;
+        font-weight: 600;
+        letter-spacing: -.012em;
+        color: var(--w-ink);
       }
 
       .chatify-card p {
-        font-size: 12px;
-        color: #94a3b8;
-        line-height: 1.4;
-        margin-bottom: 12px;
+        margin-top: 4px;
+        font-size: 13px;
+        line-height: 1.55;
+        color: var(--w-ink-2);
       }
 
       .chatify-btn-link {
-        background: ${this.config.primaryColor};
-        color: white;
+        margin-top: 14px;
+        width: 100%;
+        height: 40px;
         border: none;
-        padding: 8px 16px;
-        border-radius: 8px;
-        font-size: 12px;
+        border-radius: var(--w-r-sm);
+        background: var(--w-brand);
+        color: var(--w-on-brand);
+        font-size: 13.5px;
         font-weight: 600;
-        cursor: pointer;
-        display: inline-flex;
+        display: flex;
         align-items: center;
+        justify-content: center;
         gap: 6px;
-        transition: background 0.15s;
+        box-shadow: var(--w-shadow-sm);
+        transition: filter .16s var(--w-ease), transform .12s var(--w-ease);
       }
 
-      .chatify-btn-link:hover {
-        filter: brightness(1.1);
-      }
+      .chatify-btn-link:hover { filter: brightness(1.08); }
+      .chatify-btn-link:active { transform: scale(.985); }
 
       .chatify-section-title {
         font-size: 11px;
         font-weight: 700;
+        letter-spacing: .09em;
         text-transform: uppercase;
-        letter-spacing: 0.5px;
-        color: #64748b;
-        margin-bottom: 8px;
+        color: var(--w-ink-3);
+        margin-bottom: 9px;
       }
+
+      .chatify-chips-section { padding: 0 2px; }
 
       .chatify-chips-grid {
         display: grid;
@@ -931,448 +1118,527 @@ class ChatifyWidget {
       }
 
       .chatify-chip {
-        background: #1e293b;
-        border: 1px solid #334155;
-        color: #cbd5e1;
-        padding: 9px 10px;
-        border-radius: 10px;
-        font-size: 11px;
-        font-weight: 600;
+        padding: 11px 12px;
+        border-radius: var(--w-r-sm);
+        border: 1px solid var(--w-line);
+        background: var(--w-surface);
+        color: var(--w-ink-2);
+        font-size: 12.5px;
+        font-weight: 500;
         text-align: left;
-        cursor: pointer;
-        transition: all 0.15s;
+        line-height: 1.35;
+        transition: border-color .16s var(--w-ease), color .16s var(--w-ease),
+          background .16s var(--w-ease), transform .12s var(--w-ease);
       }
 
       .chatify-chip:hover {
-        background: #2563eb;
-        color: white;
-        border-color: #3b82f6;
+        border-color: var(--w-brand);
+        color: var(--w-ink);
+        background: var(--w-brand-a08);
         transform: translateY(-1px);
       }
 
+      .chatify-card-help p { margin-bottom: 10px; }
+
       .chatify-search-box {
-        background: #1e293b;
-        border: 1px solid #334155;
-        border-radius: 10px;
-        padding: 10px 14px;
-        font-size: 12px;
-        color: #64748b;
+        height: 40px;
+        padding: 0 12px;
+        border-radius: var(--w-r-sm);
+        border: 1px solid var(--w-line);
+        background: var(--w-surface-2);
+        color: var(--w-ink-3);
+        font-size: 13px;
+        display: flex;
+        align-items: center;
         cursor: pointer;
-        transition: border-color 0.2s;
+        transition: border-color .16s var(--w-ease), color .16s var(--w-ease);
       }
 
-      .chatify-search-box:hover {
-        border-color: #475569;
-        color: #94a3b8;
-      }
+      .chatify-search-box:hover { border-color: var(--w-line-2); color: var(--w-ink-2); }
 
-      /* Messages Tab Styles */
+      /* ── Thread header ────────────────────────────────────────────── */
+
       .chatify-header {
-        background: #0f172a;
-        border-bottom: 1px solid #1e293b;
-        padding: 12px 16px;
         display: flex;
         align-items: center;
         justify-content: space-between;
+        gap: 10px;
+        padding: 13px 16px;
+        border-bottom: 1px solid var(--w-line);
+        background: var(--w-surface);
+        flex-shrink: 0;
       }
 
-      .chatify-header-info {
+      .chatify-header-info { display: flex; align-items: center; gap: 10px; min-width: 0; }
+
+      .chatify-back-btn,
+      .chatify-close-btn {
+        width: 30px;
+        height: 30px;
+        border-radius: var(--w-r-sm);
+        border: none;
+        background: transparent;
+        color: var(--w-ink-3);
+        font-size: 15px;
+        line-height: 1;
         display: flex;
         align-items: center;
-        gap: 10px;
+        justify-content: center;
+        flex-shrink: 0;
+        transition: background .16s var(--w-ease), color .16s var(--w-ease);
       }
 
-      .chatify-back-btn {
-        background: transparent;
-        border: none;
-        color: #94a3b8;
-        font-size: 16px;
-        cursor: pointer;
-        padding: 4px 6px;
-        border-radius: 6px;
-      }
-
-      .chatify-back-btn:hover {
-        color: white;
-        background: #1e293b;
-      }
+      .chatify-back-btn:hover,
+      .chatify-close-btn:hover { background: var(--w-surface-3); color: var(--w-ink); }
 
       .chatify-avatar {
-        width: 36px;
-        height: 36px;
-        border-radius: 10px;
-        background: ${this.config.primaryColor};
-        color: white;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-weight: 700;
-        font-size: 14px;
         position: relative;
-      }
-
-      .chatify-online-dot {
-        position: absolute;
-        bottom: -2px;
-        right: -2px;
-        width: 9px;
-        height: 9px;
+        width: 34px;
+        height: 34px;
         border-radius: 50%;
-        background: #10b981;
-        border: 2px solid #0f172a;
-      }
-
-      .chatify-header-text h3 {
-        font-size: 13px;
-        font-weight: 700;
-        color: #f8fafc;
-      }
-
-      .chatify-header-text p {
-        font-size: 11px;
-        color: #94a3b8;
-      }
-
-      .chatify-close-btn {
-        background: transparent;
-        border: none;
-        color: #94a3b8;
-        cursor: pointer;
-        padding: 6px;
+        background: var(--w-brand);
+        color: var(--w-on-brand);
         font-size: 14px;
-      }
-
-      .chatify-close-btn:hover {
-        color: white;
-      }
-
-      .chatify-body {
-        flex: 1;
-        overflow-y: auto;
-        padding: 16px;
-        display: flex;
-        flex-direction: column;
-        gap: 12px;
-        background: #090d16;
-      }
-
-      .chatify-prechat {
-        background: #1e293b;
-        border: 1px solid #334155;
-        border-radius: 14px;
-        padding: 20px;
-        text-align: center;
-        margin: auto 0;
-      }
-
-      .chatify-prechat h4 {
-        font-size: 15px;
         font-weight: 700;
-        color: white;
-        margin-bottom: 6px;
-      }
-
-      .chatify-prechat p {
-        font-size: 12px;
-        color: #94a3b8;
-        margin-bottom: 16px;
-      }
-
-      .chatify-form-group {
-        text-align: left;
-        margin-bottom: 12px;
-      }
-
-      .chatify-form-group label {
-        font-size: 11px;
-        font-weight: 600;
-        color: #cbd5e1;
-        display: block;
-        margin-bottom: 4px;
-      }
-
-      .chatify-input {
-        width: 100%;
-        padding: 9px 12px;
-        border-radius: 8px;
-        border: 1px solid #475569;
-        background: #0f172a;
-        color: white;
-        font-size: 12px;
-        outline: none;
-      }
-
-      .chatify-input:focus {
-        border-color: ${this.config.primaryColor};
-      }
-
-      .chatify-start-btn {
-        width: 100%;
-        padding: 10px;
-        border-radius: 8px;
-        border: none;
-        background: ${this.config.primaryColor};
-        color: white;
-        font-weight: 600;
-        font-size: 13px;
-        cursor: pointer;
-        margin-top: 6px;
-      }
-
-      .chatify-message-row {
-        display: flex;
-        flex-direction: column;
-      }
-
-      .chatify-msg-visitor {
-        align-self: flex-end;
-        background: ${this.config.primaryColor};
-        color: white;
-        padding: 10px 14px;
-        border-radius: 16px 16px 2px 16px;
-        max-width: 82%;
-        font-size: 13px;
-        line-height: 1.4;
-        word-break: break-word;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-      }
-
-      .chatify-msg-agent {
-        align-self: flex-start;
-        background: #1e293b;
-        color: #f1f5f9;
-        border: 1px solid #334155;
-        padding: 10px 14px;
-        border-radius: 16px 16px 16px 2px;
-        max-width: 82%;
-        font-size: 13px;
-        line-height: 1.4;
-        word-break: break-word;
-      }
-
-      .chatify-msg-time {
-        font-size: 10px;
-        color: #64748b;
-        margin-top: 3px;
-      }
-
-      .chatify-msg-visitor .chatify-msg-time {
-        color: rgba(255, 255, 255, 0.7);
-        text-align: right;
-      }
-
-      /* Post-Chat CSAT Rating Box */
-      .chatify-csat-box {
-        background: #1e293b;
-        border: 1px solid #334155;
-        border-radius: 14px;
-        padding: 16px;
-        text-align: center;
-        margin: 12px 0;
-      }
-
-      .chatify-csat-title {
-        font-size: 13px;
-        font-weight: 700;
-        color: white;
-        margin-bottom: 4px;
-      }
-
-      .chatify-csat-sub {
-        font-size: 11px;
-        color: #94a3b8;
-        margin-bottom: 12px;
-      }
-
-      .chatify-csat-emojis {
-        display: flex;
-        justify-content: center;
-        gap: 12px;
-      }
-
-      .chatify-csat-btn {
-        background: transparent;
-        border: none;
-        font-size: 24px;
-        cursor: pointer;
-        transition: transform 0.15s;
-      }
-
-      .chatify-csat-btn:hover {
-        transform: scale(1.3);
-      }
-
-      .chatify-footer {
-        padding: 12px 14px;
-        background: #0f172a;
-        border-top: 1px solid #1e293b;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-      }
-
-      .chatify-textarea {
-        flex: 1;
-        background: #1e293b;
-        border: 1px solid #334155;
-        border-radius: 10px;
-        padding: 9px 12px;
-        color: white;
-        font-size: 13px;
-        resize: none;
-        outline: none;
-        max-height: 80px;
-      }
-
-      .chatify-textarea:focus {
-        border-color: ${this.config.primaryColor};
-      }
-
-      .chatify-send-btn {
-        width: 38px;
-        height: 38px;
-        border-radius: 10px;
-        background: ${this.config.primaryColor};
-        color: white;
-        border: none;
-        cursor: pointer;
+        text-transform: uppercase;
         display: flex;
         align-items: center;
         justify-content: center;
         flex-shrink: 0;
       }
 
-      .chatify-send-btn svg {
-        width: 16px;
-        height: 16px;
-        fill: currentColor;
+      .chatify-online-dot {
+        position: absolute;
+        right: -1px;
+        bottom: -1px;
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: var(--w-success);
+        border: 2px solid var(--w-surface);
       }
 
-      /* Help Tab Styles */
-      .chatify-help-body {
+      .chatify-header-text { min-width: 0; }
+
+      .chatify-header-text h3 {
+        font-size: 14px;
+        font-weight: 600;
+        letter-spacing: -.012em;
+        color: var(--w-ink);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .chatify-header-text p {
+        font-size: 12px;
+        color: var(--w-ink-3);
+        margin-top: 1px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      /* ── Message body ─────────────────────────────────────────────── */
+
+      .chatify-body {
         flex: 1;
+        min-height: 0;
         overflow-y: auto;
         padding: 16px;
-        background: #090d16;
-      }
-
-      .chatify-help-search-bar input {
-        width: 100%;
-        padding: 10px 14px;
-        border-radius: 10px;
-        background: #1e293b;
-        border: 1px solid #334155;
-        color: white;
-        font-size: 12px;
-        outline: none;
-        margin-bottom: 14px;
-      }
-
-      .chatify-faq-list {
+        background: var(--w-canvas);
         display: flex;
         flex-direction: column;
         gap: 10px;
       }
 
-      .chatify-faq-item {
-        background: #0f172a;
-        border: 1px solid #1e293b;
-        border-radius: 12px;
-        padding: 12px 14px;
-        cursor: pointer;
-        transition: border-color 0.15s;
+      .chatify-prechat {
+        margin: auto 0;
+        background: var(--w-surface);
+        border: 1px solid var(--w-line);
+        border-radius: var(--w-r-md);
+        padding: 20px;
+        box-shadow: var(--w-shadow-sm);
+        animation: w-rise .35s var(--w-ease) both;
       }
 
-      .chatify-faq-item:hover {
-        border-color: #334155;
+      .chatify-prechat h4 {
+        font-size: 16px;
+        font-weight: 600;
+        letter-spacing: -.014em;
+        color: var(--w-ink);
       }
+
+      .chatify-prechat p {
+        margin: 5px 0 18px;
+        font-size: 13px;
+        line-height: 1.55;
+        color: var(--w-ink-2);
+      }
+
+      .chatify-form-group { margin-bottom: 12px; }
+
+      .chatify-form-group label {
+        display: block;
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--w-ink-2);
+        margin-bottom: 6px;
+      }
+
+      .chatify-input {
+        width: 100%;
+        height: 42px;
+        padding: 0 12px;
+        border-radius: var(--w-r-sm);
+        border: 1px solid var(--w-line-2);
+        background: var(--w-surface);
+        color: var(--w-ink);
+        font-size: 13.5px;
+        outline: none;
+        transition: border-color .16s var(--w-ease), box-shadow .16s var(--w-ease);
+      }
+
+      .chatify-input::placeholder { color: var(--w-ink-3); }
+
+      .chatify-input:focus {
+        border-color: var(--w-brand);
+        box-shadow: 0 0 0 3px var(--w-brand-a16);
+      }
+
+      .chatify-start-btn {
+        width: 100%;
+        height: 44px;
+        margin-top: 6px;
+        border: none;
+        border-radius: var(--w-r-sm);
+        background: var(--w-brand);
+        color: var(--w-on-brand);
+        font-size: 14px;
+        font-weight: 600;
+        box-shadow: var(--w-shadow-sm);
+        transition: filter .16s var(--w-ease), transform .12s var(--w-ease);
+      }
+
+      .chatify-start-btn:hover { filter: brightness(1.08); }
+      .chatify-start-btn:active { transform: scale(.985); }
+
+      .chatify-message-row {
+        display: flex;
+        animation: w-rise .26s var(--w-ease) both;
+      }
+
+      .chatify-msg-visitor,
+      .chatify-msg-agent {
+        max-width: 82%;
+        padding: 10px 13px;
+        font-size: 13.5px;
+        line-height: 1.55;
+      }
+
+      /* pre-wrap belongs on the text node only — on the bubble it would also
+         render the markup's own indentation as blank lines. */
+      .chatify-msg-text {
+        white-space: pre-wrap;
+        word-wrap: break-word;
+        overflow-wrap: anywhere;
+      }
+
+      .chatify-msg-visitor {
+        margin-left: auto;
+        background: var(--w-brand);
+        color: var(--w-on-brand);
+        border-radius: var(--w-r-md) var(--w-r-md) 4px var(--w-r-md);
+        box-shadow: var(--w-shadow-sm);
+      }
+
+      .chatify-msg-agent {
+        margin-right: auto;
+        background: var(--w-surface);
+        color: var(--w-ink);
+        border: 1px solid var(--w-line);
+        border-radius: var(--w-r-md) var(--w-r-md) var(--w-r-md) 4px;
+      }
+
+      .chatify-msg-time {
+        margin-top: 4px;
+        font-size: 10.5px;
+        color: var(--w-ink-3);
+        text-align: right;
+      }
+
+      .chatify-msg-visitor .chatify-msg-time { color: inherit; opacity: .68; }
+
+      /* ── CSAT ─────────────────────────────────────────────────────── */
+
+      .chatify-csat-box {
+        margin-top: 6px;
+        background: var(--w-surface);
+        border: 1px solid var(--w-line);
+        border-radius: var(--w-r-md);
+        padding: 16px;
+        text-align: center;
+        box-shadow: var(--w-shadow-sm);
+        animation: w-rise .3s var(--w-ease) both;
+      }
+
+      .chatify-csat-title {
+        font-size: 14px;
+        font-weight: 600;
+        letter-spacing: -.012em;
+        color: var(--w-ink);
+      }
+
+      .chatify-csat-sub {
+        margin-top: 3px;
+        font-size: 12px;
+        color: var(--w-ink-3);
+      }
+
+      .chatify-csat-emojis {
+        margin-top: 12px;
+        display: flex;
+        justify-content: center;
+        gap: 6px;
+      }
+
+      .chatify-csat-btn {
+        width: 42px;
+        height: 42px;
+        border-radius: var(--w-r-sm);
+        border: 1px solid var(--w-line);
+        background: var(--w-surface-2);
+        font-size: 20px;
+        line-height: 1;
+        transition: transform .18s var(--w-spring), border-color .16s var(--w-ease),
+          background .16s var(--w-ease);
+      }
+
+      .chatify-csat-btn:hover {
+        transform: scale(1.16) translateY(-2px);
+        border-color: var(--w-brand);
+        background: var(--w-brand-a08);
+      }
+
+      /* ── Composer ─────────────────────────────────────────────────── */
+
+      .chatify-footer {
+        display: flex;
+        align-items: flex-end;
+        gap: 8px;
+        padding: 12px 14px;
+        border-top: 1px solid var(--w-line);
+        background: var(--w-surface);
+        flex-shrink: 0;
+      }
+
+      .chatify-textarea {
+        flex: 1;
+        min-height: 42px;
+        max-height: 120px;
+        padding: 11px 13px;
+        border-radius: var(--w-r-md);
+        border: 1px solid var(--w-line-2);
+        background: var(--w-surface-2);
+        color: var(--w-ink);
+        font-size: 13.5px;
+        line-height: 1.45;
+        resize: none;
+        outline: none;
+        transition: border-color .16s var(--w-ease), box-shadow .16s var(--w-ease);
+      }
+
+      .chatify-textarea::placeholder { color: var(--w-ink-3); }
+
+      .chatify-textarea:focus {
+        border-color: var(--w-brand);
+        box-shadow: 0 0 0 3px var(--w-brand-a16);
+      }
+
+      .chatify-send-btn {
+        width: 42px;
+        height: 42px;
+        flex-shrink: 0;
+        border: none;
+        border-radius: var(--w-r-md);
+        background: var(--w-brand);
+        color: var(--w-on-brand);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: var(--w-shadow-sm);
+        transition: filter .16s var(--w-ease), transform .12s var(--w-ease);
+      }
+
+      .chatify-send-btn:hover { filter: brightness(1.08); }
+      .chatify-send-btn:active { transform: scale(.94); }
+
+      .chatify-send-btn svg { width: 19px; height: 19px; fill: currentColor; }
+
+      /* ── Help tab ─────────────────────────────────────────────────── */
+
+      .chatify-help-body {
+        flex: 1;
+        min-height: 0;
+        overflow-y: auto;
+        padding: 14px;
+        background: var(--w-canvas);
+      }
+
+      .chatify-help-search-bar { margin-bottom: 12px; }
+
+      .chatify-help-search-bar input {
+        width: 100%;
+        height: 42px;
+        padding: 0 13px;
+        border-radius: var(--w-r-sm);
+        border: 1px solid var(--w-line-2);
+        background: var(--w-surface);
+        color: var(--w-ink);
+        font-size: 13.5px;
+        outline: none;
+        transition: border-color .16s var(--w-ease), box-shadow .16s var(--w-ease);
+      }
+
+      .chatify-help-search-bar input::placeholder { color: var(--w-ink-3); }
+
+      .chatify-help-search-bar input:focus {
+        border-color: var(--w-brand);
+        box-shadow: 0 0 0 3px var(--w-brand-a16);
+      }
+
+      .chatify-faq-list { display: flex; flex-direction: column; gap: 8px; }
+
+      .chatify-faq-item {
+        background: var(--w-surface);
+        border: 1px solid var(--w-line);
+        border-radius: var(--w-r-md);
+        padding: 13px 14px;
+        cursor: pointer;
+        transition: border-color .16s var(--w-ease), box-shadow .16s var(--w-ease);
+      }
+
+      .chatify-faq-item:hover { border-color: var(--w-line-2); box-shadow: var(--w-shadow-sm); }
+      .chatify-faq-item.open { border-color: var(--w-brand); }
 
       .chatify-faq-q {
         display: flex;
         align-items: center;
         justify-content: space-between;
-        font-size: 12px;
+        gap: 10px;
+        font-size: 13.5px;
         font-weight: 600;
-        color: white;
+        line-height: 1.4;
+        color: var(--w-ink);
       }
 
       .chatify-faq-arrow {
-        font-size: 16px;
-        color: #64748b;
-        transition: transform 0.2s;
+        color: var(--w-ink-3);
+        font-size: 17px;
+        line-height: 1;
+        flex-shrink: 0;
+        transition: transform .22s var(--w-ease), color .16s var(--w-ease);
       }
 
       .chatify-faq-item.open .chatify-faq-arrow {
         transform: rotate(90deg);
+        color: var(--w-brand);
       }
 
       .chatify-faq-a {
-        display: none;
-        font-size: 11px;
-        color: #94a3b8;
-        line-height: 1.5;
-        margin-top: 8px;
-        padding-top: 8px;
-        border-top: 1px solid #1e293b;
+        max-height: 0;
+        overflow: hidden;
+        opacity: 0;
+        font-size: 13px;
+        line-height: 1.6;
+        color: var(--w-ink-2);
+        transition: max-height .28s var(--w-ease), opacity .22s var(--w-ease),
+          margin-top .28s var(--w-ease);
       }
 
       .chatify-faq-item.open .chatify-faq-a {
-        display: block;
+        max-height: 260px;
+        opacity: 1;
+        margin-top: 9px;
       }
 
-      /* Bottom Navigation Bar (Intercom style) */
+      /* ── Bottom navigation ────────────────────────────────────────── */
+
       .chatify-bottom-nav {
-        height: 56px;
-        background: #0f172a;
-        border-top: 1px solid #1e293b;
         display: flex;
-        align-items: center;
-        justify-content: space-around;
+        border-top: 1px solid var(--w-line);
+        background: var(--w-surface);
+        padding: 6px 6px calc(6px + env(safe-area-inset-bottom, 0px));
+        flex-shrink: 0;
       }
 
       .chatify-nav-item {
-        background: transparent;
+        position: relative;
+        flex: 1;
         border: none;
-        color: #64748b;
-        font-size: 11px;
-        font-weight: 600;
-        cursor: pointer;
+        background: transparent;
+        color: var(--w-ink-3);
+        padding: 7px 0 6px;
+        border-radius: var(--w-r-sm);
         display: flex;
         flex-direction: column;
         align-items: center;
-        gap: 2px;
-        padding: 6px 16px;
-        border-radius: 8px;
-        transition: color 0.15s;
+        gap: 3px;
+        font-size: 11px;
+        font-weight: 600;
+        transition: color .16s var(--w-ease), background .16s var(--w-ease);
       }
 
-      .chatify-nav-item:hover {
-        color: #cbd5e1;
-      }
+      .chatify-nav-item svg { transition: transform .2s var(--w-spring); }
+      .chatify-nav-item:hover { color: var(--w-ink-2); background: var(--w-surface-2); }
 
-      .chatify-nav-item.active {
-        color: ${this.config.primaryColor};
-      }
+      .chatify-nav-item.active { color: var(--w-brand); }
+      .chatify-nav-item.active svg { transform: translateY(-1px) scale(1.06); }
 
-      .nav-msg-icon-wrap {
-        position: relative;
-      }
+      .nav-msg-icon-wrap { position: relative; display: flex; }
 
       .chatify-nav-badge {
         position: absolute;
-        top: -2px;
+        top: -3px;
         right: -6px;
-        background: #ef4444;
-        color: white;
-        border-radius: 9999px;
-        font-size: 9px;
-        font-weight: 800;
-        min-width: 14px;
-        height: 14px;
-        padding: 0 3px;
-        display: flex;
+        min-width: 15px;
+        height: 15px;
+        padding: 0 4px;
+        border-radius: 999px;
+        background: #e11d48;
+        color: #fff;
+        font-size: 9.5px;
+        font-weight: 700;
+        display: none;
         align-items: center;
         justify-content: center;
+        border: 2px solid var(--w-surface);
+      }
+
+      /* ── Motion ───────────────────────────────────────────────────── */
+
+      @keyframes w-window-in {
+        from { opacity: 0; transform: translateY(14px) scale(.985); }
+        to   { opacity: 1; transform: none; }
+      }
+
+      @keyframes w-rise {
+        from { opacity: 0; transform: translateY(7px); }
+        to   { opacity: 1; transform: none; }
+      }
+
+      @keyframes w-fade { from { opacity: 0; } to { opacity: 1; } }
+
+      @keyframes w-pop {
+        from { opacity: 0; transform: scale(.6); }
+        to   { opacity: 1; transform: none; }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        *, *::before, *::after {
+          animation-duration: .01ms !important;
+          transition-duration: .01ms !important;
+        }
       }
     `;
   }
@@ -1426,9 +1692,9 @@ class ChatifyWidget {
 
     if (this.messages.length === 0) {
       body.innerHTML = `
-        <div style="text-align:center; margin:auto 0; color:#64748b; font-size:12px;">
-          <p style="color:#94a3b8; font-weight:600; margin-bottom:4px;">How can we help you today?</p>
-          <p>Send a message below and our support team will join the chat.</p>
+        <div style="text-align:center; margin:auto 0; padding:0 18px;">
+          <p style="color:var(--w-ink); font-size:15px; font-weight:600; letter-spacing:-.012em; margin-bottom:5px;">How can we help?</p>
+          <p style="color:var(--w-ink-2); font-size:13px; line-height:1.55;">Send a message below and someone from our team will pick it up.</p>
         </div>
       `;
       return;
@@ -1446,10 +1712,9 @@ class ChatifyWidget {
 
       const bubble = document.createElement('div');
       bubble.className = isVisitor ? 'chatify-msg-visitor' : 'chatify-msg-agent';
-      bubble.innerHTML = `
-        <div>${this.escapeHTML(msg.content)}</div>
-        <div class="chatify-msg-time">${timeStr}</div>
-      `;
+      // Kept on one line: the text element preserves whitespace, so any
+      // indentation in this template would be rendered as blank lines.
+      bubble.innerHTML = `<div class="chatify-msg-text">${this.escapeHTML(msg.content)}</div><div class="chatify-msg-time">${timeStr}</div>`;
 
       row.appendChild(bubble);
       body.appendChild(row);
@@ -1479,7 +1744,7 @@ class ChatifyWidget {
       body.appendChild(csatCard);
     } else if (this.csatRated) {
       const thankYou = document.createElement('div');
-      thankYou.style.cssText = 'text-align:center; padding:10px; font-size:12px; color:#34d399; font-weight:600;';
+      thankYou.style.cssText = 'text-align:center; padding:12px; font-size:12.5px; color:var(--w-success); font-weight:600;';
       thankYou.textContent = '✓ Thank you for rating our support!';
       body.appendChild(thankYou);
     }
