@@ -841,6 +841,26 @@
   }
 }
 
+@keyframes ds-radar-sweep {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes ds-pulse-glow {
+  0%, 100% {
+    opacity: 0.8;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.35;
+    transform: scale(1.08);
+  }
+}
+
 .animate-rise {
   animation: ds-rise 0.55s var(--ds-ease-out) both;
 }
@@ -855,6 +875,12 @@
 }
 .animate-spin-slow {
   animation: ds-spin 1s linear infinite;
+}
+.animate-radar {
+  animation: ds-radar-sweep 4s linear infinite;
+}
+.animate-glow {
+  animation: ds-pulse-glow 2.5s var(--ds-ease) infinite;
 }
 
 .delay-1 { animation-delay: 0.06s; }

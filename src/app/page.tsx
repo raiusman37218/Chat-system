@@ -3,6 +3,7 @@ import Script from 'next/script';
 import {
   ArrowRight,
   Blocks,
+  Bot,
   Check,
   Code2,
   Fingerprint,
@@ -16,6 +17,8 @@ import {
   Zap,
 } from 'lucide-react';
 import { ProductShowcase } from '@/components/marketing/ProductShowcase';
+import { LandingNav } from '@/components/marketing/LandingNav';
+import { FaqSection } from '@/components/marketing/FaqSection';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { Logo } from '@/components/ui/Logo';
 
@@ -91,52 +94,7 @@ export default function HomePage() {
   return (
     <div className="min-h-screen flex flex-col bg-canvas">
       {/* ───────────────────────── Navigation ───────────────────────── */}
-      <header className="sticky top-0 z-50 border-b border-line glass">
-        <div className="u-container h-16 flex items-center justify-between gap-6">
-          <Link href="/" className="flex items-center shrink-0">
-            <Logo size={34} />
-          </Link>
-
-          <nav className="hidden md:flex items-center gap-1 text-[13px] font-medium">
-            {[
-              ['Product', '#product'],
-              ['How it works', '#how'],
-              ['Install', '#install'],
-            ].map(([label, href]) => (
-              <a
-                key={href}
-                href={href}
-                className="px-3 py-1.5 rounded-lg text-ink-2 hover:text-ink hover:bg-surface-3 transition-colors"
-              >
-                {label}
-              </a>
-            ))}
-            <a
-              href="/demo.html"
-              target="_blank"
-              rel="noreferrer"
-              className="px-3 py-1.5 rounded-lg text-ink-2 hover:text-ink hover:bg-surface-3 transition-colors inline-flex items-center gap-1.5"
-            >
-              Live demo
-              <span className="live-dot" />
-            </a>
-          </nav>
-
-          <div className="flex items-center gap-2.5">
-            <ThemeToggle className="hidden sm:inline-flex" />
-            <Link
-              href="/login"
-              className="hidden sm:inline-flex btn btn-sm btn-ghost"
-            >
-              Sign in
-            </Link>
-            <Link href="/signup" className="btn btn-sm btn-primary">
-              Get started
-              <ArrowRight className="w-3.5 h-3.5" />
-            </Link>
-          </div>
-        </div>
-      </header>
+      <LandingNav />
 
       <main className="flex-1">
         {/* ───────────────────────── Hero ───────────────────────── */}
@@ -145,12 +103,15 @@ export default function HomePage() {
 
           <div className="u-container relative pt-20 pb-16 sm:pt-28 sm:pb-20">
             <div className="max-w-3xl mx-auto text-center">
-              <div className="animate-rise inline-flex items-center gap-2 h-7 pl-1.5 pr-3 rounded-full border border-line bg-surface shadow-xs text-[12px] font-medium text-ink-2">
-                <span className="inline-flex items-center h-5 px-2 rounded-full bg-ink text-ink-inv text-[10px] font-bold tracking-wide">
+              <a
+                href="#product"
+                className="animate-rise inline-flex items-center gap-2 h-7 pl-1.5 pr-3 rounded-full border border-line bg-surface hover:border-accent shadow-xs text-[12px] font-medium text-ink-2 transition-all hover:scale-102"
+              >
+                <span className="inline-flex items-center h-5 px-2 rounded-full bg-accent text-white text-[10px] font-bold tracking-wide">
                   NEW
                 </span>
-                Live visitor radar is here
-              </div>
+                Live visitor radar & AI Autopilot are live →
+              </a>
 
               <h1 className="animate-rise delay-1 mt-7 text-[2.6rem] leading-[1.05] sm:text-6xl sm:leading-[1.03] font-semibold text-ink">
                 Live chat your customers
@@ -344,6 +305,22 @@ export default function HomePage() {
             </div>
 
             {/* Small cells */}
+            <div className="card card-hover p-6 flex flex-col justify-between">
+              <div>
+                <div className="w-9 h-9 rounded-xl bg-purple-500/10 border border-purple-500/20 text-purple-600 dark:text-purple-300 flex items-center justify-center mb-4">
+                  <Bot className="w-4.5 h-4.5" />
+                </div>
+                <h3 className="text-[15px] font-semibold text-ink">AI Autopilot & Copilot</h3>
+                <p className="mt-1.5 text-[13px] leading-relaxed text-ink-2">
+                  Answer routine questions 24/7, draft contextual responses for agents, and summarize threads with one click.
+                </p>
+              </div>
+              <div className="mt-4 pt-3 border-t border-line/60 flex items-center gap-1.5 text-[11px] font-semibold text-purple-600 dark:text-purple-300">
+                <Sparkles className="w-3 h-3" />
+                <span>AI auto-reply & suggestions</span>
+              </div>
+            </div>
+
             {[
               {
                 Icon: Zap,
@@ -352,13 +329,8 @@ export default function HomePage() {
               },
               {
                 Icon: ShieldCheck,
-                title: 'Tenant isolation',
-                body: 'Row-level security scopes every conversation, visitor and agent to one workspace.',
-              },
-              {
-                Icon: Layers,
-                title: 'Shadow DOM sandbox',
-                body: 'The widget carries its own style tree. No host stylesheet can reach in and break it.',
+                title: 'Isolated & Secure',
+                body: 'Row-level security scopes every conversation, and Shadow DOM prevents style collisions.',
               },
             ].map(({ Icon, title, body }) => (
               <div key={title} className="card card-hover p-6">
@@ -383,7 +355,7 @@ export default function HomePage() {
                     Built for the person doing the replying
                   </h3>
                   <p className="mt-2 text-[13.5px] leading-relaxed text-ink-2">
-                    Saved replies behind a <span className="kbd">#</span>{' '}
+                    Saved replies behind a <span className="kbd">/</span>{' '}
                     shortcut, private team notes the customer never sees,
                     priority and tags, assignment, and a CSAT rating collected
                     the moment you resolve.
@@ -508,6 +480,9 @@ export default function HomePage() {
             </div>
           </div>
         </section>
+
+        {/* ───────────────────────── FAQ ───────────────────────── */}
+        <FaqSection />
 
         {/* ───────────────────────── CTA ───────────────────────── */}
         <section className="u-container pb-24">

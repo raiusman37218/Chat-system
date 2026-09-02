@@ -192,14 +192,23 @@ export function VisitorDetailsSidebar({
   const liveUrl =
     liveVisitor.current_page_url || liveVisitor.current_url || '/';
 
+  const [copiedEmail, setCopiedEmail] = useState(false);
+
+  const handleCopyEmail = (email: string) => {
+    navigator.clipboard.writeText(email);
+    setCopiedEmail(true);
+    setTimeout(() => setCopiedEmail(false), 2000);
+  };
+
   return (
-    <aside className="hidden xl:flex w-[320px] 2xl:w-[340px] shrink-0 h-screen border-l border-line bg-surface flex-col overflow-y-auto select-none">
+    <aside className="hidden xl:flex w-[280px] 2xl:w-[300px] shrink-0 h-screen border-l border-line bg-surface flex-col overflow-y-auto select-none relative z-10">
       {/* ── 1. Profile Header & Identity ── */}
-      <div className="px-5 py-5 flex flex-col items-center text-center border-b border-line relative bg-surface-2/30">
+      <div className="px-5 py-6 flex flex-col items-center text-center border-b border-line/80 relative bg-surface-2/40">
         {onClose && (
           <button
             onClick={onClose}
-            className="absolute top-3 right-3 p-1 rounded-md text-ink-3 hover:text-ink hover:bg-surface-3 transition-colors"
+            title="Close sidebar"
+            className="absolute top-3 right-3 p-1.5 rounded-lg text-ink-3 hover:text-ink hover:bg-surface-2 transition-colors"
           >
             <X className="w-4 h-4" />
           </button>
@@ -208,36 +217,48 @@ export function VisitorDetailsSidebar({
         <Avatar
           name={displayName}
           seed={liveVisitor.id}
-          size="md"
+          size="lg"
           muted={!liveVisitor.name && !liveVisitor.email}
           online={isOnline}
+          className="shadow-sm ring-2 ring-black/5 dark:ring-white/10"
         />
-        <h2 className="mt-2.5 text-[14.5px] font-bold tracking-tight text-ink">
+        <h2 className="mt-3 text-[15px] font-bold tracking-tight text-ink">
           {displayName}
         </h2>
 
         {liveVisitor.email ? (
-          <a
-            href={`mailto:${liveVisitor.email}`}
-            className="mt-0.5 inline-flex items-center gap-1.5 text-[12px] text-ink-2 hover:text-accent transition-colors max-w-full truncate"
-          >
-            <Mail className="w-3 h-3 shrink-0 text-ink-3" />
-            <span className="truncate">{liveVisitor.email}</span>
-          </a>
+          <div className="mt-1 flex items-center gap-1.5 max-w-full">
+            <a
+              href={`mailto:${liveVisitor.email}`}
+              className="inline-flex items-center gap-1.5 text-[12px] text-ink-2 hover:text-accent transition-colors truncate font-medium"
+            >
+              <Mail className="w-3.5 h-3.5 shrink-0 text-ink-3" />
+              <span className="truncate">{liveVisitor.email}</span>
+            </a>
+            <button
+              onClick={() => handleCopyEmail(liveVisitor.email!)}
+              title={copiedEmail ? 'Copied!' : 'Copy email'}
+              className="text-[10px] text-ink-3 hover:text-ink px-1.5 py-0.5 rounded bg-surface-3 hover:bg-surface-2 transition-colors shrink-0"
+            >
+              {copiedEmail ? 'Copied' : 'Copy'}
+            </button>
+          </div>
         ) : (
-          <p className="mt-0.5 text-[11.5px] text-ink-3">No email captured</p>
+          <p className="mt-1 text-[11.5px] text-ink-3">Anonymous visitor</p>
         )}
 
         <span
           className={cn(
-            'mt-2.5 pill text-[11px] font-medium',
-            isOnline ? 'pill-success' : 'pill-neutral'
+            'mt-3 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold border shadow-xs',
+            isOnline
+              ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
+              : 'bg-surface-2 text-ink-3 border-line'
           )}
         >
           {isOnline ? (
             <>
               <span className="live-dot" />
-              Online on site
+              Active on website
             </>
           ) : (
             <>Last seen {formatTimeAgo(liveVisitor.last_seen || liveVisitor.last_seen_at)}</>
@@ -246,8 +267,8 @@ export function VisitorDetailsSidebar({
       </div>
 
       <div className="p-4 space-y-4">
-        {/* ── 2. Live Currently Viewing Page (Realtime updates) ── */}
-        <Section title="Currently Viewing (Live)">
+        {/* ── 2. Live Currently Viewing Page ── */}
+        <Section title="Currently Viewing">
           <div className="px-3 py-2.5">
             <a
               href={liveUrl}
@@ -271,8 +292,8 @@ export function VisitorDetailsSidebar({
           </div>
         </Section>
 
-        {/* ── 3. Device, Location, Visit Count & Time on Site ── */}
-        <Section title="Visitor Environment">
+        {/* ── 3. Device, Location, Visit Count & Telemetry ── */}
+        <Section title="Visitor Details">
           <Row Icon={MapPin} label="Location">
             {liveVisitor.ip_location_city || liveVisitor.location
               ? `${liveVisitor.ip_location_city || liveVisitor.location}${
@@ -280,10 +301,10 @@ export function VisitorDetailsSidebar({
                     ? `, ${liveVisitor.ip_location_country}`
                     : ''
                 }`
-              : 'Unknown location'}
+              : 'Global / Web'}
           </Row>
           <Row Icon={Monitor} label="Device">
-            {liveVisitor.device || browser} · {liveVisitor.os || os}
+            {liveVisitor.device || (browser && !browser.includes('Unknown') ? `${browser} · ${os}` : 'Desktop · Web')}
           </Row>
           <Row Icon={Hash} label="Visits">
             <span className="tabular-nums font-bold">
@@ -306,7 +327,7 @@ export function VisitorDetailsSidebar({
           action={
             <button
               onClick={() => setShowTagInput(!showTagInput)}
-              className="text-[11px] text-accent hover:underline flex items-center gap-0.5"
+              className="text-[11px] text-accent hover:underline flex items-center gap-0.5 font-semibold"
             >
               <Plus className="w-3 h-3" />
               Add
@@ -316,12 +337,21 @@ export function VisitorDetailsSidebar({
           <div className="p-3">
             <div className="flex flex-wrap gap-1.5">
               {(conversation.tags || []).length === 0 && !showTagInput ? (
-                <EmptyState
-                  type="no-tags"
-                  quickTags={PRESET_TAGS}
-                  onSelectTag={handleToggleTag}
-                  className="py-1 px-0"
-                />
+                <div className="py-2 text-center w-full">
+                  <p className="text-[11.5px] text-ink-3 mb-2">No tags applied yet</p>
+                  <div className="flex flex-wrap justify-center gap-1">
+                    {PRESET_TAGS.slice(0, 4).map((preset) => (
+                      <button
+                        key={preset}
+                        type="button"
+                        onClick={() => handleToggleTag(preset)}
+                        className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-surface-2 text-ink-2 border border-line hover:border-accent hover:text-accent transition-colors"
+                      >
+                        +{preset}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               ) : (
                 (conversation.tags || []).map((tag) => (
                   <span

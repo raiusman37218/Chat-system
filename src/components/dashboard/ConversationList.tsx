@@ -224,32 +224,33 @@ export function ConversationList({
   ];
 
   return (
-    <div className="w-[340px] shrink-0 h-screen flex flex-col border-r border-line bg-surface select-none">
-      {/* ── Header: title + search, then one row of queues.
-          Channel and tag filters used to sit here as two more scrolling pill
-          strips; they live behind the Filter button now, because they are
-          occasional controls and were pushing the actual conversations below
-          the fold. ── */}
-      <div className="px-3 pt-3.5 pb-2.5 border-b border-line space-y-2.5">
+    <div className="w-full md:w-[310px] shrink-0 h-screen flex flex-col border-r border-line bg-surface select-none">
+      <div className="p-3 border-b border-line/80 space-y-2.5 bg-surface/50 backdrop-blur-xs">
         <div className="flex items-center justify-between gap-2 px-1">
-          <h2 className="text-[14px] font-semibold tracking-tight text-ink">
-            Inbox
-          </h2>
-          <span className="text-[11px] text-ink-3 tabular-nums">
-            {filteredAndSorted.length}
-          </span>
+          <div className="flex items-center gap-2">
+            <h2 className="text-[14px] font-bold tracking-tight text-ink">
+              Inbox
+            </h2>
+            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-surface-2 text-ink-3 border border-line">
+              {filteredAndSorted.length}
+            </span>
+          </div>
+          {statusView !== 'open' && (
+            <span className="text-[10.5px] font-semibold px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-600 dark:text-amber-400 capitalize">
+              {statusView}
+            </span>
+          )}
         </div>
 
-        {/* Search */}
         <div className="relative">
           <Search className="w-3.5 h-3.5 text-ink-3 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
           <input
             ref={searchInputRef}
             type="text"
-            placeholder="Search conversations"
+            placeholder="Search conversations..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="input input-sm pl-8.5 pr-12 bg-surface-2 text-[12.5px] w-full"
+            className="input input-sm pl-8.5 pr-14 bg-surface-2 text-[12.5px] w-full border-line/70 focus:border-accent"
           />
           {searchQuery ? (
             <button
@@ -260,35 +261,36 @@ export function ConversationList({
               <X className="w-3.5 h-3.5" />
             </button>
           ) : (
-            <span className="kbd absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none">
+            <span className="kbd absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-[10px]">
               Ctrl K
             </span>
           )}
         </div>
 
-        {/* Queues + filter affordance */}
         <div className="flex items-center gap-1.5">
-          <div className="flex-1 min-w-0 flex items-center gap-0.5 p-0.5 rounded-lg bg-surface-2 border border-line overflow-x-auto scrollbar-none">
+          <div className="flex-1 min-w-0 flex items-center gap-1 p-1 rounded-xl bg-surface-2 border border-line/70 overflow-x-auto scrollbar-none">
             {queueTabs.map((tab) => {
               const active = activeQueue === tab.id;
               return (
                 <button
                   key={tab.id}
                   onClick={() => setActiveQueue(tab.id)}
-                  title={tab.label + ' (' + tab.count + ')'}
+                  title={`${tab.label} (${tab.count})`}
                   className={cn(
-                    'h-6 px-2 rounded-md text-[11.5px] font-medium whitespace-nowrap transition-colors flex items-center gap-1.5 shrink-0',
+                    'h-6 px-2.5 rounded-lg text-[11.5px] font-semibold whitespace-nowrap transition-all flex items-center justify-center gap-1.5 flex-1 shrink-0',
                     active
-                      ? 'bg-surface text-ink shadow-xs font-semibold'
+                      ? 'bg-surface text-ink shadow-xs border border-line/50 font-bold'
                       : 'text-ink-3 hover:text-ink'
                   )}
                 >
-                  {tab.label}
+                  <span>{tab.label}</span>
                   {tab.count > 0 && (
                     <span
                       className={cn(
-                        'tabular-nums text-[10px]',
-                        active ? 'text-accent' : 'text-ink-3'
+                        'tabular-nums text-[10px] px-1.5 py-0.2 rounded-full font-bold',
+                        active
+                          ? 'bg-accent/10 text-accent'
+                          : 'bg-surface-3 text-ink-3'
                       )}
                     >
                       {tab.count}
@@ -303,52 +305,51 @@ export function ConversationList({
             <button
               onClick={() => setShowFilters((v) => !v)}
               aria-label="Filters"
+              title="Filter channels and status"
               className={cn(
-                'w-7 h-7 rounded-lg border flex items-center justify-center transition-colors relative',
+                'w-8 h-8 rounded-xl border flex items-center justify-center transition-all shadow-xs',
                 hasActiveFilters
-                  ? 'border-accent-line bg-accent-soft text-accent'
-                  : 'border-line bg-surface-2 text-ink-3 hover:text-ink'
+                  ? 'border-accent bg-accent/10 text-accent font-bold ring-2 ring-accent/15'
+                  : 'border-line/80 bg-surface-2 text-ink-3 hover:text-ink hover:bg-surface-3'
               )}
             >
               <SlidersHorizontal className="w-3.5 h-3.5" />
             </button>
 
             {showFilters && (
-              <div className="absolute right-0 top-[calc(100%+6px)] z-50 w-60 p-2.5 rounded-xl border border-line bg-surface shadow-lg animate-pop">
-                {/* Open / snoozed / closed is a state, not a queue — keeping it
-                    out of the tab row is what stops that row overflowing. */}
-                <div className="eyebrow mb-1.5">Status</div>
-                <div className="flex flex-wrap gap-1 mb-3">
+              <div className="absolute right-0 top-[calc(100%+6px)] z-50 w-64 p-3 rounded-2xl border border-line bg-surface shadow-xl animate-pop">
+                <div className="eyebrow mb-1.5 text-[10px] font-bold text-ink-3 uppercase">Status</div>
+                <div className="flex flex-wrap gap-1.5 mb-3">
                   {statusViews.map((v) => (
                     <button
                       key={v.id}
                       onClick={() => setStatusView(v.id)}
                       className={cn(
-                        'px-2 h-6 rounded-md text-[11px] font-medium transition-colors inline-flex items-center gap-1.5',
+                        'px-2.5 h-6.5 rounded-lg text-[11px] font-semibold transition-all inline-flex items-center gap-1.5',
                         statusView === v.id
-                          ? 'bg-ink text-ink-inv'
-                          : 'bg-surface-2 text-ink-2 hover:bg-surface-3'
+                          ? 'bg-ink text-ink-inv shadow-xs'
+                          : 'bg-surface-2 text-ink-2 hover:bg-surface-3 border border-line/60'
                       )}
                     >
                       {v.label}
                       {v.count ? (
-                        <span className="tabular-nums opacity-70">{v.count}</span>
+                        <span className="tabular-nums text-[10px] opacity-75">{v.count}</span>
                       ) : null}
                     </button>
                   ))}
                 </div>
 
-                <div className="eyebrow mb-1.5">Channel</div>
-                <div className="flex flex-wrap gap-1 mb-3">
+                <div className="eyebrow mb-1.5 text-[10px] font-bold text-ink-3 uppercase">Channel</div>
+                <div className="flex flex-wrap gap-1.5 mb-3">
                   {CHANNELS.map((ch) => (
                     <button
                       key={ch.value}
                       onClick={() => setChannelFilter(ch.value)}
                       className={cn(
-                        'px-2 h-6 rounded-md text-[11px] font-medium transition-colors',
+                        'px-2.5 h-6.5 rounded-lg text-[11px] font-semibold transition-all',
                         channelFilter === ch.value
-                          ? 'bg-ink text-ink-inv'
-                          : 'bg-surface-2 text-ink-2 hover:bg-surface-3'
+                          ? 'bg-ink text-ink-inv shadow-xs'
+                          : 'bg-surface-2 text-ink-2 hover:bg-surface-3 border border-line/60'
                       )}
                     >
                       {ch.label}
@@ -356,96 +357,65 @@ export function ConversationList({
                   ))}
                 </div>
 
-                <div className="eyebrow mb-1.5">Tag</div>
-                <div className="flex flex-wrap gap-1 max-h-32 overflow-y-auto">
-                  <button
-                    onClick={() => setSelectedTagFilter('all')}
-                    className={cn(
-                      'px-2 h-6 rounded-md text-[11px] font-medium transition-colors',
-                      selectedTagFilter === 'all'
-                        ? 'bg-ink text-ink-inv'
-                        : 'bg-surface-2 text-ink-2 hover:bg-surface-3'
-                    )}
-                  >
-                    Any
-                  </button>
-                  {availableTags.map((tag) => (
-                    <button
-                      key={tag}
-                      onClick={() =>
-                        setSelectedTagFilter(
-                          selectedTagFilter === tag ? 'all' : tag
-                        )
-                      }
-                      className={cn(
-                        'px-2 h-6 rounded-md text-[11px] font-medium transition-colors',
-                        selectedTagFilter === tag
-                          ? 'bg-ink text-ink-inv'
-                          : 'bg-surface-2 text-ink-2 hover:bg-surface-3'
-                      )}
-                    >
-                      {tag}
-                    </button>
-                  ))}
-                </div>
+                {availableTags.length > 0 && (
+                  <>
+                    <div className="eyebrow mb-1.5 text-[10px] font-bold text-ink-3 uppercase">Tag</div>
+                    <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto">
+                      <button
+                        onClick={() => setSelectedTagFilter('all')}
+                        className={cn(
+                          'px-2.5 h-6 rounded-lg text-[10.5px] font-semibold transition-all',
+                          selectedTagFilter === 'all'
+                            ? 'bg-ink text-ink-inv'
+                            : 'bg-surface-2 text-ink-2 hover:bg-surface-3 border border-line/60'
+                        )}
+                      >
+                        All tags
+                      </button>
+                      {availableTags.map((tag) => (
+                        <button
+                          key={tag}
+                          onClick={() => setSelectedTagFilter(tag)}
+                          className={cn(
+                            'px-2 h-6 rounded-lg text-[10.5px] font-semibold transition-all flex items-center gap-1',
+                            selectedTagFilter === tag
+                              ? 'bg-accent text-accent-ink'
+                              : 'bg-surface-2 text-ink-2 hover:bg-surface-3 border border-line/60'
+                          )}
+                        >
+                          <TagIcon className="w-2.5 h-2.5" />
+                          #{tag}
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
 
                 {hasActiveFilters && (
-                  <button
-                    onClick={() => {
-                      setChannelFilter('all');
-                      setSelectedTagFilter('all');
-                      setStatusView('open');
-                    }}
-                    className="mt-3 w-full btn btn-xs btn-secondary"
-                  >
-                    Reset filters
-                  </button>
+                  <div className="pt-2 mt-2 border-t border-line/80 flex justify-end">
+                    <button
+                      onClick={() => {
+                        setStatusView('open');
+                        setChannelFilter('all');
+                        setSelectedTagFilter('all');
+                      }}
+                      className="text-[11px] font-semibold text-accent hover:underline"
+                    >
+                      Reset all filters
+                    </button>
+                  </div>
                 )}
               </div>
             )}
           </div>
         </div>
-
-        {/* Active filters, shown only when they are actually narrowing things */}
-        {hasActiveFilters && (
-          <div className="flex items-center gap-1 flex-wrap px-0.5">
-            {statusView !== 'open' && (
-              <button
-                onClick={() => setStatusView('open')}
-                className="pill pill-accent"
-              >
-                {statusView === 'closed' ? 'Closed' : 'Snoozed'}
-                <X className="w-2.5 h-2.5 opacity-60" />
-              </button>
-            )}
-            {channelFilter !== 'all' && (
-              <button
-                onClick={() => setChannelFilter('all')}
-                className="pill pill-accent"
-              >
-                {CHANNELS.find((c) => c.value === channelFilter)?.label}
-                <X className="w-2.5 h-2.5 opacity-60" />
-              </button>
-            )}
-            {selectedTagFilter !== 'all' && (
-              <button
-                onClick={() => setSelectedTagFilter('all')}
-                className="pill pill-accent"
-              >
-                {selectedTagFilter}
-                <X className="w-2.5 h-2.5 opacity-60" />
-              </button>
-            )}
-          </div>
-        )}
       </div>
 
-      {/* ── 2. Conversation List (with Urgent Priority Sorting & Badges) ── */}
-      <div className="flex-1 overflow-y-auto divide-y divide-line/60">
+      <div className="flex-1 overflow-y-auto px-2 py-2 space-y-1">
         {loading ? (
-          <ConversationListSkeleton count={6} />
+          <ConversationListSkeleton />
         ) : filteredAndSorted.length === 0 ? (
-          <div className="h-full flex items-center justify-center p-4">
+          <div className="p-4 flex items-center justify-center h-full">
             {searchQuery ? (
               <EmptyState
                 type="no-search-results"
@@ -498,27 +468,26 @@ export function ConversationList({
                 key={conv.id}
                 onClick={() => onSelectConversation(conv.id)}
                 className={cn(
-                  'w-full text-left p-3.5 transition-all flex items-start gap-3 relative border-l-3',
+                  'w-full text-left p-3 rounded-xl transition-all duration-150 flex items-start gap-3 relative border cursor-pointer group',
                   selected
-                    ? 'bg-surface-2 border-accent shadow-xs'
+                    ? 'bg-surface-2 border-line-2 shadow-xs ring-1 ring-accent/25'
                     : hasUnread
-                    ? 'bg-blue-50/30 dark:bg-blue-950/15 border-blue-500 hover:bg-surface-2'
-                    : isUrgent
-                    ? 'bg-red-50/30 dark:bg-red-950/15 border-red-500 hover:bg-surface-2'
-                    : 'border-transparent hover:bg-surface-2/60'
+                    ? 'bg-surface border-line/90 hover:bg-surface-2/80 hover:border-line-2 shadow-xs'
+                    : 'bg-surface border-line/60 hover:bg-surface-2/70 hover:border-line/90 shadow-xs'
                 )}
               >
-                {/* Visitor Avatar with live online indicator */}
+                {selected && (
+                  <span className="absolute left-0 top-2.5 bottom-2.5 w-1 rounded-r-full bg-accent" />
+                )}
                 <Avatar
                   name={name}
                   seed={conv.visitor_id}
                   size="md"
                   online={online}
                   muted={!conv.visitor?.name && !conv.visitor?.email}
-                  className="shrink-0 mt-0.5"
+                  className="shrink-0 mt-0.5 shadow-xs"
                 />
 
-                {/* Conversation Meta & Snippet */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between gap-1.5">
                     <span
@@ -527,23 +496,21 @@ export function ConversationList({
                         hasUnread
                           ? 'font-bold text-ink'
                           : selected
-                          ? 'font-semibold text-ink'
-                          : 'font-medium text-ink-2'
+                          ? 'font-bold text-accent'
+                          : 'font-semibold text-ink group-hover:text-ink'
                       )}
                     >
                       {name}
                     </span>
 
-                    {/* Relative Timestamp */}
-                    <span className="text-[11px] text-ink-3 shrink-0 tabular-nums font-mono">
+                    <span className="text-[10.5px] text-ink-3 shrink-0 tabular-nums font-mono">
                       {formatTimeAgo(conv.updated_at || conv.created_at)}
                     </span>
                   </div>
 
-                  {/* 2-Line AI Summary for long threads, or Last Message Snippet */}
                   {conv.summary ? (
-                    <div className="mt-1.5 p-2 rounded-lg bg-accent-soft/35 border border-accent-line/60 text-[11.5px] leading-tight">
-                      <div className="flex items-center gap-1 text-[9.5px] font-bold text-accent uppercase tracking-wide mb-1">
+                    <div className="mt-1.5 p-2 rounded-lg bg-accent-soft/40 border border-accent-line/60 text-[11.5px] leading-tight">
+                      <div className="flex items-center gap-1 text-[9.5px] font-bold text-accent uppercase tracking-wider mb-0.5">
                         <Sparkles className="w-2.5 h-2.5" />
                         AI Summary
                       </div>
@@ -557,13 +524,13 @@ export function ConversationList({
                         'text-[12px] truncate mt-1 leading-snug',
                         hasUnread
                           ? 'font-semibold text-ink dark:text-slate-100'
-                          : 'text-ink-3'
+                          : 'text-ink-3 group-hover:text-ink-2'
                       )}
                     >
                       {fromAgent ? (
                         <span className="text-ink-2 font-medium">You: </span>
                       ) : fromAi ? (
-                        <span className="text-purple-500 font-medium">🤖 AI: </span>
+                        <span className="text-purple-600 dark:text-purple-400 font-medium">🤖 AI: </span>
                       ) : null}
                       {conv.last_message?.content ||
                         (conv.last_message?.attachment_url
@@ -572,26 +539,27 @@ export function ConversationList({
                     </p>
                   )}
 
-                  {/* Badges Footer: Priority, Channel, Sentiment, Assigned Agent, Tags */}
                   <div className="flex items-center gap-1.5 mt-2 flex-wrap">
-                    {/* Urgent already sorts to the top of the list; a pulsing
-                        all-caps flag on top of that was shouting. */}
-                    {isUrgent && <span className="pill pill-danger">Urgent</span>}
-
-                    {conv.priority === 'high' && (
-                      <span className="pill pill-warn">High</span>
+                    {isUrgent && (
+                      <span className="px-1.5 py-0.5 text-[9.5px] font-bold rounded-md bg-red-500/15 text-red-600 dark:text-red-400 border border-red-500/20">
+                        Urgent
+                      </span>
                     )}
 
-                    {/* Only a positive or negative read is worth a row badge;
-                        "Neutral" would appear on nearly every conversation. */}
+                    {conv.priority === 'high' && (
+                      <span className="px-1.5 py-0.5 text-[9.5px] font-bold rounded-md bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+                        High
+                      </span>
+                    )}
+
                     {(conv.sentiment === 'positive' ||
                       conv.sentiment === 'negative') && (
                       <span
                         className={cn(
-                          'pill',
+                          'inline-flex items-center gap-1 px-1.5 py-0.5 text-[9.5px] font-bold rounded-md border',
                           conv.sentiment === 'positive'
-                            ? 'pill-success'
-                            : 'pill-danger'
+                            ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
+                            : 'bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20'
                         )}
                         title={`Visitor sentiment: ${conv.sentiment}`}
                       >
@@ -608,9 +576,8 @@ export function ConversationList({
                       <ChannelBadge channel={conv.channel} />
                     )}
 
-                    {/* Assigned Agent Pill */}
                     {conv.agent && (
-                      <span className="inline-flex items-center gap-1 text-[10px] text-ink-2 bg-surface-3 px-1.5 py-0.5 rounded border border-line">
+                      <span className="inline-flex items-center gap-1 text-[10px] text-ink-2 bg-surface-2 px-1.5 py-0.5 rounded-md border border-line">
                         <Avatar
                           name={conv.agent.name}
                           seed={conv.agent.id}
@@ -622,25 +589,24 @@ export function ConversationList({
                       </span>
                     )}
 
-                    {/* Tags Pills */}
                     {conv.tags?.slice(0, 2).map((t) => (
                       <span
                         key={t}
-                        className="text-[9.5px] text-ink-3 bg-surface-2 px-1.5 py-0.5 rounded border border-line truncate max-w-[60px]"
+                        className="text-[9.5px] font-medium text-ink-3 bg-surface-2 px-1.5 py-0.5 rounded-md border border-line truncate max-w-[60px]"
                       >
                         #{t}
                       </span>
                     ))}
 
                     {conv.status === 'snoozed' && (
-                      <span className="inline-flex items-center gap-0.5 text-[10px] text-amber-600 dark:text-amber-400 bg-amber-500/15 px-1.5 py-0.5 rounded font-medium">
+                      <span className="inline-flex items-center gap-0.5 text-[9.5px] text-amber-600 dark:text-amber-400 bg-amber-500/15 px-1.5 py-0.5 rounded-md font-medium border border-amber-500/20">
                         <Clock className="w-2.5 h-2.5" />
                         Snoozed
                       </span>
                     )}
 
                     {conv.csat_rating && (
-                      <span className="inline-flex items-center gap-0.5 text-[10px] text-amber-500 font-medium bg-amber-500/10 px-1.5 py-0.5 rounded">
+                      <span className="inline-flex items-center gap-0.5 text-[9.5px] text-amber-500 font-bold bg-amber-500/10 px-1.5 py-0.5 rounded-md border border-amber-500/20">
                         <Star className="w-2.5 h-2.5 fill-current" />
                         {conv.csat_rating}/5
                       </span>
@@ -648,9 +614,8 @@ export function ConversationList({
                   </div>
                 </div>
 
-                {/* Blue Unread Dot */}
                 {hasUnread && (
-                  <span className="w-2 h-2 rounded-full bg-blue-500 shrink-0 mt-1.5 shadow-xs" />
+                  <span className="w-2 h-2 rounded-full bg-blue-500 shrink-0 mt-2 shadow-xs ring-2 ring-blue-500/25" />
                 )}
               </button>
             );

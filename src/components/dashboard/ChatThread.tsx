@@ -10,11 +10,14 @@ import {
   CheckCircle2,
   ChevronDown,
   Clock,
+  CornerDownLeft,
   ExternalLink,
   FileText,
   GitMerge,
   Lock,
   MoreHorizontal,
+  PanelRightClose,
+  PanelRightOpen,
   Plus,
   RotateCcw,
   Send,
@@ -56,6 +59,8 @@ interface ChatThreadProps {
   onToggleAiMode?: (mode: 'autopilot' | 'disabled') => Promise<void>;
   loading?: boolean;
   onBack?: () => void;
+  onToggleDetailsSidebar?: () => void;
+  isDetailsSidebarOpen?: boolean;
 }
 
 interface CannedItem {
@@ -120,6 +125,8 @@ export function ChatThread({
   onToggleAiMode,
   loading = false,
   onBack,
+  onToggleDetailsSidebar,
+  isDetailsSidebarOpen = true,
 }: ChatThreadProps) {
   const [inputText, setInputText] = useState('');
   const [isSending, setIsSending] = useState(false);
@@ -735,9 +742,9 @@ export function ChatThread({
           min-h rather than a fixed h: a fixed height clipped its own content
           the moment anything wrapped. The identity block takes the remaining
           width (flex-1) instead of collapsing, and the name line never wraps —
-          secondary details live on the line below. */}
-      <header className="shrink-0 px-5 py-2.5 min-h-16 flex items-center justify-between gap-3 border-b border-line bg-surface">
-        <div className="flex items-center gap-2.5 min-w-0 flex-1">
+      {/* ── Header ── */}
+      <header className="shrink-0 px-4 py-2.5 min-h-16 flex items-center justify-between gap-3 border-b border-line bg-surface">
+        <div className="flex items-center gap-2.5 min-w-0 flex-1 overflow-hidden">
           {onBack && (
             <button
               onClick={onBack}
@@ -753,11 +760,12 @@ export function ChatThread({
             size="md"
             online={isOnline}
             muted={!visitor?.name && !visitor?.email}
+            className="shrink-0"
           />
-          <div className="min-w-0 flex-1">
-            {/* Line 1: identity only, always one line. */}
-            <div className="flex items-center gap-2 min-w-0">
-              <h2 className="text-[15px] font-semibold tracking-tight truncate min-w-0">
+          <div className="min-w-0 flex-1 overflow-hidden">
+            {/* Line 1: identity only, always one line, truncated */}
+            <div className="flex items-center gap-2 min-w-0 overflow-hidden">
+              <h2 className="text-[15px] font-bold tracking-tight truncate min-w-0">
                 {displayName}
               </h2>
               {conversation.channel && conversation.channel !== 'web' && (
@@ -767,8 +775,6 @@ export function ChatThread({
                   size="xs"
                 />
               )}
-              {/* Neutral is the default, so showing it tells the agent nothing
-                  — only a positive or negative read earns a badge. */}
               {(conversation.sentiment === 'positive' ||
                 conversation.sentiment === 'negative') && (
                 <span
@@ -792,15 +798,15 @@ export function ChatThread({
               )}
             </div>
 
-            {/* Line 2: everything secondary, truncated rather than wrapped. */}
-            <div className="flex items-center gap-2 text-[11.5px] text-ink-3 min-w-0">
+            {/* Line 2: details, fully truncated */}
+            <div className="flex items-center gap-1.5 text-[11.5px] text-ink-3 min-w-0 overflow-hidden truncate">
               {isOnline ? (
                 <span className="inline-flex items-center gap-1.5 text-success font-medium shrink-0">
                   <span className="live-dot" />
                   Active now
                 </span>
               ) : (
-                <span className="shrink-0">
+                <span className="shrink-0 truncate">
                   Active{' '}
                   {formatTimeAgo(visitor?.last_seen || conversation.updated_at)}
                 </span>
@@ -829,7 +835,7 @@ export function ChatThread({
                     href={visitor.current_url}
                     target="_blank"
                     rel="noreferrer"
-                    className="hidden @xl/thread:inline-flex items-center gap-1 min-w-0 hover:text-accent transition-colors"
+                    className="hidden @xl/thread:inline-flex items-center gap-1 min-w-0 hover:text-accent transition-colors truncate"
                   >
                     <span className="truncate">{visitor.current_url}</span>
                     <ExternalLink className="w-2.5 h-2.5 shrink-0" />
@@ -840,10 +846,8 @@ export function ChatThread({
           </div>
         </div>
 
-        {/* Only status and the resolve action live up here. Priority and
-            assignment sit in the meta bar below, which can wrap — the header
-            cannot, and overflowed at common laptop widths. */}
-        <div className="flex items-center gap-2 shrink-0">
+        {/* Actions strip in header */}
+        <div className="flex items-center gap-1.5 shrink-0 ml-auto">
           <Menu<ConversationStatus>
             value={conversation.status}
             options={STATUS_OPTIONS}
@@ -875,7 +879,7 @@ export function ChatThread({
           {conversation.status !== 'closed' ? (
             <button
               onClick={() => onUpdateStatus('closed')}
-              className="btn btn-sm btn-primary"
+              className="btn btn-sm btn-primary shadow-xs"
               title="Close and resolve this conversation"
             >
               <CheckCircle2 className="w-3.5 h-3.5" />
@@ -884,36 +888,18 @@ export function ChatThread({
           ) : (
             <button
               onClick={() => onUpdateStatus('open')}
-              className="btn btn-sm btn-secondary"
+              className="btn btn-sm btn-secondary shadow-xs"
             >
               <RotateCcw className="w-3.5 h-3.5" />
               <span className="hidden @2xl/thread:inline">Reopen</span>
             </button>
           )}
 
-          {/* Everything that is not "reply / resolve" lives behind one menu.
-              Snooze, Merge, Auto-assign and the AI toggle were four competing
-              buttons in the header and meta bar before this. */}
+          {/* More actions: AI Autopilot, Snooze, Merge, Auto-Assign */}
           <Menu<ThreadAction>
             value={"" as ThreadAction}
             label="More actions"
             options={[
-              {
-                value: "snooze",
-                label:
-                  conversation.status === "snoozed" ? "Snoozed — edit" : "Snooze",
-                description: "Hide until a chosen time",
-              },
-              {
-                value: "merge",
-                label: "Merge conversation",
-                description: "Combine with another thread from this visitor",
-              },
-              {
-                value: "auto-assign",
-                label: isAutoAssigning ? "Assigning…" : "Auto-assign",
-                description: "Round-robin to an available teammate",
-              },
               ...(onToggleAiMode
                 ? [
                     {
@@ -929,6 +915,22 @@ export function ChatThread({
                     },
                   ]
                 : []),
+              {
+                value: "snooze",
+                label:
+                  conversation.status === "snoozed" ? "Snoozed — edit" : "Snooze conversation",
+                description: "Hide until a chosen time",
+              },
+              {
+                value: "merge",
+                label: "Merge conversation",
+                description: "Combine with another thread from this visitor",
+              },
+              {
+                value: "auto-assign",
+                label: isAutoAssigning ? "Assigning…" : "Auto-assign to agent",
+                description: "Round-robin to an available teammate",
+              },
             ]}
             onChange={(action) => {
               if (action === "snooze") setShowSnoozeModal(true);
@@ -942,7 +944,7 @@ export function ChatThread({
             trigger={({ open }) => (
               <span
                 className={cn(
-                  "btn btn-sm btn-secondary w-9 px-0",
+                  "btn btn-sm btn-secondary w-8.5 px-0",
                   open && "bg-surface-3"
                 )}
                 title="More actions"
@@ -952,127 +954,158 @@ export function ChatThread({
             )}
           />
 
+          {/* CRM Details Sidebar Toggle */}
+          {onToggleDetailsSidebar && (
+            <button
+              onClick={onToggleDetailsSidebar}
+              title={isDetailsSidebarOpen ? "Hide CRM details panel" : "Show CRM details panel"}
+              aria-label={isDetailsSidebarOpen ? "Hide CRM details panel" : "Show CRM details panel"}
+              className={cn(
+                "btn btn-sm btn-secondary w-8.5 px-0 transition-all",
+                isDetailsSidebarOpen ? "text-accent bg-accent/10 border-accent/30" : "text-ink-3 hover:text-ink"
+              )}
+            >
+              {isDetailsSidebarOpen ? (
+                <PanelRightClose className="w-4 h-4" />
+              ) : (
+                <PanelRightOpen className="w-4 h-4" />
+              )}
+            </button>
+          )}
         </div>
       </header>
 
-      {/* ── Meta bar ──
-          A single row that scrolls sideways when it runs out of room. It used
-          to wrap, which grew it to three stacked rows and pushed the actual
-          conversation down the screen. */}
-      <div className="shrink-0 px-5 py-2 flex items-center gap-2 border-b border-line bg-surface-2 overflow-x-auto scrollbar-none">
-        <div className="flex items-center gap-1.5 min-w-0">
-          <Menu<ConversationPriority>
-            value={currentPriority}
-            options={PRIORITY_OPTIONS}
-            label="Priority"
+      {/* ── Meta bar: perfectly scrollable single row without overlapping ── */}
+      <div className="shrink-0 px-4 py-2 flex items-center gap-2 border-b border-line bg-surface-2 overflow-x-auto scrollbar-none whitespace-nowrap">
+        <Menu<ConversationPriority>
+          value={currentPriority}
+          options={PRIORITY_OPTIONS}
+          label="Priority"
+          align="start"
+          className="shrink-0"
+          onChange={(v) => onUpdatePriority?.(v)}
+        />
+
+        <div className="inline-flex items-center shrink-0">
+          <Menu<string>
+            value={conversation.agent_id || ''}
+            options={assignOptions}
+            label="Assignee"
             align="start"
             className="shrink-0"
-            onChange={(v) => onUpdatePriority?.(v)}
+            onChange={(v) => onAssignAgent(v || null)}
           />
+        </div>
 
-          <div className="inline-flex items-center gap-1">
-            <Menu<string>
-              value={conversation.agent_id || ''}
-              options={assignOptions}
-              label="Assignee"
-              align="start"
-              className="shrink-0"
-              onChange={(v) => onAssignAgent(v || null)}
-            />
-
-          </div>
-
-          {conversation.status === "snoozed" && conversation.snoozed_until && (
-            <span className="pill pill-warn shrink-0">
-              <Clock className="w-3 h-3" />
-              Snoozed {formatTimeAgo(conversation.snoozed_until)}
-            </span>
-          )}
-
-          {onToggleAiMode && conversation.ai_mode !== "disabled" && (
-            <span className="pill pill-accent shrink-0">
-              <Bot className="w-3 h-3" />
-              AI autopilot
-            </span>
-          )}
-
-          <span className="w-px h-4 bg-line-2 mx-1" />
-
-          <Tag className="w-3.5 h-3.5 text-ink-3 shrink-0" />
-
-          {conversation.tags?.length ? (
-            conversation.tags.map((t) => (
-              <span key={t} className="pill pill-accent group">
-                {t}
-                <button
-                  onClick={() => handleToggleTag(t)}
-                  aria-label={`Remove tag ${t}`}
-                  className="opacity-50 hover:opacity-100 transition-opacity"
-                >
-                  <X className="w-2.5 h-2.5" />
-                </button>
-              </span>
-            ))
-          ) : (
-            <span className="text-[11.5px] text-ink-3">No tags</span>
-          )}
-
-          <div ref={tagPickerRef} className="relative">
-            <button
-              onClick={() => setShowTagPicker((s) => !s)}
-              className="inline-flex items-center gap-1 h-[22px] px-2 rounded-full border border-dashed border-line-2 text-[11px] font-medium text-ink-3 hover:text-ink hover:border-line-3 transition-colors"
-            >
-              <Plus className="w-3 h-3" />
-              Add
-            </button>
-
-            {showTagPicker && (
-              <div className="absolute top-[calc(100%+6px)] left-0 z-50 w-56 p-2 rounded-xl border border-line bg-surface shadow-lg animate-pop">
-                <div className="eyebrow px-1.5 pb-1.5">Tags</div>
-                <div className="space-y-0.5 mb-2">
-                  {PRESET_TAGS.map((pt) => {
-                    const active = (conversation.tags || []).includes(pt);
-                    return (
-                      <button
-                        key={pt}
-                        onClick={() => handleToggleTag(pt)}
-                        className={cn(
-                          'w-full flex items-center justify-between px-2 py-1.5 rounded-lg text-[12.5px] transition-colors',
-                          active
-                            ? 'bg-accent-soft text-accent font-medium'
-                            : 'text-ink hover:bg-surface-3'
-                        )}
-                      >
-                        {pt}
-                        {active && <Check className="w-3.5 h-3.5" />}
-                      </button>
-                    );
-                  })}
-                </div>
-                <div className="pt-2 border-t border-line flex items-center gap-1.5">
-                  <input
-                    type="text"
-                    placeholder="Custom tag"
-                    value={customTagInput}
-                    onChange={(e) => setCustomTagInput(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleAddCustomTag()}
-                    className="input input-sm flex-1"
-                  />
-                  <button
-                    onClick={handleAddCustomTag}
-                    className="btn btn-sm btn-primary shrink-0"
-                  >
-                    Add
-                  </button>
-                </div>
-              </div>
+        {/* Interactive AI Autopilot Toggle Pill */}
+        {onToggleAiMode && (
+          <button
+            type="button"
+            onClick={() =>
+              onToggleAiMode(
+                conversation.ai_mode === 'disabled' ? 'autopilot' : 'disabled'
+              )
+            }
+            className={cn(
+              'pill shrink-0 transition-all cursor-pointer inline-flex items-center gap-1.5 text-[11px]',
+              conversation.ai_mode !== 'disabled'
+                ? 'pill-accent font-bold shadow-xs'
+                : 'pill-neutral hover:bg-surface-3'
             )}
-          </div>
+            title={
+              conversation.ai_mode !== 'disabled'
+                ? 'AI Autopilot is ON (click to pause)'
+                : 'AI Autopilot is OFF (click to activate)'
+            }
+          >
+            <Bot className="w-3 h-3 text-accent" />
+            <span>{conversation.ai_mode !== 'disabled' ? 'AI Autopilot' : 'Autopilot Off'}</span>
+          </button>
+        )}
+
+        {conversation.status === "snoozed" && conversation.snoozed_until && (
+          <span className="pill pill-warn shrink-0">
+            <Clock className="w-3 h-3" />
+            Snoozed {formatTimeAgo(conversation.snoozed_until)}
+          </span>
+        )}
+
+        <span className="w-px h-4 bg-line-2 mx-0.5 shrink-0" />
+
+        <Tag className="w-3.5 h-3.5 text-ink-3 shrink-0" />
+
+        {conversation.tags?.length ? (
+          conversation.tags.map((t) => (
+            <span key={t} className="pill pill-accent group shrink-0">
+              {t}
+              <button
+                onClick={() => handleToggleTag(t)}
+                aria-label={`Remove tag ${t}`}
+                className="opacity-50 hover:opacity-100 transition-opacity"
+              >
+                <X className="w-2.5 h-2.5" />
+              </button>
+            </span>
+          ))
+        ) : (
+          <span className="text-[11.5px] text-ink-3 shrink-0">No tags</span>
+        )}
+
+        <div ref={tagPickerRef} className="relative shrink-0">
+          <button
+            onClick={() => setShowTagPicker((s) => !s)}
+            className="inline-flex items-center gap-1 h-[22px] px-2 rounded-full border border-dashed border-line-2 text-[11px] font-medium text-ink-3 hover:text-ink hover:border-line-3 transition-colors shrink-0"
+          >
+            <Plus className="w-3 h-3" />
+            Add
+          </button>
+
+          {showTagPicker && (
+            <div className="absolute top-[calc(100%+6px)] left-0 z-50 w-56 p-2 rounded-xl border border-line bg-surface shadow-lg animate-pop">
+              <div className="eyebrow px-1.5 pb-1.5">Tags</div>
+              <div className="space-y-0.5 mb-2">
+                {PRESET_TAGS.map((pt) => {
+                  const active = (conversation.tags || []).includes(pt);
+                  return (
+                    <button
+                      key={pt}
+                      onClick={() => handleToggleTag(pt)}
+                      className={cn(
+                        'w-full flex items-center justify-between px-2 py-1.5 rounded-lg text-[12.5px] transition-colors',
+                        active
+                          ? 'bg-accent-soft text-accent font-medium'
+                          : 'text-ink hover:bg-surface-3'
+                      )}
+                    >
+                      {pt}
+                      {active && <Check className="w-3.5 h-3.5" />}
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="pt-2 border-t border-line flex items-center gap-1.5">
+                <input
+                  type="text"
+                  placeholder="Custom tag"
+                  value={customTagInput}
+                  onChange={(e) => setCustomTagInput(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleAddCustomTag()}
+                  className="input input-sm flex-1"
+                />
+                <button
+                  onClick={handleAddCustomTag}
+                  className="btn btn-sm btn-primary shrink-0"
+                >
+                  Add
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         {conversation.csat_rating && (
           <span
-            className="pill pill-warn shrink-0 ml-auto"
+            className="pill pill-warn shrink-0"
             title={
               conversation.csat_feedback
                 ? `CSAT ${conversation.csat_rating}/5 — ${conversation.csat_feedback}`
@@ -1250,111 +1283,132 @@ export function ChatThread({
           </div>
         )}
 
-        <div className="flex items-center justify-between gap-2 mb-2.5 min-w-0">
-          <div className="inline-flex items-center gap-0.5 p-0.5 rounded-lg bg-surface-2 border border-line shrink-0">
-            {(
-              [
-                ['reply', 'Reply'],
-                ['internal', 'Note'],
-              ] as const
-            ).map(([mode, label]) => (
+        {/* Unified Linear-Style Composer Card */}
+        <div
+          className={cn(
+            'rounded-2xl border transition-all duration-200 overflow-hidden shadow-xs focus-within:shadow-md',
+            isInternalMode
+              ? 'bg-amber-500/5 border-amber-500/40 focus-within:border-amber-500/80 focus-within:ring-2 focus-within:ring-amber-500/20'
+              : 'bg-surface border-line focus-within:border-accent/80 focus-within:ring-2 focus-within:ring-accent/20'
+          )}
+        >
+          {/* Composer Header Bar */}
+          <div className="px-3 pt-2 pb-1.5 flex items-center justify-between gap-2 border-b border-line/40 bg-surface-2/30">
+            <div className="inline-flex items-center gap-1 p-0.5 rounded-lg bg-surface-2 border border-line/60">
               <button
-                key={mode}
-                onClick={() => setComposerMode(mode)}
+                type="button"
+                onClick={() => setComposerMode('reply')}
                 className={cn(
-                  'h-7 px-3 rounded-md text-[12px] font-semibold transition-colors inline-flex items-center gap-1.5',
-                  composerMode === mode
-                    ? mode === 'internal'
-                      ? 'bg-warn-soft text-warn shadow-xs'
-                      : 'bg-surface text-ink shadow-xs'
+                  'h-6 px-2.5 rounded-md text-[11.5px] font-semibold transition-all inline-flex items-center gap-1.5',
+                  composerMode === 'reply'
+                    ? 'bg-surface text-ink font-bold shadow-xs'
                     : 'text-ink-3 hover:text-ink'
                 )}
               >
-                {mode === 'internal' && <Lock className="w-3 h-3" />}
-                {label}
+                <Send className="w-3 h-3" />
+                Reply
               </button>
-            ))}
+              <button
+                type="button"
+                onClick={() => setComposerMode('internal')}
+                className={cn(
+                  'h-6 px-2.5 rounded-md text-[11.5px] font-semibold transition-all inline-flex items-center gap-1.5',
+                  composerMode === 'internal'
+                    ? 'bg-amber-500/20 text-amber-700 dark:text-amber-300 font-bold shadow-xs'
+                    : 'text-ink-3 hover:text-ink'
+                )}
+              >
+                <Lock className="w-3 h-3" />
+                Note
+              </button>
+            </div>
+
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={handleGenerateAiSuggestion}
+                disabled={aiDrafting}
+                className="h-6 px-2 rounded-md text-[11px] font-semibold text-accent hover:bg-accent/10 transition-colors inline-flex items-center gap-1"
+                title="Ask AI Copilot to draft a reply"
+              >
+                <Sparkles className={cn('w-3 h-3', aiDrafting && 'animate-spin')} />
+                <span>{aiDrafting ? 'Drafting…' : 'AI Copilot'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowMacros((s) => !s)}
+                className="h-6 px-2 rounded-md text-[11px] font-medium text-ink-3 hover:text-ink hover:bg-surface-3 transition-colors inline-flex items-center gap-1"
+                title="Saved replies (/)"
+              >
+                <Zap className="w-3 h-3 text-amber-500" />
+                <span>Replies</span>
+              </button>
+
+              <span className="text-[10.5px] text-ink-3 hidden @3xl/thread:inline shrink-0 truncate max-w-[120px] ml-1">
+                as <strong className="text-ink font-medium">{currentAgent?.name || 'Agent'}</strong>
+              </span>
+            </div>
           </div>
 
-          <div className="flex items-center gap-1.5 min-w-0">
-            <button
-              type="button"
-              onClick={handleGenerateAiSuggestion}
-              disabled={aiDrafting}
-              className="btn btn-sm btn-ghost text-accent hover:text-accent font-medium gap-1.5"
-              title="Ask LangGraph AI Copilot to draft a response"
-            >
-              <Sparkles className={`w-3.5 h-3.5 ${aiDrafting ? 'animate-spin' : ''}`} />
-              <span className="hidden @xl/thread:inline">
-                {aiDrafting ? 'Drafting…' : 'AI Suggest'}
-              </span>
-            </button>
+          {/* Textarea */}
+          <div className="p-3">
+            <textarea
+              ref={textareaRef}
+              rows={2}
+              value={inputText}
+              onChange={handleInputChange}
+              onKeyDown={handleKeyDown}
+              placeholder={
+                isInternalMode
+                  ? 'Write an internal note for your team (visitor will not see this)…'
+                  : `Reply to ${displayName}…`
+              }
+              className="w-full bg-transparent text-[13px] leading-relaxed text-ink resize-none focus:outline-none placeholder:text-ink-3 min-h-[48px] max-h-40"
+            />
+          </div>
+
+          {/* Composer Footer Action Bar */}
+          <div className="px-3 py-2 bg-surface-2/40 border-t border-line/40 flex items-center justify-between text-[11px] text-ink-3">
+            <div className="flex items-center gap-1.5">
+              <span>Press</span>
+              <span className="kbd text-[9.5px]">Ctrl ↵</span>
+              <span>to send</span>
+              <span className="text-ink-3/40">·</span>
+              <span className="kbd text-[9.5px]">/</span>
+              <span>macros</span>
+              {inputText.length > 0 && (
+                <>
+                  <span className="text-ink-3/40">·</span>
+                  <span className="font-mono text-[10px] opacity-70">
+                    {inputText.length} chars
+                  </span>
+                </>
+              )}
+            </div>
 
             <button
-              onClick={() => setShowMacros((s) => !s)}
-              className="btn btn-sm btn-ghost"
+              onClick={handleSend}
+              disabled={!inputText.trim() || isSending}
+              title={isInternalMode ? 'Post internal note (Ctrl+Enter)' : 'Send reply (Ctrl+Enter)'}
+              className={cn(
+                'h-7 px-3 rounded-lg flex items-center gap-1.5 text-[11.5px] font-bold transition-all shadow-xs cursor-pointer',
+                !inputText.trim() || isSending
+                  ? 'bg-surface-3 text-ink-3 cursor-not-allowed opacity-50'
+                  : isInternalMode
+                  ? 'bg-amber-600 hover:bg-amber-700 text-white shadow-sm hover:scale-102'
+                  : 'bg-accent hover:bg-accent-hover text-accent-ink shadow-sm hover:scale-102'
+              )}
             >
-              <Zap className="w-3.5 h-3.5" />
-              <span className="hidden @lg/thread:inline">Saved replies</span>
+              <span>{isInternalMode ? 'Add Note' : 'Send'}</span>
+              {isInternalMode ? (
+                <Lock className="w-3 h-3" />
+              ) : (
+                <Send className="w-3 h-3" />
+              )}
             </button>
-            <span className="text-[11.5px] text-ink-3 hidden @3xl/thread:inline shrink-0 truncate max-w-[140px]">
-              as{' '}
-              <span className="font-medium text-ink-2">
-                {currentAgent?.name || 'Agent'}
-              </span>
-            </span>
           </div>
         </div>
-
-        <div
-          className={cn(
-            'flex items-end gap-2 p-2 rounded-xl border transition-colors',
-            isInternalMode
-              ? 'bg-warn-soft border-warn-line focus-within:border-warn'
-              : 'bg-surface-2 border-line-2 focus-within:border-accent'
-          )}
-        >
-          <textarea
-            ref={textareaRef}
-            rows={1}
-            value={inputText}
-            onChange={handleInputChange}
-            onKeyDown={handleKeyDown}
-            placeholder={
-              isInternalMode
-                ? 'Write a note for your team — the visitor never sees this…'
-                : `Reply to ${displayName}…`
-            }
-            className="flex-1 min-h-[42px] max-h-40 px-2 py-2.5 bg-transparent text-[13.5px] leading-relaxed text-ink resize-none focus:outline-none"
-          />
-
-          <button
-            onClick={handleSend}
-            disabled={!inputText.trim() || isSending}
-            title={isInternalMode ? 'Post internal note' : 'Send reply'}
-            className={cn(
-              'shrink-0 w-9 h-9 rounded-lg flex items-center justify-center transition-all',
-              !inputText.trim() || isSending
-                ? 'bg-surface-3 text-ink-3 cursor-not-allowed'
-                : isInternalMode
-                ? 'bg-warn text-white hover:opacity-90 shadow-sm'
-                : 'bg-ink text-ink-inv hover:bg-primary-hover shadow-sm'
-            )}
-          >
-            {isInternalMode ? (
-              <Lock className="w-4 h-4" />
-            ) : (
-              <Send className="w-4 h-4" />
-            )}
-          </button>
-        </div>
-
-        <p className="mt-2 text-[11px] text-ink-3">
-          <span className="kbd">Enter</span> send ·{' '}
-          <span className="kbd">Shift</span>
-          <span className="kbd">Enter</span> new line ·{' '}
-          <span className="kbd">/</span> saved replies
-        </p>
       </div>
 
       {/* ── Snooze Modal ── */}

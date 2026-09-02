@@ -5,9 +5,12 @@ import {
   BarChart2,
   Bell,
   ChevronsUpDown,
+  ExternalLink,
+  HelpCircle,
   Inbox,
   Radio,
   Settings,
+  Sparkles,
   Volume2,
   VolumeX,
 } from 'lucide-react';
@@ -31,6 +34,7 @@ interface SidebarProps {
   };
   onUpdateAgentStatus: (status: AgentStatus) => void;
   onLogout: () => void;
+  onOpenShortcuts?: () => void;
 }
 
 const STATUS_TINT: Record<AgentStatus, string> = {
@@ -47,9 +51,8 @@ export function Sidebar({
   counts,
   onUpdateAgentStatus,
   onLogout,
+  onOpenShortcuts,
 }: SidebarProps) {
-  // The sound module owns the preference and its persistence; this just
-  // mirrors it, so there is no second copy of the state to drift.
   const soundActive = React.useSyncExternalStore(
     sound.subscribe,
     sound.isEnabled,
@@ -68,13 +71,6 @@ export function Sidebar({
   const isAdmin =
     currentAgent?.role === 'admin' || currentAgent?.role === 'owner';
 
-  /*
-   * Four destinations, not six. Install, Integrations and Admin were three
-   * separate entries that all did the same job — configure the workspace — so
-   * they live behind Settings now. Conversation filters are not here either:
-   * the inbox owns its own queue tabs, and having both was the main source of
-   * "which filter am I actually looking at?".
-   */
   const nav: {
     view: View;
     label: string;
@@ -85,7 +81,11 @@ export function Sidebar({
       view: 'inbox',
       label: 'Inbox',
       Icon: Inbox,
-      badge: counts.open > 0 ? counts.open : undefined,
+      badge: counts.open > 0 ? (
+        <span className="px-1.5 py-0.5 text-[10.5px] font-bold rounded-full bg-accent text-accent-ink shadow-xs">
+          {counts.open}
+        </span>
+      ) : undefined,
     },
     {
       view: 'visitors',
@@ -93,42 +93,53 @@ export function Sidebar({
       Icon: Radio,
       badge:
         counts.liveVisitors > 0 ? (
-          <span className="inline-flex items-center gap-1.5 text-success font-semibold">
+          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold border border-emerald-500/20">
             <span className="live-dot" />
             {counts.liveVisitors}
           </span>
         ) : undefined,
     },
     ...(isAdmin
-      ? [{ view: 'reports' as View, label: 'Reports', Icon: BarChart2 }]
+      ? [{ view: 'reports' as View, label: 'Analytics', Icon: BarChart2 }]
       : []),
     { view: 'settings', label: 'Settings', Icon: Settings },
   ];
 
   return (
-    <aside className="w-[236px] shrink-0 h-screen flex flex-col bg-surface-2 border-r border-line select-none">
-      {/* Workspace identity */}
-      <div className="p-3 border-b border-line">
-        <div className="flex items-center gap-2.5 px-1.5 py-1.5">
-          <Avatar
-            name={workspace?.name || 'C'}
-            seed={workspace?.id || 'chatify'}
-            color={workspace?.brand_color || undefined}
-            size="sm"
-          />
-          <div className="min-w-0 flex-1">
-            <div className="text-[13px] font-semibold text-ink truncate leading-tight">
-              {workspace?.name || 'Chatify'}
-            </div>
-            <div className="text-[11px] text-ink-3 truncate">
-              {workspace?.website_url || 'Live workspace'}
+    <aside className="w-[220px] shrink-0 h-screen flex flex-col bg-surface border-r border-line select-none relative z-10">
+      {/* Workspace Identity Card */}
+      <div className="p-3 border-b border-line/80">
+        <div className="flex items-center justify-between gap-2.5 p-2 rounded-xl bg-surface-2/80 hover:bg-surface-2 transition-all border border-line/60">
+          <div className="flex items-center gap-2.5 min-w-0 flex-1">
+            <Avatar
+              name={workspace?.name || 'C'}
+              seed={workspace?.id || 'chatify'}
+              color={workspace?.brand_color || undefined}
+              size="sm"
+              className="shadow-xs ring-1 ring-black/5 dark:ring-white/10"
+            />
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-1.5">
+                <span className="text-[13px] font-bold text-ink truncate leading-tight">
+                  {workspace?.name || 'Chatify'}
+                </span>
+                <span className="text-[9px] font-bold px-1 py-0.5 rounded bg-accent-soft text-accent uppercase tracking-wider">
+                  Live
+                </span>
+              </div>
+              <div className="text-[11px] text-ink-3 truncate flex items-center gap-1 mt-0.5">
+                <span className="truncate">{workspace?.website_url ? workspace.website_url.replace(/^https?:\/\//, '') : 'Workspace Active'}</span>
+              </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Navigation */}
-      <nav className="p-3 flex-1 overflow-y-auto space-y-0.5">
+      {/* Navigation List */}
+      <nav className="p-3 flex-1 overflow-y-auto space-y-1">
+        <div className="px-2 py-1 text-[10px] font-bold tracking-wider uppercase text-ink-3">
+          Menu
+        </div>
         {nav.map(({ view, label, Icon, badge }) => {
           const active = activeView === view;
           return (
@@ -137,54 +148,76 @@ export function Sidebar({
               onClick={() => onSelectView(view)}
               aria-current={active ? 'page' : undefined}
               className={cn(
-                'w-full h-9 px-2.5 rounded-lg flex items-center justify-between gap-2 text-[13px] font-medium transition-colors duration-150',
+                'w-full h-9 px-2.5 rounded-lg flex items-center justify-between gap-2 text-[13px] font-medium transition-all duration-150 relative group',
                 active
-                  ? 'bg-surface text-ink shadow-xs border border-line'
-                  : 'text-ink-2 hover:bg-surface-3 hover:text-ink border border-transparent'
+                  ? 'bg-accent/10 text-accent font-semibold shadow-xs'
+                  : 'text-ink-2 hover:bg-surface-2 hover:text-ink'
               )}
             >
+              {active && (
+                <span className="absolute left-0 top-1.5 bottom-1.5 w-1 rounded-r-full bg-accent" />
+              )}
               <span className="flex items-center gap-2.5 truncate">
-                <Icon className="w-4 h-4 shrink-0" />
+                <Icon
+                  className={cn(
+                    'w-4 h-4 shrink-0 transition-transform duration-150 group-hover:scale-105',
+                    active ? 'text-accent' : 'text-ink-3 group-hover:text-ink'
+                  )}
+                />
                 {label}
               </span>
               {badge !== undefined && (
-                <span className="text-[11px] text-ink-3 shrink-0">{badge}</span>
+                <span className="shrink-0">{badge}</span>
               )}
             </button>
           );
         })}
       </nav>
 
-      {/* Footer: utilities + profile */}
-      <div className="p-3 border-t border-line space-y-2.5">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-0.5">
+      {/* Footer: Quick controls + Agent Profile */}
+      <div className="p-3 border-t border-line/80 space-y-2.5 bg-surface-2/40">
+        <div className="flex items-center justify-between px-1">
+          <div className="flex items-center gap-1">
             <button
               onClick={toggleSound}
-              title={soundActive ? 'Mute alerts' : 'Unmute alerts'}
-              aria-label={soundActive ? 'Mute alerts' : 'Unmute alerts'}
-              className="w-8 h-8 rounded-lg flex items-center justify-center text-ink-3 hover:text-ink hover:bg-surface-3 transition-colors"
+              title={soundActive ? 'Sound notifications: ON' : 'Sound notifications: MUTED'}
+              aria-label={soundActive ? 'Mute audio' : 'Unmute audio'}
+              className={cn(
+                'w-7 h-7 rounded-lg flex items-center justify-center transition-colors',
+                soundActive
+                  ? 'text-ink-2 hover:text-ink hover:bg-surface-3'
+                  : 'text-ink-3 hover:text-ink hover:bg-surface-3 opacity-60'
+              )}
             >
               {soundActive ? (
-                <Volume2 className="w-4 h-4" />
+                <Volume2 className="w-3.5 h-3.5" />
               ) : (
-                <VolumeX className="w-4 h-4" />
+                <VolumeX className="w-3.5 h-3.5" />
               )}
             </button>
             <button
               onClick={enableNotifications}
-              title="Enable browser notifications"
-              aria-label="Enable browser notifications"
-              className="w-8 h-8 rounded-lg flex items-center justify-center text-ink-3 hover:text-ink hover:bg-surface-3 transition-colors"
+              title="Browser notifications"
+              aria-label="Browser notifications"
+              className="w-7 h-7 rounded-lg flex items-center justify-center text-ink-3 hover:text-ink hover:bg-surface-3 transition-colors"
             >
-              <Bell className="w-4 h-4" />
+              <Bell className="w-3.5 h-3.5" />
             </button>
+            {onOpenShortcuts && (
+              <button
+                onClick={onOpenShortcuts}
+                title="Keyboard Shortcuts (?)"
+                aria-label="Keyboard Shortcuts"
+                className="w-7 h-7 rounded-lg flex items-center justify-center text-ink-3 hover:text-ink hover:bg-surface-3 transition-colors text-[11px] font-mono font-bold"
+              >
+                ?
+              </button>
+            )}
           </div>
           <ThemeToggle />
         </div>
 
-        {/* Status and log out share one menu — a separate log-out row below the
-            profile was a second way to do the same thing. */}
+        {/* Agent Profile & Status Card */}
         <Menu<AgentStatus | 'logout'>
           value={(currentAgent?.status || 'online') as AgentStatus}
           side="top"
@@ -192,7 +225,7 @@ export function Sidebar({
           label="Agent status"
           menuClassName="left-0 right-0 min-w-0"
           options={[
-            { value: 'online', label: 'Online', dot: STATUS_TINT.online, description: 'Receiving new chats' },
+            { value: 'online', label: 'Online', dot: STATUS_TINT.online, description: 'Receiving live chats' },
             { value: 'away', label: 'Away', dot: STATUS_TINT.away, description: 'Paused assignments' },
             { value: 'offline', label: 'Offline', dot: STATUS_TINT.offline, description: 'Hidden from visitors' },
             { value: 'logout', label: 'Log out', danger: true },
@@ -204,10 +237,10 @@ export function Sidebar({
           trigger={({ open }) => (
             <span
               className={cn(
-                'flex items-center gap-2.5 w-full h-11 px-2 rounded-xl border transition-colors',
+                'flex items-center gap-2.5 w-full p-2 rounded-xl border transition-all cursor-pointer shadow-xs',
                 open
-                  ? 'bg-surface border-line-2'
-                  : 'bg-surface border-line hover:border-line-2'
+                  ? 'bg-surface border-line-2 ring-2 ring-accent/15'
+                  : 'bg-surface border-line hover:border-line-2 hover:bg-surface-2/60'
               )}
             >
               <Avatar
@@ -215,19 +248,28 @@ export function Sidebar({
                 seed={currentAgent?.id || 'agent'}
                 size="sm"
                 online={currentAgent?.status === 'online'}
+                className="shrink-0"
               />
               <span className="min-w-0 flex-1 text-left">
-                <span className="block text-[12.5px] font-semibold text-ink truncate leading-tight">
+                <span className="block text-[12.5px] font-bold text-ink truncate leading-tight">
                   {currentAgent?.name || 'Agent'}
                 </span>
-                <span className="flex items-center gap-1.5 text-[11px] text-ink-3 capitalize">
+                <span className="flex items-center gap-1.5 text-[10.5px] text-ink-3 capitalize mt-0.5">
                   <span
-                    className="w-1.5 h-1.5 rounded-full"
+                    className="w-1.5 h-1.5 rounded-full shrink-0"
                     style={{
                       background: STATUS_TINT[currentAgent?.status || 'online'],
                     }}
                   />
-                  {currentAgent?.status || 'online'}
+                  <span>{currentAgent?.status || 'online'}</span>
+                  {currentAgent?.role && (
+                    <>
+                      <span className="text-ink-3/40">·</span>
+                      <span className="text-[10px] font-medium uppercase text-ink-3">
+                        {currentAgent.role}
+                      </span>
+                    </>
+                  )}
                 </span>
               </span>
               <ChevronsUpDown className="w-3.5 h-3.5 text-ink-3 shrink-0" />

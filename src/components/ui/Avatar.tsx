@@ -80,13 +80,12 @@ export function Avatar({
       >
         {(name || '?').charAt(0)}
       </div>
-      {online !== undefined && (
+      {online && (
         <span
-          title={online ? 'Active now' : 'Away'}
+          title="Active now"
           className={cn(
-            'absolute -bottom-px -right-px rounded-full ring-2 ring-[var(--ds-surface)]',
-            DOT[size],
-            online ? 'bg-success' : 'bg-line-3'
+            'absolute -bottom-0.5 -right-0.5 rounded-full ring-2 ring-surface bg-emerald-500 shadow-xs',
+            DOT[size]
           )}
         />
       )}

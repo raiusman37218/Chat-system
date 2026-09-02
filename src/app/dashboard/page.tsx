@@ -28,6 +28,7 @@ export default function DashboardPage() {
   const [allAgents, setAllAgents] = useState<Agent[]>([]);
   const [cannedResponses, setCannedResponses] = useState<CannedResponse[]>([]);
   const [showShortcutsModal, setShowShortcutsModal] = useState(false);
+  const [isDetailsSidebarOpen, setIsDetailsSidebarOpen] = useState(true);
 
   // Four destinations: the inbox, the visitor radar, reports, and one
   // Settings hub that owns install / widget / team / channels / AI.
@@ -673,6 +674,7 @@ export default function DashboardPage() {
           counts={counts}
           onUpdateAgentStatus={handleUpdateAgentStatus}
           onLogout={handleLogout}
+          onOpenShortcuts={() => setShowShortcutsModal(true)}
         />
       </div>
 
@@ -684,8 +686,8 @@ export default function DashboardPage() {
             className={cn(
               'h-full shrink-0',
               selectedConversationId
-                ? 'hidden md:flex md:w-[340px]'
-                : 'flex w-full md:w-[340px] pb-14 md:pb-0'
+                ? 'hidden md:flex md:w-[310px]'
+                : 'flex w-full md:w-[310px] pb-14 md:pb-0'
             )}
           >
             <ConversationList
@@ -716,6 +718,8 @@ export default function DashboardPage() {
                 onUpdatePriority={handleUpdatePriority}
                 onUpdateTags={handleUpdateTags}
                 onBack={() => setSelectedConversationId(null)}
+                isDetailsSidebarOpen={isDetailsSidebarOpen}
+                onToggleDetailsSidebar={() => setIsDetailsSidebarOpen((prev) => !prev)}
                 onToggleAiMode={async (mode) => {
                   if (!selectedConversationId) return;
                   await supabase
@@ -731,25 +735,73 @@ export default function DashboardPage() {
                 }}
               />
 
-              <VisitorDetailsSidebar
-                visitor={activeConversation.visitor}
-                conversation={activeConversation}
-                currentAgent={currentAgent}
-                onSelectConversation={setSelectedConversationId}
-                onUpdateTags={handleUpdateTags}
-              />
+              {isDetailsSidebarOpen && (
+                <VisitorDetailsSidebar
+                  visitor={activeConversation.visitor}
+                  conversation={activeConversation}
+                  currentAgent={currentAgent}
+                  onSelectConversation={setSelectedConversationId}
+                  onUpdateTags={handleUpdateTags}
+                  onClose={() => setIsDetailsSidebarOpen(false)}
+                />
+              )}
             </div>
           ) : (
-            <div className="hidden md:flex flex-1 flex-col items-center justify-center p-8 bg-canvas text-center">
-              <EmptyState
-                type="no-conversations"
-                title="Select a conversation"
-                description="Choose an incoming thread from your inbox to reply, or embed the widget so visitors can start chatting."
-                actionLabel="Get the Embed Code"
-                onAction={() => setActiveView('settings')}
-                secondaryActionLabel="Open Shortcuts (?)"
-                onSecondaryAction={() => setShowShortcutsModal(true)}
-              />
+            <div className="hidden md:flex flex-1 flex-col items-center justify-center p-8 bg-canvas text-center select-none">
+              <div className="max-w-md w-full p-8 rounded-3xl border border-line bg-surface shadow-md flex flex-col items-center animate-rise">
+                <div className="relative mb-5">
+                  <div className="w-16 h-16 rounded-2xl bg-accent/10 border border-accent/20 flex items-center justify-center text-accent shadow-inner">
+                    <Inbox className="w-8 h-8" />
+                  </div>
+                  <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-emerald-500 text-white flex items-center justify-center text-xs font-bold border-2 border-surface shadow-xs">
+                    ✓
+                  </div>
+                </div>
+
+                <h3 className="text-lg font-bold text-ink tracking-tight mb-2">
+                  Ready for new conversations
+                </h3>
+                <p className="text-[13px] text-ink-3 leading-relaxed mb-6">
+                  Select a visitor from your inbox on the left to start replying, or monitor active traffic on the live radar.
+                </p>
+
+                <div className="flex items-center gap-2.5 w-full mb-6">
+                  <button
+                    onClick={() => setActiveView('visitors')}
+                    className="flex-1 btn btn-sm btn-secondary shadow-xs hover:border-line-2 gap-1.5"
+                  >
+                    <Radio className="w-3.5 h-3.5 text-emerald-500" />
+                    Live Radar ({counts.liveVisitors})
+                  </button>
+                  <button
+                    onClick={() => setActiveView('settings')}
+                    className="flex-1 btn btn-sm btn-primary shadow-xs gap-1.5"
+                  >
+                    <Settings className="w-3.5 h-3.5" />
+                    Widget Setup
+                  </button>
+                </div>
+
+                {/* Keyboard Quick Guide */}
+                <div className="w-full pt-4 border-t border-line/60 grid grid-cols-2 gap-2 text-[11px] text-ink-3 text-left">
+                  <div className="flex items-center justify-between px-2 py-1 rounded-lg bg-surface-2">
+                    <span>Search Inbox</span>
+                    <span className="kbd text-[9.5px]">Ctrl K</span>
+                  </div>
+                  <div className="flex items-center justify-between px-2 py-1 rounded-lg bg-surface-2">
+                    <span>Shortcuts</span>
+                    <span className="kbd text-[9.5px]">?</span>
+                  </div>
+                  <div className="flex items-center justify-between px-2 py-1 rounded-lg bg-surface-2">
+                    <span>Saved Replies</span>
+                    <span className="kbd text-[9.5px]">/</span>
+                  </div>
+                  <div className="flex items-center justify-between px-2 py-1 rounded-lg bg-surface-2">
+                    <span>Send Message</span>
+                    <span className="kbd text-[9.5px]">Ctrl ↵</span>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
         </div>
