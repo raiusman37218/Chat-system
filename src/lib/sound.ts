@@ -1,7 +1,34 @@
 // Synthesizes pleasant modern UI audio chimes using Web Audio API
+const STORAGE_KEY = 'chatify_sound_enabled';
+
 class SoundManager {
   private ctx: AudioContext | null = null;
   private soundEnabled: boolean = true;
+  private hydrated = false;
+  private listeners = new Set<() => void>();
+
+  /**
+   * The stored preference is read on first client access rather than in the
+   * constructor, which also runs during SSR where localStorage does not exist.
+   */
+  private hydrate() {
+    if (this.hydrated || typeof window === 'undefined') return;
+    this.hydrated = true;
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (stored !== null) this.soundEnabled = stored === 'true';
+    } catch {
+      // Storage unavailable — keep the default.
+    }
+  }
+
+  /** Lets React subscribe to the preference via useSyncExternalStore. */
+  public subscribe = (onChange: () => void) => {
+    this.listeners.add(onChange);
+    return () => {
+      this.listeners.delete(onChange);
+    };
+  };
 
   private getContext(): AudioContext | null {
     if (typeof window === 'undefined') return null;
@@ -18,13 +45,24 @@ class SoundManager {
   }
 
   public toggleSound(enable?: boolean): boolean {
+    this.hydrate();
     this.soundEnabled = enable !== undefined ? enable : !this.soundEnabled;
+    try {
+      localStorage.setItem(STORAGE_KEY, String(this.soundEnabled));
+    } catch {
+      // Storage unavailable — the in-memory value still applies.
+    }
+    this.listeners.forEach((l) => l());
     return this.soundEnabled;
   }
 
-  public isEnabled(): boolean {
+  public isEnabled = (): boolean => {
+    this.hydrate();
     return this.soundEnabled;
-  }
+  };
+
+  /** Server snapshot: matches the default so hydration stays consistent. */
+  public isEnabledServer = (): boolean => true;
 
   // Dual tone gentle notification chime for incoming messages
   public playIncomingMessage() {

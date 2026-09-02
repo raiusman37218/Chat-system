@@ -8,7 +8,6 @@ import {
   Fingerprint,
   Gauge,
   Layers,
-  MessageSquare,
   MousePointerClick,
   Palette,
   Radio,

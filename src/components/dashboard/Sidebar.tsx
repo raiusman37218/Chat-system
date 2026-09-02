@@ -2,37 +2,31 @@
 
 import React from 'react';
 import {
+  BarChart2,
   Bell,
   ChevronsUpDown,
-  Code2,
-  ExternalLink,
   Inbox,
-  LogOut,
   Radio,
+  Settings,
   Volume2,
   VolumeX,
 } from 'lucide-react';
-import { Agent, AgentStatus, ConversationStatus, Workspace } from '@/types/database';
+import { Agent, AgentStatus, Workspace } from '@/types/database';
 import { sound } from '@/lib/sound';
 import { requestNotificationPermission, cn } from '@/lib/utils';
 import { Avatar } from '@/components/ui/Avatar';
 import { Menu } from '@/components/ui/Menu';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 
-type View = 'inbox' | 'visitors' | 'installation';
+export type View = 'inbox' | 'visitors' | 'reports' | 'settings';
 
 interface SidebarProps {
   currentAgent: Agent | null;
   workspace: Workspace | null;
   activeView: View;
   onSelectView: (view: View) => void;
-  statusFilter: ConversationStatus | 'all';
-  onSelectStatusFilter: (status: ConversationStatus | 'all') => void;
   counts: {
-    all: number;
     open: number;
-    pending: number;
-    closed: number;
     liveVisitors: number;
   };
   onUpdateAgentStatus: (status: AgentStatus) => void;
@@ -45,30 +39,25 @@ const STATUS_TINT: Record<AgentStatus, string> = {
   offline: 'var(--ds-line-3)',
 };
 
-const FILTERS: { value: ConversationStatus | 'all'; label: string; key: keyof SidebarProps['counts'] }[] = [
-  { value: 'all', label: 'All', key: 'all' },
-  { value: 'open', label: 'Open', key: 'open' },
-  { value: 'pending', label: 'Pending', key: 'pending' },
-  { value: 'closed', label: 'Resolved', key: 'closed' },
-];
-
 export function Sidebar({
   currentAgent,
   workspace,
   activeView,
   onSelectView,
-  statusFilter,
-  onSelectStatusFilter,
   counts,
   onUpdateAgentStatus,
   onLogout,
 }: SidebarProps) {
-  const [soundActive, setSoundActive] = React.useState(true);
+  // The sound module owns the preference and its persistence; this just
+  // mirrors it, so there is no second copy of the state to drift.
+  const soundActive = React.useSyncExternalStore(
+    sound.subscribe,
+    sound.isEnabled,
+    sound.isEnabledServer
+  );
 
   const toggleSound = () => {
-    const newState = sound.toggleSound();
-    setSoundActive(newState);
-    if (newState) sound.playSentMessage();
+    if (sound.toggleSound()) sound.playSentMessage();
   };
 
   const enableNotifications = async () => {
@@ -76,7 +65,22 @@ export function Sidebar({
     if (granted) sound.playIncomingMessage();
   };
 
-  const nav: { view: View; label: string; Icon: typeof Inbox; badge?: React.ReactNode }[] = [
+  const isAdmin =
+    currentAgent?.role === 'admin' || currentAgent?.role === 'owner';
+
+  /*
+   * Four destinations, not six. Install, Integrations and Admin were three
+   * separate entries that all did the same job — configure the workspace — so
+   * they live behind Settings now. Conversation filters are not here either:
+   * the inbox owns its own queue tabs, and having both was the main source of
+   * "which filter am I actually looking at?".
+   */
+  const nav: {
+    view: View;
+    label: string;
+    Icon: typeof Inbox;
+    badge?: React.ReactNode;
+  }[] = [
     {
       view: 'inbox',
       label: 'Inbox',
@@ -95,11 +99,14 @@ export function Sidebar({
           </span>
         ) : undefined,
     },
-    { view: 'installation', label: 'Install', Icon: Code2 },
+    ...(isAdmin
+      ? [{ view: 'reports' as View, label: 'Reports', Icon: BarChart2 }]
+      : []),
+    { view: 'settings', label: 'Settings', Icon: Settings },
   ];
 
   return (
-    <aside className="w-[252px] shrink-0 h-screen flex flex-col bg-surface-2 border-r border-line select-none">
+    <aside className="w-[236px] shrink-0 h-screen flex flex-col bg-surface-2 border-r border-line select-none">
       {/* Workspace identity */}
       <div className="p-3 border-b border-line">
         <div className="flex items-center gap-2.5 px-1.5 py-1.5">
@@ -121,82 +128,32 @@ export function Sidebar({
       </div>
 
       {/* Navigation */}
-      <div className="p-3 flex-1 overflow-y-auto space-y-6">
-        <nav className="space-y-0.5">
-          {nav.map(({ view, label, Icon, badge }) => {
-            const active = activeView === view;
-            return (
-              <button
-                key={view}
-                onClick={() => onSelectView(view)}
-                aria-current={active ? 'page' : undefined}
-                className={cn(
-                  'w-full h-9 px-2.5 rounded-lg flex items-center justify-between gap-2 text-[13px] font-medium transition-colors duration-150',
-                  active
-                    ? 'bg-surface text-ink shadow-xs border border-line'
-                    : 'text-ink-2 hover:bg-surface-3 hover:text-ink border border-transparent'
-                )}
-              >
-                <span className="flex items-center gap-2.5 truncate">
-                  <Icon className="w-4 h-4 shrink-0" />
-                  {label}
-                </span>
-                {badge !== undefined && (
-                  <span className="text-[11px] text-ink-3 shrink-0">{badge}</span>
-                )}
-              </button>
-            );
-          })}
-        </nav>
-
-        {activeView === 'inbox' && (
-          <div>
-            <div className="px-2.5 pb-2 eyebrow">Filter</div>
-            <div className="space-y-0.5">
-              {FILTERS.map((f) => {
-                const active = statusFilter === f.value;
-                return (
-                  <button
-                    key={f.value}
-                    onClick={() => onSelectStatusFilter(f.value)}
-                    className={cn(
-                      'w-full h-8 px-2.5 rounded-lg flex items-center justify-between text-[12.5px] transition-colors duration-150',
-                      active
-                        ? 'bg-surface-3 text-ink font-semibold'
-                        : 'text-ink-2 hover:bg-surface-3/60 hover:text-ink'
-                    )}
-                  >
-                    <span>{f.label}</span>
-                    <span className="text-[11px] text-ink-3 tabular-nums">
-                      {counts[f.key]}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* Simulator shortcut */}
-        <a
-          href={`/demo.html?workspaceId=${workspace?.id || ''}&name=${encodeURIComponent(
-            workspace?.name || 'Chatify'
-          )}`}
-          target="_blank"
-          rel="noreferrer"
-          className="block card p-3 card-hover group"
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-[12.5px] font-semibold text-ink">
-              Customer simulator
-            </span>
-            <ExternalLink className="w-3.5 h-3.5 text-ink-3 group-hover:text-accent transition-colors" />
-          </div>
-          <p className="mt-1 text-[11.5px] leading-snug text-ink-3">
-            Open your site as a visitor and test the widget end to end.
-          </p>
-        </a>
-      </div>
+      <nav className="p-3 flex-1 overflow-y-auto space-y-0.5">
+        {nav.map(({ view, label, Icon, badge }) => {
+          const active = activeView === view;
+          return (
+            <button
+              key={view}
+              onClick={() => onSelectView(view)}
+              aria-current={active ? 'page' : undefined}
+              className={cn(
+                'w-full h-9 px-2.5 rounded-lg flex items-center justify-between gap-2 text-[13px] font-medium transition-colors duration-150',
+                active
+                  ? 'bg-surface text-ink shadow-xs border border-line'
+                  : 'text-ink-2 hover:bg-surface-3 hover:text-ink border border-transparent'
+              )}
+            >
+              <span className="flex items-center gap-2.5 truncate">
+                <Icon className="w-4 h-4 shrink-0" />
+                {label}
+              </span>
+              {badge !== undefined && (
+                <span className="text-[11px] text-ink-3 shrink-0">{badge}</span>
+              )}
+            </button>
+          );
+        })}
+      </nav>
 
       {/* Footer: utilities + profile */}
       <div className="p-3 border-t border-line space-y-2.5">
@@ -226,6 +183,8 @@ export function Sidebar({
           <ThemeToggle />
         </div>
 
+        {/* Status and log out share one menu — a separate log-out row below the
+            profile was a second way to do the same thing. */}
         <Menu<AgentStatus | 'logout'>
           value={(currentAgent?.status || 'online') as AgentStatus}
           side="top"
@@ -275,14 +234,6 @@ export function Sidebar({
             </span>
           )}
         />
-
-        <button
-          onClick={onLogout}
-          className="w-full h-8 rounded-lg flex items-center justify-center gap-2 text-[12px] font-medium text-ink-3 hover:text-danger hover:bg-danger-soft transition-colors"
-        >
-          <LogOut className="w-3.5 h-3.5" />
-          Log out
-        </button>
       </div>
     </aside>
   );

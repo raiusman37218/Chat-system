@@ -16,6 +16,8 @@ interface InstallationGuideProps {
   workspace: Workspace | null;
   hasVisitors: boolean;
   latestVisitorUrl?: string;
+  /** Rendered inside the Settings hub, which supplies its own page header. */
+  embedded?: boolean;
 }
 
 type Platform = 'html' | 'wordpress' | 'shopify' | 'react';
@@ -31,6 +33,7 @@ export function InstallationGuide({
   workspace,
   hasVisitors,
   latestVisitorUrl,
+  embedded = false,
 }: InstallationGuideProps) {
   const [copied, setCopied] = useState(false);
   const [activePlatform, setActivePlatform] = useState<Platform>('html');
@@ -132,33 +135,42 @@ export default function RootLayout({ children }) {
   };
 
   return (
-    <div className="flex-1 min-w-0 h-screen flex flex-col bg-canvas">
-      {/* Header */}
-      <header className="shrink-0 px-7 h-16 flex items-center justify-between gap-4 border-b border-line bg-surface">
-        <div className="min-w-0">
-          <h1 className="text-[15px] font-semibold tracking-tight">
-            Install the widget
-          </h1>
-          <p className="text-[12px] text-ink-3 mt-0.5">
-            One script tag. Works on any site, no build step required.
-          </p>
-        </div>
+    <div
+      className={cn(
+        'flex-1 min-w-0 flex flex-col bg-canvas',
+        !embedded && 'h-screen'
+      )}
+    >
+      {!embedded && (
+        <header className="shrink-0 px-7 h-16 flex items-center justify-between gap-4 border-b border-line bg-surface">
+          <div className="min-w-0">
+            <h1 className="text-[15px] font-semibold tracking-tight">
+              Install the widget
+            </h1>
+            <p className="text-[12px] text-ink-3 mt-0.5">
+              One script tag. Works on any site, no build step required.
+            </p>
+          </div>
 
-        <span
-          className={cn('pill shrink-0', hasVisitors ? 'pill-success' : 'pill-warn')}
-        >
-          {hasVisitors ? (
-            <>
-              <span className="live-dot" />
-              Connected — receiving traffic
-            </>
-          ) : (
-            'Awaiting first visit'
-          )}
-        </span>
-      </header>
+          <span
+            className={cn(
+              'pill shrink-0',
+              hasVisitors ? 'pill-success' : 'pill-warn'
+            )}
+          >
+            {hasVisitors ? (
+              <>
+                <span className="live-dot" />
+                Connected — receiving traffic
+              </>
+            ) : (
+              'Awaiting first visit'
+            )}
+          </span>
+        </header>
+      )}
 
-      <div className="flex-1 overflow-y-auto p-7">
+      <div className={cn('flex-1 p-7', !embedded && 'overflow-y-auto')}>
         <div className="max-w-3xl space-y-6">
           {/* Workspace summary */}
           <div className="card p-5 flex items-center justify-between gap-4 flex-wrap">

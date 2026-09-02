@@ -55,14 +55,29 @@ export async function requestNotificationPermission(): Promise<boolean> {
   return false;
 }
 
-export function sendBrowserNotification(title: string, body: string, icon?: string) {
+export function sendBrowserNotification(
+  title: string,
+  body: string,
+  options?: {
+    icon?: string;
+    tag?: string;
+    onClick?: () => void;
+  }
+) {
   if (typeof window === 'undefined' || !('Notification' in window)) return;
   if (Notification.permission === 'granted') {
     try {
-      new Notification(title, {
-        body,
-        icon: icon || '/favicon.ico',
+      const notif = new Notification(title, {
+        body: body.length > 140 ? `${body.slice(0, 137)}...` : body,
+        icon: options?.icon || '/chat-icon.png',
+        tag: options?.tag || 'chatify-notification',
       });
+
+      notif.onclick = () => {
+        window.focus();
+        if (options?.onClick) options.onClick();
+        notif.close();
+      };
     } catch {
       // Ignored in environments where Notification constructor fails
     }

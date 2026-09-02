@@ -283,7 +283,7 @@ export function ProductShowcase() {
             <div className="p-3 border-t border-line">
               <div className="flex items-center gap-2 h-9 px-3 rounded-xl border border-line bg-surface-2 text-[11px] text-ink-3">
                 <span className="flex-1">Reply to Maya…</span>
-                <span className="kbd">↵</span>
+                <span className="kbd">Enter</span>
               </div>
             </div>
           </div>

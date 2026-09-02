@@ -8,12 +8,12 @@ import {
   MapPin,
   MessageSquare,
   Monitor,
-  Radio,
   RefreshCw,
 } from 'lucide-react';
 import { Visitor } from '@/types/database';
 import { formatTimeAgo, parseUserAgent } from '@/lib/utils';
 import { Avatar } from '@/components/ui/Avatar';
+import { EmptyState } from '@/components/ui/EmptyState';
 
 interface LiveVisitorsRadarProps {
   visitors: Visitor[];
@@ -59,39 +59,16 @@ export function LiveVisitorsRadar({
       {/* Grid */}
       <div className="flex-1 overflow-y-auto p-7">
         {activeVisitors.length === 0 ? (
-          <div className="h-full flex flex-col items-center justify-center text-center max-w-md mx-auto gap-5">
-            <div className="relative w-16 h-16 flex items-center justify-center">
-              <span className="absolute inset-0 rounded-full border border-line" />
-              <span className="absolute inset-3 rounded-full border border-line" />
-              <Radio className="w-6 h-6 text-ink-3" />
-            </div>
-
-            <div>
-              <h2 className="text-[15px] font-semibold">
-                Nobody on the site right now
-              </h2>
-              <p className="mt-1.5 text-[13px] leading-relaxed text-ink-2">
-                As soon as someone loads a page carrying your script, they appear
-                here with their current URL, device and location.
-              </p>
-            </div>
-
-            <div className="panel p-4 text-left w-full">
-              <p className="text-[12.5px] font-semibold">Want to see it work?</p>
-              <p className="mt-1 text-[12px] leading-relaxed text-ink-2">
-                Open the customer simulator in another tab and click around — the
-                radar updates live.
-              </p>
-              <a
-                href="/demo.html"
-                target="_blank"
-                rel="noreferrer"
-                className="btn btn-sm btn-secondary mt-3"
-              >
-                <ExternalLink className="w-3.5 h-3.5" />
-                Open simulator
-              </a>
-            </div>
+          <div className="h-full flex items-center justify-center p-8">
+            <EmptyState
+              type="no-visitors"
+              title="Radar Scanning for Live Visitors"
+              description="Nobody is browsing your site right now. As soon as someone visits, their page URL, location, and device will appear here live."
+              actionLabel="Launch Demo Simulator"
+              onAction={() => window.open('/demo.html', '_blank')}
+              secondaryActionLabel="Refresh Radar"
+              onSecondaryAction={onRefresh}
+            />
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 gap-4">

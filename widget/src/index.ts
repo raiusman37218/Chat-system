@@ -143,11 +143,44 @@ class ChatifyWidget {
         if (data.brand_color) this.config.primaryColor = data.brand_color;
         if (data.greeting_title) this.config.title = data.greeting_title;
         if (data.greeting_message) this.config.subtitle = data.greeting_message;
+        if (data.widget_position) {
+          this.config.position = data.widget_position === 'left' ? 'bottom-left' : 'bottom-right';
+        }
 
         this.updateThemeAndTexts();
+
+        // Check Business Hours schedule
+        if (data.business_hours?.enabled) {
+          const isOutside = this.isOutsideBusinessHours(data.business_hours);
+          if (isOutside) {
+            const statusPill = this.shadow?.querySelector('.chatify-status-pill');
+            if (statusPill) {
+              statusPill.innerHTML = '<span class="status-dot" style="background:#94a3b8"></span> Away (Offline)';
+            }
+          }
+        }
       }
     } catch (e) {
       console.warn('[Chatify] Could not fetch workspace config:', e);
+    }
+  }
+
+  private isOutsideBusinessHours(businessHours: any): boolean {
+    if (!businessHours || !businessHours.enabled || !businessHours.schedule) return false;
+    try {
+      const now = new Date();
+      const tz = businessHours.timezone || 'UTC';
+      const dayName = new Intl.DateTimeFormat('en-US', { weekday: 'long', timeZone: tz }).format(now).toLowerCase();
+      const daySchedule = businessHours.schedule[dayName];
+      if (!daySchedule || !daySchedule.enabled) return true;
+
+      const timeStr = new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: tz }).format(now);
+      if (timeStr < daySchedule.start || timeStr > daySchedule.end) {
+        return true;
+      }
+      return false;
+    } catch {
+      return false;
     }
   }
 

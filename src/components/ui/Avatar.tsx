@@ -47,6 +47,7 @@ export function Avatar({
   size = 'sm',
   online,
   color,
+  muted,
   className,
 }: {
   name: string;
@@ -56,10 +57,14 @@ export function Avatar({
   online?: boolean;
   /** Overrides the derived colour — used for workspace brand avatars. */
   color?: string;
+  /** Neutral styling for identities with no name or email to colour-code. */
+  muted?: boolean;
   className?: string;
 }) {
   const picked = avatarColors(seed || name || '?');
-  const bg = color || picked.bg;
+  const useMuted = muted && !color;
+  const bg = useMuted ? 'var(--ds-surface-3)' : color || picked.bg;
+  const fg = useMuted ? 'var(--ds-ink-2)' : picked.fg;
 
   return (
     // The size lives on the wrapper too. Without an explicit height it would
@@ -71,7 +76,7 @@ export function Avatar({
           'w-full h-full rounded-full flex items-center justify-center font-semibold uppercase select-none',
           SIZES[size]
         )}
-        style={{ backgroundColor: bg, color: picked.fg }}
+        style={{ backgroundColor: bg, color: fg }}
       >
         {(name || '?').charAt(0)}
       </div>

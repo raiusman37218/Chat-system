@@ -3,16 +3,20 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import { Agent, Conversation, Message, Visitor, Workspace, AgentStatus, ConversationStatus, ConversationPriority } from '@/types/database';
-import { Sidebar } from '@/components/dashboard/Sidebar';
+import { Agent, Conversation, Message, Visitor, Workspace, AgentStatus, ConversationStatus, ConversationPriority, CannedResponse } from '@/types/database';
+import { Sidebar, type View } from '@/components/dashboard/Sidebar';
 import { ConversationList } from '@/components/dashboard/ConversationList';
 import { ChatThread } from '@/components/dashboard/ChatThread';
 import { VisitorDetailsSidebar } from '@/components/dashboard/VisitorDetailsSidebar';
 import { LiveVisitorsRadar } from '@/components/dashboard/LiveVisitorsRadar';
-import { InstallationGuide } from '@/components/dashboard/InstallationGuide';
+import { SettingsHub } from '@/components/dashboard/SettingsHub';
+import { AnalyticsDashboard } from '@/components/admin/AnalyticsDashboard';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { KeyboardShortcutsModal } from '@/components/ui/KeyboardShortcutsModal';
 import { sound } from '@/lib/sound';
-import { sendBrowserNotification } from '@/lib/utils';
-import { MessageSquare } from 'lucide-react';
+import { sendBrowserNotification, cn } from '@/lib/utils';
+import { updateFaviconBadge } from '@/lib/favicon';
+import { BarChart2, Inbox, Radio, Settings } from 'lucide-react';
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -22,10 +26,12 @@ export default function DashboardPage() {
   const [currentAgent, setCurrentAgent] = useState<Agent | null>(null);
   const [currentWorkspace, setCurrentWorkspace] = useState<Workspace | null>(null);
   const [allAgents, setAllAgents] = useState<Agent[]>([]);
+  const [cannedResponses, setCannedResponses] = useState<CannedResponse[]>([]);
+  const [showShortcutsModal, setShowShortcutsModal] = useState(false);
 
-  // Navigation & Views: 'inbox' | 'visitors' | 'installation'
-  const [activeView, setActiveView] = useState<'inbox' | 'visitors' | 'installation'>('inbox');
-  const [statusFilter, setStatusFilter] = useState<ConversationStatus | 'all'>('all');
+  // Four destinations: the inbox, the visitor radar, reports, and one
+  // Settings hub that owns install / widget / team / channels / AI.
+  const [activeView, setActiveView] = useState<View>('inbox');
 
   // Conversations & Messages
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -41,6 +47,39 @@ export default function DashboardPage() {
 
   const currentWorkspaceIdRef = useRef<string | null>(null);
   currentWorkspaceIdRef.current = currentWorkspace?.id || null;
+
+  // Dynamically update favicon badge and title count when unread conversations change
+  useEffect(() => {
+    const unreadTotal = conversations.reduce(
+      (acc, c) => acc + (c.unread_count || 0),
+      0
+    );
+    updateFaviconBadge(unreadTotal);
+  }, [conversations]);
+
+  // Global Keyboard Shortcuts Listener (? for cheatsheet, Esc to deselect)
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      const activeTag = document.activeElement?.tagName.toLowerCase();
+      const isInputActive =
+        activeTag === 'input' ||
+        activeTag === 'textarea' ||
+        (document.activeElement as HTMLElement)?.isContentEditable;
+
+      if (e.key === '?' && !isInputActive && !e.metaKey && !e.ctrlKey) {
+        e.preventDefault();
+        setShowShortcutsModal((prev) => !prev);
+        return;
+      }
+
+      if (e.key === 'Escape' && !showShortcutsModal && selectedConversationId) {
+        setSelectedConversationId(null);
+      }
+    };
+
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+  }, [showShortcutsModal, selectedConversationId]);
 
   // 1. Initial Load & Auth Verification
   const initializeDashboard = useCallback(async () => {
@@ -121,6 +160,14 @@ export default function DashboardPage() {
       // Fetch conversations and visitors for this workspace
       await refreshConversations(workspace.id);
       await refreshVisitors(workspace.id);
+
+      // Fetch canned responses
+      const { data: cannedList } = await supabase
+        .from('canned_responses')
+        .select('*')
+        .or(`workspace_id.eq.${workspace.id},workspace_id.is.null`)
+        .order('shortcut');
+      if (cannedList) setCannedResponses(cannedList as CannedResponse[]);
 
       setLoading(false);
     } catch (err) {
@@ -256,7 +303,28 @@ export default function DashboardPage() {
 
           if (newMsg.sender_type === 'visitor') {
             sound.playIncomingMessage();
-            sendBrowserNotification('New Customer Message', newMsg.content);
+            sendBrowserNotification(
+              'New Customer Message',
+              newMsg.content || 'Sent an attachment',
+              {
+                tag: `msg-${newMsg.conversation_id}`,
+                onClick: () => {
+                  setSelectedConversationId(newMsg.conversation_id);
+                },
+              }
+            );
+
+            // Dispatch offline agent email check
+            fetch('/api/notifications/dispatch', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                event: 'new_message',
+                conversation_id: newMsg.conversation_id,
+                message: newMsg,
+                workspace_id: currentWorkspaceIdRef.current,
+              }),
+            }).catch((err) => console.error('[Offline Email Dispatch]:', err));
           }
 
           refreshConversations();
@@ -269,7 +337,49 @@ export default function DashboardPage() {
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'conversations' },
-        () => {
+        (payload) => {
+          if (payload.eventType === 'INSERT') {
+            sound.playNewConversation();
+            const newConv = payload.new as Conversation;
+            sendBrowserNotification(
+              'New Conversation Started',
+              'A visitor started a new conversation on your site.',
+              {
+                tag: `conv-${newConv.id}`,
+                onClick: () => {
+                  setSelectedConversationId(newConv.id);
+                },
+              }
+            );
+
+            // Dispatch Slack notification
+            fetch('/api/notifications/dispatch', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                event: 'conversation_created',
+                conversation_id: newConv.id,
+                workspace_id: currentWorkspaceIdRef.current,
+              }),
+            }).catch((err) => console.error('[Slack Dispatch]:', err));
+
+            // Schedule Claude AI Auto-First-Response check if unassigned
+            const wsId = newConv.workspace_id || currentWorkspaceIdRef.current;
+            if (wsId) {
+              const delay = currentWorkspace?.ai_settings?.auto_response_delay_seconds || 20;
+              setTimeout(() => {
+                fetch('/api/ai/auto-respond', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    conversation_id: newConv.id,
+                    workspace_id: wsId,
+                  }),
+                }).catch((err) => console.warn('[AI Auto-Respond]:', err));
+              }, delay * 1000);
+            }
+          }
+
           refreshConversations();
         }
       )
@@ -311,12 +421,55 @@ export default function DashboardPage() {
       )
       .subscribe();
 
+    const internalNotesChannel = supabase
+      .channel('chatify-dashboard-internal-notes')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'internal_notes' },
+        (payload) => {
+          const note = payload.new as any;
+          if (
+            currentAgent?.id &&
+            note.mentioned_agent_ids?.includes(currentAgent.id) &&
+            note.agent_id !== currentAgent.id
+          ) {
+            sound.playIncomingMessage();
+            sendBrowserNotification(
+              'You were @mentioned in a conversation',
+              note.content
+            );
+          }
+        }
+      )
+      .subscribe();
+
+    // Periodic check for overdue snoozed conversations
+    const checkSnoozed = () => {
+      fetch('/api/conversations/snooze')
+        .then((res) => res.json())
+        .then((data) => {
+          if (data && data.reopened > 0) {
+            refreshConversations();
+            sendBrowserNotification(
+              'Snooze expired',
+              `${data.reopened} snoozed conversation(s) have reopened.`
+            );
+          }
+        })
+        .catch(() => {});
+    };
+
+    checkSnoozed();
+    const snoozeInterval = setInterval(checkSnoozed, 30000);
+
     return () => {
       supabase.removeChannel(messagesChannel);
       supabase.removeChannel(conversationsChannel);
       supabase.removeChannel(visitorsChannel);
+      supabase.removeChannel(internalNotesChannel);
+      clearInterval(snoozeInterval);
     };
-  }, [supabase]);
+  }, [supabase, currentAgent?.id]);
 
   // 6. Action Handlers
   const handleSendMessage = async (content: string, isInternal: boolean = false) => {
@@ -406,7 +559,11 @@ export default function DashboardPage() {
 
     const { error } = await supabase
       .from('conversations')
-      .update({ agent_id: agentId, updated_at: new Date().toISOString() })
+      .update({
+        agent_id: agentId,
+        assigned_agent_id: agentId,
+        updated_at: new Date().toISOString(),
+      })
       .eq('id', selectedConversationId);
 
     if (error) {
@@ -417,7 +574,9 @@ export default function DashboardPage() {
     const assignedAgent = allAgents.find((a) => a.id === agentId) || null;
     setConversations((prev) =>
       prev.map((c) =>
-        c.id === selectedConversationId ? { ...c, agent_id: agentId, agent: assignedAgent } : c
+        c.id === selectedConversationId
+          ? { ...c, agent_id: agentId, assigned_agent_id: agentId, agent: assignedAgent }
+          : c
       )
     );
   };
@@ -472,15 +631,14 @@ export default function DashboardPage() {
 
   const activeConversation = conversations.find((c) => c.id === selectedConversationId);
 
+  const isAdmin =
+    currentAgent?.role === 'admin' || currentAgent?.role === 'owner';
+
   const counts = {
-    all: conversations.length,
     open: conversations.filter((c) => c.status === 'open').length,
-    pending: conversations.filter((c) => c.status === 'pending').length,
-    closed: conversations.filter((c) => c.status === 'closed').length,
-    liveVisitors: visitors.filter((v) => {
-      const diff = (new Date().getTime() - new Date(v.last_seen).getTime()) / 1000;
-      return diff < 90;
-    }).length,
+    liveVisitors: visitors.filter(
+      (v) => (Date.now() - new Date(v.last_seen).getTime()) / 1000 < 90
+    ).length,
   };
 
   if (loading) {
@@ -499,32 +657,54 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-canvas">
-      {/* 1. Left Sidebar Navigation */}
-      <Sidebar
-        currentAgent={currentAgent}
-        workspace={currentWorkspace}
-        activeView={activeView}
-        onSelectView={setActiveView}
-        statusFilter={statusFilter}
-        onSelectStatusFilter={setStatusFilter}
-        counts={counts}
-        onUpdateAgentStatus={handleUpdateAgentStatus}
-        onLogout={handleLogout}
-      />
+    <div className="flex h-screen w-screen overflow-hidden bg-canvas relative">
+      {/* 1. Left Sidebar Navigation (Desktop) */}
+      <div
+        className={cn(
+          'h-screen shrink-0',
+          selectedConversationId ? 'hidden md:flex' : 'hidden md:flex'
+        )}
+      >
+        <Sidebar
+          currentAgent={currentAgent}
+          workspace={currentWorkspace}
+          activeView={activeView}
+          onSelectView={setActiveView}
+          counts={counts}
+          onUpdateAgentStatus={handleUpdateAgentStatus}
+          onLogout={handleLogout}
+        />
+      </div>
 
       {/* 2. Middle & Right Content Area based on activeView */}
       {activeView === 'inbox' && (
-        <>
-          <ConversationList
-            conversations={conversations}
-            selectedConversationId={selectedConversationId}
-            onSelectConversation={setSelectedConversationId}
-            statusFilter={statusFilter}
-          />
+        <div className="flex-1 flex overflow-hidden w-full">
+          {/* Conversation List: full width on mobile when no conversation active */}
+          <div
+            className={cn(
+              'h-full shrink-0',
+              selectedConversationId
+                ? 'hidden md:flex md:w-[340px]'
+                : 'flex w-full md:w-[340px] pb-14 md:pb-0'
+            )}
+          >
+            <ConversationList
+              conversations={conversations}
+              selectedConversationId={selectedConversationId}
+              onSelectConversation={setSelectedConversationId}
+              currentAgent={currentAgent}
+              loading={loading}
+            />
+          </div>
 
+          {/* Chat Thread + Visitor CRM Sidebar */}
           {activeConversation ? (
-            <>
+            <div
+              className={cn(
+                'flex-1 flex overflow-hidden',
+                selectedConversationId ? 'flex w-full' : 'hidden md:flex'
+              )}
+            >
               <ChatThread
                 conversation={activeConversation}
                 messages={messages}
@@ -535,57 +715,114 @@ export default function DashboardPage() {
                 onAssignAgent={handleAssignAgent}
                 onUpdatePriority={handleUpdatePriority}
                 onUpdateTags={handleUpdateTags}
+                onBack={() => setSelectedConversationId(null)}
+                onToggleAiMode={async (mode) => {
+                  if (!selectedConversationId) return;
+                  await supabase
+                    .from('conversations')
+                    .update({ ai_mode: mode, updated_at: new Date().toISOString() })
+                    .eq('id', selectedConversationId);
+
+                  setConversations((prev) =>
+                    prev.map((c) =>
+                      c.id === selectedConversationId ? { ...c, ai_mode: mode } : c
+                    )
+                  );
+                }}
               />
 
               <VisitorDetailsSidebar
                 visitor={activeConversation.visitor}
                 conversation={activeConversation}
+                currentAgent={currentAgent}
+                onSelectConversation={setSelectedConversationId}
+                onUpdateTags={handleUpdateTags}
               />
-            </>
+            </div>
           ) : (
-            <div className="flex-1 flex flex-col items-center justify-center gap-4 bg-canvas px-8 text-center">
-              <div className="w-14 h-14 rounded-2xl bg-surface-2 border border-line flex items-center justify-center p-2.5 text-ink-3 shadow-xs">
-                <img
-                  src="/chat-icon.png"
-                  alt="Chatify"
-                  className="w-full h-full object-contain opacity-85"
-                />
-              </div>
-              <div className="max-w-sm">
-                <p className="text-[14px] font-semibold">
-                  No conversation selected
-                </p>
-                <p className="mt-1.5 text-[13px] leading-relaxed text-ink-2">
-                  Pick a thread from the list, or install the widget on your site
-                  so visitors can start one.
-                </p>
-              </div>
-              <button
-                onClick={() => setActiveView('installation')}
-                className="btn btn-sm btn-secondary"
-              >
-                Get the embed code
-              </button>
+            <div className="hidden md:flex flex-1 flex-col items-center justify-center p-8 bg-canvas text-center">
+              <EmptyState
+                type="no-conversations"
+                title="Select a conversation"
+                description="Choose an incoming thread from your inbox to reply, or embed the widget so visitors can start chatting."
+                actionLabel="Get the Embed Code"
+                onAction={() => setActiveView('settings')}
+                secondaryActionLabel="Open Shortcuts (?)"
+                onSecondaryAction={() => setShowShortcutsModal(true)}
+              />
             </div>
           )}
-        </>
+        </div>
       )}
 
       {activeView === 'visitors' && (
-        <LiveVisitorsRadar
-          visitors={visitors}
-          onOpenConversationForVisitor={handleOpenConversationForVisitor}
-          onRefresh={() => refreshVisitors()}
-        />
+        <div className="flex-1 flex overflow-hidden w-full pb-14 md:pb-0">
+          <LiveVisitorsRadar
+            visitors={visitors}
+            onOpenConversationForVisitor={handleOpenConversationForVisitor}
+            onRefresh={() => refreshVisitors()}
+          />
+        </div>
       )}
 
-      {activeView === 'installation' && (
-        <InstallationGuide
-          workspace={currentWorkspace}
-          hasVisitors={visitors.length > 0}
-          latestVisitorUrl={visitors[0]?.current_url}
-        />
+      {activeView === 'reports' && currentWorkspace && currentAgent && (
+        <div className="flex-1 flex overflow-hidden w-full pb-14 md:pb-0">
+          <AnalyticsDashboard
+            workspace={currentWorkspace}
+            currentAgent={currentAgent}
+          />
+        </div>
       )}
+
+      {activeView === 'settings' && (
+        <div className="flex-1 flex overflow-hidden w-full pb-14 md:pb-0">
+          <SettingsHub
+            workspace={currentWorkspace}
+            currentAgent={currentAgent}
+            agents={allAgents}
+            cannedResponses={cannedResponses}
+            hasVisitors={visitors.length > 0}
+            latestVisitorUrl={visitors[0]?.current_url}
+            onWorkspaceUpdated={(ws) => setCurrentWorkspace(ws)}
+          />
+        </div>
+      )}
+
+      {/* 3. Mobile bottom navigation — mirrors the desktop rail exactly, so
+          the app has one navigation model rather than two. */}
+      {!selectedConversationId && (
+        <nav className="md:hidden fixed bottom-0 left-0 right-0 h-14 bg-surface border-t border-line flex items-center justify-around px-2 z-40 shadow-lg">
+          {(
+            [
+              ['inbox', 'Inbox', Inbox, true],
+              ['visitors', 'Visitors', Radio, true],
+              ['reports', 'Reports', BarChart2, isAdmin],
+              ['settings', 'Settings', Settings, true],
+            ] as [View, string, typeof Inbox, boolean][]
+          )
+            .filter(([, , , visible]) => visible)
+            .map(([view, label, Icon]) => (
+              <button
+                key={view}
+                onClick={() => setActiveView(view)}
+                aria-current={activeView === view ? 'page' : undefined}
+                className={cn(
+                  'flex flex-col items-center justify-center gap-0.5 px-3 py-1 rounded-lg text-[10px] font-medium transition-colors',
+                  activeView === view ? 'text-accent font-bold' : 'text-ink-3'
+                )}
+              >
+                <Icon className="w-4 h-4" />
+                <span>{label}</span>
+              </button>
+            ))}
+        </nav>
+      )}
+
+      {/* 4. Global Keyboard Shortcuts Cheatsheet Modal */}
+      <KeyboardShortcutsModal
+        isOpen={showShortcutsModal}
+        onClose={() => setShowShortcutsModal(false)}
+      />
     </div>
   );
 }

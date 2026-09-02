@@ -9,7 +9,6 @@ import {
   Check,
   Copy,
   ExternalLink,
-  MessageSquare,
   Send,
   Sparkles,
 } from 'lucide-react';

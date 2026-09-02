@@ -34,14 +34,20 @@ export const viewport: Viewport = {
  * Applies the stored theme before first paint. Without this the page renders
  * light for a frame and then snaps to dark, which looks broken.
  */
+/**
+ * Resolves the theme before first paint. `data-theme` is ALWAYS written — even
+ * on "system" — because the `dark:` Tailwind variant keys off the attribute and
+ * cannot see a media query. Storage stays empty for "system" so the choice
+ * remains "follow the OS" rather than a pinned value.
+ */
 const themeBootstrap = `
 (function () {
-  try {
-    var t = localStorage.getItem('chatify-theme');
-    if (t === 'light' || t === 'dark') {
-      document.documentElement.setAttribute('data-theme', t);
-    }
-  } catch (e) {}
+  var stored = null;
+  try { stored = localStorage.getItem('chatify-theme'); } catch (e) {}
+  var theme = stored === 'light' || stored === 'dark'
+    ? stored
+    : (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+  document.documentElement.setAttribute('data-theme', theme);
 })();
 `;
 

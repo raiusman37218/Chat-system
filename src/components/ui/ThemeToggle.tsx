@@ -23,14 +23,28 @@ const OPTIONS: { value: Theme; label: string; Icon: typeof Sun }[] = [
 
 const listeners = new Set<() => void>();
 
+const systemDark = () =>
+  typeof window !== 'undefined' &&
+  window.matchMedia('(prefers-color-scheme: dark)').matches;
+
 function subscribe(onChange: () => void) {
   listeners.add(onChange);
   // `storage` only fires in *other* tabs, which is exactly what we want on top
   // of the local notifications above.
   window.addEventListener('storage', onChange);
+
+  // While on "system", follow the OS live so the attribute stays correct.
+  const mq = window.matchMedia('(prefers-color-scheme: dark)');
+  const onSystemChange = () => {
+    if (getSnapshot() === 'system') applyTheme('system');
+    onChange();
+  };
+  mq.addEventListener('change', onSystemChange);
+
   return () => {
     listeners.delete(onChange);
     window.removeEventListener('storage', onChange);
+    mq.removeEventListener('change', onSystemChange);
   };
 }
 
@@ -48,21 +62,27 @@ function getServerSnapshot(): Theme {
   return 'system';
 }
 
+/**
+ * `data-theme` is the single source of truth — the token blocks and the
+ * `dark:` custom variant in globals.css both key off it, so no companion
+ * `.dark` class is needed.
+ */
 function applyTheme(theme: Theme) {
-  const root = document.documentElement;
+  // The attribute always carries a resolved value, never "system": the `dark:`
+  // Tailwind variant matches on it and cannot read a media query. "system" is
+  // represented by the ABSENCE of a stored preference instead.
+  document.documentElement.setAttribute(
+    'data-theme',
+    theme === 'system' ? (systemDark() ? 'dark' : 'light') : theme
+  );
+
   try {
-    if (theme === 'system') {
-      root.removeAttribute('data-theme');
-      localStorage.removeItem(STORAGE_KEY);
-    } else {
-      root.setAttribute('data-theme', theme);
-      localStorage.setItem(STORAGE_KEY, theme);
-    }
+    if (theme === 'system') localStorage.removeItem(STORAGE_KEY);
+    else localStorage.setItem(STORAGE_KEY, theme);
   } catch {
     // Private mode with storage disabled — the attribute swap still applies.
-    if (theme === 'system') root.removeAttribute('data-theme');
-    else root.setAttribute('data-theme', theme);
   }
+
   listeners.forEach((l) => l());
 }
 
