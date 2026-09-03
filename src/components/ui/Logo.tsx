@@ -40,11 +40,11 @@ export function Logo({
       </div>
       {showText && (
         <span
-          className={`font-semibold tracking-tight text-ink ${
-            pixelSize >= 40 ? 'text-[17px]' : 'text-[15px]'
+          className={`font-bold tracking-tight text-ink flex items-center ${
+            pixelSize >= 40 ? 'text-[19px]' : pixelSize >= 32 ? 'text-[17px]' : 'text-[15px]'
           } ${textClassName}`}
         >
-          Chatify
+          Chat<span className="text-blue-600 dark:text-blue-500">i</span>fy
         </span>
       )}
     </div>

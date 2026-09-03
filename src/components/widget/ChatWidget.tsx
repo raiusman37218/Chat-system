@@ -59,7 +59,9 @@ export default function ChatWidget({
 }: ChatWidgetProps) {
   // 1. Theme and Configuration
   const brandColor = config.brandColor || '#2563EB';
-  const position = config.position || 'bottom-right';
+  const [widgetPosition, setWidgetPosition] = useState<'bottom-right' | 'bottom-left'>(
+    config.position || 'bottom-right'
+  );
   const companyName = config.companyName || 'Chatify Support';
   const welcomeText = config.welcomeText || 'Hi there! 👋 How can we help you today?';
   const autoGreetingDelay = config.autoGreetingDelaySeconds ?? 5;
@@ -104,7 +106,7 @@ export default function ChatWidget({
         const [{ data: wsData }, { data: articlesData }] = await Promise.all([
           supabase
             .from('workspaces')
-            .select('help_center_tab_label, show_help_tab')
+            .select('help_center_tab_label, show_help_tab, widget_position')
             .eq('id', config.workspaceId)
             .maybeSingle(),
           supabase
@@ -118,6 +120,9 @@ export default function ChatWidget({
         if (wsData) {
           if (wsData.help_center_tab_label) setHelpTabLabel(wsData.help_center_tab_label);
           if (typeof wsData.show_help_tab === 'boolean') setShowHelpTab(wsData.show_help_tab);
+          if (wsData.widget_position) {
+            setWidgetPosition(wsData.widget_position === 'left' ? 'bottom-left' : 'bottom-right');
+          }
         }
         if (articlesData) setHelpArticles(articlesData);
       } catch (err) {
@@ -486,7 +491,7 @@ export default function ChatWidget({
     }
   };
 
-  const isPositionLeft = position === 'bottom-left';
+  const isPositionLeft = widgetPosition === 'bottom-left';
 
   return (
     <div
@@ -1045,7 +1050,11 @@ export default function ChatWidget({
             {isOpen ? (
               <X className="w-6 h-6 transition-transform duration-200 rotate-90 scale-100" />
             ) : (
-              <MessageCircle className="w-6 h-6 transition-transform duration-200" />
+              <img
+                src="/chat-icon.png"
+                alt="Chat"
+                className="w-7 h-7 object-contain filter drop-shadow-sm transition-transform duration-200 hover:scale-105"
+              />
             )}
 
             {/* Unread Counter Badge Pill */}
