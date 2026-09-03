@@ -158,17 +158,13 @@ export function SettingsHub({
   return (
     <div className="flex-1 min-w-0 h-screen flex flex-col bg-canvas">
       <header className="shrink-0 px-7 h-16 flex items-center border-b border-line bg-surface">
-        <div className="min-w-0">
-          <h1 className="text-[15px] font-semibold tracking-tight">Settings</h1>
-          <p className="text-[12px] text-ink-3 mt-0.5 truncate">
-            {current?.description}
-          </p>
-        </div>
+        <h1 className="text-[15px] font-semibold tracking-tight">Settings</h1>
       </header>
 
       <div className="flex-1 flex min-h-0">
         {/* Section list */}
         <nav className="w-[212px] shrink-0 border-r border-line bg-surface-2 p-2.5 overflow-y-auto">
+          <div className="eyebrow px-2.5 pt-1 pb-2">Workspace</div>
           {sections.map(({ id, label, Icon }) => {
             const isActive = active === id;
             return (
@@ -192,6 +188,21 @@ export function SettingsHub({
 
         {/* Section body */}
         <div className="flex-1 min-w-0 overflow-y-auto">
+          {current && (
+            <div className="px-7 pt-6 pb-1 max-w-4xl">
+              <div className="flex items-center gap-2.5">
+                <current.Icon className="w-4 h-4 text-ink-3 shrink-0" />
+                <h2 className="text-[17px] font-semibold tracking-tight">
+                  {current.label}
+                </h2>
+              </div>
+              <p className="mt-1 text-[13px] leading-relaxed text-ink-2">
+                {current.description}
+              </p>
+              <div className="mt-5 hairline" />
+            </div>
+          )}
+
           {active === 'install' && (
             <InstallationGuide
               embedded

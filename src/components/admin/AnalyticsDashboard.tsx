@@ -36,14 +36,20 @@ interface AnalyticsData {
   summary: {
     totalConversations: number;
     volumeChangePercent: number;
-    avgFirstResponseSeconds: number;
-    avgResolutionSeconds: number;
-    avgCsat: number;
-    positiveCsatPercent: number;
+    avgFirstResponseSeconds: number | null;
+    avgResolutionSeconds: number | null;
+    avgCsat: number | null;
+    positiveCsatPercent: number | null;
     totalCsatRatings: number;
   };
   statusBreakdown: Array<{ name: string; value: number; color: string }>;
-  timelineData: Array<{ date: string; total: number; resolved: number; csat: number }>;
+  timelineData: Array<{
+    date: string;
+    total: number;
+    resolved: number;
+    /** null on days with no ratings, so the trend line breaks instead of lying. */
+    csat: number | null;
+  }>;
   perAgentPerformance: Array<{
     id: string;
     name: string;
@@ -52,15 +58,17 @@ interface AnalyticsData {
     role: string;
     handled: number;
     resolved: number;
-    resolutionRate: number;
-    avgFrt: number;
-    avgResolution: number;
-    csatScore: number;
+    resolutionRate: number | null;
+    avgFrt: number | null;
+    avgResolution: number | null;
+    csatScore: number | null;
     csatCount: number;
   }>;
 }
 
-function formatDuration(seconds: number): string {
+/** An em dash beats a made-up number when there is nothing to average. */
+function formatDuration(seconds: number | null): string {
+  if (seconds === null || seconds === undefined) return '—';
   if (seconds < 60) return `${seconds}s`;
   const mins = Math.floor(seconds / 60);
   const remSecs = seconds % 60;
@@ -101,13 +109,15 @@ export function AnalyticsDashboard({ workspace, currentAgent }: AnalyticsDashboa
     fetchAnalytics();
   }, [workspace.id, range, granularity]);
 
+  // Empty, not "typical". This renders while loading and on error, where a
+  // plausible-looking 4.8 would be indistinguishable from a real measurement.
   const summary = data?.summary || {
     totalConversations: 0,
     volumeChangePercent: 0,
-    avgFirstResponseSeconds: 75,
-    avgResolutionSeconds: 980,
-    avgCsat: 4.8,
-    positiveCsatPercent: 96,
+    avgFirstResponseSeconds: null,
+    avgResolutionSeconds: null,
+    avgCsat: null,
+    positiveCsatPercent: null,
     totalCsatRatings: 0,
   };
 
@@ -236,11 +246,20 @@ export function AnalyticsDashboard({ workspace, currentAgent }: AnalyticsDashboa
               <span className="text-2xl font-bold text-ink tracking-tight">
                 {formatDuration(summary.avgFirstResponseSeconds)}
               </span>
-              <span className="text-xs font-semibold text-emerald-600 flex items-center gap-0.5">
-                <CheckCircle2 className="w-3 h-3" /> Fast
-              </span>
+              {/* "Fast" used to show unconditionally, including on a fabricated
+                  average. It is a judgement, so it needs a real number first. */}
+              {summary.avgFirstResponseSeconds !== null &&
+                summary.avgFirstResponseSeconds < 120 && (
+                  <span className="text-xs font-semibold text-emerald-600 flex items-center gap-0.5">
+                    <CheckCircle2 className="w-3 h-3" /> Fast
+                  </span>
+                )}
             </div>
-            <p className="text-[11.5px] text-ink-3">Time until first agent reply</p>
+            <p className="text-[11.5px] text-ink-3">
+              {summary.avgFirstResponseSeconds === null
+                ? 'No replies measured yet'
+                : 'Time until first agent reply'}
+            </p>
           </div>
 
           {/* KPI 3: Avg Resolution Time */}
@@ -254,7 +273,11 @@ export function AnalyticsDashboard({ workspace, currentAgent }: AnalyticsDashboa
                 {formatDuration(summary.avgResolutionSeconds)}
               </span>
             </div>
-            <p className="text-[11.5px] text-ink-3">From start to closed ticket</p>
+            <p className="text-[11.5px] text-ink-3">
+              {summary.avgResolutionSeconds === null
+                ? 'No conversations resolved yet'
+                : 'From start to closed ticket'}
+            </p>
           </div>
 
           {/* KPI 4: CSAT Satisfaction Score */}
@@ -265,15 +288,29 @@ export function AnalyticsDashboard({ workspace, currentAgent }: AnalyticsDashboa
             </div>
             <div className="flex items-baseline gap-2">
               <span className="text-2xl font-bold text-ink tracking-tight flex items-center gap-1">
-                {summary.avgCsat}
-                <span className="text-amber-500 text-lg">★</span>
+                {summary.avgCsat ?? '—'}
+                {summary.avgCsat !== null && (
+                  <span className="text-amber-500 text-lg">★</span>
+                )}
               </span>
-              <span className="text-xs font-semibold text-emerald-600">
-                {summary.positiveCsatPercent}% positive
-              </span>
+              {summary.positiveCsatPercent !== null && (
+                <span
+                  className={`text-xs font-semibold ${
+                    summary.positiveCsatPercent >= 60
+                      ? 'text-emerald-600'
+                      : 'text-amber-600'
+                  }`}
+                >
+                  {summary.positiveCsatPercent}% positive
+                </span>
+              )}
             </div>
             <p className="text-[11.5px] text-ink-3">
-              Based on {summary.totalCsatRatings} post-chat rating(s)
+              {summary.totalCsatRatings > 0
+                ? `Based on ${summary.totalCsatRatings} post-chat rating${
+                    summary.totalCsatRatings === 1 ? '' : 's'
+                  }`
+                : 'No ratings collected yet'}
             </p>
           </div>
         </div>
@@ -458,7 +495,8 @@ export function AnalyticsDashboard({ workspace, currentAgent }: AnalyticsDashboa
                   tick={{ fontSize: 11, fill: 'var(--color-ink-3, #94a3b8)' }}
                 />
                 <YAxis
-                  domain={[3.5, 5]}
+                  domain={[1, 5]}
+                  ticks={[1, 2, 3, 4, 5]}
                   tickLine={false}
                   axisLine={false}
                   tick={{ fontSize: 11, fill: 'var(--color-ink-3, #94a3b8)' }}
@@ -480,6 +518,8 @@ export function AnalyticsDashboard({ workspace, currentAgent }: AnalyticsDashboa
                   strokeWidth={2.5}
                   dot={{ r: 3, fill: '#f59e0b' }}
                   activeDot={{ r: 5 }}
+                  // Days without ratings are gaps, not a continuation.
+                  connectNulls={false}
                 />
               </LineChart>
             </ResponsiveContainer>
@@ -546,7 +586,11 @@ export function AnalyticsDashboard({ workspace, currentAgent }: AnalyticsDashboa
                   {/* Handled Conversations */}
                   <div className="col-span-2 text-center">
                     <span className="font-bold text-ink text-sm">{agent.handled}</span>
-                    <div className="text-[10.5px] text-ink-3">{agent.resolutionRate}% resolved</div>
+                    <div className="text-[10.5px] text-ink-3">
+                      {agent.resolutionRate === null
+                        ? 'No conversations'
+                        : `${agent.resolutionRate}% resolved`}
+                    </div>
                   </div>
 
                   {/* Avg First Response */}
@@ -561,13 +605,19 @@ export function AnalyticsDashboard({ workspace, currentAgent }: AnalyticsDashboa
 
                   {/* CSAT Score */}
                   <div className="col-span-2 flex items-center justify-end gap-1.5">
-                    <span className="px-2.5 py-1 rounded-lg bg-amber-500/10 text-amber-700 dark:text-amber-400 font-bold text-xs flex items-center gap-1">
-                      <Star className="w-3 h-3 fill-current text-amber-500" />
-                      {agent.csatScore}
-                    </span>
-                    <span className="text-[11px] text-ink-3 font-medium">
-                      ({agent.csatCount})
-                    </span>
+                    {agent.csatScore === null ? (
+                      <span className="text-[12px] text-ink-3">—</span>
+                    ) : (
+                      <>
+                        <span className="px-2.5 py-1 rounded-lg bg-amber-500/10 text-amber-700 dark:text-amber-400 font-bold text-xs flex items-center gap-1">
+                          <Star className="w-3 h-3 fill-current text-amber-500" />
+                          {agent.csatScore}
+                        </span>
+                        <span className="text-[11px] text-ink-3 font-medium">
+                          ({agent.csatCount})
+                        </span>
+                      </>
+                    )}
                   </div>
                 </div>
               ))

@@ -148,27 +148,33 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    // Averages
+    // Averages.
+    //
+    // These return null, never a placeholder. Earlier revisions fell back to
+    // "benchmark" figures (84s, 18m, 4.8 stars, 95% positive) when there was
+    // nothing to measure, so a workspace with zero ratings still displayed a
+    // healthy-looking CSAT. A reporting screen that invents numbers is worse
+    // than one that admits it has none.
     const avgFrt =
       frtValues.length > 0
         ? Math.round(frtValues.reduce((a, b) => a + b, 0) / frtValues.length)
-        : 84; // 1m 24s benchmark fallback
+        : null;
 
     const avgResolution =
       resValues.length > 0
         ? Math.round(resValues.reduce((a, b) => a + b, 0) / resValues.length)
-        : 1120; // 18m benchmark fallback
+        : null;
 
     const avgCsat =
       csatValues.length > 0
         ? Number((csatValues.reduce((a, b) => a + b, 0) / csatValues.length).toFixed(1))
-        : 4.8;
+        : null;
 
     const positiveCsatCount = csatValues.filter((v) => v >= 4).length;
     const positiveCsatPercent =
       csatValues.length > 0
         ? Math.round((positiveCsatCount / csatValues.length) * 100)
-        : 95;
+        : null;
 
     // Volume comparison
     const totalCurrent = convList.length;
@@ -248,10 +254,12 @@ export async function GET(req: NextRequest) {
     }
 
     const timelineData = Array.from(timelineMap.values()).map((t) => {
+      // null, so the trend line breaks on days with no ratings instead of
+      // drawing a flat invented 4.8 across an empty month.
       const avgDayCsat =
         t.csatScores.length > 0
           ? Number((t.csatScores.reduce((a, b) => a + b, 0) / t.csatScores.length).toFixed(1))
-          : 4.8;
+          : null;
       return {
         date: t.date,
         total: t.conversations,
@@ -270,23 +278,25 @@ export async function GET(req: NextRequest) {
         csatList: [],
       };
 
+      // Same rule as the workspace summary: an agent who has handled nothing
+      // reports nothing, rather than a flattering 65s / 4.9 stars / 100%.
       const agentAvgFrt =
         m.frtList.length > 0
           ? Math.round(m.frtList.reduce((a, b) => a + b, 0) / m.frtList.length)
-          : 65;
+          : null;
 
       const agentAvgRes =
         m.resList.length > 0
           ? Math.round(m.resList.reduce((a, b) => a + b, 0) / m.resList.length)
-          : 940;
+          : null;
 
       const agentAvgCsat =
         m.csatList.length > 0
           ? Number((m.csatList.reduce((a, b) => a + b, 0) / m.csatList.length).toFixed(1))
-          : 4.9;
+          : null;
 
       const resolutionRate =
-        m.handled > 0 ? Math.round((m.resolved / m.handled) * 100) : 100;
+        m.handled > 0 ? Math.round((m.resolved / m.handled) * 100) : null;
 
       return {
         id: agent.id,
