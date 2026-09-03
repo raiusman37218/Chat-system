@@ -12,6 +12,9 @@ interface WidgetConfig {
   subtitle: string;
   primaryColor: string;
   position: 'bottom-right' | 'bottom-left';
+  helpTabLabel: string;
+  showHelpTab: boolean;
+  helpTabIcon: string;
 }
 
 interface MessageItem {
@@ -23,31 +26,38 @@ interface MessageItem {
 }
 
 interface FAQItem {
+  id?: string;
   q: string;
   a: string;
+  summary?: string;
   category: string;
+  icon?: string;
 }
 
 const DEFAULT_FAQS: FAQItem[] = [
   {
     q: 'How do I install Chatify on my website?',
     a: 'Copy the 1-line script tag from your Embed Code tab and paste it directly above the closing </body> tag on your website.',
-    category: 'Installation'
+    category: 'Installation',
+    icon: '🚀'
   },
   {
     q: 'What are your pricing plans?',
     a: 'We offer a Starter plan at $29/mo and an Enterprise plan with custom SLAs and high-concurrency websocket clusters.',
-    category: 'Billing'
+    category: 'Billing',
+    icon: '💳'
   },
   {
     q: 'How does live visitor tracking work?',
     a: 'Our beacon tracks website visits in real-time. When you browse between pages, your support agent sees your active URL on their live radar.',
-    category: 'Features'
+    category: 'Features',
+    icon: '⚡'
   },
   {
     q: 'Can I add multiple agents to my team?',
     a: 'Yes! Chatify is fully multi-tenant and supports unlimited agent seats per business workspace.',
-    category: 'Team'
+    category: 'Team',
+    icon: '👥'
   }
 ];
 
@@ -69,6 +79,7 @@ class ChatifyWidget {
   private activeTab: 'home' | 'messages' | 'help' = 'home';
   private unreadCount: number = 0;
   private messages: MessageItem[] = [];
+  private faqs: FAQItem[] = DEFAULT_FAQS;
   private isPreChatCompleted: boolean = false;
   private csatRated: boolean = false;
 
@@ -117,6 +128,9 @@ class ChatifyWidget {
       subtitle: script?.getAttribute('data-subtitle') || 'We reply in under 5 minutes',
       primaryColor: script?.getAttribute('data-color') || '#2e5bff',
       position: (script?.getAttribute('data-position') as 'bottom-right' | 'bottom-left') || 'bottom-right',
+      helpTabLabel: script?.getAttribute('data-help-label') || 'Help',
+      showHelpTab: script?.getAttribute('data-show-help') !== 'false',
+      helpTabIcon: script?.getAttribute('data-help-icon') || '📖',
     };
   }
 
@@ -146,6 +160,15 @@ class ChatifyWidget {
         if (data.widget_position) {
           this.config.position = data.widget_position === 'left' ? 'bottom-left' : 'bottom-right';
         }
+        if (data.help_center_tab_label) {
+          this.config.helpTabLabel = data.help_center_tab_label;
+        }
+        if (typeof data.show_help_tab === 'boolean') {
+          this.config.showHelpTab = data.show_help_tab;
+        }
+        if (data.help_center_tab_icon) {
+          this.config.helpTabIcon = data.help_center_tab_icon;
+        }
 
         this.updateThemeAndTexts();
 
@@ -160,6 +183,9 @@ class ChatifyWidget {
           }
         }
       }
+
+      // Load Help Desk / Knowledge Base articles dynamically
+      await this.loadWorkspaceArticles();
     } catch (e) {
       console.warn('[Chatify] Could not fetch workspace config:', e);
     }
@@ -182,6 +208,108 @@ class ChatifyWidget {
     } catch {
       return false;
     }
+  }
+
+  // 2b. Dynamic Knowledge Base Articles
+  private async loadWorkspaceArticles() {
+    if (!this.config.workspaceId) return;
+
+    try {
+      const { data: articles, error } = await this.supabase
+        .from('articles')
+        .select('id, title, summary, content, category, section:help_sections(name, icon)')
+        .eq('workspace_id', this.config.workspaceId)
+        .eq('status', 'published')
+        .order('created_at', { ascending: false });
+
+      if (!error && articles && articles.length > 0) {
+        this.faqs = articles.map((a: any) => ({
+          id: a.id,
+          q: a.title,
+          summary: a.summary || '',
+          a: a.content,
+          category: a.section?.name || a.category || 'General',
+          icon: a.section?.icon || '📚',
+        }));
+        this.renderFaqList();
+      }
+    } catch (err) {
+      console.warn('[Chatify] Failed to fetch dynamic articles:', err);
+    }
+  }
+
+  private renderFaqList() {
+    const listEl = this.shadow?.getElementById('faqList');
+    if (!listEl) return;
+
+    listEl.innerHTML = this.faqs
+      .map(
+        (faq, idx) => `
+        <div class="chatify-faq-item" data-idx="${idx}" data-id="${faq.id || ''}">
+          ${faq.category ? `
+            <div style="font-size:11px; font-weight:600; color:var(--w-brand); margin-bottom:4px; display:flex; align-items:center; gap:4px;">
+              <span>${faq.icon || '📚'}</span>
+              <span>${faq.category}</span>
+            </div>
+          ` : ''}
+          <div class="chatify-faq-q">
+            <span>${faq.q}</span>
+            <span class="chatify-faq-arrow">›</span>
+          </div>
+          <div class="chatify-faq-a">
+            ${faq.summary ? `<p style="font-size:12px; font-weight:600; color:var(--w-ink); margin-bottom:6px; line-height:1.4;">${faq.summary}</p>` : ''}
+            <div style="white-space:pre-wrap; line-height:1.6;">${faq.a}</div>
+            ${faq.id ? `
+              <div style="margin-top:12px; padding-top:8px; border-top:1px solid var(--w-line); display:flex; justify-content:space-between; align-items:center;">
+                <span style="font-size:11px; color:var(--w-ink-3);">Helpful?</span>
+                <div class="chatify-vote-group" style="display:flex; gap:6px;">
+                  <button class="chatify-vote-btn" data-art-id="${faq.id}" data-helpful="true" style="padding:3px 8px; border-radius:4px; border:1px solid var(--w-line); background:var(--w-surface); font-size:11.5px; cursor:pointer; color:var(--w-ink);">👍 Yes</button>
+                  <button class="chatify-vote-btn" data-art-id="${faq.id}" data-helpful="false" style="padding:3px 8px; border-radius:4px; border:1px solid var(--w-line); background:var(--w-surface); font-size:11.5px; cursor:pointer; color:var(--w-ink);">👎 No</button>
+                </div>
+              </div>
+            ` : ''}
+          </div>
+        </div>
+      `
+      )
+      .join('');
+
+    this.bindFaqListeners();
+  }
+
+  private bindFaqListeners() {
+    this.shadow?.querySelectorAll('.chatify-faq-item').forEach((item) => {
+      (item as HTMLElement).onclick = (e: MouseEvent) => {
+        if ((e.target as HTMLElement).closest('.chatify-vote-btn')) return;
+        item.classList.toggle('open');
+      };
+    });
+
+    this.shadow?.querySelectorAll('.chatify-vote-btn').forEach((btn) => {
+      (btn as HTMLElement).onclick = async (e) => {
+        e.stopPropagation();
+        const target = e.currentTarget as HTMLElement;
+        const artId = target.getAttribute('data-art-id');
+        const helpful = target.getAttribute('data-helpful') === 'true';
+        const group = target.closest('.chatify-vote-group');
+
+        if (group) {
+          group.innerHTML = '<span style="font-size:11px; color:var(--w-brand); font-weight:600;">✓ Feedback sent</span>';
+        }
+
+        if (artId && this.config.workspaceId) {
+          try {
+            await this.supabase.rpc('fn_submit_article_feedback', {
+              p_article_id: artId,
+              p_workspace_id: this.config.workspaceId,
+              p_visitor_id: this.visitorId,
+              p_is_helpful: helpful,
+              p_feedback_text: null,
+            });
+          } catch (err) {}
+        }
+      };
+    });
   }
 
   // 3. Visitor ID Management
@@ -223,6 +351,17 @@ class ChatifyWidget {
         p_location: locationStr,
         p_workspace_id: this.config.workspaceId || null,
       });
+
+      // Sent separately because fn_upsert_visitor is overloaded and cannot take
+      // extra parameters. Fails quietly on projects that have not run the
+      // visitor timezone/language migration yet.
+      try {
+        await this.supabase.rpc('fn_update_visitor_meta', {
+          p_id: this.visitorId,
+          p_timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || null,
+          p_language: navigator.language || null,
+        });
+      } catch {}
     } catch (e) {
       console.warn('[Chatify] Visitor tracking error:', e);
     }
@@ -637,6 +776,9 @@ class ChatifyWidget {
 
     this.shadow.getElementById('homeSearchTrigger')?.addEventListener('click', () => {
       this.switchTab('help');
+      setTimeout(() => {
+        (this.shadow?.getElementById('helpSearchInput') as HTMLInputElement)?.focus();
+      }, 100);
     });
 
     // Quick-Reply Action Chips
@@ -650,12 +792,8 @@ class ChatifyWidget {
       });
     });
 
-    // FAQ Accordion
-    this.shadow.querySelectorAll('.chatify-faq-item').forEach((item) => {
-      item.addEventListener('click', () => {
-        item.classList.toggle('open');
-      });
-    });
+    // FAQ Accordion & Reactions
+    this.bindFaqListeners();
 
     // FAQ Search Input
     const faqSearch = this.shadow.getElementById('helpSearchInput') as HTMLInputElement | null;
@@ -727,6 +865,38 @@ class ChatifyWidget {
     // messenger opens speaking in the customer's voice rather than ours.
     const homeSub = this.shadow?.getElementById('homeGreetingSub');
     if (homeSub && this.config.subtitle) homeSub.textContent = this.config.subtitle;
+
+    // Apply custom Help Tab label, header title, and search placeholder
+    const navHelpText = this.shadow?.querySelector('#navHelp span');
+    if (navHelpText && this.config.helpTabLabel) {
+      navHelpText.textContent = this.config.helpTabLabel;
+    }
+
+    const helpTabTitle = this.shadow?.querySelector('#tabHelp .chatify-header-text h3');
+    if (helpTabTitle && this.config.helpTabLabel) {
+      helpTabTitle.textContent = this.config.helpTabLabel;
+    }
+
+    const homeHelpCardTitle = this.shadow?.querySelector('#cardHelpSearch .chatify-section-title');
+    if (homeHelpCardTitle && this.config.helpTabLabel) {
+      homeHelpCardTitle.textContent = this.config.helpTabLabel;
+    }
+
+    const homeSearchSpan = this.shadow?.querySelector('#homeSearchTrigger span');
+    if (homeSearchSpan && this.config.helpTabLabel) {
+      homeSearchSpan.textContent = `🔍 Search for ${this.config.helpTabLabel.toLowerCase()} articles...`;
+    }
+
+    // Toggle Help Tab & Home Card Visibility based on showHelpTab setting
+    const navHelpBtn = this.shadow?.getElementById('navHelp') as HTMLElement | null;
+    const cardHelpSearch = this.shadow?.getElementById('cardHelpSearch') as HTMLElement | null;
+    if (this.config.showHelpTab === false) {
+      if (navHelpBtn) navHelpBtn.style.display = 'none';
+      if (cardHelpSearch) cardHelpSearch.style.display = 'none';
+    } else {
+      if (navHelpBtn) navHelpBtn.style.display = 'flex';
+      if (cardHelpSearch) cardHelpSearch.style.display = 'block';
+    }
   }
 
   /* ---------------------------------------------------------------- theme */

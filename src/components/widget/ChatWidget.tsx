@@ -13,6 +13,12 @@ import {
   FileText,
   Clock,
   Sparkles,
+  BookOpen,
+  Search,
+  ChevronLeft,
+  ThumbsUp,
+  ThumbsDown,
+  ExternalLink,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { Message } from '@/types/database';
@@ -26,6 +32,8 @@ export interface WidgetConfig {
   autoGreetingDelaySeconds?: number;
   autoGreetingText?: string;
   workspaceId?: string;
+  helpTabLabel?: string;
+  showHelpTab?: boolean;
 }
 
 interface ChatWidgetProps {
@@ -74,10 +82,50 @@ export default function ChatWidget({
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [visitorId, setVisitorId] = useState<string>('');
 
+  // Help Desk state
+  const [isHelpOpen, setIsHelpOpen] = useState(false);
+  const [helpArticles, setHelpArticles] = useState<any[]>([]);
+  const [helpSearch, setHelpSearch] = useState('');
+  const [selectedArticle, setSelectedArticle] = useState<any | null>(null);
+  const [articleVoted, setArticleVoted] = useState<Record<string, boolean>>({});
+  const [helpTabLabel, setHelpTabLabel] = useState(config.helpTabLabel || 'Help');
+  const [showHelpTab, setShowHelpTab] = useState(config.showHelpTab !== false);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const supabase = useMemo(() => createClient(), []);
+
+  // Fetch published articles & workspace settings for widget's help desk
+  useEffect(() => {
+    if (!config.workspaceId) return;
+    async function loadWorkspaceAndArticles() {
+      try {
+        const [{ data: wsData }, { data: articlesData }] = await Promise.all([
+          supabase
+            .from('workspaces')
+            .select('help_center_tab_label, show_help_tab')
+            .eq('id', config.workspaceId)
+            .maybeSingle(),
+          supabase
+            .from('articles')
+            .select('id, title, summary, content, category, section:help_sections(name, icon)')
+            .eq('workspace_id', config.workspaceId)
+            .eq('status', 'published')
+            .order('created_at', { ascending: false }),
+        ]);
+
+        if (wsData) {
+          if (wsData.help_center_tab_label) setHelpTabLabel(wsData.help_center_tab_label);
+          if (typeof wsData.show_help_tab === 'boolean') setShowHelpTab(wsData.show_help_tab);
+        }
+        if (articlesData) setHelpArticles(articlesData);
+      } catch (err) {
+        console.warn('Failed to load help tab config in widget:', err);
+      }
+    }
+    loadWorkspaceAndArticles();
+  }, [config.workspaceId, supabase]);
 
   // 3. Initialize Visitor Identity
   useEffect(() => {
@@ -515,6 +563,19 @@ export default function ChatWidget({
           </div>
 
           <div className="flex items-center gap-1">
+            {showHelpTab && (
+              <button
+                onClick={() => {
+                  setIsHelpOpen((prev) => !prev);
+                  setSelectedArticle(null);
+                }}
+                className="p-1.5 rounded-lg hover:bg-white/20 transition-colors text-white"
+                title={isHelpOpen ? 'Back to Chat' : `${helpTabLabel} & FAQs`}
+              >
+                <BookOpen className="w-4.5 h-4.5" />
+              </button>
+            )}
+
             <button
               onClick={() => {
                 toggleWidget(false);
@@ -528,8 +589,173 @@ export default function ChatWidget({
           </div>
         </div>
 
-        {/* BODY AREA */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-3.5 bg-slate-50/70 dark:bg-slate-950/60 relative">
+        {isHelpOpen ? (
+          <div className="flex-1 flex flex-col min-h-0 bg-slate-50/80 dark:bg-slate-950/80 overflow-hidden">
+            {selectedArticle ? (
+              <div className="flex-1 overflow-y-auto p-4 space-y-3.5">
+                <button
+                  onClick={() => setSelectedArticle(null)}
+                  className="text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"
+                >
+                  <ChevronLeft className="w-3.5 h-3.5" />
+                  <span>Back to all guides</span>
+                </button>
+
+                <div>
+                  <span className="text-[11px] font-semibold text-blue-600 dark:text-blue-400 px-2 py-0.5 rounded bg-blue-50 dark:bg-blue-950/50 border border-blue-200/50">
+                    {selectedArticle.section?.icon || '📚'} {selectedArticle.section?.name || selectedArticle.category || 'General'}
+                  </span>
+                  <h3 className="text-[16px] font-bold text-slate-900 dark:text-white mt-2">
+                    {selectedArticle.title}
+                  </h3>
+                </div>
+
+                {selectedArticle.summary && (
+                  <p className="text-xs font-medium text-slate-600 dark:text-slate-300 bg-slate-200/50 dark:bg-slate-800/50 p-2.5 rounded-lg leading-relaxed">
+                    {selectedArticle.summary}
+                  </p>
+                )}
+
+                <div className="text-xs text-slate-700 dark:text-slate-200 whitespace-pre-wrap leading-relaxed">
+                  {selectedArticle.content}
+                </div>
+
+                {/* Helpful voting */}
+                <div className="pt-3 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between text-xs text-slate-500">
+                  <span>Was this article helpful?</span>
+                  {articleVoted[selectedArticle.id] ? (
+                    <span className="text-emerald-500 font-semibold text-[11px]">✓ Thank you!</span>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={async () => {
+                          setArticleVoted((prev) => ({ ...prev, [selectedArticle.id]: true }));
+                          if (config.workspaceId) {
+                            fetch('/api/help/feedback', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({
+                                articleId: selectedArticle.id,
+                                workspaceId: config.workspaceId,
+                                visitorId,
+                                isHelpful: true,
+                              }),
+                            }).catch(() => {});
+                          }
+                        }}
+                        className="px-2.5 py-1 rounded bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs hover:border-emerald-500 transition-colors"
+                      >
+                        👍 Yes
+                      </button>
+                      <button
+                        onClick={async () => {
+                          setArticleVoted((prev) => ({ ...prev, [selectedArticle.id]: true }));
+                          if (config.workspaceId) {
+                            fetch('/api/help/feedback', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({
+                                articleId: selectedArticle.id,
+                                workspaceId: config.workspaceId,
+                                visitorId,
+                                isHelpful: false,
+                              }),
+                            }).catch(() => {});
+                          }
+                        }}
+                        className="px-2.5 py-1 rounded bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs hover:border-rose-500 transition-colors"
+                      >
+                        👎 No
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                <div className="pt-3">
+                  <button
+                    onClick={() => setIsHelpOpen(false)}
+                    className="w-full py-2 rounded-xl text-white font-semibold text-xs transition-opacity hover:opacity-95 shadow-sm"
+                    style={{ backgroundColor: brandColor }}
+                  >
+                    Still need assistance? Start Chat
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex-1 flex flex-col min-h-0">
+                <div className="p-3 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
+                  <div className="relative">
+                    <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <input
+                      type="text"
+                      value={helpSearch}
+                      onChange={(e) => setHelpSearch(e.target.value)}
+                      placeholder={`Search ${helpTabLabel.toLowerCase()}...`}
+                      className="w-full h-8.5 pl-9 pr-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex-1 overflow-y-auto p-3 space-y-2">
+                  {helpArticles
+                    .filter((a) => {
+                      if (!helpSearch.trim()) return true;
+                      const q = helpSearch.toLowerCase().trim();
+                      return (
+                        a.title.toLowerCase().includes(q) ||
+                        a.summary?.toLowerCase().includes(q) ||
+                        a.content.toLowerCase().includes(q) ||
+                        a.category?.toLowerCase().includes(q)
+                      );
+                    })
+                    .map((art) => (
+                      <div
+                        key={art.id}
+                        onClick={() => setSelectedArticle(art)}
+                        className="p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-slate-400 dark:hover:border-slate-600 transition-all cursor-pointer space-y-1 shadow-2xs"
+                      >
+                        <span className="text-[10.5px] font-semibold text-blue-600 dark:text-blue-400">
+                          {art.section?.icon || '📚'} {art.section?.name || art.category}
+                        </span>
+                        <h4 className="text-xs font-bold text-slate-800 dark:text-slate-100 leading-snug">
+                          {art.title}
+                        </h4>
+                        {art.summary && (
+                          <p className="text-[11.5px] text-slate-500 dark:text-slate-400 line-clamp-1">
+                            {art.summary}
+                          </p>
+                        )}
+                      </div>
+                    ))}
+
+                  {helpArticles.length === 0 && (
+                    <div className="p-8 text-center text-xs text-slate-400 space-y-2">
+                      <BookOpen className="w-8 h-8 text-slate-300 mx-auto" />
+                      <p>No articles available yet.</p>
+                    </div>
+                  )}
+                </div>
+
+                {config.workspaceId && (
+                  <div className="p-2.5 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-center">
+                    <a
+                      href={`/help/${config.workspaceId}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-[11.5px] font-semibold text-blue-600 dark:text-blue-400 hover:underline inline-flex items-center gap-1"
+                    >
+                      <span>Open Full {helpTabLabel} Portal</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        ) : (
+          <>
+            {/* BODY AREA */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-3.5 bg-slate-50/70 dark:bg-slate-950/60 relative">
           {/* OFFLINE BANNER */}
           {isAgentOnline === false && (
             <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-xs text-amber-800 dark:text-amber-300 flex items-start gap-2.5">
@@ -797,6 +1023,8 @@ export default function ChatWidget({
               </form>
             )}
           </div>
+        )}
+          </>
         )}
       </div>
 

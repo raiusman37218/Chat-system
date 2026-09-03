@@ -548,6 +548,7 @@ export default function HomePage() {
                   ['How it works', '#how'],
                   ['Install', '#install'],
                   ['Live demo', '/demo.html'],
+                  ['Help Center', '/help'],
                 ],
               },
               {

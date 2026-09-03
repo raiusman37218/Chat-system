@@ -7,8 +7,6 @@ import {
   Globe,
   Hash,
   Mail,
-  MapPin,
-  Monitor,
   User,
   Plus,
   X,
@@ -18,8 +16,21 @@ import {
   Conversation,
   Agent,
 } from '@/types/database';
-import { formatTimeAgo, parseUserAgent, cn } from '@/lib/utils';
+import { formatTimeAgo, cn } from '@/lib/utils';
 import { Avatar } from '@/components/ui/Avatar';
+import {
+  BrowserIcon,
+  CountryFlag,
+  DeviceIcon,
+  OsIcon,
+} from '@/components/ui/BrandIcon';
+import {
+  languageLabel,
+  localTimeIn,
+  parseLocation,
+  parseUserAgentDetailed,
+  timezoneFrom,
+} from '@/lib/visitor-meta';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { createClient } from '@/lib/supabase/client';
 
@@ -180,7 +191,14 @@ export function VisitorDetailsSidebar({
     );
   }
 
-  const { browser, os } = parseUserAgent(liveVisitor.user_agent);
+  const ua = parseUserAgentDetailed(liveVisitor.user_agent);
+  const place = parseLocation(
+    liveVisitor.location,
+    liveVisitor.ip_location_city,
+    liveVisitor.ip_location_country
+  );
+  const timezone = liveVisitor.timezone || timezoneFrom(liveVisitor.location);
+  const localTime = localTimeIn(timezone);
   const isOnline = liveVisitor.last_seen
     ? (Date.now() - new Date(liveVisitor.last_seen).getTime()) / 1000 < 90
     : false;
@@ -292,32 +310,94 @@ export function VisitorDetailsSidebar({
           </div>
         </Section>
 
-        {/* ── 3. Device, Location, Visit Count & Telemetry ── */}
-        <Section title="Visitor Details">
-          <Row Icon={MapPin} label="Location">
-            {liveVisitor.ip_location_city || liveVisitor.location
-              ? `${liveVisitor.ip_location_city || liveVisitor.location}${
-                  liveVisitor.ip_location_country
-                    ? `, ${liveVisitor.ip_location_country}`
-                    : ''
-                }`
-              : 'Global / Web'}
-          </Row>
-          <Row Icon={Monitor} label="Device">
-            {liveVisitor.device || (browser && !browser.includes('Unknown') ? `${browser} · ${os}` : 'Desktop · Web')}
-          </Row>
+        {/* ── 3. Location ── */}
+        <Section title="Location">
+          {/* A dead "Unknown location" row is worse than no row when the time
+              below already tells the agent which region they are in. */}
+          {(place.label || !localTime) && (
+            <div className="px-3 py-2.5 flex items-center gap-2.5">
+              <CountryFlag flag={place.flag} />
+              <span className="text-[12.5px] font-medium text-ink truncate">
+                {place.label || 'Location unavailable'}
+              </span>
+            </div>
+          )}
+
+          {localTime && (
+            <div className="px-3 py-2.5 flex items-center gap-2.5">
+              <Clock className="w-4 h-4 text-ink-3 shrink-0" />
+              <span className="text-[12.5px] font-medium text-ink truncate">
+                {localTime}
+                <span className="ml-1.5 font-normal text-ink-3">
+                  ({timezone})
+                </span>
+              </span>
+            </div>
+          )}
+
+          {liveVisitor.language && (
+            <div className="px-3 py-2.5 flex items-center gap-2.5">
+              <Globe className="w-4 h-4 text-ink-3 shrink-0" />
+              <span className="text-[12.5px] font-medium text-ink truncate">
+                {languageLabel(liveVisitor.language)}
+              </span>
+            </div>
+          )}
+
+          {liveVisitor.ip_address && (
+            <div className="px-3 py-2.5 flex items-center gap-2.5">
+              <Hash className="w-4 h-4 text-ink-3 shrink-0" />
+              <span className="font-mono text-[12px] text-ink truncate">
+                {liveVisitor.ip_address}
+              </span>
+            </div>
+          )}
+        </Section>
+
+        {/* ── 4. Device ── */}
+        <Section title="Device">
+          <div className="px-3 py-2.5 flex items-center gap-2.5">
+            <BrowserIcon browser={ua.browser} title={ua.browserName} />
+            <span className="text-[12.5px] font-medium text-ink truncate">
+              {ua.browserName}
+              {ua.browserVersion && (
+                <span className="ml-1 font-normal text-ink-2">
+                  {ua.browserVersion}
+                </span>
+              )}
+            </span>
+          </div>
+
+          <div className="px-3 py-2.5 flex items-center gap-2.5">
+            <OsIcon os={ua.os} title={ua.osName} />
+            <span className="text-[12.5px] font-medium text-ink truncate">
+              {ua.osName}
+              {ua.osVersion && (
+                <span className="ml-1 font-normal text-ink-2">
+                  {ua.osVersion}
+                </span>
+              )}
+            </span>
+          </div>
+
+          <div className="px-3 py-2.5 flex items-center gap-2.5">
+            <DeviceIcon device={ua.device} />
+            <span className="text-[12.5px] font-medium text-ink capitalize truncate">
+              {ua.device}
+            </span>
+          </div>
+        </Section>
+
+        {/* ── 5. Session ── */}
+        <Section title="Session">
           <Row Icon={Hash} label="Visits">
-            <span className="tabular-nums font-bold">
-              {liveVisitor.visit_count || 1} session{(liveVisitor.visit_count || 1) > 1 ? 's' : ''}
+            <span className="tabular-nums">
+              {liveVisitor.visit_count || 1} session
+              {(liveVisitor.visit_count || 1) > 1 ? 's' : ''}
             </span>
           </Row>
           <Row Icon={Clock} label="First seen">
             {formatTimeAgo(liveVisitor.first_seen_at || liveVisitor.first_seen)}
-          </Row>
-          <Row Icon={Hash} label="IP Address">
-            <span className="font-mono text-[11px]">
-              {liveVisitor.ip_address || '—'}
-            </span>
           </Row>
         </Section>
 

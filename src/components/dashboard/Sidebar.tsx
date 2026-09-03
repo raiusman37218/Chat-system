@@ -4,6 +4,7 @@ import React from 'react';
 import {
   BarChart2,
   Bell,
+  BookOpen,
   ChevronsUpDown,
   ExternalLink,
   HelpCircle,
@@ -21,7 +22,7 @@ import { Avatar } from '@/components/ui/Avatar';
 import { Menu } from '@/components/ui/Menu';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 
-export type View = 'inbox' | 'visitors' | 'reports' | 'settings';
+export type View = 'inbox' | 'visitors' | 'reports' | 'helpdesk' | 'settings';
 
 interface SidebarProps {
   currentAgent: Agent | null;
@@ -31,6 +32,7 @@ interface SidebarProps {
   counts: {
     open: number;
     liveVisitors: number;
+    articles?: number;
   };
   onUpdateAgentStatus: (status: AgentStatus) => void;
   onLogout: () => void;
@@ -102,6 +104,17 @@ export function Sidebar({
     ...(isAdmin
       ? [{ view: 'reports' as View, label: 'Analytics', Icon: BarChart2 }]
       : []),
+    {
+      view: 'helpdesk',
+      label: 'Help Desk',
+      Icon: BookOpen,
+      badge:
+        counts.articles !== undefined && counts.articles > 0 ? (
+          <span className="px-1.5 py-0.5 text-[10.5px] font-medium rounded-full bg-surface-3 text-ink-2">
+            {counts.articles}
+          </span>
+        ) : undefined,
+    },
     { view: 'settings', label: 'Settings', Icon: Settings },
   ];
 

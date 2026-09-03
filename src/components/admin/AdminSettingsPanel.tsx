@@ -130,6 +130,8 @@ export function AdminSettingsPanel({
   const [greetingMessage, setGreetingMessage] = useState(
     workspace.greeting_message || "We're here to help! Send us a message and we'll reply shortly."
   );
+  const [helpTabLabel, setHelpTabLabel] = useState(workspace.help_center_tab_label || 'Help');
+  const [showHelpTab, setShowHelpTab] = useState(workspace.show_help_tab !== false);
   const [previewOpen, setPreviewOpen] = useState(true);
 
   const handleSaveWidget = async () => {
@@ -141,6 +143,8 @@ export function AdminSettingsPanel({
         widget_position: widgetPosition,
         greeting_title: greetingTitle,
         greeting_message: greetingMessage,
+        help_center_tab_label: helpTabLabel,
+        show_help_tab: showHelpTab,
       });
       if (res.workspace) {
         setWorkspace(res.workspace);
@@ -697,6 +701,37 @@ export function AdminSettingsPanel({
                       placeholder="We're here to help! Ask us anything or browse our quick answers."
                       className="input resize-none"
                     />
+                  </div>
+
+                  {/* Help Desk Tab Customization */}
+                  <div className="pt-3 border-t border-line space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <label className="field-label mb-0">Help Tab on Website Widget</label>
+                        <p className="text-[11.5px] text-ink-3">Show self-service articles tab in the chat launcher</p>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={showHelpTab}
+                          onChange={(e) => setShowHelpTab(e.target.checked)}
+                          className="sr-only peer"
+                        />
+                        <div className="w-10 h-5.5 bg-surface-3 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-line after:border after:rounded-full after:h-4.5 after:w-4.5 after:transition-all peer-checked:bg-accent"></div>
+                      </label>
+                    </div>
+
+                    <div>
+                      <label className="field-label">Help Tab Custom Label</label>
+                      <input
+                        type="text"
+                        value={helpTabLabel}
+                        onChange={(e) => setHelpTabLabel(e.target.value)}
+                        placeholder="e.g. Help Center, FAQs, Guides, Madad"
+                        className="input"
+                      />
+                      <p className="text-[11px] text-ink-3 mt-1">Visitors see this text on the widget bottom navigation button.</p>
+                    </div>
                   </div>
                 </div>
               </div>

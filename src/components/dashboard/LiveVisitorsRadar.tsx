@@ -14,8 +14,20 @@ import {
   Users,
 } from 'lucide-react';
 import { Visitor } from '@/types/database';
-import { formatTimeAgo, parseUserAgent, cn } from '@/lib/utils';
+import { formatTimeAgo, cn } from '@/lib/utils';
 import { Avatar } from '@/components/ui/Avatar';
+import {
+  BrowserIcon,
+  CountryFlag,
+  DeviceIcon,
+  OsIcon,
+} from '@/components/ui/BrandIcon';
+import {
+  localTimeIn,
+  parseLocation,
+  parseUserAgentDetailed,
+  timezoneFrom,
+} from '@/lib/visitor-meta';
 import { EmptyState } from '@/components/ui/EmptyState';
 
 interface LiveVisitorsRadarProps {
@@ -127,7 +139,15 @@ export function LiveVisitorsRadar({
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 gap-4">
             {activeVisitors.map((visitor) => {
-              const { browser, os } = parseUserAgent(visitor.user_agent);
+              const ua = parseUserAgentDetailed(visitor.user_agent);
+              const place = parseLocation(
+                visitor.location,
+                visitor.ip_location_city,
+                visitor.ip_location_country
+              );
+              const localTime = localTimeIn(
+                visitor.timezone || timezoneFrom(visitor.location)
+              );
               const displayName =
                 visitor.name ||
                 (visitor.email
@@ -183,23 +203,44 @@ export function LiveVisitorsRadar({
                     </div>
                   </a>
 
-                  {/* Device & Location Telemetry */}
+                  {/* Device & location telemetry, same marks as the visitor panel */}
                   <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-[12px] text-ink-2 bg-surface-2/40 p-3 rounded-xl border border-line/40">
                     <span className="flex items-center gap-1.5 truncate">
-                      <MapPin className="w-3.5 h-3.5 text-ink-3 shrink-0" />
+                      <CountryFlag flag={place.flag} className="w-3.5 h-3.5" />
                       <span className="truncate font-medium">
-                        {visitor.location || 'Location undetected'}
+                        {place.label || 'Location undetected'}
                       </span>
                     </span>
                     <span className="flex items-center gap-1.5 truncate">
-                      <Monitor className="w-3.5 h-3.5 text-ink-3 shrink-0" />
+                      <BrowserIcon
+                        browser={ua.browser}
+                        className="w-3.5 h-3.5"
+                        title={ua.browserName}
+                      />
                       <span className="truncate font-medium">
-                        {browser} · {os}
+                        {ua.browserName}
+                        {ua.browserVersion ? ` ${ua.browserVersion}` : ''}
                       </span>
                     </span>
-                    <span className="col-span-2 flex items-center gap-1.5 text-[11px] text-ink-3 truncate">
+                    <span className="flex items-center gap-1.5 truncate">
+                      <OsIcon os={ua.os} className="w-3.5 h-3.5" title={ua.osName} />
+                      <span className="truncate font-medium">{ua.osName}</span>
+                    </span>
+                    <span className="flex items-center gap-1.5 truncate">
+                      <DeviceIcon device={ua.device} className="w-3.5 h-3.5" />
+                      <span className="truncate font-medium capitalize">
+                        {ua.device}
+                      </span>
+                    </span>
+                    {localTime && (
+                      <span className="flex items-center gap-1.5 truncate">
+                        <Clock className="w-3.5 h-3.5 text-ink-3 shrink-0" />
+                        <span className="truncate font-medium">{localTime}</span>
+                      </span>
+                    )}
+                    <span className="flex items-center gap-1.5 truncate text-[11px] text-ink-3">
                       <Clock className="w-3 h-3 shrink-0" />
-                      Dwell time: {formatTimeAgo(visitor.first_seen)}
+                      Since {formatTimeAgo(visitor.first_seen)}
                     </span>
                   </div>
 

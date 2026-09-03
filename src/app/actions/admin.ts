@@ -76,20 +76,35 @@ export async function updateWidgetSettingsAction(
     widget_position?: 'right' | 'left';
     greeting_title?: string;
     greeting_message?: string;
+    help_center_tab_label?: string;
+    show_help_tab?: boolean;
+    help_center_tab_icon?: string;
   }
 ) {
   await assertAdminUser(workspaceId);
   const supabase = await createClient();
 
+  const updatePayload: any = {
+    brand_color: data.brand_color,
+    logo_url: data.logo_url,
+    widget_position: data.widget_position || 'right',
+    greeting_title: data.greeting_title,
+    greeting_message: data.greeting_message,
+  };
+
+  if (data.help_center_tab_label !== undefined) {
+    updatePayload.help_center_tab_label = data.help_center_tab_label;
+  }
+  if (data.show_help_tab !== undefined) {
+    updatePayload.show_help_tab = data.show_help_tab;
+  }
+  if (data.help_center_tab_icon !== undefined) {
+    updatePayload.help_center_tab_icon = data.help_center_tab_icon;
+  }
+
   const { data: updated, error } = await supabase
     .from('workspaces')
-    .update({
-      brand_color: data.brand_color,
-      logo_url: data.logo_url,
-      widget_position: data.widget_position || 'right',
-      greeting_title: data.greeting_title,
-      greeting_message: data.greeting_message,
-    })
+    .update(updatePayload)
     .eq('id', workspaceId)
     .select()
     .single();

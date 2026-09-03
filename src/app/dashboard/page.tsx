@@ -11,12 +11,13 @@ import { VisitorDetailsSidebar } from '@/components/dashboard/VisitorDetailsSide
 import { LiveVisitorsRadar } from '@/components/dashboard/LiveVisitorsRadar';
 import { SettingsHub } from '@/components/dashboard/SettingsHub';
 import { AnalyticsDashboard } from '@/components/admin/AnalyticsDashboard';
+import { HelpDeskDashboard } from '@/components/dashboard/HelpDeskDashboard';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { KeyboardShortcutsModal } from '@/components/ui/KeyboardShortcutsModal';
 import { sound } from '@/lib/sound';
 import { sendBrowserNotification, cn } from '@/lib/utils';
 import { updateFaviconBadge } from '@/lib/favicon';
-import { BarChart2, Inbox, Radio, Settings } from 'lucide-react';
+import { BarChart2, BookOpen, Inbox, Radio, Settings } from 'lucide-react';
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -29,9 +30,10 @@ export default function DashboardPage() {
   const [cannedResponses, setCannedResponses] = useState<CannedResponse[]>([]);
   const [showShortcutsModal, setShowShortcutsModal] = useState(false);
   const [isDetailsSidebarOpen, setIsDetailsSidebarOpen] = useState(true);
+  const [articlesCount, setArticlesCount] = useState(0);
 
-  // Four destinations: the inbox, the visitor radar, reports, and one
-  // Settings hub that owns install / widget / team / channels / AI.
+  // Five destinations: the inbox, the visitor radar, reports, help desk,
+  // and the Settings hub.
   const [activeView, setActiveView] = useState<View>('inbox');
 
   // Conversations & Messages
@@ -169,6 +171,13 @@ export default function DashboardPage() {
         .or(`workspace_id.eq.${workspace.id},workspace_id.is.null`)
         .order('shortcut');
       if (cannedList) setCannedResponses(cannedList as CannedResponse[]);
+
+      // Fetch articles count for sidebar badge
+      const { count: artCount } = await supabase
+        .from('articles')
+        .select('*', { count: 'exact', head: true })
+        .eq('workspace_id', workspace.id);
+      if (artCount !== null && artCount !== undefined) setArticlesCount(artCount);
 
       setLoading(false);
     } catch (err) {
@@ -640,6 +649,7 @@ export default function DashboardPage() {
     liveVisitors: visitors.filter(
       (v) => (Date.now() - new Date(v.last_seen).getTime()) / 1000 < 90
     ).length,
+    articles: articlesCount,
   };
 
   if (loading) {
@@ -826,6 +836,16 @@ export default function DashboardPage() {
         </div>
       )}
 
+      {activeView === 'helpdesk' && (
+        <div className="flex-1 flex overflow-hidden w-full pb-14 md:pb-0">
+          <HelpDeskDashboard
+            workspace={currentWorkspace}
+            currentAgent={currentAgent}
+            onArticlesCountChange={(c) => setArticlesCount(c)}
+          />
+        </div>
+      )}
+
       {activeView === 'settings' && (
         <div className="flex-1 flex overflow-hidden w-full pb-14 md:pb-0">
           <SettingsHub
@@ -849,6 +869,7 @@ export default function DashboardPage() {
               ['inbox', 'Inbox', Inbox, true],
               ['visitors', 'Visitors', Radio, true],
               ['reports', 'Reports', BarChart2, isAdmin],
+              ['helpdesk', 'Help Desk', BookOpen, true],
               ['settings', 'Settings', Settings, true],
             ] as [View, string, typeof Inbox, boolean][]
           )

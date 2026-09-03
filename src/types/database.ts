@@ -23,6 +23,10 @@ export interface Visitor {
   browser: string | null;
   os: string | null;
   referrer_source: string | null;
+  /** IANA zone, populated once the visitor timezone/language migration runs. */
+  timezone?: string | null;
+  /** BCP-47 tag from the visitor's browser, e.g. "en-IN". */
+  language?: string | null;
   visit_count: number;
   is_online: boolean;
 
@@ -212,13 +216,48 @@ export interface AISettingsConfig {
   model?: string;
 }
 
+export interface HelpSection {
+  id: string;
+  workspace_id: string;
+  name: string;
+  description: string | null;
+  icon: string;
+  order_index: number;
+  created_at: string;
+  updated_at?: string;
+  articles?: Article[];
+  article_count?: number;
+}
+
 export interface Article {
   id: string;
   workspace_id: string;
+  section_id?: string | null;
   title: string;
+  slug?: string | null;
   category: string;
   summary: string | null;
   content: string;
+  status?: 'published' | 'draft';
+  author_id?: string | null;
+  views_count?: number;
+  helpful_count?: number;
+  not_helpful_count?: number;
+  created_at: string;
+  updated_at?: string;
+
+  // Joined relations
+  author?: Agent | null;
+  section?: HelpSection | null;
+}
+
+export interface ArticleFeedback {
+  id: string;
+  article_id: string;
+  workspace_id: string;
+  visitor_id: string | null;
+  is_helpful: boolean;
+  feedback_text?: string | null;
   created_at: string;
 }
 
@@ -235,6 +274,9 @@ export interface Workspace {
   business_hours?: BusinessHoursConfig;
   auto_assignment?: AutoAssignmentConfig;
   ai_settings?: AISettingsConfig;
+  help_center_tab_label?: string | null;
+  show_help_tab?: boolean | null;
+  help_center_tab_icon?: string | null;
   created_at: string;
 }
 
@@ -328,6 +370,24 @@ export interface Database {
         Row: WorkspaceIntegration;
         Insert: Partial<WorkspaceIntegration>;
         Update: Partial<WorkspaceIntegration>;
+        Relationships: [];
+      };
+      articles: {
+        Row: Article;
+        Insert: Partial<Article>;
+        Update: Partial<Article>;
+        Relationships: [];
+      };
+      help_sections: {
+        Row: HelpSection;
+        Insert: Partial<HelpSection>;
+        Update: Partial<HelpSection>;
+        Relationships: [];
+      };
+      article_feedback: {
+        Row: ArticleFeedback;
+        Insert: Partial<ArticleFeedback>;
+        Update: Partial<ArticleFeedback>;
         Relationships: [];
       };
       [key: string]: {

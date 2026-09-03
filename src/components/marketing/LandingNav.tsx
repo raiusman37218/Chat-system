@@ -32,6 +32,12 @@ export function LandingNav() {
               {label}
             </a>
           ))}
+          <Link
+            href="/help"
+            className="px-3.5 py-1.5 rounded-lg text-ink-2 hover:text-ink hover:bg-surface-3 transition-colors"
+          >
+            Help Center
+          </Link>
           <a
             href="/demo.html"
             target="_blank"
@@ -101,6 +107,13 @@ export function LandingNav() {
             >
               FAQ
             </a>
+            <Link
+              href="/help"
+              onClick={() => setMobileMenuOpen(false)}
+              className="px-3 py-2 rounded-lg text-ink hover:bg-surface-2 transition-colors flex items-center justify-between"
+            >
+              <span>Help Center</span>
+            </Link>
             <a
               href="/demo.html"
               target="_blank"
