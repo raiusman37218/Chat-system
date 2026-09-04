@@ -938,7 +938,13 @@ class ChatifyWidget {
 
     const homeGreeting = this.shadow?.getElementById('homeGreetingTitle');
     if (homeGreeting && this.config.title) {
-      const cleanTitle = this.config.title.replace(/^Welcome to\s+/i, '').replace(/Support!?/i, '').trim();
+      // Strip a trailing emoji as well as the boilerplate: workspace titles
+      // often already end in a wave, which produced "Hello from Chatify 👋 👋".
+      const cleanTitle = this.config.title
+        .replace(/^Welcome to\s+/i, '')
+        .replace(/Support!?/i, '')
+        .replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}️]+\s*$/u, '')
+        .trim();
       homeGreeting.textContent = cleanTitle ? `Hello from ${cleanTitle} 👋` : 'Hello there 👋';
     }
 
@@ -1056,6 +1062,7 @@ class ChatifyWidget {
         --w-shadow-xl: 0 32px 68px rgba(11,11,15,.18), 0 12px 26px rgba(11,11,15,.10);
 
         --w-ease: cubic-bezier(.22,.61,.36,1);
+        --w-ease-out: cubic-bezier(.16,1,.3,1);
         --w-spring: cubic-bezier(.34,1.4,.64,1);
 
         color-scheme: light;
@@ -1128,11 +1135,27 @@ class ChatifyWidget {
       }
 
       .chatify-launcher:hover {
-        transform: scale(1.06);
-        box-shadow: 0 12px 32px var(--w-brand-a28), 0 4px 12px rgba(11,11,15,.2);
+        transform: scale(1.07) translateY(-1px);
+        box-shadow: 0 16px 38px var(--w-brand-a28), 0 6px 14px rgba(11,11,15,.22);
       }
 
-      .chatify-launcher:active { transform: scale(.97); }
+      .chatify-launcher:active { transform: scale(.95); }
+
+      /* An expanding ring, drawn only while messages are waiting. A launcher
+         that pulses permanently is just noise the visitor learns to ignore. */
+      .chatify-launcher::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        border-radius: 50%;
+        border: 2px solid var(--w-brand);
+        opacity: 0;
+        pointer-events: none;
+      }
+
+      .chatify-launcher.has-unread::after {
+        animation: w-halo 2.4s var(--w-ease-out) infinite;
+      }
 
       .chatify-launcher-icon {
         width: 36px;
@@ -1219,12 +1242,38 @@ class ChatifyWidget {
 
       .chatify-home-hero {
         position: relative;
+        isolation: isolate;
+        overflow: hidden;
         padding: 24px 22px 56px;
-        background:
-          radial-gradient(100% 100% at 88% 12%, rgba(255, 255, 255, 0.22) 0%, transparent 64%),
-          linear-gradient(140deg, var(--w-brand) 0%, var(--w-brand-deep) 100%);
+        background: linear-gradient(150deg, var(--w-brand) 0%, var(--w-brand-deep) 100%);
         color: #ffffff;
         flex-shrink: 0;
+      }
+
+      /* Two offset colour pools that drift against each other. The movement is
+         slow and low-contrast on purpose — it should read as depth, not as an
+         animation demanding attention. */
+      .chatify-home-hero::before {
+        content: '';
+        position: absolute;
+        inset: -40%;
+        z-index: -1;
+        background:
+          radial-gradient(38% 42% at 22% 26%, rgba(255, 255, 255, 0.30), transparent 62%),
+          radial-gradient(34% 38% at 78% 12%, rgba(255, 255, 255, 0.18), transparent 60%),
+          radial-gradient(44% 46% at 62% 88%, var(--w-brand-a28), transparent 64%);
+        animation: w-aurora 22s var(--w-ease) infinite alternate;
+      }
+
+      /* A whisper of grain stops the gradient from banding on wide screens. */
+      .chatify-home-hero::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        z-index: -1;
+        opacity: 0.055;
+        pointer-events: none;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");
       }
 
       .chatify-brand-row {
@@ -1277,11 +1326,13 @@ class ChatifyWidget {
       }
 
       .chatify-home-title {
-        font-size: 26px;
+        font-size: 27px;
         font-weight: 700;
-        letter-spacing: -0.03em;
-        line-height: 1.22;
+        letter-spacing: -0.032em;
+        line-height: 1.18;
         color: #ffffff;
+        text-wrap: balance;
+        text-shadow: 0 1px 12px rgba(0, 0, 0, 0.14);
       }
 
       .chatify-home-sub {
@@ -1291,6 +1342,17 @@ class ChatifyWidget {
         color: rgba(255, 255, 255, 0.9);
         font-weight: 400;
       }
+
+      /* Each block rises a beat after the one above it. The whole sequence is
+         under a third of a second, so it reads as the panel settling rather
+         than as something the visitor has to wait for. */
+      .chatify-home-content > * {
+        animation: w-rise .34s var(--w-ease-out) both;
+      }
+      .chatify-home-content > *:nth-child(1) { animation-delay: .04s; }
+      .chatify-home-content > *:nth-child(2) { animation-delay: .10s; }
+      .chatify-home-content > *:nth-child(3) { animation-delay: .16s; }
+      .chatify-home-content > *:nth-child(4) { animation-delay: .22s; }
 
       .chatify-home-content {
         flex: 1;
@@ -1318,8 +1380,9 @@ class ChatifyWidget {
       }
 
       .chatify-card-action:hover {
-        box-shadow: 0 6px 24px -2px rgba(15, 23, 42, 0.09), 0 14px 34px -4px rgba(15, 23, 42, 0.12);
-        transform: translateY(-1px);
+        box-shadow: 0 8px 28px -2px rgba(15, 23, 42, 0.10), 0 18px 42px -6px rgba(15, 23, 42, 0.14);
+        transform: translateY(-2px);
+        border-color: var(--w-brand-a28);
       }
 
       .chatify-card-head {
@@ -1467,16 +1530,22 @@ class ChatifyWidget {
       }
 
       .chatify-chip:hover {
-        background: var(--w-surface-2);
-        border-color: var(--w-line-2);
-        transform: translateX(2px);
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+        background: var(--w-brand-a08);
+        border-color: var(--w-brand-a28);
+        transform: translateX(3px);
+        box-shadow: 0 3px 12px rgba(0, 0, 0, 0.06);
       }
 
       .chatify-chip-arrow {
         color: var(--w-ink-3);
         font-size: 16px;
         font-weight: 600;
+        transition: transform .18s var(--w-ease), color .18s var(--w-ease);
+      }
+
+      .chatify-chip:hover .chatify-chip-arrow {
+        color: var(--w-brand);
+        transform: translateX(3px);
       }
 
       .chatify-search-trigger {
@@ -1679,7 +1748,7 @@ class ChatifyWidget {
 
       .chatify-message-row {
         display: flex;
-        animation: w-rise .26s var(--w-ease) both;
+        animation: w-bubble-in .3s var(--w-ease-out) both;
       }
 
       .chatify-msg-visitor,
@@ -1700,18 +1769,19 @@ class ChatifyWidget {
 
       .chatify-msg-visitor {
         margin-left: auto;
-        background: var(--w-brand);
+        background: linear-gradient(145deg, var(--w-brand) 0%, var(--w-brand-deep) 130%);
         color: var(--w-on-brand);
-        border-radius: var(--w-r-md) var(--w-r-md) 4px var(--w-r-md);
-        box-shadow: var(--w-shadow-sm);
+        border-radius: 18px 18px 5px 18px;
+        box-shadow: 0 2px 10px var(--w-brand-a28), 0 1px 2px rgba(11, 11, 15, 0.10);
       }
 
       .chatify-msg-agent {
         margin-right: auto;
         background: var(--w-surface);
         color: var(--w-ink);
+        border-radius: 18px 18px 18px 5px;
+        box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
         border: 1px solid var(--w-line);
-        border-radius: var(--w-r-md) var(--w-r-md) var(--w-r-md) 4px;
       }
 
       .chatify-msg-time {
@@ -1824,7 +1894,11 @@ class ChatifyWidget {
         transition: filter .16s var(--w-ease), transform .12s var(--w-ease);
       }
 
-      .chatify-send-btn:hover { filter: brightness(1.08); }
+      .chatify-send-btn:hover {
+        filter: brightness(1.08);
+        transform: translateY(-1px) scale(1.04);
+        box-shadow: 0 6px 16px var(--w-brand-a28);
+      }
       .chatify-send-btn:active { transform: scale(.94); }
 
       .chatify-send-btn svg { width: 19px; height: 19px; fill: currentColor; }
@@ -1998,6 +2072,21 @@ class ChatifyWidget {
       }
 
       /* ── Motion ───────────────────────────────────────────────────── */
+
+      @keyframes w-bubble-in {
+        from { opacity: 0; transform: translateY(8px) scale(.97); }
+        to   { opacity: 1; transform: none; }
+      }
+
+      @keyframes w-aurora {
+        from { transform: translate3d(-4%, -3%, 0) scale(1); }
+        to   { transform: translate3d(5%, 4%, 0) scale(1.12); }
+      }
+
+      @keyframes w-halo {
+        0%        { transform: scale(1);   opacity: .5; }
+        70%, 100% { transform: scale(1.7); opacity: 0; }
+      }
 
       @keyframes w-window-in {
         from { opacity: 0; transform: translateY(14px) scale(.985); }
@@ -2175,6 +2264,10 @@ class ChatifyWidget {
   private updateUnreadBadge() {
     const badge = this.shadow?.getElementById('chatifyBadge');
     const navBadge = this.shadow?.getElementById('navMsgBadge');
+    const launcher = this.shadow?.getElementById('chatifyLauncherBtn');
+
+    // The halo ring only runs while something is actually waiting.
+    launcher?.classList.toggle('has-unread', this.unreadCount > 0);
 
     if (this.unreadCount > 0) {
       const text = this.unreadCount > 9 ? '9+' : this.unreadCount.toString();
