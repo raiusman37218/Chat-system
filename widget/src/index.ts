@@ -246,6 +246,11 @@ class ChatifyWidget {
     const listEl = this.shadow?.getElementById('faqList');
     if (!listEl) return;
 
+    const cardHelpSearch = this.shadow?.getElementById('cardHelpSearch') as HTMLElement | null;
+    if (cardHelpSearch) {
+      cardHelpSearch.style.display = (this.config.showHelpTab !== false && this.faqs.length > 0) ? 'block' : 'none';
+    }
+
     if (this.faqs.length === 0) {
       listEl.innerHTML = `
         <div style="padding: 36px 16px; text-align: center; color: var(--w-ink-3); font-size: 13px;">
@@ -658,31 +663,8 @@ class ChatifyWidget {
             </button>
           </div>
 
-          <!-- Quick Inquiries Section -->
-          <div class="chatify-chips-section">
-            <div class="chatify-section-title">Quick Inquiries</div>
-            <div class="chatify-chips-grid">
-              <button class="chatify-chip" data-query="Hello! I would like to talk to someone about pricing.">
-                <span>💳 Pricing &amp; Plans</span>
-                <span class="chatify-chip-arrow">›</span>
-              </button>
-              <button class="chatify-chip" data-query="Hi! Can you provide more info on enterprise integrations?">
-                <span>⚡ Features &amp; Integrations</span>
-                <span class="chatify-chip-arrow">›</span>
-              </button>
-              <button class="chatify-chip" data-query="Hello, I need technical support with my setup.">
-                <span>🛠️ Technical Support</span>
-                <span class="chatify-chip-arrow">›</span>
-              </button>
-              <button class="chatify-chip" data-query="Hi there! I would like to speak with a human agent.">
-                <span>🙋 Speak with a Human</span>
-                <span class="chatify-chip-arrow">›</span>
-              </button>
-            </div>
-          </div>
-
-          <!-- Help Center Quick Search -->
-          <div class="chatify-card chatify-card-help" id="cardHelpSearch">
+          <!-- Help Center Quick Search (shown only when workspace has published articles) -->
+          <div class="chatify-card chatify-card-help" id="cardHelpSearch" style="display: none;">
             <div class="chatify-section-title" id="homeHelpSectionTitle">Knowledge Base</div>
             <p class="chatify-card-sub" style="margin-bottom:12px;">Search self-service answers and guides:</p>
             <div class="chatify-search-trigger" id="homeSearchTrigger">
@@ -846,17 +828,6 @@ class ChatifyWidget {
       }, 100);
     });
 
-    // Quick-Reply Action Chips
-    this.shadow.querySelectorAll('.chatify-chip').forEach((chip) => {
-      chip.addEventListener('click', async (e) => {
-        const query = (e.currentTarget as HTMLElement).getAttribute('data-query');
-        if (query) {
-          this.switchTab('messages');
-          await this.sendMessage(query);
-        }
-      });
-    });
-
     // FAQ Accordion & Reactions
     this.bindFaqListeners();
 
@@ -981,7 +952,7 @@ class ChatifyWidget {
       if (cardHelpSearch) cardHelpSearch.style.display = 'none';
     } else {
       if (navHelpBtn) navHelpBtn.style.display = 'flex';
-      if (cardHelpSearch) cardHelpSearch.style.display = 'block';
+      if (cardHelpSearch) cardHelpSearch.style.display = this.faqs.length > 0 ? 'block' : 'none';
     }
   }
 

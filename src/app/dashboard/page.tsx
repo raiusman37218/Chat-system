@@ -821,6 +821,7 @@ export default function DashboardPage() {
         <div className="flex-1 flex overflow-hidden w-full pb-14 md:pb-0">
           <LiveVisitorsRadar
             visitors={visitors}
+            workspace={currentWorkspace}
             onOpenConversationForVisitor={handleOpenConversationForVisitor}
             onRefresh={() => refreshVisitors()}
           />

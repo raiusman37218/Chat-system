@@ -13,7 +13,7 @@ import {
   Smartphone,
   Users,
 } from 'lucide-react';
-import { Visitor } from '@/types/database';
+import { Visitor, Workspace } from '@/types/database';
 import { formatTimeAgo, cn } from '@/lib/utils';
 import { Avatar } from '@/components/ui/Avatar';
 import {
@@ -32,6 +32,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 
 interface LiveVisitorsRadarProps {
   visitors: Visitor[];
+  workspace?: Workspace | null;
   onOpenConversationForVisitor: (visitorId: string) => void;
   onRefresh: () => void;
 }
@@ -41,6 +42,7 @@ const LIVE_WINDOW_SECONDS = 90;
 
 export function LiveVisitorsRadar({
   visitors,
+  workspace,
   onOpenConversationForVisitor,
   onRefresh,
 }: LiveVisitorsRadarProps) {
@@ -131,7 +133,12 @@ export function LiveVisitorsRadar({
               title="Radar Scanning for Live Visitors"
               description="Nobody is browsing your site right now. As soon as someone visits, their page URL, location, and device will appear here live."
               actionLabel="Launch Demo Simulator"
-              onAction={() => window.open('/demo.html', '_blank')}
+              onAction={() => {
+                const targetUrl = workspace?.id
+                  ? `/demo.html?workspaceId=${workspace.id}&name=${encodeURIComponent(workspace.name || '')}`
+                  : '/demo.html';
+                window.open(targetUrl, '_blank');
+              }}
               secondaryActionLabel="Refresh Radar"
               onSecondaryAction={onRefresh}
             />

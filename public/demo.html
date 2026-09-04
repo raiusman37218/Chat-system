@@ -584,16 +584,21 @@
   </footer>
 
   <script>
-    // 1. Extract Workspace parameters from URL
+    // 1. Extract Workspace parameters from URL (or remembered active workspace)
     const urlParams = new URLSearchParams(window.location.search);
-    const workspaceId = urlParams.get('workspaceId') || urlParams.get('ws') || 'a0000000-0000-0000-0000-000000000001';
+    const workspaceId = urlParams.get('workspaceId') || urlParams.get('ws') || localStorage.getItem('chatify_active_workspace') || '';
+    if (workspaceId) {
+      localStorage.setItem('chatify_active_workspace', workspaceId);
+    }
     const workspaceName = urlParams.get('name');
 
     // 2. Customize simulator UI based on workspace
     document.addEventListener('DOMContentLoaded', () => {
       const wsDisplay = document.getElementById('simWsDisplay');
       if (wsDisplay) {
-        wsDisplay.textContent = `Workspace: ${workspaceName ? decodeURIComponent(workspaceName) : workspaceId.slice(0, 8) + '...'}`;
+        wsDisplay.textContent = workspaceId
+          ? `Workspace: ${workspaceName ? decodeURIComponent(workspaceName) : workspaceId.slice(0, 8) + '...'}`
+          : 'Workspace: (None selected)';
       }
 
       if (workspaceName) {
@@ -637,7 +642,9 @@
     // 6. Dynamically load the Chatify widget
     const widgetScript = document.createElement('script');
     widgetScript.src = '/widget.js';
-    widgetScript.setAttribute('data-workspace-id', workspaceId);
+    if (workspaceId) {
+      widgetScript.setAttribute('data-workspace-id', workspaceId);
+    }
     document.body.appendChild(widgetScript);
   </script>
 </body>

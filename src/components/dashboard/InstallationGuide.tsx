@@ -212,7 +212,7 @@ export default function RootLayout({ children }) {
             </div>
 
             <a
-              href="/demo.html"
+              href={`/demo.html?workspaceId=${workspaceId}&name=${encodeURIComponent(workspace?.name || '')}`}
               target="_blank"
               rel="noreferrer"
               className="btn btn-sm btn-secondary shrink-0"
