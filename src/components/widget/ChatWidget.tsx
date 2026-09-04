@@ -704,18 +704,34 @@ export default function ChatWidget({
                 </div>
 
                 <div className="flex-1 overflow-y-auto p-3 space-y-2">
-                  {helpArticles
-                    .filter((a) => {
+                  {helpArticles.length === 0 ? (
+                    <div className="p-8 text-center text-xs text-slate-400 space-y-2">
+                      <BookOpen className="w-8 h-8 text-slate-300 mx-auto" />
+                      <p>No articles available yet.</p>
+                    </div>
+                  ) : (() => {
+                    const filtered = helpArticles.filter((a) => {
                       if (!helpSearch.trim()) return true;
                       const q = helpSearch.toLowerCase().trim();
                       return (
-                        a.title.toLowerCase().includes(q) ||
+                        a.title?.toLowerCase().includes(q) ||
                         a.summary?.toLowerCase().includes(q) ||
-                        a.content.toLowerCase().includes(q) ||
-                        a.category?.toLowerCase().includes(q)
+                        a.content?.toLowerCase().includes(q) ||
+                        a.category?.toLowerCase().includes(q) ||
+                        a.section?.name?.toLowerCase().includes(q)
                       );
-                    })
-                    .map((art) => (
+                    });
+
+                    if (filtered.length === 0) {
+                      return (
+                        <div className="p-8 text-center text-xs text-slate-400 space-y-2">
+                          <BookOpen className="w-8 h-8 text-slate-300 mx-auto" />
+                          <p>No articles match &ldquo;{helpSearch}&rdquo;</p>
+                        </div>
+                      );
+                    }
+
+                    return filtered.map((art) => (
                       <div
                         key={art.id}
                         onClick={() => setSelectedArticle(art)}
@@ -733,14 +749,8 @@ export default function ChatWidget({
                           </p>
                         )}
                       </div>
-                    ))}
-
-                  {helpArticles.length === 0 && (
-                    <div className="p-8 text-center text-xs text-slate-400 space-y-2">
-                      <BookOpen className="w-8 h-8 text-slate-300 mx-auto" />
-                      <p>No articles available yet.</p>
-                    </div>
-                  )}
+                    ));
+                  })()}
                 </div>
 
                 {config.workspaceId && (

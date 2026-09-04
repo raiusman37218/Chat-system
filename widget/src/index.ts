@@ -36,33 +36,6 @@ interface FAQItem {
   icon?: string;
 }
 
-const DEFAULT_FAQS: FAQItem[] = [
-  {
-    q: 'How do I install Chatify on my website?',
-    a: 'Copy the 1-line script tag from your Embed Code tab and paste it directly above the closing </body> tag on your website.',
-    category: 'Installation',
-    icon: '🚀'
-  },
-  {
-    q: 'What are your pricing plans?',
-    a: 'We offer a Starter plan at $29/mo and an Enterprise plan with custom SLAs and high-concurrency websocket clusters.',
-    category: 'Billing',
-    icon: '💳'
-  },
-  {
-    q: 'How does live visitor tracking work?',
-    a: 'Our beacon tracks website visits in real-time. When you browse between pages, your support agent sees your active URL on their live radar.',
-    category: 'Features',
-    icon: '⚡'
-  },
-  {
-    q: 'Can I add multiple agents to my team?',
-    a: 'Yes! Chatify is fully multi-tenant and supports unlimited agent seats per business workspace.',
-    category: 'Team',
-    icon: '👥'
-  }
-];
-
 class ChatifyWidget {
   private config: WidgetConfig;
   private supabase: SupabaseClient;
@@ -81,7 +54,7 @@ class ChatifyWidget {
   private activeTab: 'home' | 'messages' | 'help' = 'home';
   private unreadCount: number = 0;
   private messages: MessageItem[] = [];
-  private faqs: FAQItem[] = DEFAULT_FAQS;
+  private faqs: FAQItem[] = [];
   private isPreChatCompleted: boolean = false;
   private csatRated: boolean = false;
 
@@ -102,6 +75,7 @@ class ChatifyWidget {
     }
 
     this.initDOM();
+    this.loadWorkspaceArticles();
     this.fetchWorkspaceSettingsAndApply().then(() => {
       this.initVisitorTracking();
       this.initSPANavigationTracking();
@@ -234,7 +208,11 @@ class ChatifyWidget {
 
   // 2b. Dynamic Knowledge Base Articles
   private async loadWorkspaceArticles() {
-    if (!this.config.workspaceId) return;
+    if (!this.config.workspaceId) {
+      this.faqs = [];
+      this.renderFaqList();
+      return;
+    }
 
     try {
       const { data: articles, error } = await this.supabase
@@ -253,10 +231,14 @@ class ChatifyWidget {
           category: a.section?.name || a.category || 'General',
           icon: a.section?.icon || '📚',
         }));
-        this.renderFaqList();
+      } else {
+        this.faqs = [];
       }
+      this.renderFaqList();
     } catch (err) {
       console.warn('[Chatify] Failed to fetch dynamic articles:', err);
+      this.faqs = [];
+      this.renderFaqList();
     }
   }
 
@@ -264,9 +246,21 @@ class ChatifyWidget {
     const listEl = this.shadow?.getElementById('faqList');
     if (!listEl) return;
 
-    listEl.innerHTML = this.faqs
-      .map(
-        (faq, idx) => `
+    if (this.faqs.length === 0) {
+      listEl.innerHTML = `
+        <div style="padding: 36px 16px; text-align: center; color: var(--w-ink-3); font-size: 13px;">
+          <div style="font-size: 28px; margin-bottom: 8px;">📖</div>
+          <p style="margin: 0; font-weight: 600; color: var(--w-ink-2); font-size: 13.5px;">No help articles published yet</p>
+          <p style="margin: 6px 0 0; font-size: 12px; color: var(--w-ink-3); line-height: 1.5;">Articles created in your Help Desk dashboard will appear here.</p>
+        </div>
+      `;
+      return;
+    }
+
+    listEl.innerHTML = `
+      ${this.faqs
+        .map(
+          (faq, idx) => `
         <div class="chatify-faq-item" data-idx="${idx}" data-id="${faq.id || ''}">
           ${faq.category ? `
             <div style="font-size:11px; font-weight:600; color:var(--w-brand); margin-bottom:4px; display:flex; align-items:center; gap:4px;">
@@ -293,8 +287,13 @@ class ChatifyWidget {
           </div>
         </div>
       `
-      )
-      .join('');
+        )
+        .join('')}
+      <div id="faqNoResults" style="display:none; padding: 32px 16px; text-align: center; color: var(--w-ink-3); font-size: 13px;">
+        <div style="font-size: 24px; margin-bottom: 8px;">🔍</div>
+        <p style="margin: 0; font-weight: 500;">No articles match your search.</p>
+      </div>
+    `;
 
     this.bindFaqListeners();
   }
@@ -779,17 +778,11 @@ class ChatifyWidget {
           </div>
 
           <div class="chatify-faq-list" id="faqList">
-            ${DEFAULT_FAQS.map(
-              (faq, idx) => `
-              <div class="chatify-faq-item" data-idx="${idx}">
-                <div class="chatify-faq-q">
-                  <span>${faq.q}</span>
-                  <span class="chatify-faq-arrow">›</span>
-                </div>
-                <div class="chatify-faq-a">${faq.a}</div>
-              </div>
-            `
-            ).join('')}
+            <div style="padding: 36px 16px; text-align: center; color: var(--w-ink-3); font-size: 13px;">
+              <div style="font-size: 28px; margin-bottom: 8px;">📖</div>
+              <p style="margin: 0; font-weight: 600; color: var(--w-ink-2); font-size: 13.5px;">No help articles published yet</p>
+              <p style="margin: 6px 0 0; font-size: 12px; color: var(--w-ink-3); line-height: 1.5;">Articles created in your Help Desk dashboard will appear here.</p>
+            </div>
           </div>
         </div>
       </div>
@@ -870,11 +863,18 @@ class ChatifyWidget {
     // FAQ Search Input
     const faqSearch = this.shadow.getElementById('helpSearchInput') as HTMLInputElement | null;
     faqSearch?.addEventListener('input', (e) => {
-      const q = (e.target as HTMLInputElement).value.toLowerCase();
+      const q = (e.target as HTMLInputElement).value.toLowerCase().trim();
+      let matchCount = 0;
       this.shadow?.querySelectorAll('.chatify-faq-item').forEach((item) => {
         const text = item.textContent?.toLowerCase() || '';
-        (item as HTMLElement).style.display = text.includes(q) ? 'block' : 'none';
+        const matches = text.includes(q);
+        (item as HTMLElement).style.display = matches ? 'block' : 'none';
+        if (matches) matchCount++;
       });
+      const noResultsEl = this.shadow?.getElementById('faqNoResults');
+      if (noResultsEl) {
+        noResultsEl.style.display = (this.faqs.length > 0 && q && matchCount === 0) ? 'block' : 'none';
+      }
     });
 
     const startBtn = this.shadow.getElementById('chatifyStartBtn');
