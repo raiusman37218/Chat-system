@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { Article, HelpSection, Workspace } from '@/types/database';
 import { createClient } from '@/lib/supabase/client';
+import { getWorkspaceHelpCenterUrl } from '@/lib/domain';
 
 export default function PublicHelpCenterPage() {
   const params = useParams();
@@ -38,20 +39,25 @@ export default function PublicHelpCenterPage() {
     async function loadData() {
       try {
         setLoading(true);
-        // Fetch workspace
-        const { data: ws } = await supabase
-          .from('workspaces')
-          .select('*')
-          .eq('id', workspaceId)
-          .maybeSingle();
+        // Fetch workspace by UUID, slug, or custom domain
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(workspaceId);
+        const { data: ws } = isUuid
+          ? await supabase.from('workspaces').select('*').eq('id', workspaceId).maybeSingle()
+          : await supabase.from('workspaces').select('*').or(`slug.eq.${workspaceId},custom_domain.eq.${workspaceId}`).maybeSingle();
 
-        if (ws) setWorkspace(ws as Workspace);
+        if (!ws) {
+          setLoading(false);
+          return;
+        }
+
+        setWorkspace(ws as Workspace);
+        const actualWorkspaceId = ws.id;
 
         // Fetch sections
         const { data: secList } = await supabase
           .from('help_sections')
           .select('*')
-          .eq('workspace_id', workspaceId)
+          .eq('workspace_id', actualWorkspaceId)
           .order('order_index', { ascending: true })
           .order('created_at', { ascending: true });
 
@@ -59,7 +65,7 @@ export default function PublicHelpCenterPage() {
         const { data: artList } = await supabase
           .from('articles')
           .select('*, author:agents(id, name, avatar_url), section:help_sections(id, name, icon)')
-          .eq('workspace_id', workspaceId)
+          .eq('workspace_id', actualWorkspaceId)
           .eq('status', 'published')
           .order('created_at', { ascending: false });
 
@@ -123,6 +129,24 @@ export default function PublicHelpCenterPage() {
     }
   };
 
+  const navigateToArticle = (art: Article) => {
+    if (typeof window !== 'undefined') {
+      const host = window.location.host.toLowerCase().split(':')[0];
+      const isPlatform =
+        host === 'localhost' ||
+        host === '127.0.0.1' ||
+        host.endsWith('.vercel.app') ||
+        host.endsWith('chatify.dev') ||
+        host.endsWith('chatify.site');
+
+      if (!isPlatform) {
+        router.push(`/${art.slug || art.id}`);
+        return;
+      }
+    }
+    router.push(`/help/${workspace?.slug || workspaceId}/${art.slug || art.id}`);
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-canvas flex flex-col items-center justify-center gap-3">
@@ -146,6 +170,12 @@ export default function PublicHelpCenterPage() {
 
   return (
     <div className="min-h-screen bg-canvas text-ink flex flex-col">
+      <head>
+        <title>{`${workspace.name} Help Center`}</title>
+        <link rel="canonical" href={getWorkspaceHelpCenterUrl(workspace)} />
+        <meta property="og:title" content={`${workspace.name} Help Center & Documentation`} />
+        <meta property="og:url" content={getWorkspaceHelpCenterUrl(workspace)} />
+      </head>
       {/* Top Brand Banner & Navigation */}
       <header className="border-b border-line/80 bg-surface sticky top-0 z-30 shadow-xs">
         <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between gap-4">
@@ -281,7 +311,7 @@ export default function PublicHelpCenterPage() {
                 {searchResults.map((article) => (
                   <div
                     key={article.id}
-                    onClick={() => router.push(`/help/${workspaceId}/${article.id}`)}
+                    onClick={() => navigateToArticle(article)}
                     className="p-5 rounded-2xl border border-line bg-surface hover:border-ink-3/40 hover:shadow-md transition-all cursor-pointer group space-y-2"
                   >
                     <div className="flex items-center gap-2">
@@ -354,7 +384,7 @@ export default function PublicHelpCenterPage() {
                           {sectionArticles.slice(0, 4).map((art) => (
                             <div
                               key={art.id}
-                              onClick={() => router.push(`/help/${workspaceId}/${art.id}`)}
+                              onClick={() => navigateToArticle(art)}
                               className="text-[13px] text-ink-2 hover:text-accent font-medium flex items-center justify-between cursor-pointer py-1 group/art"
                             >
                               <span className="truncate group-hover/art:translate-x-0.5 transition-transform">

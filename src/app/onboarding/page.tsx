@@ -11,10 +11,12 @@ import {
   ExternalLink,
   Send,
   Sparkles,
+  BookOpen,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { Logo } from '@/components/ui/Logo';
+import { cleanDomain, getDefaultSubdomain } from '@/lib/domain';
 
 const PRESET_COLORS = [
   { name: 'Electric Blue', hex: '#2e5bff' },
@@ -62,6 +64,16 @@ export default function OnboardingPage() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
 
+      // Generate slug and default help subdomain
+      const cleanWeb = cleanDomain(websiteUrl);
+      const baseSlug = (businessName || 'workspace')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/(^-|-$)/g, '') || 'workspace';
+      const slug = `${baseSlug}-${Math.random().toString(36).substring(2, 6)}`;
+      const customDomain = cleanWeb ? `help.${cleanWeb}` : null;
+      const verificationToken = `chatify_tok_${Math.random().toString(36).substring(2, 10)}`;
+
       // 1. Create Workspace
       const { data: ws, error: wsError } = await supabase
         .from('workspaces')
@@ -72,6 +84,10 @@ export default function OnboardingPage() {
           greeting_title: greetingTitle,
           greeting_message: greetingMessage,
           owner_id: session.user.id,
+          slug,
+          custom_domain: customDomain,
+          custom_domain_status: 'pending',
+          custom_domain_verification_token: verificationToken,
         })
         .select()
         .single();
@@ -215,6 +231,25 @@ export default function OnboardingPage() {
                   <p className="mt-1.5 text-[12px] text-ink-3">
                     Where the chat widget will live. You can change this later.
                   </p>
+
+                  {websiteUrl && cleanDomain(websiteUrl) && (
+                    <div className="mt-3.5 p-3.5 rounded-xl bg-accent-soft/40 border border-accent-line/60 flex items-center justify-between text-xs animate-in fade-in">
+                      <div className="flex items-center gap-2.5">
+                        <BookOpen className="w-4 h-4 text-accent shrink-0" />
+                        <div>
+                          <span className="text-[10.5px] font-bold text-accent uppercase tracking-wider block">
+                            Public Help Center Domain
+                          </span>
+                          <span className="font-mono text-[12.5px] text-ink font-semibold">
+                            https://{getDefaultSubdomain(websiteUrl)}
+                          </span>
+                        </div>
+                      </div>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-accent/15 text-accent whitespace-nowrap">
+                        Workspace Scoped
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
 

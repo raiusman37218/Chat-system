@@ -39,6 +39,59 @@ export async function middleware(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
+  // Host-based routing for Custom Domains and Help Center subdomains
+  const host = request.headers.get('host')?.toLowerCase().split(':')[0] || '';
+  const isPlatformHost =
+    host === 'localhost' ||
+    host === '127.0.0.1' ||
+    host.endsWith('.vercel.app') ||
+    host === 'chatify.dev' ||
+    host === 'chatify.site';
+
+  if (!isPlatformHost) {
+    const { data: ws } = await supabase
+      .from('workspaces')
+      .select('id, custom_domain, custom_domain_status')
+      .ilike('custom_domain', host)
+      .eq('custom_domain_status', 'verified')
+      .maybeSingle();
+
+    if (ws) {
+      const pathname = request.nextUrl.pathname;
+
+      // Sitemap routing
+      if (pathname === '/sitemap.xml') {
+        const sitemapUrl = request.nextUrl.clone();
+        sitemapUrl.pathname = `/help/${ws.id}/sitemap.xml`;
+        return NextResponse.rewrite(sitemapUrl, {
+          request: { headers: request.headers },
+        });
+      }
+
+      // Root Help Center
+      if (pathname === '/' || pathname === '') {
+        const helpUrl = request.nextUrl.clone();
+        helpUrl.pathname = `/help/${ws.id}`;
+        return NextResponse.rewrite(helpUrl, {
+          request: { headers: request.headers },
+        });
+      }
+
+      // Article direct path (e.g. support.mycompany.com/article-slug)
+      if (
+        !pathname.startsWith('/api') &&
+        !pathname.startsWith('/_next') &&
+        !pathname.startsWith('/help')
+      ) {
+        const articleUrl = request.nextUrl.clone();
+        articleUrl.pathname = `/help/${ws.id}${pathname}`;
+        return NextResponse.rewrite(articleUrl, {
+          request: { headers: request.headers },
+        });
+      }
+    }
+  }
+
   // Role-based protection for /admin routes
   if (request.nextUrl.pathname.startsWith('/admin')) {
     if (!user) {

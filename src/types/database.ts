@@ -277,6 +277,11 @@ export interface Workspace {
   help_center_tab_label?: string | null;
   show_help_tab?: boolean | null;
   help_center_tab_icon?: string | null;
+  slug?: string | null;
+  custom_domain?: string | null;
+  custom_domain_status?: 'pending' | 'verified' | 'failed' | null;
+  custom_domain_verified_at?: string | null;
+  custom_domain_verification_token?: string | null;
   created_at: string;
 }
 

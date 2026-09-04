@@ -22,6 +22,11 @@ import {
   X,
   Bot,
   Zap,
+  Globe,
+  ExternalLink,
+  RefreshCw,
+  CheckCircle2,
+  XCircle,
 } from 'lucide-react';
 import {
   Workspace,
@@ -43,6 +48,18 @@ import {
   updateCannedResponseAction,
   deleteCannedResponseAction,
 } from '@/app/actions/admin';
+import {
+  updateWorkspaceDomainAction,
+  verifyWorkspaceDomainAction,
+  removeWorkspaceDomainAction,
+} from '@/app/actions/domain';
+import {
+  getWorkspaceHelpCenterUrl,
+  cleanDomain,
+  getDefaultSubdomain,
+  getExpectedDnsRecords,
+} from '@/lib/domain';
+import { cn } from '@/lib/utils';
 
 interface AdminSettingsPanelProps {
   workspace: Workspace;
@@ -63,7 +80,8 @@ export type AdminTab =
   | 'canned'
   | 'assignment'
   | 'ai'
-  | 'snippet';
+  | 'snippet'
+  | 'domain';
 
 const DEFAULT_SCHEDULE: BusinessHoursConfig = {
   enabled: false,
@@ -464,6 +482,100 @@ export function AdminSettingsPanel({
     showStatus('Code snippet copied to clipboard!');
   };
 
+  // ──────────────────────────────────────────────────────────────────────────
+  // SECTION 8: DOMAIN & HELP CENTER STATE & HANDLERS
+  // ──────────────────────────────────────────────────────────────────────────
+  const [customDomainInput, setCustomDomainInput] = useState(
+    workspace.custom_domain || getDefaultSubdomain(workspace.website_url) || ''
+  );
+  const [domainMode, setDomainMode] = useState<'subdomain' | 'custom'>(
+    workspace.custom_domain && !workspace.custom_domain.startsWith('help.') ? 'custom' : 'subdomain'
+  );
+  const [savingDomain, setSavingDomain] = useState(false);
+  const [verifyingDomain, setVerifyingDomain] = useState(false);
+  const [verificationResult, setVerificationResult] = useState<{
+    verified: boolean;
+    status: 'verified' | 'failed';
+    details: string;
+  } | null>(null);
+  const [copiedToken, setCopiedToken] = useState(false);
+  const [copiedCname, setCopiedCname] = useState(false);
+  const [copiedPublicUrl, setCopiedPublicUrl] = useState(false);
+
+  const handleSaveDomain = async () => {
+    if (!customDomainInput.trim()) {
+      showStatus('Please provide a domain', 'error');
+      return;
+    }
+    setSavingDomain(true);
+    try {
+      const res = await updateWorkspaceDomainAction(workspace.id, customDomainInput);
+      if (res.success && res.data) {
+        setWorkspace(res.data.workspace);
+        onWorkspaceUpdated?.(res.data.workspace);
+        showStatus('Domain saved! Now please configure your DNS records below.');
+      } else {
+        showStatus(res.error || 'Failed to update domain', 'error');
+      }
+    } catch (err: any) {
+      showStatus(err.message || 'Error updating domain', 'error');
+    } finally {
+      setSavingDomain(false);
+    }
+  };
+
+  const handleVerifyDomain = async () => {
+    setVerifyingDomain(true);
+    setVerificationResult(null);
+    try {
+      const res = await verifyWorkspaceDomainAction(workspace.id);
+      if (res.data) {
+        setVerificationResult(res.data);
+        if (res.data.verified) {
+          const updatedWs = {
+            ...workspace,
+            custom_domain: cleanDomain(customDomainInput),
+            custom_domain_status: 'verified' as const,
+            custom_domain_verified_at: new Date().toISOString(),
+          };
+          setWorkspace(updatedWs);
+          onWorkspaceUpdated?.(updatedWs);
+          showStatus('Domain successfully verified and active!', 'success');
+        } else {
+          showStatus('DNS records not detected yet. Check the instructions below.', 'error');
+        }
+      } else {
+        showStatus(res.error || 'Verification failed', 'error');
+      }
+    } catch (err: any) {
+      showStatus(err.message || 'Error running DNS verification', 'error');
+    } finally {
+      setVerifyingDomain(false);
+    }
+  };
+
+  const handleRemoveDomain = async () => {
+    if (!confirm('Are you sure you want to remove this custom domain? The Help Center will fall back to your platform URL.')) return;
+    try {
+      const res = await removeWorkspaceDomainAction(workspace.id);
+      if (res.success) {
+        const updatedWs = {
+          ...workspace,
+          custom_domain: null,
+          custom_domain_status: null,
+          custom_domain_verified_at: null,
+        };
+        setWorkspace(updatedWs);
+        onWorkspaceUpdated?.(updatedWs);
+        setCustomDomainInput(getDefaultSubdomain(workspace.website_url) || '');
+        setVerificationResult(null);
+        showStatus('Custom domain removed');
+      }
+    } catch (err: any) {
+      showStatus(err.message || 'Failed to remove domain', 'error');
+    }
+  };
+
   return (
     <div
       className={
@@ -520,6 +632,7 @@ export function AdminSettingsPanel({
           { id: 'canned', label: 'Canned Replies', icon: MessageSquareText, badge: cannedResponses.length },
           { id: 'assignment', label: 'Auto-Assignment', icon: Sliders },
           { id: 'ai', label: 'Claude AI Assistant', icon: Sparkles },
+          { id: 'domain', label: 'Custom Domains', icon: Globe },
           { id: 'snippet', label: 'Install Snippet', icon: Code },
         ].map((tab) => {
           const active = activeTab === tab.id;
@@ -1756,6 +1869,307 @@ export function AdminSettingsPanel({
                   </p>
                 </div>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* ─────────────────────────────────────────────────────────────────── */}
+        {/* TAB 8: CUSTOM DOMAINS & PUBLIC HELP CENTER */}
+        {/* ─────────────────────────────────────────────────────────────────── */}
+        {activeTab === 'domain' && (
+          <div className="space-y-6 animate-rise">
+            {/* 1. Live Resolved Help Center URL */}
+            <div className="card p-6 space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-line pb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-accent-soft text-accent flex items-center justify-center font-bold">
+                    <Globe className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-[15px] font-semibold text-ink">Public Help Center URL</h3>
+                    <p className="text-[12px] text-ink-3">
+                      Your knowledge base is scoped specifically to your business domain.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <span
+                    className={cn(
+                      'px-2.5 py-1 rounded-full text-[11px] font-semibold flex items-center gap-1.5',
+                      workspace.custom_domain_status === 'verified'
+                        ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
+                        : workspace.custom_domain_status === 'failed'
+                        ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20'
+                        : 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20'
+                    )}
+                  >
+                    {workspace.custom_domain_status === 'verified' ? (
+                      <>
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        <span>Verified &amp; Live</span>
+                      </>
+                    ) : workspace.custom_domain_status === 'failed' ? (
+                      <>
+                        <XCircle className="w-3.5 h-3.5" />
+                        <span>DNS Check Failed</span>
+                      </>
+                    ) : (
+                      <>
+                        <Clock className="w-3.5 h-3.5" />
+                        <span>DNS Verification Pending</span>
+                      </>
+                    )}
+                  </span>
+                </div>
+              </div>
+
+              {/* Resolved URL Display */}
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-3.5 rounded-xl bg-surface-2 border border-line">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="text-[12px] text-ink-3 shrink-0 font-medium">Public URL:</span>
+                  <a
+                    href={getWorkspaceHelpCenterUrl(workspace)}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="font-mono text-[13px] font-semibold text-accent hover:underline truncate"
+                  >
+                    {getWorkspaceHelpCenterUrl(workspace)}
+                  </a>
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(getWorkspaceHelpCenterUrl(workspace));
+                      setCopiedPublicUrl(true);
+                      setTimeout(() => setCopiedPublicUrl(false), 2000);
+                      showStatus('Help Center URL copied to clipboard!');
+                    }}
+                    className="btn btn-sm btn-secondary gap-1.5"
+                  >
+                    {copiedPublicUrl ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+                    <span>{copiedPublicUrl ? 'Copied' : 'Copy Link'}</span>
+                  </button>
+
+                  <a
+                    href={getWorkspaceHelpCenterUrl(workspace)}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="btn btn-sm btn-primary gap-1.5"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" />
+                    <span>Open Live</span>
+                  </a>
+                </div>
+              </div>
+            </div>
+
+            {/* 2. Custom Domain Configuration Form */}
+            <div className="card p-6 space-y-5">
+              <div className="border-b border-line pb-4">
+                <h3 className="text-[15px] font-semibold text-ink">Configure Custom Help Center Domain</h3>
+                <p className="text-[12px] text-ink-3">
+                  Point a custom subdomain (e.g. <code className="font-mono text-ink">help.{cleanDomain(workspace.website_url) || 'yourcompany.com'}</code> or <code className="font-mono text-ink">support.{cleanDomain(workspace.website_url) || 'yourcompany.com'}</code>) directly to your Help Center.
+                </p>
+              </div>
+
+              {/* Mode Selection */}
+              <div className="space-y-2">
+                <label className="field-label">Domain Mode</label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDomainMode('subdomain');
+                      setCustomDomainInput(getDefaultSubdomain(workspace.website_url) || 'help.yourbrand.com');
+                    }}
+                    className={cn(
+                      'p-3.5 rounded-xl border text-left transition-all',
+                      domainMode === 'subdomain'
+                        ? 'border-accent bg-accent-soft/30 text-ink ring-1 ring-accent'
+                        : 'border-line bg-surface hover:bg-surface-2 text-ink-2'
+                    )}
+                  >
+                    <div className="font-semibold text-[13px] text-ink flex items-center justify-between">
+                      <span>Subdomain Mode</span>
+                      {domainMode === 'subdomain' && <Check className="w-4 h-4 text-accent" />}
+                    </div>
+                    <p className="text-[11.5px] text-ink-3 mt-1">
+                      help.{cleanDomain(workspace.website_url) || 'yourdomain.com'} (Recommended)
+                    </p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setDomainMode('custom')}
+                    className={cn(
+                      'p-3.5 rounded-xl border text-left transition-all',
+                      domainMode === 'custom'
+                        ? 'border-accent bg-accent-soft/30 text-ink ring-1 ring-accent'
+                        : 'border-line bg-surface hover:bg-surface-2 text-ink-2'
+                    )}
+                  >
+                    <div className="font-semibold text-[13px] text-ink flex items-center justify-between">
+                      <span>Fully Custom Domain</span>
+                      {domainMode === 'custom' && <Check className="w-4 h-4 text-accent" />}
+                    </div>
+                    <p className="text-[11.5px] text-ink-3 mt-1">
+                      support.mycompany.com, kb.brand.io, docs.company.com
+                    </p>
+                  </button>
+                </div>
+              </div>
+
+              {/* Domain Input Field */}
+              <div className="space-y-2">
+                <label className="field-label">Target Domain / Subdomain</label>
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <span className="absolute left-3 top-2.5 text-[13px] text-ink-3 font-mono">https://</span>
+                    <input
+                      type="text"
+                      value={customDomainInput}
+                      onChange={(e) => setCustomDomainInput(e.target.value)}
+                      placeholder="help.yourcompany.com"
+                      className="input pl-20 font-mono text-[13px]"
+                    />
+                  </div>
+                  <button
+                    onClick={handleSaveDomain}
+                    disabled={savingDomain}
+                    className="btn btn-primary px-4 gap-1.5 shrink-0"
+                  >
+                    {savingDomain ? 'Saving…' : 'Save Domain'}
+                  </button>
+                </div>
+                <p className="text-[11.5px] text-ink-3">
+                  Do not include https:// or slashes. Example: <code className="font-mono">help.{cleanDomain(workspace.website_url) || 'mycompany.com'}</code>
+                </p>
+              </div>
+
+              {/* DNS Verification Records Box */}
+              {workspace.custom_domain && (
+                <div className="pt-4 border-t border-line space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="text-[13.5px] font-semibold text-ink">Required DNS Records</h4>
+                      <p className="text-[11.5px] text-ink-3">
+                        Add these records to your DNS manager (Cloudflare, GoDaddy, Namecheap, Vercel, etc.).
+                      </p>
+                    </div>
+
+                    <button
+                      onClick={handleVerifyDomain}
+                      disabled={verifyingDomain}
+                      className="btn btn-sm btn-primary gap-1.5 shadow-sm"
+                    >
+                      <RefreshCw className={cn('w-3.5 h-3.5', verifyingDomain && 'animate-spin')} />
+                      <span>{verifyingDomain ? 'Verifying DNS…' : 'Verify DNS Records'}</span>
+                    </button>
+                  </div>
+
+                  {/* Verification result diagnostics */}
+                  {verificationResult && (
+                    <div
+                      className={cn(
+                        'p-3.5 rounded-xl border text-[12.5px] flex items-start gap-2.5 animate-in fade-in',
+                        verificationResult.verified
+                          ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-700 dark:text-emerald-300'
+                          : 'bg-rose-500/10 border-rose-500/30 text-rose-700 dark:text-rose-300'
+                      )}
+                    >
+                      {verificationResult.verified ? (
+                        <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-500 mt-0.5" />
+                      ) : (
+                        <AlertCircle className="w-4 h-4 shrink-0 text-rose-500 mt-0.5" />
+                      )}
+                      <div>
+                        <div className="font-semibold">
+                          {verificationResult.verified ? 'Verification Successful!' : 'DNS Records Not Detected'}
+                        </div>
+                        <p className="mt-0.5 text-[11.5px] opacity-90">{verificationResult.details}</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Table of DNS Records */}
+                  <div className="rounded-xl border border-line bg-surface overflow-hidden text-[12.5px]">
+                    <div className="grid grid-cols-12 px-4 py-2.5 bg-surface-2 border-b border-line font-semibold text-ink-2 text-[11.5px]">
+                      <div className="col-span-2">Type</div>
+                      <div className="col-span-3">Host / Name</div>
+                      <div className="col-span-5">Target / Value</div>
+                      <div className="col-span-2 text-right">Action</div>
+                    </div>
+
+                    {/* CNAME RECORD */}
+                    {(() => {
+                      const records = getExpectedDnsRecords(workspace);
+                      return (
+                        <>
+                          <div className="grid grid-cols-12 px-4 py-3 border-b border-line/60 items-center">
+                            <div className="col-span-2 font-mono font-bold text-accent">CNAME</div>
+                            <div className="col-span-3 font-mono text-ink truncate">{records.cname.name}</div>
+                            <div className="col-span-5 font-mono text-ink truncate">{records.cname.value}</div>
+                            <div className="col-span-2 text-right">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  navigator.clipboard.writeText(records.cname.value);
+                                  setCopiedCname(true);
+                                  setTimeout(() => setCopiedCname(false), 2000);
+                                  showStatus('CNAME target copied!');
+                                }}
+                                className="btn btn-xs btn-secondary"
+                              >
+                                {copiedCname ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
+                                <span>{copiedCname ? 'Copied' : 'Copy'}</span>
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* TXT RECORD */}
+                          <div className="grid grid-cols-12 px-4 py-3 items-center">
+                            <div className="col-span-2 font-mono font-bold text-amber-500">TXT</div>
+                            <div className="col-span-3 font-mono text-ink truncate">{records.txt.name}</div>
+                            <div className="col-span-5 font-mono text-ink truncate">{records.txt.value}</div>
+                            <div className="col-span-2 text-right">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  navigator.clipboard.writeText(records.txt.value);
+                                  setCopiedToken(true);
+                                  setTimeout(() => setCopiedToken(false), 2000);
+                                  showStatus('TXT verification value copied!');
+                                }}
+                                className="btn btn-xs btn-secondary"
+                              >
+                                {copiedToken ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
+                                <span>{copiedToken ? 'Copied' : 'Copy'}</span>
+                              </button>
+                            </div>
+                          </div>
+                        </>
+                      );
+                    })()}
+                  </div>
+
+                  <div className="flex items-center justify-between pt-2">
+                    <p className="text-[11.5px] text-ink-3">
+                      Note: DNS changes can take up to a few minutes to propagate across global DNS resolvers.
+                    </p>
+
+                    <button
+                      type="button"
+                      onClick={handleRemoveDomain}
+                      className="text-[11.5px] text-rose-500 hover:underline flex items-center gap-1"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Remove Custom Domain</span>
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}

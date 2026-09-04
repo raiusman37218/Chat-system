@@ -9,6 +9,7 @@ import {
   Palette,
   Share2,
   Users,
+  Globe,
 } from 'lucide-react';
 import { Agent, CannedResponse, Workspace } from '@/types/database';
 import { cn } from '@/lib/utils';
@@ -34,6 +35,7 @@ import {
 type SectionId =
   | 'install'
   | 'widget'
+  | 'domains'
   | 'team'
   | 'replies'
   | 'routing'
@@ -61,6 +63,13 @@ const SECTIONS: Section[] = [
     label: 'Widget',
     description: 'Branding, greeting and appearance',
     Icon: Palette,
+    adminOnly: true,
+  },
+  {
+    id: 'domains',
+    label: 'Custom Domains',
+    description: 'Help Center URLs, custom domain and DNS verification',
+    Icon: Globe,
     adminOnly: true,
   },
   {
@@ -130,6 +139,7 @@ export function SettingsHub({
   /** Availability merges two former admin tabs, so it renders both. */
   const adminTabFor: Partial<Record<SectionId, AdminTab>> = {
     widget: 'widget',
+    domains: 'domain',
     team: 'team',
     replies: 'canned',
     routing: 'hours',

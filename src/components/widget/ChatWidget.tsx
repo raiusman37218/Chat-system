@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { Message } from '@/types/database';
+import { getWorkspaceHelpCenterUrl } from '@/lib/domain';
 
 export interface WidgetConfig {
   brandColor?: string;
@@ -92,6 +93,9 @@ export default function ChatWidget({
   const [articleVoted, setArticleVoted] = useState<Record<string, boolean>>({});
   const [helpTabLabel, setHelpTabLabel] = useState(config.helpTabLabel || 'Help');
   const [showHelpTab, setShowHelpTab] = useState(config.showHelpTab !== false);
+  const [helpCenterPortalUrl, setHelpCenterPortalUrl] = useState<string>(
+    config.workspaceId ? `/help/${config.workspaceId}` : '/help'
+  );
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -106,7 +110,7 @@ export default function ChatWidget({
         const [{ data: wsData }, { data: articlesData }] = await Promise.all([
           supabase
             .from('workspaces')
-            .select('help_center_tab_label, show_help_tab, widget_position')
+            .select('id, slug, custom_domain, custom_domain_status, website_url, help_center_tab_label, show_help_tab, widget_position')
             .eq('id', config.workspaceId)
             .maybeSingle(),
           supabase
@@ -123,6 +127,8 @@ export default function ChatWidget({
           if (wsData.widget_position) {
             setWidgetPosition(wsData.widget_position === 'left' ? 'bottom-left' : 'bottom-right');
           }
+          const resolvedUrl = getWorkspaceHelpCenterUrl(wsData as any);
+          setHelpCenterPortalUrl(resolvedUrl);
         }
         if (articlesData) setHelpArticles(articlesData);
       } catch (err) {
@@ -530,15 +536,11 @@ export default function ChatWidget({
         >
           <div className="flex items-center gap-3">
             <div className="relative w-10 h-10 rounded-full bg-white/20 flex items-center justify-center overflow-hidden border border-white/30 backdrop-blur-sm">
-              {config.logoUrl ? (
-                <img
-                  src={config.logoUrl}
-                  alt={companyName}
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <Sparkles className="w-5 h-5 text-white" />
-              )}
+              <img
+                src={config.logoUrl || '/chat-icon.png'}
+                alt={companyName}
+                className="w-full h-full object-contain p-1"
+              />
               {/* Online/Offline Status Dot */}
               <span
                 className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white ${
@@ -744,7 +746,7 @@ export default function ChatWidget({
                 {config.workspaceId && (
                   <div className="p-2.5 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-center">
                     <a
-                      href={`/help/${config.workspaceId}`}
+                      href={helpCenterPortalUrl}
                       target="_blank"
                       rel="noreferrer"
                       className="text-[11.5px] font-semibold text-blue-600 dark:text-blue-400 hover:underline inline-flex items-center gap-1"

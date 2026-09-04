@@ -15,6 +15,8 @@ interface WidgetConfig {
   helpTabLabel: string;
   showHelpTab: boolean;
   helpTabIcon: string;
+  logoUrl?: string;
+  greetingTitle?: string;
 }
 
 interface MessageItem {
@@ -163,6 +165,8 @@ class ChatifyWidget {
         if (data.help_center_tab_label) {
           this.config.helpTabLabel = data.help_center_tab_label;
         }
+        if (data.logo_url) this.config.logoUrl = data.logo_url;
+        if (data.greeting_title) this.config.greetingTitle = data.greeting_title;
         if (typeof data.show_help_tab === 'boolean') {
           this.config.showHelpTab = data.show_help_tab;
         }
@@ -175,10 +179,28 @@ class ChatifyWidget {
         // Check Business Hours schedule
         if (data.business_hours?.enabled) {
           const isOutside = this.isOutsideBusinessHours(data.business_hours);
+          const statusPill = this.shadow?.getElementById('homeStatusPill');
+          const cardSub = this.shadow?.getElementById('homeCardSub');
+          const btnCta = this.shadow?.querySelector('#btnGoToMessages span');
           if (isOutside) {
-            const statusPill = this.shadow?.querySelector('.chatify-status-pill');
             if (statusPill) {
-              statusPill.innerHTML = '<span class="status-dot" style="background:#94a3b8"></span> Away (Offline)';
+              statusPill.innerHTML = '<span class="chatify-pulse-dot away"></span> Typically replies in a few hours';
+            }
+            if (cardSub) {
+              cardSub.textContent = "Leave a message and we'll reply as soon as we're back online.";
+            }
+            if (btnCta) {
+              btnCta.textContent = "Leave us a message";
+            }
+          } else {
+            if (statusPill) {
+              statusPill.innerHTML = '<span class="chatify-pulse-dot online"></span> Typically replies in 5m';
+            }
+            if (cardSub) {
+              cardSub.textContent = "Ask us anything, or share your feedback.";
+            }
+            if (btnCta) {
+              btnCta.textContent = "Send us a message";
             }
           }
         }
@@ -581,8 +603,9 @@ class ChatifyWidget {
     launcher.innerHTML = `
       <div class="chatify-badge" id="chatifyBadge">0</div>
       <img id="chatifyIconOpen" src="${CHATIFY_ICON_DATA_URI}" alt="Chat" class="chatify-launcher-icon" />
-      <svg id="chatifyIconClose" style="display:none;" viewBox="0 0 24 24">
-        <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+      <svg id="chatifyIconClose" style="display:none;" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="18" y1="6" x2="6" y2="18"></line>
+        <line x1="6" y1="6" x2="18" y2="18"></line>
       </svg>
     `;
     launcher.onclick = () => this.toggleWindow();
@@ -598,9 +621,14 @@ class ChatifyWidget {
         <div class="chatify-home-hero">
           <div class="chatify-brand-row">
             <div class="chatify-home-avatar" id="homeBrandAvatar">
-              <img src="${CHATIFY_ICON_DATA_URI}" alt="Chatify" style="width:100%;height:100%;object-fit:contain;" />
+              <img src="${CHATIFY_ICON_DATA_URI}" alt="Logo" style="width:100%;height:100%;object-fit:contain;border-radius:inherit;" />
             </div>
-            <button class="chatify-icon-btn" id="homeCloseBtn" title="Close">✕</button>
+            <button class="chatify-icon-btn" id="homeCloseBtn" title="Close Messenger">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            </button>
           </div>
           <h2 class="chatify-home-title" id="homeGreetingTitle">Hello there 👋</h2>
           <p class="chatify-home-sub" id="homeGreetingSub">How can our support team help you today?</p>
@@ -610,42 +638,61 @@ class ChatifyWidget {
           <!-- Start Chat Card -->
           <div class="chatify-card chatify-card-action" id="cardStartChat">
             <div class="chatify-card-head">
-              <div class="chatify-avatars-stack">
-                <div class="chatify-mini-avatar" style="background:var(--w-brand);">A</div>
-                <div class="chatify-mini-avatar" style="background:var(--w-brand-deep);">S</div>
+              <div class="chatify-avatars-stack" id="homeAvatarsStack">
+                <div class="chatify-mini-avatar" style="background:linear-gradient(135deg,#3b82f6,#1d4ed8);">A</div>
+                <div class="chatify-mini-avatar" style="background:linear-gradient(135deg,#8b5cf6,#6d28d9);">S</div>
+                <div class="chatify-mini-avatar" style="background:linear-gradient(135deg,#10b981,#047857);">M</div>
               </div>
-              <span class="chatify-status-pill">● Typically replies in 5m</span>
+              <span class="chatify-status-pill" id="homeStatusPill">
+                <span class="chatify-pulse-dot online"></span>
+                <span>Typically replies in 5m</span>
+              </span>
             </div>
-            <h4>Send us a message</h4>
-            <p>Our team of support engineers is online right now.</p>
-            <button class="chatify-btn-link" id="btnGoToMessages">Send message →</button>
+            <h4 class="chatify-card-title">Send us a message</h4>
+            <p class="chatify-card-sub" id="homeCardSub">Ask us anything, or share your feedback.</p>
+            <button class="chatify-primary-cta" id="btnGoToMessages">
+              <span>Send us a message</span>
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+                <polyline points="12 5 19 12 12 19"></polyline>
+              </svg>
+            </button>
           </div>
 
-          <!-- Quick-Reply Action Chips -->
+          <!-- Quick Inquiries Section -->
           <div class="chatify-chips-section">
             <div class="chatify-section-title">Quick Inquiries</div>
             <div class="chatify-chips-grid">
               <button class="chatify-chip" data-query="Hello! I would like to talk to someone about pricing.">
-                💳 Pricing Question
+                <span>💳 Pricing &amp; Plans</span>
+                <span class="chatify-chip-arrow">›</span>
               </button>
               <button class="chatify-chip" data-query="Hi! Can you provide more info on enterprise integrations?">
-                ⚡ Enterprise Features
+                <span>⚡ Features &amp; Integrations</span>
+                <span class="chatify-chip-arrow">›</span>
               </button>
               <button class="chatify-chip" data-query="Hello, I need technical support with my setup.">
-                🛠️ Technical Help
+                <span>🛠️ Technical Support</span>
+                <span class="chatify-chip-arrow">›</span>
               </button>
               <button class="chatify-chip" data-query="Hi there! I would like to speak with a human agent.">
-                🙋 Speak with Human
+                <span>🙋 Speak with a Human</span>
+                <span class="chatify-chip-arrow">›</span>
               </button>
             </div>
           </div>
 
           <!-- Help Center Quick Search -->
           <div class="chatify-card chatify-card-help" id="cardHelpSearch">
-            <div class="chatify-section-title">Knowledge Base</div>
-            <p style="font-size:13px; color:var(--w-ink-2);">Search common answers and documentation:</p>
-            <div class="chatify-search-box" id="homeSearchTrigger">
-              <span>🔍 Search for help articles...</span>
+            <div class="chatify-section-title" id="homeHelpSectionTitle">Knowledge Base</div>
+            <p class="chatify-card-sub" style="margin-bottom:12px;">Search self-service answers and guides:</p>
+            <div class="chatify-search-trigger" id="homeSearchTrigger">
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+              </svg>
+              <span>Search for help articles...</span>
+              <span class="chatify-search-kbd">Search</span>
             </div>
           </div>
         </div>
@@ -655,9 +702,14 @@ class ChatifyWidget {
       <div class="chatify-tab-pane" id="tabMessages" style="display: none;">
         <div class="chatify-header">
           <div class="chatify-header-info">
-            <button class="chatify-back-btn" id="btnBackToHome" title="Back to Home">←</button>
+            <button class="chatify-back-btn" id="btnBackToHome" title="Back to Home">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="19" y1="12" x2="5" y2="12"></line>
+                <polyline points="12 19 5 12 12 5"></polyline>
+              </svg>
+            </button>
             <div class="chatify-avatar" id="chatifyHeaderAvatar">
-              <img src="${CHATIFY_ICON_DATA_URI}" alt="Chatify" style="width:100%;height:100%;object-fit:contain;" />
+              <img src="${CHATIFY_ICON_DATA_URI}" alt="Logo" style="width:100%;height:100%;object-fit:contain;border-radius:inherit;" />
               <span class="chatify-online-dot"></span>
             </div>
             <div class="chatify-header-text">
@@ -665,7 +717,12 @@ class ChatifyWidget {
               <p id="chatifyHeaderSubtitle">${this.config.subtitle}</p>
             </div>
           </div>
-          <button class="chatify-close-btn" id="chatifyCloseBtn">✕</button>
+          <button class="chatify-close-btn" id="chatifyCloseBtn" title="Close">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
         </div>
 
         <div class="chatify-body" id="chatifyBody">
@@ -692,9 +749,10 @@ class ChatifyWidget {
 
         <div class="chatify-footer" id="chatifyFooter" style="${!this.isPreChatCompleted ? 'display:none;' : 'display:flex;'}">
           <textarea id="chatifyTextarea" class="chatify-textarea" rows="1" placeholder="Type a message..."></textarea>
-          <button id="chatifySendBtn" class="chatify-send-btn">
-            <svg viewBox="0 0 24 24">
-              <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+          <button id="chatifySendBtn" class="chatify-send-btn" title="Send message">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="22" y1="2" x2="11" y2="13"></line>
+              <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
             </svg>
           </button>
         </div>
@@ -707,7 +765,12 @@ class ChatifyWidget {
             <h3>Knowledge Base</h3>
             <p>Self-service guides &amp; FAQs</p>
           </div>
-          <button class="chatify-close-btn" id="helpCloseBtn">✕</button>
+          <button class="chatify-close-btn" id="helpCloseBtn" title="Close">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
         </div>
 
         <div class="chatify-help-body">
@@ -734,18 +797,27 @@ class ChatifyWidget {
       <!-- Bottom Intercom Navigation Bar -->
       <nav class="chatify-bottom-nav">
         <button class="chatify-nav-item active" data-tab="home" id="navHome">
-          <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+            <polyline points="9 22 9 12 15 12 15 22"></polyline>
+          </svg>
           <span>Home</span>
         </button>
         <button class="chatify-nav-item" data-tab="messages" id="navMessages">
           <div class="nav-msg-icon-wrap">
-            <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M20 2H4c-1.1 0-1.99.9-1.99 2L2 22l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zM6 9h12v2H6V9zm8 5H6v-2h8v2zm4-6H6V6h12v2z"/></svg>
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+            </svg>
             <span class="chatify-nav-badge" id="navMsgBadge" style="display:none;">1</span>
           </div>
           <span>Messages</span>
         </button>
         <button class="chatify-nav-item" data-tab="help" id="navHelp">
-          <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 16h-2v-2h2v2zm1.07-7.75l-.9.92C12.45 11.9 12 12.5 12 14h-2v-.5c0-1.1.45-2.1 1.17-2.83l1.24-1.26c.37-.36.59-.86.59-1.41 0-1.1-.9-2-2-2s-2 .9-2 2H7c0-2.76 2.24-5 5-5s5 2.24 5 5c0 1.04-.42 1.99-1.07 2.75z"/></svg>
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"></circle>
+            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+            <line x1="12" y1="17" x2="12.01" y2="17"></line>
+          </svg>
           <span>Help</span>
         </button>
       </nav>
@@ -859,10 +931,18 @@ class ChatifyWidget {
     if (subEl) subEl.textContent = this.config.subtitle;
 
     const brandAvatar = this.shadow?.getElementById('homeBrandAvatar');
-    if (brandAvatar) brandAvatar.textContent = this.config.title.charAt(0);
+    if (brandAvatar) {
+      const logoSrc = this.config.logoUrl || CHATIFY_ICON_DATA_URI;
+      brandAvatar.innerHTML = `<img src="${logoSrc}" alt="Logo" style="width:100%;height:100%;object-fit:contain;border-radius:inherit;" />`;
+    }
 
-    // Carry the workspace's own greeting through to the Home tab, so the
-    // messenger opens speaking in the customer's voice rather than ours.
+    const homeGreeting = this.shadow?.getElementById('homeGreetingTitle');
+    if (homeGreeting && this.config.title) {
+      const cleanTitle = this.config.title.replace(/^Welcome to\s+/i, '').replace(/Support!?/i, '').trim();
+      homeGreeting.textContent = cleanTitle ? `Hello from ${cleanTitle} 👋` : 'Hello there 👋';
+    }
+
+    // Carry the workspace's own greeting through to the Home tab
     const homeSub = this.shadow?.getElementById('homeGreetingSub');
     if (homeSub && this.config.subtitle) homeSub.textContent = this.config.subtitle;
 
@@ -1139,11 +1219,11 @@ class ChatifyWidget {
 
       .chatify-home-hero {
         position: relative;
-        padding: 22px 22px 50px;
+        padding: 24px 22px 56px;
         background:
-          radial-gradient(120% 90% at 12% 0%, ${this.alpha(brand, 0.55)}, transparent 62%),
-          linear-gradient(150deg, var(--w-brand), var(--w-brand-deep));
-        color: var(--w-on-brand);
+          radial-gradient(100% 100% at 88% 12%, rgba(255, 255, 255, 0.22) 0%, transparent 64%),
+          linear-gradient(140deg, var(--w-brand) 0%, var(--w-brand-deep) 100%);
+        color: #ffffff;
         flex-shrink: 0;
       }
 
@@ -1151,68 +1231,75 @@ class ChatifyWidget {
         display: flex;
         align-items: center;
         justify-content: space-between;
-        margin-bottom: 26px;
+        margin-bottom: 22px;
       }
 
       .chatify-home-avatar {
-        width: 34px;
-        height: 34px;
-        border-radius: 50%;
-        background: rgba(255,255,255,.2);
-        border: 1px solid rgba(255,255,255,.26);
+        width: 38px;
+        height: 38px;
+        border-radius: 12px;
+        background: rgba(255, 255, 255, 0.2);
+        border: 1.5px solid rgba(255, 255, 255, 0.32);
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 14px;
-        font-weight: 700;
-        text-transform: uppercase;
-        backdrop-filter: blur(6px);
+        padding: 7px;
+        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.16);
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+      }
+
+      .chatify-home-avatar img {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
       }
 
       .chatify-icon-btn {
-        width: 30px;
-        height: 30px;
+        width: 32px;
+        height: 32px;
         border-radius: 50%;
-        border: none;
-        background: rgba(255,255,255,.14);
-        color: inherit;
-        font-size: 14px;
-        line-height: 1;
+        border: 1px solid rgba(255, 255, 255, 0.22);
+        background: rgba(255, 255, 255, 0.16);
+        color: #ffffff;
         display: flex;
         align-items: center;
         justify-content: center;
-        transition: background .16s var(--w-ease), transform .16s var(--w-ease);
+        cursor: pointer;
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+        transition: all .2s cubic-bezier(0.16, 1, 0.3, 1);
       }
 
       .chatify-icon-btn:hover {
-        background: rgba(255,255,255,.26);
-        transform: rotate(90deg);
+        background: rgba(255, 255, 255, 0.3);
+        transform: scale(1.06);
       }
 
       .chatify-home-title {
-        font-size: 25px;
-        font-weight: 600;
-        letter-spacing: -.024em;
-        line-height: 1.2;
+        font-size: 26px;
+        font-weight: 700;
+        letter-spacing: -0.03em;
+        line-height: 1.22;
+        color: #ffffff;
       }
 
       .chatify-home-sub {
         margin-top: 6px;
         font-size: 14px;
-        line-height: 1.5;
-        opacity: .82;
+        line-height: 1.45;
+        color: rgba(255, 255, 255, 0.9);
+        font-weight: 400;
       }
 
-      /* The whole sheet lifts over the gradient hero. Lifting only the first
-         card instead would put it outside this scroll box, which clips it. */
       .chatify-home-content {
         flex: 1;
         min-height: 0;
         overflow-y: auto;
-        margin-top: -26px;
+        margin-top: -30px;
         padding: 16px;
         background: var(--w-canvas);
-        border-radius: var(--w-r-lg) var(--w-r-lg) 0 0;
+        border-radius: 20px 20px 0 0;
         display: flex;
         flex-direction: column;
         gap: 14px;
@@ -1220,14 +1307,20 @@ class ChatifyWidget {
 
       .chatify-card {
         background: var(--w-surface);
-        border: 1px solid var(--w-line);
-        border-radius: var(--w-r-md);
-        padding: 16px;
-        box-shadow: var(--w-shadow-sm);
+        border: 1px solid rgba(0, 0, 0, 0.07);
+        border-radius: 18px;
+        padding: 18px;
+        box-shadow: 0 4px 18px -2px rgba(15, 23, 42, 0.06), 0 10px 28px -4px rgba(15, 23, 42, 0.08);
       }
 
-      .chatify-card-action { transition: box-shadow .2s var(--w-ease), transform .2s var(--w-ease); }
-      .chatify-card-action:hover { box-shadow: var(--w-shadow-md); transform: translateY(-1px); }
+      .chatify-card-action {
+        transition: box-shadow .24s var(--w-ease), transform .24s var(--w-ease);
+      }
+
+      .chatify-card-action:hover {
+        box-shadow: 0 6px 24px -2px rgba(15, 23, 42, 0.09), 0 14px 34px -4px rgba(15, 23, 42, 0.12);
+        transform: translateY(-1px);
+      }
 
       .chatify-card-head {
         display: flex;
@@ -1236,13 +1329,16 @@ class ChatifyWidget {
         margin-bottom: 12px;
       }
 
-      .chatify-avatars-stack { display: flex; }
+      .chatify-avatars-stack {
+        display: flex;
+        align-items: center;
+      }
 
       .chatify-mini-avatar {
-        width: 26px;
-        height: 26px;
+        width: 30px;
+        height: 30px;
         border-radius: 50%;
-        color: #fff;
+        color: #ffffff;
         font-size: 11px;
         font-weight: 700;
         display: flex;
@@ -1250,114 +1346,169 @@ class ChatifyWidget {
         justify-content: center;
         border: 2px solid var(--w-surface);
         margin-left: -8px;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
       }
-      .chatify-mini-avatar:first-child { margin-left: 0; }
+
+      .chatify-mini-avatar:first-child {
+        margin-left: 0;
+      }
 
       .chatify-status-pill {
         display: inline-flex;
         align-items: center;
-        gap: 5px;
-        height: 22px;
-        padding: 0 9px;
+        gap: 6px;
+        height: 24px;
+        padding: 0 10px;
         border-radius: 999px;
         background: var(--w-surface-2);
         border: 1px solid var(--w-line);
-        font-size: 11px;
+        font-size: 11.5px;
         font-weight: 600;
         color: var(--w-ink-2);
         white-space: nowrap;
       }
 
-      .chatify-card h4 {
-        font-size: 15px;
-        font-weight: 600;
-        letter-spacing: -.012em;
+      .chatify-pulse-dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        display: inline-block;
+      }
+
+      .chatify-pulse-dot.online {
+        background: #10b981;
+        box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.25);
+      }
+
+      .chatify-pulse-dot.away {
+        background: #f59e0b;
+        box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.25);
+      }
+
+      .chatify-card-title {
+        font-size: 17px;
+        font-weight: 700;
         color: var(--w-ink);
+        letter-spacing: -0.015em;
+        margin-bottom: 4px;
       }
 
-      .chatify-card p {
-        margin-top: 4px;
+      .chatify-card-sub {
         font-size: 13px;
-        line-height: 1.55;
         color: var(--w-ink-2);
+        line-height: 1.45;
+        margin-bottom: 16px;
       }
 
-      .chatify-btn-link {
-        margin-top: 14px;
+      .chatify-primary-cta {
         width: 100%;
-        height: 40px;
-        border: none;
-        border-radius: var(--w-r-sm);
+        height: 44px;
+        border-radius: 12px;
         background: var(--w-brand);
-        color: var(--w-on-brand);
-        font-size: 13.5px;
+        color: #ffffff;
         font-weight: 600;
+        font-size: 14px;
+        border: none;
+        cursor: pointer;
         display: flex;
         align-items: center;
         justify-content: center;
-        gap: 6px;
-        box-shadow: var(--w-shadow-sm);
-        transition: filter .16s var(--w-ease), transform .12s var(--w-ease);
+        gap: 8px;
+        box-shadow: 0 4px 14px var(--w-brand-a28);
+        transition: all .2s cubic-bezier(0.16, 1, 0.3, 1);
       }
 
-      .chatify-btn-link:hover { filter: brightness(1.08); }
-      .chatify-btn-link:active { transform: scale(.985); }
+      .chatify-primary-cta:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 6px 20px var(--w-brand-a28);
+        filter: brightness(1.04);
+      }
+
+      .chatify-primary-cta:active {
+        transform: translateY(0);
+        filter: brightness(0.98);
+      }
+
+      .chatify-chips-section {
+        margin-top: 4px;
+      }
 
       .chatify-section-title {
         font-size: 11px;
         font-weight: 700;
-        letter-spacing: .09em;
         text-transform: uppercase;
+        letter-spacing: 0.06em;
         color: var(--w-ink-3);
-        margin-bottom: 9px;
+        margin-bottom: 8px;
+        padding-left: 2px;
       }
 
-      .chatify-chips-section { padding: 0 2px; }
-
       .chatify-chips-grid {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
+        display: flex;
+        flex-direction: column;
         gap: 8px;
       }
 
       .chatify-chip {
-        padding: 11px 12px;
-        border-radius: var(--w-r-sm);
-        border: 1px solid var(--w-line);
+        width: 100%;
+        padding: 11px 14px;
+        border-radius: 12px;
         background: var(--w-surface);
-        color: var(--w-ink-2);
-        font-size: 12.5px;
+        border: 1px solid var(--w-line);
+        color: var(--w-ink);
+        font-size: 13px;
         font-weight: 500;
-        text-align: left;
-        line-height: 1.35;
-        transition: border-color .16s var(--w-ease), color .16s var(--w-ease),
-          background .16s var(--w-ease), transform .12s var(--w-ease);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        cursor: pointer;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+        transition: all .18s var(--w-ease);
       }
 
       .chatify-chip:hover {
-        border-color: var(--w-brand);
-        color: var(--w-ink);
-        background: var(--w-brand-a08);
-        transform: translateY(-1px);
+        background: var(--w-surface-2);
+        border-color: var(--w-line-2);
+        transform: translateX(2px);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
       }
 
-      .chatify-card-help p { margin-bottom: 10px; }
+      .chatify-chip-arrow {
+        color: var(--w-ink-3);
+        font-size: 16px;
+        font-weight: 600;
+      }
 
-      .chatify-search-box {
-        height: 40px;
-        padding: 0 12px;
-        border-radius: var(--w-r-sm);
-        border: 1px solid var(--w-line);
+      .chatify-search-trigger {
         background: var(--w-surface-2);
+        border: 1px solid var(--w-line);
+        border-radius: 12px;
+        padding: 11px 14px;
         color: var(--w-ink-3);
         font-size: 13px;
         display: flex;
         align-items: center;
+        gap: 10px;
         cursor: pointer;
-        transition: border-color .16s var(--w-ease), color .16s var(--w-ease);
+        transition: all .18s var(--w-ease);
       }
 
-      .chatify-search-box:hover { border-color: var(--w-line-2); color: var(--w-ink-2); }
+      .chatify-search-trigger:hover {
+        background: var(--w-surface);
+        border-color: var(--w-brand-a28);
+        color: var(--w-ink);
+      }
+
+      .chatify-search-kbd {
+        margin-left: auto;
+        font-size: 10px;
+        font-weight: 600;
+        padding: 2px 7px;
+        border-radius: 6px;
+        background: var(--w-surface);
+        border: 1px solid var(--w-line);
+        color: var(--w-ink-3);
+      }
 
       /* ── Thread header ────────────────────────────────────────────── */
 
@@ -1769,10 +1920,14 @@ class ChatifyWidget {
 
       .chatify-bottom-nav {
         display: flex;
-        border-top: 1px solid var(--w-line);
-        background: var(--w-surface);
-        padding: 6px 6px calc(6px + env(safe-area-inset-bottom, 0px));
+        border-top: 1px solid rgba(0, 0, 0, 0.07);
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        padding: 6px 10px calc(8px + env(safe-area-inset-bottom, 0px));
         flex-shrink: 0;
+        height: 64px;
+        box-sizing: border-box;
       }
 
       .chatify-nav-item {
@@ -1780,23 +1935,47 @@ class ChatifyWidget {
         flex: 1;
         border: none;
         background: transparent;
-        color: var(--w-ink-3);
-        padding: 7px 0 6px;
-        border-radius: var(--w-r-sm);
+        color: #64748b;
+        padding: 6px 0 4px;
+        border-radius: 12px;
         display: flex;
         flex-direction: column;
         align-items: center;
+        justify-content: center;
         gap: 3px;
-        font-size: 11px;
-        font-weight: 600;
-        transition: color .16s var(--w-ease), background .16s var(--w-ease);
+        font-size: 11.5px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all .18s var(--w-ease);
       }
 
-      .chatify-nav-item svg { transition: transform .2s var(--w-spring); }
-      .chatify-nav-item:hover { color: var(--w-ink-2); background: var(--w-surface-2); }
+      .chatify-nav-item svg {
+        transition: transform .2s var(--w-spring), color .18s var(--w-ease);
+      }
 
-      .chatify-nav-item.active { color: var(--w-brand); }
-      .chatify-nav-item.active svg { transform: translateY(-1px) scale(1.06); }
+      .chatify-nav-item:hover {
+        color: #1e293b;
+        background: rgba(0, 0, 0, 0.03);
+      }
+
+      .chatify-nav-item.active {
+        color: var(--w-brand);
+        font-weight: 700;
+      }
+
+      .chatify-nav-item.active svg {
+        transform: translateY(-1px) scale(1.08);
+      }
+
+      .chatify-nav-item.active::after {
+        content: '';
+        position: absolute;
+        bottom: 2px;
+        width: 16px;
+        height: 3px;
+        border-radius: 999px;
+        background: var(--w-brand);
+      }
 
       .nav-msg-icon-wrap { position: relative; display: flex; }
 

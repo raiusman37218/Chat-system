@@ -40,10 +40,13 @@ import {
   Strikethrough,
   AlertTriangle,
   Lightbulb,
+  Globe,
+  Copy,
 } from 'lucide-react';
 import { Agent, Article, HelpSection, Workspace } from '@/types/database';
 import { EmojiPickerPopover } from '@/components/dashboard/EmojiPickerPopover';
 import { MarkdownArticleContent } from '@/components/dashboard/MarkdownArticleContent';
+import { getWorkspaceHelpCenterUrl, cleanDomain } from '@/lib/domain';
 import {
   getHelpDeskDataAction,
   createHelpSectionAction,
@@ -182,8 +185,29 @@ export function HelpDeskDashboard({
   };
 
   const handleOpenPublicHelpCenter = () => {
-    if (!workspace?.id) return;
-    window.open(`/help/${workspace.id}`, '_blank');
+    if (!workspace) return;
+    const url = getWorkspaceHelpCenterUrl(workspace);
+    window.open(url, '_blank');
+  };
+
+  const handleCopyPublicHelpCenterLink = () => {
+    if (!workspace) return;
+    const url = getWorkspaceHelpCenterUrl(workspace);
+    navigator.clipboard.writeText(url);
+    showToast('Help Center link copied to clipboard!');
+  };
+
+  const handleCopyArticleLink = (art: Article) => {
+    if (!workspace) return;
+    const url = getWorkspaceHelpCenterUrl(workspace, art);
+    navigator.clipboard.writeText(url);
+    showToast(`Link for "${art.title}" copied!`);
+  };
+
+  const handleOpenArticleLive = (art: Article) => {
+    if (!workspace) return;
+    const url = getWorkspaceHelpCenterUrl(workspace, art);
+    window.open(url, '_blank');
   };
 
   return (
@@ -217,6 +241,15 @@ export function HelpDeskDashboard({
         </div>
 
         <div className="flex items-center gap-2.5">
+          <button
+            onClick={handleCopyPublicHelpCenterLink}
+            className="h-9 px-3 rounded-lg border border-line bg-surface-2 hover:bg-surface hover:border-ink-3/40 text-ink text-[12px] font-medium flex items-center gap-1.5 transition-all shadow-xs"
+            title="Copy Public Help Center URL"
+          >
+            <Link2 className="w-3.5 h-3.5 text-accent" />
+            <span>Copy URL</span>
+          </button>
+
           <button
             onClick={handleOpenPublicHelpCenter}
             className="h-9 px-3.5 rounded-lg border border-line bg-surface-2 hover:bg-surface hover:border-ink-3/40 text-ink text-[12.5px] font-medium flex items-center gap-1.5 transition-all shadow-xs"
@@ -260,6 +293,49 @@ export function HelpDeskDashboard({
           </button>
         </div>
       </header>
+
+      {/* Domain Status Banner */}
+      {workspace && (
+        <div className="px-8 py-2 bg-surface-2/80 border-b border-line/60 flex items-center justify-between text-xs">
+          <div className="flex items-center gap-2 min-w-0">
+            <Globe className="w-3.5 h-3.5 text-accent shrink-0" />
+            <span className="text-ink-3 shrink-0">Public URL:</span>
+            <a
+              href={getWorkspaceHelpCenterUrl(workspace)}
+              target="_blank"
+              rel="noreferrer"
+              className="font-mono text-accent hover:underline font-semibold truncate"
+            >
+              {getWorkspaceHelpCenterUrl(workspace)}
+            </a>
+            {workspace.custom_domain && (
+              <span
+                className={cn(
+                  'px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider shrink-0',
+                  workspace.custom_domain_status === 'verified'
+                    ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
+                    : workspace.custom_domain_status === 'failed'
+                    ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20'
+                    : 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20'
+                )}
+              >
+                {workspace.custom_domain_status === 'verified'
+                  ? 'Domain Verified'
+                  : workspace.custom_domain_status === 'failed'
+                  ? 'DNS Check Failed'
+                  : 'DNS Pending'}
+              </span>
+            )}
+          </div>
+          <button
+            onClick={handleCopyPublicHelpCenterLink}
+            className="text-ink-3 hover:text-ink font-medium text-[11.5px] flex items-center gap-1 transition-colors shrink-0 ml-4"
+          >
+            <Copy className="w-3 h-3" />
+            <span>Copy Link</span>
+          </button>
+        </div>
+      )}
 
       <main className="p-8 space-y-6 max-w-7xl mx-auto w-full">
         {/* KPI Metrics Cards */}
@@ -504,6 +580,22 @@ export function HelpDeskDashboard({
 
                       <div className="flex items-center gap-1">
                         <button
+                          onClick={() => handleCopyArticleLink(article)}
+                          className="h-8 w-8 rounded-md hover:bg-surface-2 flex items-center justify-center text-ink-3 hover:text-ink transition-colors"
+                          title="Copy public article link"
+                        >
+                          <Link2 className="w-3.5 h-3.5" />
+                        </button>
+
+                        <button
+                          onClick={() => handleOpenArticleLive(article)}
+                          className="h-8 w-8 rounded-md hover:bg-surface-2 flex items-center justify-center text-ink-3 hover:text-ink transition-colors"
+                          title="Open live article"
+                        >
+                          <ExternalLink className="w-3.5 h-3.5" />
+                        </button>
+
+                        <button
                           onClick={() => handleToggleStatus(article)}
                           className="h-8 px-2.5 rounded-md text-[11.5px] font-medium border border-line hover:bg-surface-2 text-ink transition-colors"
                           title={isPublished ? 'Unpublish to draft' : 'Publish live'}
@@ -542,6 +634,7 @@ export function HelpDeskDashboard({
       {/* ARTICLE EDITOR MODAL */}
       {isArticleModalOpen && (
         <ArticleEditorModal
+          workspace={workspace}
           workspaceId={workspace?.id || ''}
           sections={sections}
           article={editingArticle}
@@ -589,6 +682,7 @@ export function HelpDeskDashboard({
 // ARTICLE EDITOR MODAL COMPONENT (with live markdown toolbar & preview)
 // ============================================================================
 interface ArticleEditorModalProps {
+  workspace: Workspace | null;
   workspaceId: string;
   sections: HelpSection[];
   article: Article | null;
@@ -597,6 +691,7 @@ interface ArticleEditorModalProps {
 }
 
 function ArticleEditorModal({
+  workspace,
   workspaceId,
   sections,
   article,
@@ -750,6 +845,18 @@ function ArticleEditorModal({
                 placeholder="e.g. 🚀 How to install the chat widget on WordPress"
                 className="w-full h-9.5 px-3 rounded-lg border border-line bg-surface text-[13px] text-ink focus:outline-none focus:border-accent"
               />
+              {workspace && (
+                <div className="flex items-center gap-1.5 text-[11px] text-ink-3 font-mono bg-surface-2/60 px-2.5 py-1 rounded border border-line/60 overflow-hidden">
+                  <Globe className="w-3 h-3 text-accent shrink-0" />
+                  <span className="text-accent font-semibold shrink-0">Public Link:</span>
+                  <span className="truncate">
+                    {getWorkspaceHelpCenterUrl(workspace, {
+                      id: article?.id || 'new-article',
+                      slug: title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'article-slug',
+                    })}
+                  </span>
+                </div>
+              )}
             </div>
 
             <div className="space-y-1">

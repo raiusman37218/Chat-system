@@ -20,6 +20,7 @@ import { Article, Workspace } from '@/types/database';
 import { createClient } from '@/lib/supabase/client';
 import { Avatar } from '@/components/ui/Avatar';
 import { MarkdownArticleContent } from '@/components/dashboard/MarkdownArticleContent';
+import { getWorkspaceHelpCenterUrl } from '@/lib/domain';
 
 export default function ArticleDetailPage() {
   const params = useParams();
@@ -49,22 +50,30 @@ export default function ArticleDetailPage() {
       try {
         setLoading(true);
 
-        // Fetch workspace
-        const { data: ws } = await supabase
-          .from('workspaces')
-          .select('*')
-          .eq('id', workspaceId)
-          .maybeSingle();
+        // Fetch workspace by UUID, slug, or custom domain
+        const isWsUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(workspaceId);
+        const { data: ws } = isWsUuid
+          ? await supabase.from('workspaces').select('*').eq('id', workspaceId).maybeSingle()
+          : await supabase.from('workspaces').select('*').or(`slug.eq.${workspaceId},custom_domain.eq.${workspaceId}`).maybeSingle();
 
-        if (ws) setWorkspace(ws as Workspace);
+        if (!ws) {
+          setLoading(false);
+          return;
+        }
 
-        // Fetch article
-        const { data: art } = await supabase
+        setWorkspace(ws as Workspace);
+        const actualWorkspaceId = ws.id;
+
+        // Fetch article by UUID or slug
+        const isArtUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(articleId);
+        const artQuery = supabase
           .from('articles')
           .select('*, author:agents(id, name, avatar_url), section:help_sections(id, name, icon)')
-          .eq('id', articleId)
-          .eq('workspace_id', workspaceId)
-          .maybeSingle();
+          .eq('workspace_id', actualWorkspaceId);
+
+        const { data: art } = isArtUuid
+          ? await artQuery.eq('id', articleId).maybeSingle()
+          : await artQuery.or(`slug.eq.${articleId},id.eq.${articleId}`).maybeSingle();
 
         if (art) {
           setArticle(art as Article);
@@ -83,7 +92,7 @@ export default function ArticleDetailPage() {
           if (art.section_id) {
             const { data: related } = await supabase
               .from('articles')
-              .select('id, title, summary, created_at')
+              .select('id, title, slug, summary, created_at')
               .eq('section_id', art.section_id)
               .eq('status', 'published')
               .neq('id', art.id)
@@ -134,11 +143,48 @@ export default function ArticleDetailPage() {
   };
 
   const handleShare = () => {
+    const publicArticleUrl = getWorkspaceHelpCenterUrl(workspace, article);
     if (typeof window !== 'undefined') {
-      navigator.clipboard.writeText(window.location.href);
+      navigator.clipboard.writeText(publicArticleUrl);
       setCopiedLink(true);
       setTimeout(() => setCopiedLink(false), 2500);
     }
+  };
+
+  const navigateToRoot = () => {
+    if (typeof window !== 'undefined') {
+      const host = window.location.host.toLowerCase().split(':')[0];
+      const isPlatform =
+        host === 'localhost' ||
+        host === '127.0.0.1' ||
+        host.endsWith('.vercel.app') ||
+        host.endsWith('chatify.dev') ||
+        host.endsWith('chatify.site');
+
+      if (!isPlatform) {
+        router.push('/');
+        return;
+      }
+    }
+    router.push(`/help/${workspace?.slug || workspaceId}`);
+  };
+
+  const navigateToArticle = (rel: Article) => {
+    if (typeof window !== 'undefined') {
+      const host = window.location.host.toLowerCase().split(':')[0];
+      const isPlatform =
+        host === 'localhost' ||
+        host === '127.0.0.1' ||
+        host.endsWith('.vercel.app') ||
+        host.endsWith('chatify.dev') ||
+        host.endsWith('chatify.site');
+
+      if (!isPlatform) {
+        router.push(`/${rel.slug || rel.id}`);
+        return;
+      }
+    }
+    router.push(`/help/${workspace?.slug || workspaceId}/${rel.slug || rel.id}`);
   };
 
   const handleOpenChat = () => {
@@ -174,7 +220,7 @@ export default function ArticleDetailPage() {
           This article might have been moved, removed, or is currently saved as an internal draft.
         </p>
         <button
-          onClick={() => router.push(`/help/${workspaceId}`)}
+          onClick={navigateToRoot}
           className="h-9 px-4 rounded-lg bg-accent text-accent-ink text-[13px] font-medium"
         >
           Return to Help Center
@@ -185,11 +231,19 @@ export default function ArticleDetailPage() {
 
   return (
     <div className="min-h-screen bg-canvas text-ink flex flex-col">
+      <head>
+        <title>{`${article.title} - ${workspace.name} Help Center`}</title>
+        <link rel="canonical" href={getWorkspaceHelpCenterUrl(workspace, article)} />
+        <meta property="og:title" content={`${article.title} | ${workspace.name}`} />
+        {article.summary && <meta property="og:description" content={article.summary} />}
+        <meta property="og:url" content={getWorkspaceHelpCenterUrl(workspace, article)} />
+      </head>
+
       {/* Top Header */}
       <header className="border-b border-line/80 bg-surface sticky top-0 z-30 shadow-xs">
         <div className="max-w-4xl mx-auto px-6 h-16 flex items-center justify-between gap-4">
           <button
-            onClick={() => router.push(`/help/${workspaceId}`)}
+            onClick={navigateToRoot}
             className="flex items-center gap-2 text-[13px] font-semibold text-ink-2 hover:text-ink transition-colors group"
           >
             <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
@@ -349,7 +403,7 @@ export default function ArticleDetailPage() {
               {relatedArticles.map((rel) => (
                 <div
                   key={rel.id}
-                  onClick={() => router.push(`/help/${workspaceId}/${rel.id}`)}
+                  onClick={() => navigateToArticle(rel)}
                   className="p-4 rounded-xl border border-line bg-surface hover:border-accent transition-all cursor-pointer space-y-1"
                 >
                   <h4 className="text-[13.5px] font-semibold text-ink hover:text-accent">
