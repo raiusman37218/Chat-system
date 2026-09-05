@@ -8,11 +8,13 @@ import {
   X,
   Tag as TagIcon,
   Sparkles,
-  Smile,
-  Frown,
   SlidersHorizontal,
   Check,
   CheckCheck,
+  ArrowUpDown,
+  User,
+  MessageSquare,
+  AlertCircle,
 } from 'lucide-react';
 import {
   Conversation,
@@ -26,9 +28,9 @@ import { ChannelBadge } from '@/components/ui/ChannelBadge';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ConversationListSkeleton } from '@/components/ui/Skeleton';
 
-/** Who owns the conversation. Open / snoozed / closed is a separate axis. */
-export type InboxQueue = 'all' | 'unassigned' | 'mine';
+export type InboxQueue = 'all' | 'waiting' | 'unassigned' | 'mine';
 export type StatusView = 'open' | 'snoozed' | 'closed';
+export type SortOption = 'newest' | 'waiting' | 'unread' | 'priority';
 
 interface ConversationListProps {
   conversations: Conversation[];
@@ -39,13 +41,6 @@ interface ConversationListProps {
   loading?: boolean;
 }
 
-const STATUS_LABEL: Record<ConversationStatus, string> = {
-  open: 'Open',
-  pending: 'Pending',
-  closed: 'Resolved',
-  snoozed: 'Snoozed',
-};
-
 const CHANNELS: { value: ChannelType | 'all'; label: string }[] = [
   { value: 'all', label: 'All Channels' },
   { value: 'web', label: 'Web' },
@@ -54,6 +49,13 @@ const CHANNELS: { value: ChannelType | 'all'; label: string }[] = [
   { value: 'facebook', label: 'Messenger' },
   { value: 'linkedin', label: 'LinkedIn' },
 ];
+
+const SORT_LABELS: Record<SortOption, { label: string; desc: string }> = {
+  newest: { label: 'Newest Activity', desc: 'Latest message on top' },
+  waiting: { label: 'Needs Reply First', desc: 'Waiting customers on top' },
+  unread: { label: 'Unread First', desc: 'Unread messages on top' },
+  priority: { label: 'Urgent & High', desc: 'Urgent priority on top' },
+};
 
 function displayNameFor(conv: Conversation) {
   return (
@@ -66,6 +68,27 @@ function displayNameFor(conv: Conversation) {
   );
 }
 
+function getLastActivityTime(conv: Conversation): number {
+  const msgTime = conv.last_message?.created_at
+    ? new Date(conv.last_message.created_at).getTime()
+    : 0;
+  const updateTime = conv.updated_at
+    ? new Date(conv.updated_at).getTime()
+    : 0;
+  const createTime = conv.created_at
+    ? new Date(conv.created_at).getTime()
+    : 0;
+  return Math.max(msgTime, updateTime, createTime);
+}
+
+function isWaitingOnAgent(conv: Conversation): boolean {
+  if (conv.status === 'closed' || conv.status === 'snoozed') return false;
+  if ((conv.unread_count || 0) > 0) return true;
+  if (conv.last_message && conv.last_message.sender_type === 'visitor') return true;
+  if (!conv.last_message) return true;
+  return false;
+}
+
 export function ConversationList({
   conversations,
   selectedConversationId,
@@ -75,6 +98,7 @@ export function ConversationList({
 }: ConversationListProps) {
   const [activeQueue, setActiveQueue] = useState<InboxQueue>('all');
   const [statusView, setStatusView] = useState<StatusView>('open');
+  const [sortBy, setSortBy] = useState<SortOption>('newest');
   const [searchQuery, setSearchQuery] = useState('');
   const [channelFilter, setChannelFilter] = useState<ChannelType | 'all'>('all');
   const [selectedTagFilter, setSelectedTagFilter] = useState<string | 'all'>('all');
@@ -99,8 +123,8 @@ export function ConversationList({
     const onDown = (e: MouseEvent) => {
       if (!filterRef.current?.contains(e.target as Node)) setShowFilters(false);
     };
-    document.addEventListener("mousedown", onDown);
-    return () => document.removeEventListener("mousedown", onDown);
+    document.addEventListener('mousedown', onDown);
+    return () => document.removeEventListener('mousedown', onDown);
   }, [showFilters]);
 
   /** True when the conversation belongs to the status view being shown. */
@@ -112,10 +136,10 @@ export function ConversationList({
     return !isClosed && !isSnoozed;
   };
 
-  // Queue counts are scoped to the current status view, so a tab never
-  // promises more conversations than the list actually shows.
+  // Queue counts scoped to the current status view
   const counts = useMemo(() => {
     let all = 0;
+    let waiting = 0;
     let unassigned = 0;
     let mine = 0;
     let snoozed = 0;
@@ -128,11 +152,12 @@ export function ConversationList({
 
       const agentId = c.assigned_agent_id || c.agent_id;
       all++;
+      if (isWaitingOnAgent(c)) waiting++;
       if (!agentId) unassigned++;
       if (currentAgent?.id && agentId === currentAgent.id) mine++;
     });
 
-    return { all, unassigned, mine, snoozed, closed };
+    return { all, waiting, unassigned, mine, snoozed, closed };
   }, [conversations, currentAgent?.id, statusView]);
 
   // Extract all distinct tags present in conversations
@@ -152,16 +177,17 @@ export function ConversationList({
       // 1. Status view (open / snoozed / closed)
       if (!inStatusView(conv, statusView)) return false;
 
-      // 2. Queue (who owns it)
+      // 2. Queue (who owns it or waiting status)
+      if (activeQueue === 'waiting' && !isWaitingOnAgent(conv)) return false;
       if (activeQueue === 'unassigned' && agentId) return false;
       if (activeQueue === 'mine' && agentId !== currentAgent?.id) return false;
 
-      // 2. Channel Filter
+      // 3. Channel Filter
       if (channelFilter !== 'all' && (conv.channel || 'web') !== channelFilter) {
         return false;
       }
 
-      // 3. Tag Filter
+      // 4. Tag Filter
       if (
         selectedTagFilter !== 'all' &&
         (!conv.tags || !conv.tags.includes(selectedTagFilter))
@@ -169,7 +195,7 @@ export function ConversationList({
         return false;
       }
 
-      // 4. Search Query Filter (deep matching name, email, keyword, tag, or id)
+      // 5. Search Query Filter
       const q = searchQuery.trim().toLowerCase();
       if (!q) return true;
 
@@ -183,22 +209,41 @@ export function ConversationList({
       );
     });
 
-    // 5. Priority Sorting: Urgent always at the top!
+    // Sort order: Industry standard customer support workflow
     return list.sort((a, b) => {
-      if (a.priority === 'urgent' && b.priority !== 'urgent') return -1;
-      if (b.priority === 'urgent' && a.priority !== 'urgent') return 1;
+      const timeA = getLastActivityTime(a);
+      const timeB = getLastActivityTime(b);
 
-      if (a.priority === 'high' && b.priority !== 'high') return -1;
-      if (b.priority === 'high' && a.priority !== 'high') return 1;
+      if (sortBy === 'waiting') {
+        const aWait = isWaitingOnAgent(a) ? 1 : 0;
+        const bWait = isWaitingOnAgent(b) ? 1 : 0;
+        if (aWait !== bWait) return bWait - aWait;
+        return timeB - timeA;
+      }
 
-      const timeA = new Date(a.updated_at || a.created_at).getTime();
-      const timeB = new Date(b.updated_at || b.created_at).getTime();
+      if (sortBy === 'unread') {
+        const aUnread = (a.unread_count || 0) > 0 ? 1 : 0;
+        const bUnread = (b.unread_count || 0) > 0 ? 1 : 0;
+        if (aUnread !== bUnread) return bUnread - aUnread;
+        return timeB - timeA;
+      }
+
+      if (sortBy === 'priority') {
+        const pOrder: Record<string, number> = { urgent: 3, high: 2, normal: 1, low: 0 };
+        const pA = pOrder[a.priority || 'normal'] || 1;
+        const pB = pOrder[b.priority || 'normal'] || 1;
+        if (pA !== pB) return pB - pA;
+        return timeB - timeA;
+      }
+
+      // Default: 'newest' (Most recent message/activity on top)
       return timeB - timeA;
     });
   }, [
     conversations,
     activeQueue,
     statusView,
+    sortBy,
     channelFilter,
     selectedTagFilter,
     searchQuery,
@@ -206,7 +251,10 @@ export function ConversationList({
   ]);
 
   const hasActiveFilters =
-    channelFilter !== 'all' || selectedTagFilter !== 'all' || statusView !== 'open';
+    channelFilter !== 'all' ||
+    selectedTagFilter !== 'all' ||
+    statusView !== 'open' ||
+    sortBy !== 'newest';
 
   const isVisitorOnline = (lastSeen?: string, isOnlineFlag?: boolean) => {
     if (isOnlineFlag === false) return false;
@@ -216,6 +264,7 @@ export function ConversationList({
 
   const queueTabs: { id: InboxQueue; label: string; count: number }[] = [
     { id: 'all', label: 'All', count: counts.all },
+    { id: 'waiting', label: 'Waiting', count: counts.waiting },
     { id: 'unassigned', label: 'Unassigned', count: counts.unassigned },
     { id: 'mine', label: 'Mine', count: counts.mine },
   ];
@@ -227,7 +276,8 @@ export function ConversationList({
   ];
 
   return (
-    <div className="w-full md:w-[310px] shrink-0 h-screen flex flex-col border-r border-line bg-surface select-none">
+    <div className="w-full md:w-[320px] shrink-0 h-screen flex flex-col border-r border-line bg-surface select-none">
+      {/* Top Header & Search */}
       <div className="p-3 border-b border-line/80 space-y-2.5 bg-surface/50 backdrop-blur-xs">
         <div className="flex items-center justify-between gap-2 px-1">
           <div className="flex items-center gap-2">
@@ -238,13 +288,22 @@ export function ConversationList({
               {filteredAndSorted.length}
             </span>
           </div>
-          {statusView !== 'open' && (
-            <span className="text-[10.5px] font-semibold px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-600 dark:text-amber-400 capitalize">
-              {statusView}
-            </span>
-          )}
+
+          <div className="flex items-center gap-1.5">
+            {sortBy !== 'newest' && (
+              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-accent/10 text-accent">
+                {SORT_LABELS[sortBy].label}
+              </span>
+            )}
+            {statusView !== 'open' && (
+              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-600 dark:text-amber-400 capitalize">
+                {statusView}
+              </span>
+            )}
+          </div>
         </div>
 
+        {/* Search Bar */}
         <div className="relative">
           <Search className="w-3.5 h-3.5 text-ink-3 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
           <input
@@ -253,7 +312,7 @@ export function ConversationList({
             placeholder="Search conversations..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="input input-sm pl-8.5 pr-14 bg-surface-2 text-[12.5px] w-full border-line/70 focus:border-accent"
+            className="input input-sm pl-8.5 pr-14 bg-surface-2 text-[12px] w-full border-line/70 focus:border-accent"
           />
           {searchQuery ? (
             <button
@@ -270,8 +329,9 @@ export function ConversationList({
           )}
         </div>
 
+        {/* Queue Tabs + Filter/Sort Trigger */}
         <div className="flex items-center gap-1.5">
-          <div className="flex-1 min-w-0 flex items-center gap-1 p-1 rounded-xl bg-surface-2 border border-line/70 overflow-x-auto scrollbar-none">
+          <div className="flex-1 min-w-0 flex items-center gap-0.5 p-1 rounded-xl bg-surface-2 border border-line/70 overflow-x-auto scrollbar-none">
             {queueTabs.map((tab) => {
               const active = activeQueue === tab.id;
               return (
@@ -280,9 +340,9 @@ export function ConversationList({
                   onClick={() => setActiveQueue(tab.id)}
                   title={`${tab.label} (${tab.count})`}
                   className={cn(
-                    'h-6 px-2.5 rounded-lg text-[11.5px] font-semibold whitespace-nowrap transition-all flex items-center justify-center gap-1.5 flex-1 shrink-0',
+                    'h-6 px-2 rounded-lg text-[11px] font-medium whitespace-nowrap transition-all flex items-center justify-center gap-1 flex-1 shrink-0',
                     active
-                      ? 'bg-surface text-ink shadow-xs border border-line/50 font-bold'
+                      ? 'bg-surface text-ink shadow-xs border border-line/60 font-bold'
                       : 'text-ink-3 hover:text-ink'
                   )}
                 >
@@ -290,9 +350,11 @@ export function ConversationList({
                   {tab.count > 0 && (
                     <span
                       className={cn(
-                        'tabular-nums text-[10px] px-1.5 py-0.2 rounded-full font-bold',
+                        'tabular-nums text-[9.5px] px-1.5 py-0.2 rounded-full font-bold',
                         active
-                          ? 'bg-accent/10 text-accent'
+                          ? tab.id === 'waiting'
+                            ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
+                            : 'bg-accent/10 text-accent'
                           : 'bg-surface-3 text-ink-3'
                       )}
                     >
@@ -304,11 +366,12 @@ export function ConversationList({
             })}
           </div>
 
+          {/* Filter & Sort Popover Trigger */}
           <div ref={filterRef} className="relative shrink-0">
             <button
               onClick={() => setShowFilters((v) => !v)}
-              aria-label="Filters"
-              title="Filter channels and status"
+              aria-label="Sort & Filters"
+              title="Sort and filter inbox"
               className={cn(
                 'w-8 h-8 rounded-xl border flex items-center justify-center transition-all shadow-xs',
                 hasActiveFilters
@@ -320,84 +383,121 @@ export function ConversationList({
             </button>
 
             {showFilters && (
-              <div className="absolute right-0 top-[calc(100%+6px)] z-50 w-64 p-3 rounded-2xl border border-line bg-surface shadow-xl animate-pop">
-                <div className="eyebrow mb-1.5 text-[10px] font-bold text-ink-3 uppercase">Status</div>
-                <div className="flex flex-wrap gap-1.5 mb-3">
-                  {statusViews.map((v) => (
-                    <button
-                      key={v.id}
-                      onClick={() => setStatusView(v.id)}
-                      className={cn(
-                        'px-2.5 h-6.5 rounded-lg text-[11px] font-semibold transition-all inline-flex items-center gap-1.5',
-                        statusView === v.id
-                          ? 'bg-ink text-ink-inv shadow-xs'
-                          : 'bg-surface-2 text-ink-2 hover:bg-surface-3 border border-line/60'
-                      )}
-                    >
-                      {v.label}
-                      {v.count ? (
-                        <span className="tabular-nums text-[10px] opacity-75">{v.count}</span>
-                      ) : null}
-                    </button>
-                  ))}
+              <div className="absolute right-0 top-[calc(100%+6px)] z-50 w-68 p-3.5 rounded-2xl border border-line bg-surface shadow-xl animate-pop text-left">
+                {/* Sort Order Selector */}
+                <div className="mb-3">
+                  <div className="flex items-center gap-1 text-[10px] font-bold text-ink-3 uppercase tracking-wider mb-1.5">
+                    <ArrowUpDown className="w-3 h-3 text-accent" />
+                    Sort Order
+                  </div>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {(Object.keys(SORT_LABELS) as SortOption[]).map((key) => (
+                      <button
+                        key={key}
+                        onClick={() => setSortBy(key)}
+                        className={cn(
+                          'px-2 py-1.5 rounded-lg text-[11px] font-medium transition-all text-left border',
+                          sortBy === key
+                            ? 'bg-accent text-accent-ink border-accent font-bold shadow-xs'
+                            : 'bg-surface-2 text-ink-2 hover:bg-surface-3 border-line/60'
+                        )}
+                      >
+                        <div className="leading-tight">{SORT_LABELS[key].label}</div>
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
-                <div className="eyebrow mb-1.5 text-[10px] font-bold text-ink-3 uppercase">Channel</div>
-                <div className="flex flex-wrap gap-1.5 mb-3">
-                  {CHANNELS.map((ch) => (
-                    <button
-                      key={ch.value}
-                      onClick={() => setChannelFilter(ch.value)}
-                      className={cn(
-                        'px-2.5 h-6.5 rounded-lg text-[11px] font-semibold transition-all',
-                        channelFilter === ch.value
-                          ? 'bg-ink text-ink-inv shadow-xs'
-                          : 'bg-surface-2 text-ink-2 hover:bg-surface-3 border border-line/60'
-                      )}
-                    >
-                      {ch.label}
-                    </button>
-                  ))}
+                {/* Status Selector */}
+                <div className="mb-3 pt-2.5 border-t border-line">
+                  <div className="text-[10px] font-bold text-ink-3 uppercase tracking-wider mb-1.5">
+                    Status View
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {statusViews.map((v) => (
+                      <button
+                        key={v.id}
+                        onClick={() => setStatusView(v.id)}
+                        className={cn(
+                          'px-2.5 h-6.5 rounded-lg text-[11px] font-semibold transition-all inline-flex items-center gap-1.5',
+                          statusView === v.id
+                            ? 'bg-ink text-ink-inv shadow-xs'
+                            : 'bg-surface-2 text-ink-2 hover:bg-surface-3 border border-line/60'
+                        )}
+                      >
+                        {v.label}
+                        {v.count ? (
+                          <span className="tabular-nums text-[10px] opacity-75">{v.count}</span>
+                        ) : null}
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
+                {/* Channel Selector */}
+                <div className="mb-3 pt-2.5 border-t border-line">
+                  <div className="text-[10px] font-bold text-ink-3 uppercase tracking-wider mb-1.5">
+                    Channel
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {CHANNELS.map((ch) => (
+                      <button
+                        key={ch.value}
+                        onClick={() => setChannelFilter(ch.value)}
+                        className={cn(
+                          'px-2.5 h-6 rounded-lg text-[10.5px] font-semibold transition-all',
+                          channelFilter === ch.value
+                            ? 'bg-ink text-ink-inv shadow-xs'
+                            : 'bg-surface-2 text-ink-2 hover:bg-surface-3 border border-line/60'
+                        )}
+                      >
+                        {ch.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Tag Selector */}
                 {availableTags.length > 0 && (
-                  <>
-                    <div className="eyebrow mb-1.5 text-[10px] font-bold text-ink-3 uppercase">Tag</div>
-                    <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto">
+                  <div className="mb-3 pt-2.5 border-t border-line">
+                    <div className="text-[10px] font-bold text-ink-3 uppercase tracking-wider mb-1.5">
+                      Tag
+                    </div>
+                    <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto">
                       <button
                         onClick={() => setSelectedTagFilter('all')}
                         className={cn(
-                          'px-2.5 h-6 rounded-lg text-[10.5px] font-semibold transition-all',
+                          'px-2 h-5.5 rounded-lg text-[10px] font-semibold transition-all',
                           selectedTagFilter === 'all'
                             ? 'bg-ink text-ink-inv'
                             : 'bg-surface-2 text-ink-2 hover:bg-surface-3 border border-line/60'
                         )}
                       >
-                        All tags
+                        All
                       </button>
                       {availableTags.map((tag) => (
                         <button
                           key={tag}
                           onClick={() => setSelectedTagFilter(tag)}
                           className={cn(
-                            'px-2 h-6 rounded-lg text-[10.5px] font-semibold transition-all flex items-center gap-1',
+                            'px-2 h-5.5 rounded-lg text-[10px] font-semibold transition-all flex items-center gap-1',
                             selectedTagFilter === tag
                               ? 'bg-accent text-accent-ink'
                               : 'bg-surface-2 text-ink-2 hover:bg-surface-3 border border-line/60'
                           )}
                         >
-                          <TagIcon className="w-2.5 h-2.5" />
                           #{tag}
                         </button>
                       ))}
                     </div>
-                  </>
+                  </div>
                 )}
 
                 {hasActiveFilters && (
-                  <div className="pt-2 mt-2 border-t border-line/80 flex justify-end">
+                  <div className="pt-2 border-t border-line/80 flex justify-end">
                     <button
                       onClick={() => {
+                        setSortBy('newest');
                         setStatusView('open');
                         setChannelFilter('all');
                         setSelectedTagFilter('all');
@@ -414,6 +514,7 @@ export function ConversationList({
         </div>
       </div>
 
+      {/* Conversations List */}
       <div className="flex-1 overflow-y-auto px-2 py-2 space-y-1">
         {loading ? (
           <ConversationListSkeleton />
@@ -435,6 +536,8 @@ export function ConversationList({
                     ? 'No closed conversations'
                     : statusView === 'snoozed'
                     ? 'No snoozed conversations'
+                    : activeQueue === 'waiting'
+                    ? 'No waiting customers'
                     : activeQueue === 'unassigned'
                     ? 'Nothing unassigned'
                     : activeQueue === 'mine'
@@ -442,12 +545,14 @@ export function ConversationList({
                     : 'Inbox zero'
                 }
                 description={
-                  channelFilter !== 'all' || selectedTagFilter !== 'all'
+                  hasActiveFilters
                     ? 'No conversations match the currently selected filters.'
                     : 'When visitors send a message on your site, conversations appear here live.'
                 }
-                actionLabel={channelFilter !== 'all' || selectedTagFilter !== 'all' ? 'Reset Filters' : undefined}
+                actionLabel={hasActiveFilters ? 'Reset Filters' : undefined}
                 onAction={() => {
+                  setSortBy('newest');
+                  setStatusView('open');
                   setChannelFilter('all');
                   setSelectedTagFilter('all');
                 }}
@@ -465,219 +570,162 @@ export function ConversationList({
             const fromAgent = conv.last_message?.sender_type === 'agent';
             const fromAi = conv.last_message?.sender_type === 'ai';
             const hasUnread = (conv.unread_count || 0) > 0;
+            const isWaiting = isWaitingOnAgent(conv);
             const isUrgent = conv.priority === 'urgent';
+            const isHigh = conv.priority === 'high';
+            const activityTime = getLastActivityTime(conv);
 
             return (
               <button
                 key={conv.id}
                 onClick={() => onSelectConversation(conv.id)}
                 className={cn(
-                  'w-full text-left p-3 rounded-xl transition-all duration-150 flex items-start gap-3 relative border cursor-pointer group',
+                  'w-full text-left p-2.5 rounded-xl transition-all duration-150 flex items-start gap-2.5 relative border cursor-pointer group',
                   selected
-                    ? 'bg-surface-2 border-line-2 shadow-xs ring-1 ring-accent/25'
+                    ? 'bg-accent-soft/40 border-accent/40 shadow-xs ring-1 ring-accent/20'
                     : hasUnread
-                    ? 'bg-red-500/5 dark:bg-red-950/20 border-red-500/40 hover:bg-red-500/10 hover:border-red-500/60 shadow-xs ring-1 ring-red-500/20'
-                    : 'bg-surface border-line/60 hover:bg-surface-2/70 hover:border-line/90 shadow-xs'
+                    ? 'bg-surface border-line-2 hover:bg-surface-2/80 shadow-xs'
+                    : 'bg-surface border-line/60 hover:bg-surface-2/60 hover:border-line shadow-xs'
                 )}
               >
-                {selected ? (
-                  <span className="absolute left-0 top-2.5 bottom-2.5 w-1 rounded-r-full bg-accent" />
-                ) : hasUnread ? (
-                  <span className="absolute left-0 top-2 bottom-2 w-1.5 rounded-r-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.7)] animate-pulse" />
-                ) : null}
+                {/* Active indicator line */}
+                {selected && (
+                  <span className="absolute left-0 top-2 bottom-2 w-1 rounded-r-full bg-accent" />
+                )}
+
+                {/* Avatar */}
                 <Avatar
                   name={name}
                   seed={conv.visitor_id}
                   size="md"
                   online={online}
                   muted={!conv.visitor?.name && !conv.visitor?.email}
-                  className="shrink-0 mt-0.5 shadow-xs"
+                  className="shrink-0 mt-0.5"
                 />
 
+                {/* Content */}
                 <div className="flex-1 min-w-0">
+                  {/* Top Line: Name + Channel + Time */}
                   <div className="flex items-center justify-between gap-1.5">
+                    <div className="flex items-center gap-1.5 truncate">
+                      <span
+                        className={cn(
+                          'text-[12.5px] truncate',
+                          hasUnread
+                            ? 'font-bold text-ink'
+                            : selected
+                            ? 'font-bold text-accent'
+                            : 'font-semibold text-ink-2 group-hover:text-ink'
+                        )}
+                      >
+                        {name}
+                      </span>
+                      {conv.channel && conv.channel !== 'web' && (
+                        <ChannelBadge channel={conv.channel} />
+                      )}
+                    </div>
+
                     <span
                       className={cn(
-                        'text-[13px] truncate flex items-center gap-1.5',
-                        hasUnread
-                          ? 'font-extrabold text-red-600 dark:text-red-400'
-                          : selected
-                          ? 'font-bold text-accent'
-                          : 'font-semibold text-ink group-hover:text-ink'
+                        'text-[10.5px] shrink-0 tabular-nums',
+                        hasUnread ? 'text-accent font-bold' : 'text-ink-3'
                       )}
                     >
-                      {name}
-                      {hasUnread && (
-                        <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded-full bg-red-600 text-white text-[9px] font-extrabold uppercase tracking-wider shrink-0 shadow-xs animate-pulse">
-                          <span className="w-1 h-1 rounded-full bg-white animate-ping" />
-                          {conv.unread_count && conv.unread_count > 1 ? `${conv.unread_count} NEW` : 'NEW'}
-                        </span>
-                      )}
-                    </span>
-
-                    <span className={cn(
-                      "text-[10.5px] shrink-0 tabular-nums font-mono",
-                      hasUnread ? "text-red-500 font-bold" : "text-ink-3"
-                    )}>
-                      {formatTimeAgo(conv.updated_at || conv.created_at)}
+                      {formatTimeAgo(activityTime)}
                     </span>
                   </div>
 
-                  {conv.summary ? (
-                    <div className="mt-1.5 p-2 rounded-lg bg-accent-soft/40 border border-accent-line/60 text-[11.5px] leading-tight">
-                      <div className="flex items-center gap-1 text-[9.5px] font-bold text-accent uppercase tracking-wider mb-0.5">
-                        <Sparkles className="w-2.5 h-2.5" />
-                        AI Summary
-                      </div>
-                      <p className="line-clamp-2 italic text-ink-2 font-medium">
-                        {conv.summary}
-                      </p>
-                    </div>
-                  ) : (
-                    <p
-                      className={cn(
-                        'text-[12px] truncate mt-1 leading-snug',
-                        hasUnread
-                          ? 'font-bold text-ink dark:text-slate-100'
-                          : 'text-ink-3 group-hover:text-ink-2'
-                      )}
-                    >
-                      {fromAgent ? (
-                        <span className="text-ink-2 font-medium inline-flex items-center gap-0.5 mr-1">
-                          <span
-                            className="inline-flex items-center"
-                            title={
-                              conv.last_message?.read_at
-                                ? 'Seen by customer'
-                                : online
-                                ? 'Delivered (website open)'
-                                : 'Sent (website closed)'
-                            }
-                          >
-                            {conv.last_message?.read_at ? (
-                              <CheckCheck className="w-3.5 h-3.5 text-blue-500 stroke-[2.5]" />
-                            ) : online ? (
-                              <CheckCheck className="w-3.5 h-3.5 text-ink-3/70 stroke-[2]" />
-                            ) : (
-                              <Check className="w-3.5 h-3.5 text-ink-3/70 stroke-[2]" />
-                            )}
-                          </span>
-                          <span>You: </span>
+                  {/* Middle Line: Last Message Snippet */}
+                  <p
+                    className={cn(
+                      'text-[11.5px] truncate mt-0.5 leading-snug',
+                      hasUnread
+                        ? 'font-medium text-ink dark:text-slate-100'
+                        : 'text-ink-3 group-hover:text-ink-2'
+                    )}
+                  >
+                    {fromAgent ? (
+                      <span className="text-ink-2 font-medium inline-flex items-center gap-0.5 mr-1">
+                        <span className="inline-flex items-center">
+                          {conv.last_message?.read_at ? (
+                            <CheckCheck className="w-3 h-3 text-blue-500 stroke-[2.5]" />
+                          ) : online ? (
+                            <CheckCheck className="w-3 h-3 text-ink-3/70 stroke-[2]" />
+                          ) : (
+                            <Check className="w-3 h-3 text-ink-3/70 stroke-[2]" />
+                          )}
                         </span>
-                      ) : fromAi ? (
-                        <span className="text-purple-600 dark:text-purple-400 font-medium inline-flex items-center gap-0.5 mr-1">
-                          <span
-                            className="inline-flex items-center"
-                            title={
-                              conv.last_message?.read_at
-                                ? 'Seen by customer'
-                                : online
-                                ? 'Delivered (website open)'
-                                : 'Sent (website closed)'
-                            }
-                          >
-                            {conv.last_message?.read_at ? (
-                              <CheckCheck className="w-3.5 h-3.5 text-blue-500 stroke-[2.5]" />
-                            ) : online ? (
-                              <CheckCheck className="w-3.5 h-3.5 text-ink-3/70 stroke-[2]" />
-                            ) : (
-                              <Check className="w-3.5 h-3.5 text-ink-3/70 stroke-[2]" />
-                            )}
-                          </span>
-                          <span>🤖 AI: </span>
+                        <span>You:</span>
+                      </span>
+                    ) : fromAi ? (
+                      <span className="text-purple-600 dark:text-purple-400 font-medium mr-1">
+                        Bot:
+                      </span>
+                    ) : null}
+                    {conv.last_message?.content ||
+                      (conv.last_message?.attachment_url
+                        ? '📎 Attachment'
+                        : 'Conversation started')}
+                  </p>
+
+                  {/* Bottom Line: Clean, Subtle Meta Pills */}
+                  <div className="flex items-center justify-between gap-1.5 mt-1.5">
+                    <div className="flex items-center gap-1 flex-wrap min-w-0">
+                      {/* Waiting on reply indicator */}
+                      {isWaiting && (
+                        <span className="px-1.5 py-0.2 text-[9.5px] font-semibold rounded-md bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+                          Waiting for reply
+                        </span>
+                      )}
+
+                      {/* Priority Tag (Only if urgent or high) */}
+                      {isUrgent ? (
+                        <span className="px-1.5 py-0.2 text-[9px] font-bold rounded-md bg-red-500/15 text-red-600 dark:text-red-400 border border-red-500/20">
+                          Urgent
+                        </span>
+                      ) : isHigh ? (
+                        <span className="px-1.5 py-0.2 text-[9px] font-bold rounded-md bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+                          High
                         </span>
                       ) : null}
-                      {conv.last_message?.content ||
-                        (conv.last_message?.attachment_url
-                          ? '📎 Attachment'
-                          : 'Conversation started')}
-                    </p>
-                  )}
 
-                  <div className="flex items-center gap-1.5 mt-2 flex-wrap">
-                    {hasUnread && (
-                      <span className="px-1.5 py-0.5 text-[9.5px] font-extrabold rounded-md bg-red-500 text-white shadow-xs">
-                        Unopened
-                      </span>
-                    )}
-
-                    {isUrgent && (
-                      <span className="px-1.5 py-0.5 text-[9.5px] font-bold rounded-md bg-red-500/15 text-red-600 dark:text-red-400 border border-red-500/20">
-                        Urgent
-                      </span>
-                    )}
-
-                    {conv.priority === 'high' && (
-                      <span className="px-1.5 py-0.5 text-[9.5px] font-bold rounded-md bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/20">
-                        High
-                      </span>
-                    )}
-
-                    {(conv.sentiment === 'positive' ||
-                      conv.sentiment === 'negative') && (
-                      <span
-                        className={cn(
-                          'inline-flex items-center gap-1 px-1.5 py-0.5 text-[9.5px] font-bold rounded-md border',
-                          conv.sentiment === 'positive'
-                            ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
-                            : 'bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20'
-                        )}
-                        title={`Visitor sentiment: ${conv.sentiment}`}
-                      >
-                        {conv.sentiment === 'positive' ? (
-                          <Smile className="w-2.5 h-2.5" />
-                        ) : (
-                          <Frown className="w-2.5 h-2.5" />
-                        )}
-                        {conv.sentiment === 'positive' ? 'Positive' : 'Frustrated'}
-                      </span>
-                    )}
-
-                    {conv.channel && conv.channel !== 'web' && (
-                      <ChannelBadge channel={conv.channel} />
-                    )}
-
-                    {conv.agent && (
-                      <span className="inline-flex items-center gap-1 text-[10px] text-ink-2 bg-surface-2 px-1.5 py-0.5 rounded-md border border-line">
-                        <Avatar
-                          name={conv.agent.name}
-                          seed={conv.agent.id}
-                          size="xs"
-                        />
-                        <span className="truncate max-w-[70px]">
-                          {conv.agent.name.split(' ')[0]}
+                      {/* Assigned Agent */}
+                      {conv.agent && (
+                        <span className="inline-flex items-center gap-1 text-[9.5px] text-ink-3 bg-surface-2 px-1.5 py-0.2 rounded-md border border-line">
+                          <span className="truncate max-w-[60px]">
+                            {conv.agent.name.split(' ')[0]}
+                          </span>
                         </span>
-                      </span>
-                    )}
+                      )}
 
-                    {conv.tags?.slice(0, 2).map((t) => (
-                      <span
-                        key={t}
-                        className="text-[9.5px] font-medium text-ink-3 bg-surface-2 px-1.5 py-0.5 rounded-md border border-line truncate max-w-[60px]"
-                      >
-                        #{t}
-                      </span>
-                    ))}
+                      {/* Compact AI indicator if summary exists */}
+                      {conv.summary && (
+                        <span
+                          title={`AI Summary: ${conv.summary}`}
+                          className="inline-flex items-center gap-0.5 text-[9px] text-accent bg-accent/10 px-1 py-0.2 rounded-md font-semibold border border-accent/20"
+                        >
+                          <Sparkles className="w-2.5 h-2.5" />
+                          AI
+                        </span>
+                      )}
 
-                    {conv.status === 'snoozed' && (
-                      <span className="inline-flex items-center gap-0.5 text-[9.5px] text-amber-600 dark:text-amber-400 bg-amber-500/15 px-1.5 py-0.5 rounded-md font-medium border border-amber-500/20">
-                        <Clock className="w-2.5 h-2.5" />
-                        Snoozed
-                      </span>
-                    )}
+                      {/* CSAT Star if rated */}
+                      {conv.csat_rating && (
+                        <span className="inline-flex items-center gap-0.5 text-[9px] text-amber-500 font-bold bg-amber-500/10 px-1.5 py-0.2 rounded-md border border-amber-500/20">
+                          <Star className="w-2.5 h-2.5 fill-current" />
+                          {conv.csat_rating}
+                        </span>
+                      )}
+                    </div>
 
-                    {conv.csat_rating && (
-                      <span className="inline-flex items-center gap-0.5 text-[9.5px] text-amber-500 font-bold bg-amber-500/10 px-1.5 py-0.5 rounded-md border border-amber-500/20">
-                        <Star className="w-2.5 h-2.5 fill-current" />
-                        {conv.csat_rating}/5
+                    {/* Unread Count Badge */}
+                    {hasUnread && (
+                      <span className="px-1.5 py-0.2 min-w-[17px] text-center text-[9.5px] font-extrabold rounded-full bg-accent text-accent-ink shrink-0 shadow-xs">
+                        {conv.unread_count}
                       </span>
                     )}
                   </div>
                 </div>
-
-                {hasUnread && (
-                  <span className="w-3 h-3 rounded-full bg-red-500 shrink-0 mt-1 shadow-md ring-4 ring-red-500/25 animate-ping" />
-                )}
               </button>
             );
           })

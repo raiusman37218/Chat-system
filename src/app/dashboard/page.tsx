@@ -373,6 +373,26 @@ export default function DashboardPage() {
             }).catch((err) => console.error('[Offline Email Dispatch]:', err));
           }
 
+          // Immediately move conversation to top of list with latest message preview
+          setConversations((prev) => {
+            const index = prev.findIndex((c) => c.id === newMsg.conversation_id);
+            if (index === -1) return prev;
+            const target = prev[index];
+            const isSelected = target.id === selectedConversationIdRef.current;
+            const updated = {
+              ...target,
+              updated_at: newMsg.created_at,
+              last_message: newMsg,
+              unread_count: isSelected
+                ? 0
+                : newMsg.sender_type === 'visitor'
+                ? (target.unread_count || 0) + 1
+                : target.unread_count,
+            };
+            const others = prev.filter((c) => c.id !== newMsg.conversation_id);
+            return [updated, ...others];
+          });
+
           refreshConversations();
         }
       )

@@ -5,8 +5,8 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export function formatTimeAgo(dateString: string): string {
-  const date = new Date(dateString);
+export function formatTimeAgo(input: string | number | Date): string {
+  const date = new Date(input);
   const now = new Date();
   const seconds = Math.floor((now.getTime() - date.getTime()) / 1000);
 
