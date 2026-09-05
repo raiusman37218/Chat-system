@@ -51,6 +51,14 @@ export default function DashboardPage() {
   const currentWorkspaceIdRef = useRef<string | null>(null);
   currentWorkspaceIdRef.current = currentWorkspace?.id || null;
 
+  const currentAgentRef = useRef<Agent | null>(null);
+  currentAgentRef.current = currentAgent;
+
+  const currentWorkspaceRef = useRef<Workspace | null>(null);
+  currentWorkspaceRef.current = currentWorkspace;
+
+  const scheduledAutoRepliesRef = useRef<Set<string>>(new Set());
+
   // Dynamically update favicon badge and title count when unread conversations change
   useEffect(() => {
     const unreadTotal = conversations.reduce(
@@ -309,8 +317,9 @@ export default function DashboardPage() {
 
   // 5. Supabase Realtime Subscriptions
   useEffect(() => {
+    const channelSuffix = `${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
     const messagesChannel = supabase
-      .channel('chatify-dashboard-messages')
+      .channel(`chatify-dashboard-messages-${channelSuffix}`)
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'messages' },
@@ -382,7 +391,7 @@ export default function DashboardPage() {
       .subscribe();
 
     const conversationsChannel = supabase
-      .channel('chatify-dashboard-conversations')
+      .channel(`chatify-dashboard-conversations-${channelSuffix}`)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'conversations' },
@@ -412,10 +421,11 @@ export default function DashboardPage() {
               }),
             }).catch((err) => console.error('[Slack Dispatch]:', err));
 
-            // Schedule Claude AI Auto-First-Response check if unassigned
+            // Schedule Claude AI Auto-First-Response check if unassigned and not already scheduled
             const wsId = newConv.workspace_id || currentWorkspaceIdRef.current;
-            if (wsId) {
-              const delay = currentWorkspace?.ai_settings?.auto_response_delay_seconds || 20;
+            if (wsId && !scheduledAutoRepliesRef.current.has(newConv.id)) {
+              scheduledAutoRepliesRef.current.add(newConv.id);
+              const delay = currentWorkspaceRef.current?.ai_settings?.auto_response_delay_seconds || 20;
               setTimeout(() => {
                 fetch('/api/ai/auto-respond', {
                   method: 'POST',
@@ -435,7 +445,7 @@ export default function DashboardPage() {
       .subscribe();
 
     const visitorsChannel = supabase
-      .channel('chatify-dashboard-visitors')
+      .channel(`chatify-dashboard-visitors-${channelSuffix}`)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'visitors' },
@@ -471,16 +481,17 @@ export default function DashboardPage() {
       .subscribe();
 
     const internalNotesChannel = supabase
-      .channel('chatify-dashboard-internal-notes')
+      .channel(`chatify-dashboard-internal-notes-${channelSuffix}`)
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'internal_notes' },
         (payload) => {
           const note = payload.new as any;
+          const agentId = currentAgentRef.current?.id;
           if (
-            currentAgent?.id &&
-            note.mentioned_agent_ids?.includes(currentAgent.id) &&
-            note.agent_id !== currentAgent.id
+            agentId &&
+            note.mentioned_agent_ids?.includes(agentId) &&
+            note.agent_id !== agentId
           ) {
             sound.playIncomingMessage();
             sendBrowserNotification(
@@ -518,7 +529,7 @@ export default function DashboardPage() {
       supabase.removeChannel(internalNotesChannel);
       clearInterval(snoozeInterval);
     };
-  }, [supabase, currentAgent?.id]);
+  }, [supabase]);
 
   // 6. Action Handlers
   const handleSendMessage = async (content: string, isInternal: boolean = false) => {

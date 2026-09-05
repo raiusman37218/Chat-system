@@ -6,13 +6,28 @@ import { dispatchOutboundMessage } from '@/lib/channels/dispatcher';
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://vfjsaynnubxywdbevxtx.supabase.co';
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZmanNheW5udWJ4eXdkYmV2eHR4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgyNTA5MDEsImV4cCI6MjEwMzgyNjkwMX0.YyBCXMqwrOk5BRhQafYLFw8tiM5PC8lc8Yocodw9wf0';
 
+// In-memory set to prevent concurrent auto-response runs for the same conversation
+const inFlightConversations = new Set<string>();
+
 export async function POST(req: NextRequest) {
+  let lockAcquired = false;
+  let conversation_id: string | undefined;
+
   try {
-    const { conversation_id, workspace_id } = await req.json();
+    const body = await req.json();
+    conversation_id = body.conversation_id;
+    const workspace_id = body.workspace_id;
 
     if (!conversation_id || !workspace_id) {
       return NextResponse.json({ error: 'Missing conversation_id or workspace_id' }, { status: 400 });
     }
+
+    // 0. Concurrency lock check: prevent simultaneous execution for the same conversation
+    if (inFlightConversations.has(conversation_id)) {
+      return NextResponse.json({ replied: false, reason: 'Auto-response already in progress' });
+    }
+    inFlightConversations.add(conversation_id);
+    lockAcquired = true;
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
@@ -28,7 +43,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ replied: false, reason: 'AI auto-first-response disabled' });
     }
 
-    // 2. Check if conversation is still open and has no agent message yet
+    // 2. Check if conversation is still open and has no agent or AI message yet
     const { data: conv } = await supabase
       .from('conversations')
       .select('*, visitor:visitors(*)')
@@ -66,6 +81,22 @@ export async function POST(req: NextRequest) {
       apiKey: aiSettings?.anthropic_api_key,
     });
 
+    if (!aiResponseText || !aiResponseText.trim()) {
+      return NextResponse.json({ replied: false, reason: 'Empty auto-response generated' });
+    }
+
+    // 3b. ATOMIC DOUBLE-CHECK: Re-query messages to guarantee no agent or AI replied during RAG generation
+    const { data: lateCheckMessages } = await supabase
+      .from('messages')
+      .select('id')
+      .eq('conversation_id', conversation_id)
+      .in('sender_type', ['agent', 'ai'])
+      .limit(1);
+
+    if (lateCheckMessages && lateCheckMessages.length > 0) {
+      return NextResponse.json({ replied: false, reason: 'Already responded during generation' });
+    }
+
     // 4. Insert message as 'ai' sender
     const { data: insertedMsg, error: msgErr } = await supabase
       .from('messages')
@@ -97,5 +128,9 @@ export async function POST(req: NextRequest) {
   } catch (error: any) {
     console.error('Error in AI auto-respond:', error);
     return NextResponse.json({ error: error.message || 'Auto-respond failed' }, { status: 500 });
+  } finally {
+    if (lockAcquired && conversation_id) {
+      inFlightConversations.delete(conversation_id);
+    }
   }
 }
