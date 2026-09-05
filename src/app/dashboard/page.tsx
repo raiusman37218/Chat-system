@@ -281,13 +281,17 @@ export default function DashboardPage() {
     }
     setMessages((data as Message[]) || []);
 
-    // Mark unread visitor messages as read
-    await supabase
-      .from('messages')
-      .update({ read_at: new Date().toISOString() })
-      .eq('conversation_id', conversationId)
-      .is('read_at', null)
-      .eq('sender_type', 'visitor');
+    // Opening the thread is the agent reading it. The RPC also backfills
+    // delivered_at, so "read" never appears without a delivery behind it.
+    // Fails quietly on projects that have not run the receipts migration.
+    try {
+      await supabase.rpc('fn_mark_messages_read', {
+        p_conversation_id: conversationId,
+        p_exclude_sender: 'agent',
+      });
+    } catch {
+      // ignored
+    }
 
     // Immediately clear unread_count for the opened conversation in UI state
     setConversations((prev) =>
@@ -320,11 +324,17 @@ export default function DashboardPage() {
             });
 
             if (newMsg.sender_type === 'visitor') {
+              // Arriving over realtime IS delivery. Whether it counts as read
+              // depends on the agent actually looking at the tab.
+              const receipt = document.hasFocus()
+                ? 'fn_mark_messages_read'
+                : 'fn_mark_messages_delivered';
               supabase
-                .from('messages')
-                .update({ read_at: new Date().toISOString() })
-                .eq('id', newMsg.id)
-                .then();
+                .rpc(receipt, {
+                  p_conversation_id: newMsg.conversation_id,
+                  p_exclude_sender: 'agent',
+                })
+                .then(undefined, () => {});
             }
           }
 

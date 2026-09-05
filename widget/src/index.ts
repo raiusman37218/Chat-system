@@ -25,6 +25,11 @@ interface MessageItem {
   content: string;
   created_at: string;
   is_internal?: boolean;
+  /** Set once the agent's client acknowledged receipt. */
+  delivered_at?: string | null;
+  read_at?: string | null;
+  /** Client-only: still in flight, shown as a clock rather than a tick. */
+  pending?: boolean;
 }
 
 interface FAQItem {
@@ -502,10 +507,31 @@ class ChatifyWidget {
             if (!this.isOpen || this.activeTab !== 'messages') {
               this.unreadCount += 1;
               this.updateUnreadBadge();
+              // It reached this browser, so it is delivered — but the visitor
+              // has not looked at it, so it is not read.
+              this.markMessagesAsDelivered();
             } else {
               this.markMessagesAsRead();
             }
           }
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'messages',
+          filter: `conversation_id=eq.${this.conversationId}`,
+        },
+        (payload) => {
+          // The agent's receipts arrive as UPDATEs; this is what turns the
+          // visitor's own ticks grey-double and then blue.
+          const updated = payload.new as MessageItem;
+          const i = this.messages.findIndex((m) => m.id === updated.id);
+          if (i === -1) return;
+          this.messages[i] = { ...this.messages[i], ...updated };
+          this.renderMessages();
         }
       )
       .on(
@@ -547,21 +573,38 @@ class ChatifyWidget {
     }
   }
 
+  /** Receipt only — the visitor has received these but not necessarily seen them. */
+  private async markMessagesAsDelivered() {
+    if (!this.conversationId) return;
+    try {
+      await this.supabase.rpc('fn_mark_messages_delivered', {
+        p_conversation_id: this.conversationId,
+        p_exclude_sender: 'visitor',
+      });
+    } catch {
+      // Project has not run the receipts migration yet; ticks stay at "sent".
+    }
+  }
+
   private async markMessagesAsRead() {
     if (!this.conversationId) return;
+    try {
+      // Backfills delivered_at too, so a read receipt never exists on its own.
+      await this.supabase.rpc('fn_mark_messages_read', {
+        p_conversation_id: this.conversationId,
+        p_exclude_sender: 'visitor',
+      });
+    } catch {
+      // ignored
+    }
+
     try {
       await this.supabase.rpc('fn_mark_conversation_messages_as_read', {
         p_conversation_id: this.conversationId,
         p_reader_type: 'visitor',
       });
-      await this.supabase
-        .from('messages')
-        .update({ read_at: new Date().toISOString() })
-        .eq('conversation_id', this.conversationId)
-        .neq('sender_type', 'visitor')
-        .is('read_at', null);
-    } catch (e) {
-      console.warn('[Chatify] Error marking messages as read:', e);
+    } catch {
+      // ignored
     }
   }
 
@@ -596,6 +639,7 @@ class ChatifyWidget {
       sender_type: 'visitor',
       content: content.trim(),
       created_at: new Date().toISOString(),
+      pending: true,
     };
     this.messages.push(tempMsg);
     this.renderMessages();
@@ -611,6 +655,7 @@ class ChatifyWidget {
       const idx = this.messages.findIndex((m) => m.id === tempMsg.id);
       if (idx !== -1) {
         this.messages[idx] = data as MessageItem;
+        this.renderMessages();
       }
     }
   }
@@ -1804,7 +1849,27 @@ class ChatifyWidget {
         text-align: right;
       }
 
-      .chatify-msg-visitor .chatify-msg-time { color: inherit; opacity: .68; }
+      .chatify-msg-visitor .chatify-msg-time {
+        color: inherit;
+        opacity: .78;
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 4px;
+      }
+
+      .chatify-tick {
+        display: inline-flex;
+        align-items: center;
+        color: currentColor;
+        opacity: .85;
+      }
+
+      /* The single place colour carries meaning instead of decoration. */
+      .chatify-tick-read {
+        color: #53bdeb;
+        opacity: 1;
+      }
 
       /* ── CSAT ─────────────────────────────────────────────────────── */
 
@@ -2198,7 +2263,12 @@ class ChatifyWidget {
       bubble.className = isVisitor ? 'chatify-msg-visitor' : 'chatify-msg-agent';
       // Kept on one line: the text element preserves whitespace, so any
       // indentation in this template would be rendered as blank lines.
-      bubble.innerHTML = `<div class="chatify-msg-text">${this.escapeHTML(msg.content)}</div><div class="chatify-msg-time">${timeStr}</div>`;
+      // Ticks only on the visitor's own messages: a receipt for something the
+      // other side sent you is meaningless.
+      const ticks = isVisitor ? this.renderTicks(msg) : '';
+      bubble.innerHTML =
+        `<div class="chatify-msg-text">${this.escapeHTML(msg.content)}</div>` +
+        `<div class="chatify-msg-time">${timeStr}${ticks}</div>`;
 
       row.appendChild(bubble);
       body.appendChild(row);
@@ -2234,6 +2304,50 @@ class ChatifyWidget {
     }
 
     body.scrollTop = body.scrollHeight;
+  }
+
+  /**
+   * WhatsApp's four states, each backed by a fact rather than a guess:
+   *   pending   clock    not yet stored on the server
+   *   sent      one tick stored, nobody has acknowledged it
+   *   delivered two ticks the agent's client received it
+   *   read      two blue the agent opened the conversation
+   */
+  private renderTicks(msg: MessageItem): string {
+    const single =
+      '<path d="M1 5.2 3.4 7.6 9 2" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>';
+    const double =
+      '<path d="M1 5.2 3.4 7.6 9 2" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>' +
+      '<path d="M5.5 5.2 7.9 7.6 13.5 2" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>';
+
+    if (msg.pending) {
+      return (
+        '<span class="chatify-tick" title="Sending">' +
+        '<svg viewBox="0 0 14 10" width="15" height="11">' +
+        '<circle cx="5" cy="5" r="3.6" fill="none" stroke="currentColor" stroke-width="1.4"/>' +
+        '<path d="M5 3v2.2l1.5.9" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>' +
+        '</svg></span>'
+      );
+    }
+
+    if (msg.read_at) {
+      return (
+        '<span class="chatify-tick chatify-tick-read" title="Read">' +
+        '<svg viewBox="0 0 14 10" width="15" height="11">' + double + '</svg></span>'
+      );
+    }
+
+    if (msg.delivered_at) {
+      return (
+        '<span class="chatify-tick" title="Delivered">' +
+        '<svg viewBox="0 0 14 10" width="15" height="11">' + double + '</svg></span>'
+      );
+    }
+
+    return (
+      '<span class="chatify-tick" title="Sent">' +
+      '<svg viewBox="0 0 14 10" width="15" height="11">' + single + '</svg></span>'
+    );
   }
 
   private escapeHTML(str: string) {

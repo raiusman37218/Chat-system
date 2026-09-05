@@ -109,7 +109,11 @@ export interface Message {
   content: string;
   attachment_url: string | null;
   created_at: string;
+  /** Set when the recipient's client acknowledged receipt. */
+  delivered_at?: string | null;
   read_at: string | null;
+  /** Client-only: true while an optimistic message is still in flight. */
+  pending?: boolean;
 
   // Joined or metadata
   agent?: Agent | null;

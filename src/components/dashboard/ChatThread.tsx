@@ -6,11 +6,9 @@ import {
   AtSign,
   Bot,
   Check,
-  CheckCheck,
   CheckCircle2,
   ChevronDown,
   Clock,
-  CornerDownLeft,
   ExternalLink,
   FileText,
   GitMerge,
@@ -29,7 +27,6 @@ import {
   ArrowLeft,
   Smile,
   Frown,
-  Meh,
 } from 'lucide-react';
 import {
   Agent,
@@ -44,6 +41,10 @@ import { Avatar } from '@/components/ui/Avatar';
 import { Menu } from '@/components/ui/Menu';
 import { ChannelBadge } from '@/components/ui/ChannelBadge';
 import { ChatThreadSkeleton } from '@/components/ui/Skeleton';
+import {
+  MessageTicks,
+  messageStatusOf,
+} from '@/components/ui/MessageTicks';
 import { createClient } from '@/lib/supabase/client';
 
 interface ChatThreadProps {
@@ -722,33 +723,10 @@ export function ChatThread({
           >
             <span className="tabular-nums">{formatTime(msg.created_at)}</span>
             {(isAgent || isAI) && (
-              <span
-                className="flex items-center"
-                title={
-                  msg.read_at
-                    ? `Seen by customer at ${new Date(msg.read_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
-                    : isOnline
-                    ? 'Delivered (customer is online)'
-                    : 'Sent'
-                }
-              >
-                {msg.read_at ? (
-                  <CheckCheck
-                    className="w-3.5 h-3.5 text-blue-500 dark:text-blue-400 stroke-[2.5]"
-                    aria-label="Seen by customer"
-                  />
-                ) : isOnline ? (
-                  <CheckCheck
-                    className="w-3.5 h-3.5 text-ink-3/70 dark:text-slate-400 stroke-[2]"
-                    aria-label="Delivered"
-                  />
-                ) : (
-                  <Check
-                    className="w-3.5 h-3.5 text-ink-3/70 dark:text-slate-400 stroke-[2]"
-                    aria-label="Sent"
-                  />
-                )}
-              </span>
+              <MessageTicks
+                status={messageStatusOf(msg)}
+                readAt={msg.read_at}
+              />
             )}
           </div>
         </div>
