@@ -352,14 +352,14 @@ export default function ChatWidget({
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isAgentTyping]);
 
-  // Mark unread agent messages as seen when widget is open
+  // Mark unread agent & AI messages as seen when widget is open
   useEffect(() => {
     if (!conversationId || !isOpen) return;
     supabase
       .from('messages')
       .update({ read_at: new Date().toISOString() })
       .eq('conversation_id', conversationId)
-      .eq('sender_type', 'agent')
+      .neq('sender_type', 'visitor')
       .is('read_at', null)
       .then();
   }, [conversationId, isOpen, messages.length, supabase]);

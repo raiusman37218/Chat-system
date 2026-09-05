@@ -472,13 +472,15 @@ export function ConversationList({
                   selected
                     ? 'bg-surface-2 border-line-2 shadow-xs ring-1 ring-accent/25'
                     : hasUnread
-                    ? 'bg-surface border-line/90 hover:bg-surface-2/80 hover:border-line-2 shadow-xs'
+                    ? 'bg-red-500/5 dark:bg-red-950/20 border-red-500/40 hover:bg-red-500/10 hover:border-red-500/60 shadow-xs ring-1 ring-red-500/20'
                     : 'bg-surface border-line/60 hover:bg-surface-2/70 hover:border-line/90 shadow-xs'
                 )}
               >
-                {selected && (
+                {selected ? (
                   <span className="absolute left-0 top-2.5 bottom-2.5 w-1 rounded-r-full bg-accent" />
-                )}
+                ) : hasUnread ? (
+                  <span className="absolute left-0 top-2 bottom-2 w-1.5 rounded-r-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.7)] animate-pulse" />
+                ) : null}
                 <Avatar
                   name={name}
                   seed={conv.visitor_id}
@@ -494,16 +496,25 @@ export function ConversationList({
                       className={cn(
                         'text-[13px] truncate flex items-center gap-1.5',
                         hasUnread
-                          ? 'font-bold text-ink'
+                          ? 'font-extrabold text-red-600 dark:text-red-400'
                           : selected
                           ? 'font-bold text-accent'
                           : 'font-semibold text-ink group-hover:text-ink'
                       )}
                     >
                       {name}
+                      {hasUnread && (
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded-full bg-red-600 text-white text-[9px] font-extrabold uppercase tracking-wider shrink-0 shadow-xs animate-pulse">
+                          <span className="w-1 h-1 rounded-full bg-white animate-ping" />
+                          {conv.unread_count && conv.unread_count > 1 ? `${conv.unread_count} NEW` : 'NEW'}
+                        </span>
+                      )}
                     </span>
 
-                    <span className="text-[10.5px] text-ink-3 shrink-0 tabular-nums font-mono">
+                    <span className={cn(
+                      "text-[10.5px] shrink-0 tabular-nums font-mono",
+                      hasUnread ? "text-red-500 font-bold" : "text-ink-3"
+                    )}>
                       {formatTimeAgo(conv.updated_at || conv.created_at)}
                     </span>
                   </div>
@@ -523,7 +534,7 @@ export function ConversationList({
                       className={cn(
                         'text-[12px] truncate mt-1 leading-snug',
                         hasUnread
-                          ? 'font-semibold text-ink dark:text-slate-100'
+                          ? 'font-bold text-ink dark:text-slate-100'
                           : 'text-ink-3 group-hover:text-ink-2'
                       )}
                     >
@@ -540,6 +551,12 @@ export function ConversationList({
                   )}
 
                   <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+                    {hasUnread && (
+                      <span className="px-1.5 py-0.5 text-[9.5px] font-extrabold rounded-md bg-red-500 text-white shadow-xs">
+                        Unopened
+                      </span>
+                    )}
+
                     {isUrgent && (
                       <span className="px-1.5 py-0.5 text-[9.5px] font-bold rounded-md bg-red-500/15 text-red-600 dark:text-red-400 border border-red-500/20">
                         Urgent
@@ -615,7 +632,7 @@ export function ConversationList({
                 </div>
 
                 {hasUnread && (
-                  <span className="w-2 h-2 rounded-full bg-blue-500 shrink-0 mt-2 shadow-xs ring-2 ring-blue-500/25" />
+                  <span className="w-3 h-3 rounded-full bg-red-500 shrink-0 mt-1 shadow-md ring-4 ring-red-500/25 animate-ping" />
                 )}
               </button>
             );

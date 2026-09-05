@@ -714,15 +714,23 @@ export function ChatThread({
           <div
             className={cn(
               'mt-1 flex items-center gap-1 px-1 text-[10.5px] text-ink-3',
-              isAgent && 'justify-end'
+              (isAgent || isAI) && 'justify-end'
             )}
           >
             <span className="tabular-nums">{formatTime(msg.created_at)}</span>
-            {isAgent &&
+            {(isAgent || isAI) &&
               (msg.read_at ? (
-                <CheckCheck className="w-3.5 h-3.5 text-blue-500 stroke-[2.5]" aria-label="Seen" />
+                <CheckCheck
+                  className="w-3.5 h-3.5 text-blue-500 dark:text-blue-400 stroke-[2.5]"
+                  aria-label="Seen by customer"
+                  title={`Seen by customer at ${new Date(msg.read_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`}
+                />
               ) : (
-                <Check className="w-3.5 h-3.5 text-ink-4 stroke-[2]" aria-label="Delivered" />
+                <Check
+                  className="w-3.5 h-3.5 text-ink-3/70 dark:text-slate-400 stroke-[2]"
+                  aria-label="Sent"
+                  title="Sent (Not seen by customer yet)"
+                />
               ))}
           </div>
         </div>

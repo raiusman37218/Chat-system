@@ -214,17 +214,28 @@ export default function DashboardPage() {
 
     const enrichedConversations: Conversation[] = await Promise.all(
       (convData || []).map(async (c: any) => {
-        const { data: msgData } = await supabase
-          .from('messages')
-          .select('*')
-          .eq('conversation_id', c.id)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
+        const [{ data: msgData }, { count: unreadCount }] = await Promise.all([
+          supabase
+            .from('messages')
+            .select('*')
+            .eq('conversation_id', c.id)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle(),
+          supabase
+            .from('messages')
+            .select('*', { count: 'exact', head: true })
+            .eq('conversation_id', c.id)
+            .eq('sender_type', 'visitor')
+            .is('read_at', null),
+        ]);
+
+        const isCurrentlySelected = selectedConversationIdRef.current === c.id;
 
         return {
           ...c,
           last_message: msgData || null,
+          unread_count: isCurrentlySelected ? 0 : (unreadCount || 0),
         };
       })
     );
@@ -270,12 +281,18 @@ export default function DashboardPage() {
     }
     setMessages((data as Message[]) || []);
 
+    // Mark unread visitor messages as read
     await supabase
       .from('messages')
       .update({ read_at: new Date().toISOString() })
       .eq('conversation_id', conversationId)
       .is('read_at', null)
       .eq('sender_type', 'visitor');
+
+    // Immediately clear unread_count for the opened conversation in UI state
+    setConversations((prev) =>
+      prev.map((c) => (c.id === conversationId ? { ...c, unread_count: 0 } : c))
+    );
   }, [supabase]);
 
   useEffect(() => {
