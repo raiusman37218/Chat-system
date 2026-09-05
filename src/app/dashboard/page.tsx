@@ -83,7 +83,14 @@ export default function DashboardPage() {
         return;
       }
 
-      if (e.key === 'Escape' && !showShortcutsModal && selectedConversationId) {
+      // Escape used to deselect even while typing a reply, throwing away the
+      // draft along with the thread.
+      if (
+        e.key === 'Escape' &&
+        !showShortcutsModal &&
+        selectedConversationId &&
+        !isInputActive
+      ) {
         setSelectedConversationId(null);
       }
     };
@@ -552,11 +559,28 @@ export default function DashboardPage() {
   }, [supabase]);
 
   // 6. Action Handlers
-  const handleSendMessage = async (content: string, isInternal: boolean = false) => {
-    if (!selectedConversationId || !currentAgent) return;
+  /**
+   * The thread passes the conversation it is actually showing. Reading
+   * `selectedConversationId` here instead was a second source of truth, and
+   * when it was momentarily null the send returned silently — the composer had
+   * already cleared the text, so the reply vanished with no error and no
+   * message. Every failure path now throws so the caller can restore the draft.
+   */
+  const handleSendMessage = async (
+    content: string,
+    isInternal: boolean = false,
+    conversationId?: string
+  ) => {
+    const targetId = conversationId || selectedConversationIdRef.current;
+    if (!targetId) {
+      throw new Error('No conversation selected — reply not sent.');
+    }
+    if (!currentAgent) {
+      throw new Error('Your session expired — reload and try again.');
+    }
 
     const { error } = await supabase.from('messages').insert({
-      conversation_id: selectedConversationId,
+      conversation_id: targetId,
       sender_type: 'agent',
       sender_id: currentAgent.id,
       content,
@@ -571,7 +595,7 @@ export default function DashboardPage() {
     await supabase
       .from('conversations')
       .update({ updated_at: new Date().toISOString() })
-      .eq('id', selectedConversationId);
+      .eq('id', targetId);
   };
 
   const handleUpdatePriority = async (priority: ConversationPriority) => {

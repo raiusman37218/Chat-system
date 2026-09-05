@@ -52,7 +52,11 @@ interface ChatThreadProps {
   messages: Message[];
   currentAgent: Agent | null;
   agentsList: Agent[];
-  onSendMessage: (content: string, isInternal?: boolean) => Promise<void>;
+  onSendMessage: (
+    content: string,
+    isInternal?: boolean,
+    conversationId?: string
+  ) => Promise<void>;
   onUpdateStatus: (status: ConversationStatus) => Promise<void>;
   onAssignAgent: (agentId: string | null) => Promise<void>;
   onUpdatePriority?: (priority: ConversationPriority) => Promise<void>;
@@ -131,6 +135,7 @@ export function ChatThread({
 }: ChatThreadProps) {
   const [inputText, setInputText] = useState('');
   const [isSending, setIsSending] = useState(false);
+  const [sendError, setSendError] = useState<string | null>(null);
   const [composerMode, setComposerMode] = useState<'reply' | 'internal'>('reply');
   const [showMacros, setShowMacros] = useState(false);
   const [macroSearch, setMacroSearch] = useState('');
@@ -413,6 +418,7 @@ export function ChatThread({
 
     setInputText('');
     setIsSending(true);
+    setSendError(null);
 
     try {
       sound.playSentMessage();
@@ -428,7 +434,7 @@ export function ChatThread({
         setMentionedAgentIds([]);
       }
 
-      await onSendMessage(text, isInternal);
+      await onSendMessage(text, isInternal, conversation.id);
 
       // If customer is on WhatsApp, Instagram, Messenger, or LinkedIn, dispatch outbound
       if (!isInternal && conversation.channel && conversation.channel !== 'web') {
@@ -445,7 +451,12 @@ export function ChatThread({
       }
     } catch (err) {
       console.error('Failed to send message:', err);
-      setInputText(text); // restore on error
+      // Give the draft back AND say so — silently restoring the text looked
+      // like the message had been sent and then reappeared.
+      setInputText(text);
+      setSendError(
+        err instanceof Error ? err.message : 'Could not send. Try again.'
+      );
     } finally {
       setIsSending(false);
       if (textareaRef.current) {
@@ -1371,6 +1382,32 @@ export function ChatThread({
               className="w-full bg-transparent text-[13px] leading-relaxed text-ink resize-none focus:outline-none placeholder:text-ink-3 min-h-[48px] max-h-40"
             />
           </div>
+
+          {/* A send that fails must say so. The draft is restored above, but
+              without this the agent only saw their text reappear and assumed
+              the message had gone out. */}
+          {sendError && (
+            <div
+              role="alert"
+              className="px-3 py-2 flex items-center gap-2 border-t border-danger-line bg-danger-soft text-[11.5px] text-danger"
+            >
+              <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+              <span className="flex-1 min-w-0">{sendError}</span>
+              <button
+                onClick={handleSend}
+                className="font-semibold underline underline-offset-2 hover:opacity-80 shrink-0"
+              >
+                Retry
+              </button>
+              <button
+                onClick={() => setSendError(null)}
+                aria-label="Dismiss"
+                className="opacity-60 hover:opacity-100 shrink-0"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </div>
+          )}
 
           {/* Composer Footer Action Bar */}
           <div className="px-3 py-2 bg-surface-2/40 border-t border-line/40 flex items-center justify-between text-[11px] text-ink-3">
