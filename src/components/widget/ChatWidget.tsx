@@ -294,7 +294,32 @@ export default function ChatWidget({
             return next;
           });
           setHasNewMessagePulse(true);
+        } else if (newMsg.sender_type !== 'visitor' && isOpen) {
+          // Auto-mark as seen if visitor is currently viewing
+          supabase
+            .from('messages')
+            .update({ read_at: new Date().toISOString() })
+            .eq('id', newMsg.id)
+            .then();
         }
+      }
+    );
+
+    // Listen for message updates (e.g. read_at timestamp when agent views message)
+    channel.on(
+      'postgres_changes',
+      {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'messages',
+        filter: `conversation_id=eq.${conversationId}`,
+      },
+      (payload) => {
+        const updatedMsg = payload.new as Message;
+        if (updatedMsg.is_internal) return;
+        setMessages((prev) =>
+          prev.map((m) => (m.id === updatedMsg.id ? { ...m, ...updatedMsg } : m))
+        );
       }
     );
 
@@ -326,6 +351,18 @@ export default function ChatWidget({
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isAgentTyping]);
+
+  // Mark unread agent messages as seen when widget is open
+  useEffect(() => {
+    if (!conversationId || !isOpen) return;
+    supabase
+      .from('messages')
+      .update({ read_at: new Date().toISOString() })
+      .eq('conversation_id', conversationId)
+      .eq('sender_type', 'agent')
+      .is('read_at', null)
+      .then();
+  }, [conversationId, isOpen, messages.length, supabase]);
 
   // Handle open/close toggle
   const toggleWidget = (openState?: boolean) => {
@@ -537,7 +574,7 @@ export default function ChatWidget({
           <div className="flex items-center gap-3">
             <div className="relative w-10 h-10 rounded-full bg-white/20 flex items-center justify-center overflow-hidden border border-white/30 backdrop-blur-sm">
               <img
-                src={config.logoUrl || '/chat-icon.png'}
+                src={config.logoUrl || '/chat-icon-white.png'}
                 alt={companyName}
                 className="w-full h-full object-contain p-1"
               />
@@ -891,19 +928,19 @@ export default function ChatWidget({
                       </p>
                     </div>
 
-                    {/* Timestamp & Delivery Info (Shown on Hover) */}
+                    {/* Timestamp & Delivery Info */}
                     <div
-                      className={`flex items-center gap-1 text-[10px] text-slate-400 mt-1 opacity-0 group-hover:opacity-100 transition-opacity ${
+                      className={`flex items-center gap-1 text-[10px] mt-1 text-slate-400 dark:text-slate-500 ${
                         isVisitor ? 'justify-end pr-1' : 'justify-start pl-1'
                       }`}
                     >
-                      <span>{timeString}</span>
+                      <span className="tabular-nums">{timeString}</span>
                       {isVisitor && (
-                        <span>
+                        <span title={msg.read_at ? 'Seen' : 'Sent'} className="flex items-center">
                           {msg.read_at ? (
-                            <CheckCheck className="w-3 h-3 text-blue-500" />
+                            <CheckCheck className="w-3.5 h-3.5 text-blue-500 stroke-[2.5]" />
                           ) : (
-                            <Check className="w-3 h-3" />
+                            <Check className="w-3.5 h-3.5 text-slate-400 stroke-[2]" />
                           )}
                         </span>
                       )}
@@ -1060,12 +1097,12 @@ export default function ChatWidget({
           >
             {/* Launcher Icon Toggle */}
             {isOpen ? (
-              <X className="w-6 h-6 transition-transform duration-200 rotate-90 scale-100" />
+              <X className="w-6 h-6 text-white transition-transform duration-200 rotate-90 scale-100" />
             ) : (
               <img
-                src="/chat-icon.png"
+                src={config.logoUrl || '/chat-icon-white.png'}
                 alt="Chat"
-                className="w-7 h-7 object-contain filter drop-shadow-sm transition-transform duration-200 hover:scale-105"
+                className="w-7 h-7 object-contain brightness-0 invert drop-shadow-sm transition-transform duration-200 hover:scale-105"
               />
             )}
 

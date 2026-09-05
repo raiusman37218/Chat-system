@@ -895,7 +895,7 @@ export function AdminSettingsPanel({
                             {logoUrl ? (
                               <img src={logoUrl} alt="Logo" className="w-full h-full object-cover" />
                             ) : (
-                              <MessageSquare className="w-4 h-4 text-white" />
+                              <img src="/chat-icon-white.png" alt="Logo" className="w-5 h-5 object-contain" />
                             )}
                           </div>
                           <div>
@@ -970,9 +970,13 @@ export function AdminSettingsPanel({
                       className="w-12 h-12 rounded-full text-white flex items-center justify-center shadow-lg transition-transform hover:scale-105 active:scale-95"
                     >
                       {previewOpen ? (
-                        <X className="w-5 h-5" />
+                        <X className="w-5 h-5 text-white" />
                       ) : (
-                        <MessageSquare className="w-5 h-5" />
+                        <img
+                          src={logoUrl || '/chat-icon-white.png'}
+                          alt="Chat"
+                          className="w-6 h-6 object-contain brightness-0 invert"
+                        />
                       )}
                     </button>
                   </div>

@@ -720,9 +720,9 @@ export function ChatThread({
             <span className="tabular-nums">{formatTime(msg.created_at)}</span>
             {isAgent &&
               (msg.read_at ? (
-                <CheckCheck className="w-3 h-3 text-accent" aria-label="Read" />
+                <CheckCheck className="w-3.5 h-3.5 text-blue-500 stroke-[2.5]" aria-label="Seen" />
               ) : (
-                <Check className="w-3 h-3" aria-label="Delivered" />
+                <Check className="w-3.5 h-3.5 text-ink-4 stroke-[2]" aria-label="Delivered" />
               ))}
           </div>
         </div>

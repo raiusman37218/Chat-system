@@ -340,6 +340,18 @@ export default function DashboardPage() {
           refreshConversations();
         }
       )
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'messages' },
+        (payload) => {
+          const updatedMsg = payload.new as Message;
+          if (updatedMsg.conversation_id === selectedConversationIdRef.current) {
+            setMessages((prev) =>
+              prev.map((m) => (m.id === updatedMsg.id ? { ...m, ...updatedMsg } : m))
+            );
+          }
+        }
+      )
       .subscribe();
 
     const conversationsChannel = supabase

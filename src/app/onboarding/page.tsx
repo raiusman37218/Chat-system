@@ -400,7 +400,7 @@ export default function OnboardingPage() {
                       style={{ backgroundColor: brandColor }}
                     >
                       <img
-                        src="/chat-icon.png"
+                        src="/chat-icon-white.png"
                         alt="Chat"
                         className="w-full h-full object-contain filter drop-shadow-sm"
                       />
