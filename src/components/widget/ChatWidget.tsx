@@ -63,8 +63,8 @@ export default function ChatWidget({
   const [widgetPosition, setWidgetPosition] = useState<'bottom-right' | 'bottom-left'>(
     config.position || 'bottom-right'
   );
-  const companyName = config.companyName || 'Chatify Support';
-  const welcomeText = config.welcomeText || 'Hi there! 👋 How can we help you today?';
+  const companyName = config.companyName || 'Range4ex Support';
+  const welcomeText = config.welcomeText || 'welcome to the Range4ex';
   const autoGreetingDelay = config.autoGreetingDelaySeconds ?? 5;
   const autoGreetingText = config.autoGreetingText || welcomeText;
 
@@ -397,28 +397,6 @@ export default function ChatWidget({
     }
   };
 
-  // Pre-chat Form Submission
-  const handlePreChatSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!visitorName.trim() || !visitorEmail.trim()) return;
-
-    try {
-      localStorage.setItem('chatify_visitor_name', visitorName);
-      localStorage.setItem('chatify_visitor_email', visitorEmail);
-    } catch (err) {}
-
-    setIsIdentified(true);
-
-    // Sync visitor info to database
-    supabase.from('visitors').upsert({
-      id: visitorId,
-      name: visitorName,
-      email: visitorEmail,
-      last_seen_at: new Date().toISOString(),
-      is_online: true,
-    });
-  };
-
   // Create Conversation if not exists
   const ensureConversation = async (): Promise<string> => {
     if (conversationId) return conversationId;
@@ -429,6 +407,7 @@ export default function ChatWidget({
         visitor_id: visitorId,
         status: 'open',
         priority: 'normal',
+        workspace_id: config.workspaceId || null,
       })
       .select()
       .single();
@@ -439,6 +418,63 @@ export default function ChatWidget({
 
     setConversationId(newConv.id);
     return newConv.id;
+  };
+
+  // Pre-chat Form Submission: immediately sends auto welcome message before user sends their message
+  const handlePreChatSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanName = visitorName.trim();
+    const cleanEmail = visitorEmail.trim();
+    if (!cleanName || !cleanEmail) return;
+
+    try {
+      localStorage.setItem('chatify_visitor_name', cleanName);
+      localStorage.setItem('chatify_visitor_email', cleanEmail);
+    } catch (err) {}
+
+    setIsIdentified(true);
+
+    try {
+      // 1. Sync visitor info to database
+      await supabase.from('visitors').upsert({
+        id: visitorId,
+        name: cleanName,
+        email: cleanEmail,
+        last_seen_at: new Date().toISOString(),
+        is_online: true,
+        workspace_id: config.workspaceId || null,
+      });
+
+      // 2. Ensure conversation is created in database
+      const activeConvId = await ensureConversation();
+
+      // 3. Immediately send auto welcome message before user sends any message
+      const { data: existingMsgs } = await supabase
+        .from('messages')
+        .select('id')
+        .eq('conversation_id', activeConvId)
+        .limit(1);
+
+      if (!existingMsgs || existingMsgs.length === 0) {
+        const welcomeContent = config.welcomeText || 'welcome to the Range4ex';
+        const { data: savedMsg } = await supabase
+          .from('messages')
+          .insert({
+            conversation_id: activeConvId,
+            sender_type: 'agent',
+            content: welcomeContent,
+            is_internal: false,
+          })
+          .select()
+          .single();
+
+        if (savedMsg) {
+          setMessages([savedMsg]);
+        }
+      }
+    } catch (err) {
+      console.error('[ChatWidget] Error during pre-chat submit:', err);
+    }
   };
 
   // Send Message

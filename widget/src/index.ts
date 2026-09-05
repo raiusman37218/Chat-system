@@ -17,6 +17,7 @@ interface WidgetConfig {
   helpTabIcon: string;
   logoUrl?: string;
   greetingTitle?: string;
+  welcomeText?: string;
 }
 
 interface MessageItem {
@@ -2219,7 +2220,33 @@ class ChatifyWidget {
     const footer = this.shadow?.getElementById('chatifyFooter');
     if (footer) footer.style.display = 'flex';
 
-    await this.ensureConversation();
+    const convId = await this.ensureConversation();
+
+    // Send auto welcome message immediately before visitor types/sends any message
+    const { data: existingMsgs } = await this.supabase
+      .from('messages')
+      .select('id')
+      .eq('conversation_id', convId)
+      .limit(1);
+
+    if (!existingMsgs || existingMsgs.length === 0) {
+      const welcomeContent = this.config.welcomeText || 'welcome to the Range4ex';
+      const { data: savedMsg } = await this.supabase
+        .from('messages')
+        .insert({
+          conversation_id: convId,
+          sender_type: 'agent',
+          content: welcomeContent,
+          is_internal: false,
+        })
+        .select()
+        .single();
+
+      if (savedMsg) {
+        this.messages.push(savedMsg as MessageItem);
+      }
+    }
+
     this.renderMessages();
   }
 
