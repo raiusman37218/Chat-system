@@ -68,17 +68,21 @@ function displayNameFor(conv: Conversation) {
   );
 }
 
+/**
+ * When something last actually HAPPENED in the conversation.
+ *
+ * Deliberately ignores `updated_at`. That column is a row-modified timestamp:
+ * adding a tag, changing priority, assigning an agent, toggling AI and snoozing
+ * all bump it. Ranking on it meant that tagging a two-day-old conversation
+ * threw it to the top of the inbox and relabelled it "just now", with nothing
+ * on screen explaining why. The only honest signals are the last message and,
+ * for a conversation with no messages yet, when it opened.
+ */
 function getLastActivityTime(conv: Conversation): number {
-  const msgTime = conv.last_message?.created_at
-    ? new Date(conv.last_message.created_at).getTime()
-    : 0;
-  const updateTime = conv.updated_at
-    ? new Date(conv.updated_at).getTime()
-    : 0;
-  const createTime = conv.created_at
-    ? new Date(conv.created_at).getTime()
-    : 0;
-  return Math.max(msgTime, updateTime, createTime);
+  if (conv.last_message?.created_at) {
+    return new Date(conv.last_message.created_at).getTime();
+  }
+  return conv.created_at ? new Date(conv.created_at).getTime() : 0;
 }
 
 function isWaitingOnAgent(conv: Conversation): boolean {
@@ -290,11 +294,19 @@ export function ConversationList({
           </div>
 
           <div className="flex items-center gap-1.5">
-            {sortBy !== 'newest' && (
-              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-accent/10 text-accent">
-                {SORT_LABELS[sortBy].label}
-              </span>
-            )}
+            <button
+              onClick={() => setShowFilters((v) => !v)}
+              title={SORT_LABELS[sortBy].desc}
+              className={cn(
+                'inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-md transition-colors',
+                sortBy === 'newest'
+                  ? 'text-ink-3 hover:text-ink hover:bg-surface-3'
+                  : 'bg-accent/10 text-accent'
+              )}
+            >
+              <ArrowUpDown className="w-2.5 h-2.5" />
+              {SORT_LABELS[sortBy].label}
+            </button>
             {statusView !== 'open' && (
               <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-600 dark:text-amber-400 capitalize">
                 {statusView}
