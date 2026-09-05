@@ -395,6 +395,24 @@ class ChatifyWidget {
     setInterval(() => {
       this.sendHeartbeat();
     }, 15000);
+
+    const notifyOffline = () => {
+      try {
+        fetch(`${this.config.supabaseUrl}/rest/v1/rpc/fn_visitor_offline`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': this.config.supabaseKey,
+            'Authorization': `Bearer ${this.config.supabaseKey}`,
+          },
+          body: JSON.stringify({ p_visitor_id: this.visitorId }),
+          keepalive: true,
+        }).catch(() => {});
+      } catch {}
+    };
+
+    window.addEventListener('beforeunload', notifyOffline);
+    window.addEventListener('pagehide', notifyOffline);
   }
 
   private async sendHeartbeat() {

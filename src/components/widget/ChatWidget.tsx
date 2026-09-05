@@ -943,9 +943,11 @@ export default function ChatWidget({
                     >
                       <span className="tabular-nums">{timeString}</span>
                       {isVisitor && (
-                        <span title={msg.read_at ? 'Seen' : 'Sent'} className="flex items-center">
+                        <span title={msg.read_at ? 'Seen by support' : isAgentOnline ? 'Delivered' : 'Sent'} className="flex items-center">
                           {msg.read_at ? (
                             <CheckCheck className="w-3.5 h-3.5 text-blue-500 stroke-[2.5]" />
+                          ) : isAgentOnline ? (
+                            <CheckCheck className="w-3.5 h-3.5 text-slate-400 stroke-[2]" />
                           ) : (
                             <Check className="w-3.5 h-3.5 text-slate-400 stroke-[2]" />
                           )}

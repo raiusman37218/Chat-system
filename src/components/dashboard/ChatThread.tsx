@@ -562,9 +562,9 @@ export function ChatThread({
       : `Visitor ${conversation.visitor_id.slice(0, 6)}`);
 
   const isOnline = Boolean(
-    visitor?.is_online ||
+    visitor?.is_online !== false &&
     (visitor?.last_seen || visitor?.last_seen_at
-      ? (Date.now() - new Date(visitor.last_seen || visitor.last_seen_at!).getTime()) / 1000 < 180
+      ? (Date.now() - new Date(visitor.last_seen || visitor.last_seen_at!).getTime()) / 1000 < 60
       : false)
   );
 

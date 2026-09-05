@@ -11,6 +11,8 @@ import {
   Smile,
   Frown,
   SlidersHorizontal,
+  Check,
+  CheckCheck,
 } from 'lucide-react';
 import {
   Conversation,
@@ -206,9 +208,10 @@ export function ConversationList({
   const hasActiveFilters =
     channelFilter !== 'all' || selectedTagFilter !== 'all' || statusView !== 'open';
 
-  const isVisitorOnline = (lastSeen?: string) => {
+  const isVisitorOnline = (lastSeen?: string, isOnlineFlag?: boolean) => {
+    if (isOnlineFlag === false) return false;
     if (!lastSeen) return false;
-    return (Date.now() - new Date(lastSeen).getTime()) / 1000 < 90;
+    return (Date.now() - new Date(lastSeen).getTime()) / 1000 < 60;
   };
 
   const queueTabs: { id: InboxQueue; label: string; count: number }[] = [
@@ -455,7 +458,8 @@ export function ConversationList({
           filteredAndSorted.map((conv) => {
             const selected = conv.id === selectedConversationId;
             const online = isVisitorOnline(
-              conv.visitor?.last_seen || conv.visitor?.last_seen_at
+              conv.visitor?.last_seen || conv.visitor?.last_seen_at,
+              conv.visitor?.is_online
             );
             const name = displayNameFor(conv);
             const fromAgent = conv.last_message?.sender_type === 'agent';
@@ -539,9 +543,49 @@ export function ConversationList({
                       )}
                     >
                       {fromAgent ? (
-                        <span className="text-ink-2 font-medium">You: </span>
+                        <span className="text-ink-2 font-medium inline-flex items-center gap-0.5 mr-1">
+                          <span
+                            className="inline-flex items-center"
+                            title={
+                              conv.last_message?.read_at
+                                ? 'Seen by customer'
+                                : online
+                                ? 'Delivered (website open)'
+                                : 'Sent (website closed)'
+                            }
+                          >
+                            {conv.last_message?.read_at ? (
+                              <CheckCheck className="w-3.5 h-3.5 text-blue-500 stroke-[2.5]" />
+                            ) : online ? (
+                              <CheckCheck className="w-3.5 h-3.5 text-ink-3/70 stroke-[2]" />
+                            ) : (
+                              <Check className="w-3.5 h-3.5 text-ink-3/70 stroke-[2]" />
+                            )}
+                          </span>
+                          <span>You: </span>
+                        </span>
                       ) : fromAi ? (
-                        <span className="text-purple-600 dark:text-purple-400 font-medium">🤖 AI: </span>
+                        <span className="text-purple-600 dark:text-purple-400 font-medium inline-flex items-center gap-0.5 mr-1">
+                          <span
+                            className="inline-flex items-center"
+                            title={
+                              conv.last_message?.read_at
+                                ? 'Seen by customer'
+                                : online
+                                ? 'Delivered (website open)'
+                                : 'Sent (website closed)'
+                            }
+                          >
+                            {conv.last_message?.read_at ? (
+                              <CheckCheck className="w-3.5 h-3.5 text-blue-500 stroke-[2.5]" />
+                            ) : online ? (
+                              <CheckCheck className="w-3.5 h-3.5 text-ink-3/70 stroke-[2]" />
+                            ) : (
+                              <Check className="w-3.5 h-3.5 text-ink-3/70 stroke-[2]" />
+                            )}
+                          </span>
+                          <span>🤖 AI: </span>
+                        </span>
                       ) : null}
                       {conv.last_message?.content ||
                         (conv.last_message?.attachment_url
