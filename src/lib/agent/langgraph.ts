@@ -1,6 +1,10 @@
 import { createClient } from '@supabase/supabase-js';
 import { dispatchOutboundMessage } from '@/lib/channels/dispatcher';
-import { generateAutoFirstResponse } from '@/lib/ai/anthropic';
+import {
+  generateAutoFirstResponse,
+  generateHelpDeskResponseWithHandover,
+  executeHandoverToHuman,
+} from '@/lib/ai/anthropic';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://vfjsaynnubxywdbevxtx.supabase.co';
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZmanNheW5udWJ4eXdkYmV2eHR4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgyNTA5MDEsImV4cCI6MjEwMzgyNjkwMX0.YyBCXMqwrOk5BRhQafYLFw8tiM5PC8lc8Yocodw9wf0';
@@ -159,7 +163,7 @@ export async function triggerLangGraphAgent(params: LangGraphTriggerParams) {
 
     // 3. ZERO-CONFIG BUILT-IN HELP DESK KNOWLEDGE AGENT (No URL required!)
     console.log(`[AI Bridge] Running Built-in Help Desk RAG for workspace ${workspaceId}`);
-    const replyText = await generateAutoFirstResponse({
+    const result = await generateHelpDeskResponseWithHandover({
       workspaceId,
       conversationId,
       incomingMessage,
@@ -168,9 +172,25 @@ export async function triggerLangGraphAgent(params: LangGraphTriggerParams) {
       systemPrompt: integration?.langgraph_system_prompt || null,
     });
 
-    if (replyText) {
-      await insertAndDispatchReply(supabase, conversationId, workspaceId, replyText, sender.channel);
-      return { success: true, action: 'reply', response: replyText };
+    if (result.replyText) {
+      await insertAndDispatchReply(supabase, conversationId, workspaceId, result.replyText, sender.channel);
+    }
+
+    // If inquiry cannot be answered from docs or user requested a human, execute handover!
+    if (result.shouldHandover) {
+      console.log(`[AI Bridge] Handing over conversation ${conversationId} to human. Reason: ${result.handoverReason}`);
+      await executeHandoverToHuman({
+        supabase,
+        conversationId,
+        workspaceId,
+        reason: result.handoverReason || 'Inquiry requires human specialist assistance.',
+        channel: sender.channel,
+      });
+      return { success: true, action: 'escalate', reason: result.handoverReason };
+    }
+
+    if (result.replyText) {
+      return { success: true, action: 'reply', response: result.replyText };
     }
 
     return { success: true, action: 'none' };

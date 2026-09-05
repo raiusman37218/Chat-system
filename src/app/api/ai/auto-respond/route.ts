@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { generateAutoFirstResponse } from '@/lib/ai/anthropic';
+import {
+  generateAutoFirstResponse,
+  generateHelpDeskResponseWithHandover,
+  executeHandoverToHuman,
+} from '@/lib/ai/anthropic';
 import { dispatchOutboundMessage } from '@/lib/channels/dispatcher';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://vfjsaynnubxywdbevxtx.supabase.co';
@@ -76,7 +80,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 3. Generate RAG First Response using workspace Help Desk sections and articles
-    const aiResponseText = await generateAutoFirstResponse({
+    const result = await generateHelpDeskResponseWithHandover({
       workspaceId: workspace_id,
       conversationId: conversation_id,
       incomingMessage: visitorMsg.content,
@@ -84,6 +88,7 @@ export async function POST(req: NextRequest) {
       apiKey: aiSettings?.anthropic_api_key,
     });
 
+    const aiResponseText = result.replyText;
     if (!aiResponseText || !aiResponseText.trim()) {
       return NextResponse.json({ replied: false, reason: 'Empty auto-response generated' });
     }
@@ -118,6 +123,18 @@ export async function POST(req: NextRequest) {
       throw msgErr;
     }
 
+    // 4b. If Help Desk cannot answer or customer requested a real agent, execute handover!
+    if (result.shouldHandover) {
+      console.log(`[Auto-Respond] Handing over conversation ${conversation_id} to real agent. Reason: ${result.handoverReason}`);
+      await executeHandoverToHuman({
+        supabase,
+        conversationId: conversation_id,
+        workspaceId: workspace_id,
+        reason: result.handoverReason || 'Inquiry not covered in Help Desk documentation.',
+        channel: conv.channel || 'web',
+      });
+    }
+
     // 5. If channel is multi-channel (WhatsApp, Meta, LinkedIn), dispatch outbound
     if (conv.channel && conv.channel !== 'web') {
       await dispatchOutboundMessage({
@@ -128,7 +145,7 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    return NextResponse.json({ replied: true, message: insertedMsg });
+    return NextResponse.json({ replied: true, message: insertedMsg, handed_over: result.shouldHandover });
   } catch (error: any) {
     console.error('Error in AI auto-respond:', error);
     return NextResponse.json({ error: error.message || 'Auto-respond failed' }, { status: 500 });

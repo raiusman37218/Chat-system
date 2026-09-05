@@ -1,6 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { createClient } from '@supabase/supabase-js';
-import {  } from '@/types/database';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://vfjsaynnubxywdbevxtx.supabase.co';
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZmanNheW5udWJ4eXdkYmV2eHR4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgyNTA5MDEsImV4cCI6MjEwMzgyNjkwMX0.YyBCXMqwrOk5BRhQafYLFw8tiM5PC8lc8Yocodw9wf0';
@@ -15,10 +14,17 @@ function getAnthropicClient(apiKey?: string | null): Anthropic | null {
   return new Anthropic({ apiKey: key });
 }
 
+export interface HelpDeskResponseResult {
+  replyText: string;
+  shouldHandover: boolean;
+  handoverReason?: string;
+  canAnswerFromDocs: boolean;
+}
+
 /**
- * 1. AI Auto-First-Response with RAG over knowledge base articles
+ * 1. AI Auto-First-Response with RAG over Help Desk sections & articles, with intelligent Human Handover
  */
-export async function generateAutoFirstResponse({
+export async function generateHelpDeskResponseWithHandover({
   workspaceId,
   conversationId,
   incomingMessage,
@@ -32,8 +38,22 @@ export async function generateAutoFirstResponse({
   visitorName?: string;
   apiKey?: string | null;
   systemPrompt?: string | null;
-}): Promise<string> {
+}): Promise<HelpDeskResponseResult> {
   const supabase = getSupabase();
+
+  // 0. Check for explicit human agent request in incoming text
+  const humanRequestRegex =
+    /\b(human|agent|person|representative|support agent|live support|operator|real person|talk to someone|speak to someone|baat karni|insan|human support|customer care|speak with human|contact agent)\b/i;
+  const isExplicitHumanRequest = humanRequestRegex.test(incomingMessage);
+
+  if (isExplicitHumanRequest) {
+    return {
+      replyText: `Hello ${visitorName || 'there'}! 👋 I understand you'd like to speak with a human support specialist. I have transferred your conversation to our live team, and someone will assist you shortly!`,
+      shouldHandover: true,
+      handoverReason: 'Customer explicitly requested to speak with a human agent.',
+      canAnswerFromDocs: false,
+    };
+  }
 
   // 1. Fetch relevant Help Desk sections and published articles for this workspace
   const [{ data: sections }, { data: articles }] = await Promise.all([
@@ -93,7 +113,7 @@ export async function generateAutoFirstResponse({
     try {
       const defaultInstruction =
         systemPrompt ||
-        'You are the official AI Support Assistant for our company. Be polite, concise, warm, and helpful. Escalate to a human agent when needed.';
+        'You are the official AI Support Assistant for our company. Be polite, concise, warm, and helpful.';
 
       const prompt = `${defaultInstruction}
 
@@ -104,10 +124,15 @@ Here is our official Help Desk Documentation:
 ${ragContext || 'No relevant documentation articles found for this workspace.'}
 
 Instructions:
-- Provide a helpful, clear, and professional response (max 2-3 short paragraphs).
-- Answer based on our Help Desk documentation whenever possible.
-- If the documentation does not fully answer their question, answer what you can and politely inform them that our human support team has been notified and will assist shortly.
-- Do not mention that you were given a prompt or internal context.`;
+1. Ground Truth Evaluation:
+   - Check if the Help Desk Documentation above provides sufficient information to answer the customer's question clearly.
+2. If YES (documentation covers this inquiry):
+   - Provide a helpful, concise, and professional response (max 2 short paragraphs) based on our documentation.
+3. If NO (documentation does NOT cover this inquiry, or the user is facing an account-specific problem, transaction issue, bug, or asks something beyond the documentation):
+   - Politely explain what you can and inform the customer that their inquiry has been escalated to our human support team who will join shortly.
+   - At the very end of your response, append the exact tag: [HANDOVER: <short reason why human is needed>]
+
+Do not invent or hallucinate policies not found in the documentation. Do not mention that you were given a prompt or internal context.`;
 
       const msg = await anthropic.messages.create({
         model: 'claude-3-5-sonnet-20241022',
@@ -117,24 +142,127 @@ Instructions:
 
       const firstBlock = msg.content[0];
       if (firstBlock && 'text' in firstBlock) {
-        return firstBlock.text.trim();
+        let text = firstBlock.text.trim();
+        const handoverMatch = text.match(/\[HANDOVER:\s*([^\]]+)\]/i);
+
+        if (handoverMatch) {
+          const reason = handoverMatch[1].trim();
+          text = text.replace(/\[HANDOVER:\s*[^\]]+\]/i, '').trim();
+          return {
+            replyText: text,
+            shouldHandover: true,
+            handoverReason: reason || 'Inquiry requires human specialist assistance.',
+            canAnswerFromDocs: false,
+          };
+        }
+
+        return {
+          replyText: text,
+          shouldHandover: false,
+          canAnswerFromDocs: true,
+        };
       }
     } catch (err) {
-      console.warn('[Anthropic] Claude API error in auto-first-response, falling back:', err);
+      console.warn('[Anthropic] Claude API error in help desk response, falling back:', err);
     }
   }
 
   // Heuristic RAG Fallback when API key is not configured or fails
-  const bestMatch = scoredArticles.find((item) => item.score > 0)?.article || relevantArticles[0];
+  const bestMatch = scoredArticles.find((item) => item.score > 0)?.article;
+  const bestScore = scoredArticles[0]?.score || 0;
 
-  if (bestMatch && (scoredArticles[0]?.score || 0) > 0) {
+  if (bestMatch && bestScore >= 4) {
     const sectionName = bestMatch.section_id ? sectionMap.get(bestMatch.section_id) : null;
     const prefix = sectionName ? `our Help Center (${sectionName} - "${bestMatch.title}")` : `"${bestMatch.title}"`;
     const excerpt = bestMatch.summary || bestMatch.content.slice(0, 220);
-    return `Hello ${visitorName || 'there'}! 👋 Thanks for reaching out. Based on ${prefix}:\n\n${excerpt}...\n\nLet us know if you have any questions, our support team has been alerted!`;
+    return {
+      replyText: `Hello ${visitorName || 'there'}! 👋 Based on ${prefix}:\n\n${excerpt}...\n\nLet us know if you have any questions, our support team has been alerted!`,
+      shouldHandover: false,
+      canAnswerFromDocs: true,
+    };
   }
 
-  return `Hello ${visitorName || 'there'}! 👋 Thank you for messaging support. I've logged your request regarding "${incomingMessage}". One of our support specialists has been alerted and will reply in just a moment.`;
+  // If score is 0 or low relevance, Help Desk doesn't cover this: Trigger Handover!
+  return {
+    replyText: `Hello ${visitorName || 'there'}! 👋 I couldn't find specific documentation covering your inquiry in our Help Center, so I've transferred your conversation to our live support team. A specialist has been alerted and will assist you shortly!`,
+    shouldHandover: true,
+    handoverReason: 'Inquiry is not covered in Help Desk documentation.',
+    canAnswerFromDocs: false,
+  };
+}
+
+/**
+ * Backward compatibility wrapper returning reply text
+ */
+export async function generateAutoFirstResponse(params: {
+  workspaceId: string;
+  conversationId: string;
+  incomingMessage: string;
+  visitorName?: string;
+  apiKey?: string | null;
+  systemPrompt?: string | null;
+}): Promise<string> {
+  const result = await generateHelpDeskResponseWithHandover(params);
+  return result.replyText;
+}
+
+/**
+ * Executes a seamless handover to human agents:
+ * - Updates conversation: status = 'open', priority = 'high', ai_mode = 'disabled'
+ * - Inserts internal note: '🤖 [AI Handover]: Transferred to human agent. Reason: ...'
+ * - Auto-assigns to an online human agent if auto-assignment is enabled
+ */
+export async function executeHandoverToHuman({
+  supabase,
+  conversationId,
+  workspaceId,
+  reason,
+  channel = 'web',
+}: {
+  supabase: ReturnType<typeof getSupabase>;
+  conversationId: string;
+  workspaceId: string;
+  reason: string;
+  channel?: string;
+}) {
+  try {
+    // 1. Escalate conversation in Supabase
+    await supabase
+      .from('conversations')
+      .update({
+        status: 'open',
+        priority: 'high',
+        ai_mode: 'disabled', // Disables AI auto-replies on this conversation
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', conversationId);
+
+    // 2. Insert private internal note for human support agents
+    await supabase.from('messages').insert({
+      conversation_id: conversationId,
+      sender_type: 'ai',
+      content: `🤖 [AI Handover to Real Agent]: Handed over to human agent.\nReason: ${reason}`,
+      is_internal: true,
+    });
+
+    // 3. Attempt auto-assignment to available human agent
+    const { data: ws } = await supabase
+      .from('workspaces')
+      .select('auto_assignment')
+      .eq('id', workspaceId)
+      .maybeSingle();
+
+    if (ws?.auto_assignment?.enabled) {
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+      fetch(`${appUrl}/api/conversations/auto-assign`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ conversation_id: conversationId }),
+      }).catch((e) => console.warn('[Auto-Assign Error during Handover]:', e));
+    }
+  } catch (err: any) {
+    console.error('[executeHandoverToHuman Error]:', err.message);
+  }
 }
 
 /**
