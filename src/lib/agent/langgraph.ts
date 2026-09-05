@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { dispatchOutboundMessage } from '@/lib/channels/dispatcher';
+import { generateAutoFirstResponse } from '@/lib/ai/anthropic';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://vfjsaynnubxywdbevxtx.supabase.co';
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZmanNheW5udWJ4eXdkYmV2eHR4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgyNTA5MDEsImV4cCI6MjEwMzgyNjkwMX0.YyBCXMqwrOk5BRhQafYLFw8tiM5PC8lc8Yocodw9wf0';
@@ -38,104 +39,135 @@ export async function triggerLangGraphAgent(params: LangGraphTriggerParams) {
   const { conversationId, workspaceId, incomingMessage, sender } = params;
 
   try {
-    // 1. Fetch workspace integration settings
-    const { data: integration, error: intErr } = await supabase
-      .from('workspace_integrations')
-      .select('*')
-      .eq('workspace_id', workspaceId)
-      .maybeSingle();
+    // 1. Fetch workspace integration settings and workspace AI settings
+    const [{ data: integration }, { data: workspace }] = await Promise.all([
+      supabase
+        .from('workspace_integrations')
+        .select('*')
+        .eq('workspace_id', workspaceId)
+        .maybeSingle(),
+      supabase
+        .from('workspaces')
+        .select('ai_settings')
+        .eq('id', workspaceId)
+        .maybeSingle(),
+    ]);
 
-    if (intErr || !integration || !integration.langgraph_enabled || !integration.langgraph_webhook_url) {
-      return { success: false, reason: 'LangGraph integration not enabled or URL missing' };
+    // Check if Agent is turned ON or OFF
+    const isEnabled = integration ? Boolean(integration.langgraph_enabled) : (workspace?.ai_settings?.enabled ?? true);
+    if (!isEnabled) {
+      return { success: true, action: 'none', reason: 'AI Agent is disabled/turned OFF' };
     }
 
-    // 2. Fetch conversation history for context
-    const { data: historyMessages } = await supabase
-      .from('messages')
-      .select('sender_type, content, created_at, is_internal')
-      .eq('conversation_id', conversationId)
-      .eq('is_internal', false)
-      .order('created_at', { ascending: true })
-      .limit(20);
-
-    const history = (historyMessages || []).map((m) => ({
-      role: m.sender_type === 'visitor' ? 'user' : 'assistant',
-      content: m.content,
-      timestamp: m.created_at,
-    }));
-
-    // 3. Dispatch payload to LangGraph agent endpoint
-    const payload = {
-      conversation_id: conversationId,
-      workspace_id: workspaceId,
-      channel: sender.channel,
-      visitor: {
-        name: sender.name || 'Customer',
-        email: sender.email || null,
-        channel_user_id: sender.channel_user_id || null,
-      },
-      current_message: incomingMessage,
-      history,
-      system_prompt:
-        integration.langgraph_system_prompt ||
-        'You are Chatify AI Support Assistant. Be polite, concise, and helpful. Escalate to a human agent when needed.',
-    };
-
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-    };
-    if (integration.langgraph_api_key) {
-      headers['Authorization'] = `Bearer ${integration.langgraph_api_key}`;
+    // Check if auto-pilot is ON or OFF
+    const isAutoPilot = integration ? Boolean(integration.langgraph_auto_pilot) : (workspace?.ai_settings?.auto_response_enabled ?? true);
+    if (!isAutoPilot) {
+      return { success: true, action: 'none', reason: 'Auto-pilot is turned OFF' };
     }
 
-    console.log(`[LangGraph Bridge] Calling agent endpoint at: ${integration.langgraph_webhook_url}`);
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 25000); // 25s timeout
+    // 2. If an external Webhook URL is configured, call it
+    if (integration?.langgraph_webhook_url?.trim()) {
+      const { data: historyMessages } = await supabase
+        .from('messages')
+        .select('sender_type, content, created_at, is_internal')
+        .eq('conversation_id', conversationId)
+        .eq('is_internal', false)
+        .order('created_at', { ascending: true })
+        .limit(20);
 
-    const res = await fetch(integration.langgraph_webhook_url, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(payload),
-      signal: controller.signal,
-    });
-    clearTimeout(timeout);
+      const history = (historyMessages || []).map((m) => ({
+        role: m.sender_type === 'visitor' ? 'user' : 'assistant',
+        content: m.content,
+        timestamp: m.created_at,
+      }));
 
-    if (!res.ok) {
-      const errText = await res.text();
-      throw new Error(`LangGraph returned HTTP ${res.status}: ${errText}`);
-    }
-
-    const data: LangGraphResponse = await res.json();
-    const replyText = data.response || data.content || data.message || '';
-
-    // 4. Handle internal notes if the agent left any
-    if (data.internal_note) {
-      await supabase.from('messages').insert({
+      const payload = {
         conversation_id: conversationId,
-        sender_type: 'ai',
-        content: `🤖 [AI Agent Note]: ${data.internal_note}`,
-        is_internal: true,
-      });
-    }
+        workspace_id: workspaceId,
+        channel: sender.channel,
+        visitor: {
+          name: sender.name || 'Customer',
+          email: sender.email || null,
+          channel_user_id: sender.channel_user_id || null,
+        },
+        current_message: incomingMessage,
+        history,
+        system_prompt:
+          integration.langgraph_system_prompt ||
+          'You are Chatify AI Support Assistant. Be polite, concise, and helpful. Escalate to a human agent when needed.',
+      };
 
-    // 5. Handle escalation
-    if (data.action === 'escalate') {
-      await supabase
-        .from('conversations')
-        .update({
-          status: 'open',
-          priority: data.priority || 'high',
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', conversationId);
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+      if (integration.langgraph_api_key) {
+        headers['Authorization'] = `Bearer ${integration.langgraph_api_key}`;
+      }
+
+      console.log(`[AI Bridge] Calling external agent endpoint at: ${integration.langgraph_webhook_url}`);
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 25000);
+
+      const res = await fetch(integration.langgraph_webhook_url, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(payload),
+        signal: controller.signal,
+      });
+      clearTimeout(timeout);
+
+      if (!res.ok) {
+        const errText = await res.text();
+        throw new Error(`External agent returned HTTP ${res.status}: ${errText}`);
+      }
+
+      const data: LangGraphResponse = await res.json();
+      const replyText = data.response || data.content || data.message || '';
+
+      if (data.internal_note) {
+        await supabase.from('messages').insert({
+          conversation_id: conversationId,
+          sender_type: 'ai',
+          content: `🤖 [AI Agent Note]: ${data.internal_note}`,
+          is_internal: true,
+        });
+      }
+
+      if (data.action === 'escalate') {
+        await supabase
+          .from('conversations')
+          .update({
+            status: 'open',
+            priority: data.priority || 'high',
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', conversationId);
+
+        if (replyText) {
+          await insertAndDispatchReply(supabase, conversationId, workspaceId, replyText, sender.channel);
+        }
+        return { success: true, action: 'escalate' };
+      }
 
       if (replyText) {
         await insertAndDispatchReply(supabase, conversationId, workspaceId, replyText, sender.channel);
+        return { success: true, action: 'reply', response: replyText };
       }
-      return { success: true, action: 'escalate' };
+
+      return { success: true, action: 'none' };
     }
 
-    // 6. Handle standard AI reply
+    // 3. ZERO-CONFIG BUILT-IN HELP DESK KNOWLEDGE AGENT (No URL required!)
+    console.log(`[AI Bridge] Running Built-in Help Desk RAG for workspace ${workspaceId}`);
+    const replyText = await generateAutoFirstResponse({
+      workspaceId,
+      conversationId,
+      incomingMessage,
+      visitorName: sender.name || undefined,
+      apiKey: integration?.langgraph_api_key || workspace?.ai_settings?.anthropic_api_key || null,
+      systemPrompt: integration?.langgraph_system_prompt || null,
+    });
+
     if (replyText) {
       await insertAndDispatchReply(supabase, conversationId, workspaceId, replyText, sender.channel);
       return { success: true, action: 'reply', response: replyText };
@@ -143,7 +175,7 @@ export async function triggerLangGraphAgent(params: LangGraphTriggerParams) {
 
     return { success: true, action: 'none' };
   } catch (err: any) {
-    console.error('[LangGraph Bridge Error]:', err.message);
+    console.error('[AI Bridge Error]:', err.message);
     return { success: false, error: err.message };
   }
 }
@@ -207,8 +239,16 @@ export async function generateLangGraphDraft(params: LangGraphTriggerParams): Pr
       .maybeSingle();
 
     if (!integration || !integration.langgraph_webhook_url) {
-      // Fallback default suggestions if agent URL isn't configured yet
-      return `Hi ${sender.name || 'there'}! Thank you for reaching out. How can I assist you with your request today?`;
+      // Use built-in Help Desk Knowledge Base RAG for suggested draft
+      const draft = await generateAutoFirstResponse({
+        workspaceId,
+        conversationId,
+        incomingMessage,
+        visitorName: sender.name || undefined,
+        apiKey: integration?.langgraph_api_key || null,
+        systemPrompt: integration?.langgraph_system_prompt || null,
+      });
+      return draft || `Hi ${sender.name || 'there'}! Thank you for reaching out. How can I assist you with your request today?`;
     }
 
     const { data: historyMessages } = await supabase

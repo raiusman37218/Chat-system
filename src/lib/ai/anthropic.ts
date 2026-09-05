@@ -24,45 +24,94 @@ export async function generateAutoFirstResponse({
   incomingMessage,
   visitorName,
   apiKey,
+  systemPrompt,
 }: {
   workspaceId: string;
   conversationId: string;
   incomingMessage: string;
   visitorName?: string;
   apiKey?: string | null;
+  systemPrompt?: string | null;
 }): Promise<string> {
   const supabase = getSupabase();
 
-  // 1. Fetch relevant Knowledge Base articles (RAG)
-  const { data: articles } = await supabase
-    .from('articles')
-    .select('title, category, summary, content')
-    .or(`workspace_id.eq.${workspaceId},workspace_id.is.null`);
+  // 1. Fetch relevant Help Desk sections and published articles for this workspace
+  const [{ data: sections }, { data: articles }] = await Promise.all([
+    supabase
+      .from('help_sections')
+      .select('id, name, description')
+      .eq('workspace_id', workspaceId)
+      .order('order_index', { ascending: true }),
+    supabase
+      .from('articles')
+      .select('id, section_id, title, category, summary, content, status')
+      .or(`workspace_id.eq.${workspaceId},workspace_id.is.null`),
+  ]);
 
-  const relevantArticles = (articles || []).slice(0, 5);
+  const publishedArticles = (articles || []).filter(
+    (a) => !a.status || a.status === 'published'
+  );
+
+  const sectionMap = new Map((sections || []).map((s) => [s.id, s.name]));
+
+  // Rank articles by keyword overlap with the customer's incoming message
+  const queryWords = incomingMessage
+    .toLowerCase()
+    .replace(/[^\w\s]/g, '')
+    .split(/\s+/)
+    .filter((w) => w.length > 2);
+
+  const scoredArticles = publishedArticles.map((article) => {
+    let score = 0;
+    const titleLower = (article.title || '').toLowerCase();
+    const summaryLower = (article.summary || '').toLowerCase();
+    const contentLower = (article.content || '').toLowerCase();
+    const categoryLower = (article.category || '').toLowerCase();
+
+    for (const word of queryWords) {
+      if (titleLower.includes(word)) score += 8;
+      if (summaryLower.includes(word)) score += 4;
+      if (categoryLower.includes(word)) score += 3;
+      if (contentLower.includes(word)) score += 1;
+    }
+    return { article, score };
+  });
+
+  scoredArticles.sort((a, b) => b.score - a.score);
+  const relevantArticles = scoredArticles.slice(0, 5).map((item) => item.article);
+
   const ragContext = relevantArticles
-    .map((a) => `### ${a.title} (${a.category})\n${a.summary ? `Summary: ${a.summary}\n` : ''}${a.content}`)
+    .map((a) => {
+      const sectionName = a.section_id ? sectionMap.get(a.section_id) : null;
+      const heading = sectionName ? `[${sectionName}] ${a.title}` : a.title;
+      return `### ${heading} (${a.category || 'General'})\n${a.summary ? `Summary: ${a.summary}\n` : ''}${a.content}`;
+    })
     .join('\n\n');
 
   const anthropic = getAnthropicClient(apiKey);
   if (anthropic) {
     try {
-      const prompt = `You are an AI support agent for our company.
-A visitor named "${visitorName || 'Customer'}" just sent their initial message:
+      const defaultInstruction =
+        systemPrompt ||
+        'You are the official AI Support Assistant for our company. Be polite, concise, warm, and helpful. Escalate to a human agent when needed.';
+
+      const prompt = `${defaultInstruction}
+
+A customer named "${visitorName || 'Customer'}" just asked:
 "${incomingMessage}"
 
-Here is our Knowledge Base documentation:
-${ragContext || 'No documentation articles found.'}
+Here is our official Help Desk Documentation:
+${ragContext || 'No relevant documentation articles found for this workspace.'}
 
 Instructions:
-- Provide a helpful, warm, professional response (max 2-3 short paragraphs).
-- If the knowledge base answers their question, explain it simply.
-- If the knowledge base does not cover their question, politely answer what you can and let them know a human agent has been alerted and will assist them shortly.
-- Do not mention that you were given a prompt or knowledge base context.`;
+- Provide a helpful, clear, and professional response (max 2-3 short paragraphs).
+- Answer based on our Help Desk documentation whenever possible.
+- If the documentation does not fully answer their question, answer what you can and politely inform them that our human support team has been notified and will assist shortly.
+- Do not mention that you were given a prompt or internal context.`;
 
       const msg = await anthropic.messages.create({
         model: 'claude-3-5-sonnet-20241022',
-        max_tokens: 400,
+        max_tokens: 450,
         messages: [{ role: 'user', content: prompt }],
       });
 
@@ -76,13 +125,13 @@ Instructions:
   }
 
   // Heuristic RAG Fallback when API key is not configured or fails
-  const queryLower = incomingMessage.toLowerCase();
-  const matchedArticle = relevantArticles.find((a) =>
-    queryLower.split(' ').some((word) => word.length > 3 && (a.title.toLowerCase().includes(word) || a.content.toLowerCase().includes(word)))
-  );
+  const bestMatch = scoredArticles.find((item) => item.score > 0)?.article || relevantArticles[0];
 
-  if (matchedArticle) {
-    return `Hello ${visitorName || 'there'}! 👋 Thanks for reaching out. Based on our docs regarding "${matchedArticle.title}": ${matchedArticle.summary || matchedArticle.content.slice(0, 180)}... Let us know if you have any questions, our team is standing by!`;
+  if (bestMatch && (scoredArticles[0]?.score || 0) > 0) {
+    const sectionName = bestMatch.section_id ? sectionMap.get(bestMatch.section_id) : null;
+    const prefix = sectionName ? `our Help Center (${sectionName} - "${bestMatch.title}")` : `"${bestMatch.title}"`;
+    const excerpt = bestMatch.summary || bestMatch.content.slice(0, 220);
+    return `Hello ${visitorName || 'there'}! 👋 Thanks for reaching out. Based on ${prefix}:\n\n${excerpt}...\n\nLet us know if you have any questions, our support team has been alerted!`;
   }
 
   return `Hello ${visitorName || 'there'}! 👋 Thank you for messaging support. I've logged your request regarding "${incomingMessage}". One of our support specialists has been alerted and will reply in just a moment.`;

@@ -61,18 +61,21 @@ export async function POST(req: NextRequest) {
       .order('created_at', { ascending: true });
 
     const msgs = existingMessages || [];
-    const hasAgentOrAiReply = msgs.some((m) => m.sender_type === 'agent' || m.sender_type === 'ai');
-
-    if (hasAgentOrAiReply) {
-      return NextResponse.json({ replied: false, reason: 'Already responded' });
-    }
-
     const visitorMsg = msgs.find((m) => m.sender_type === 'visitor');
     if (!visitorMsg) {
       return NextResponse.json({ replied: false, reason: 'No visitor message found' });
     }
 
-    // 3. Generate RAG First Response
+    const visitorMsgIndex = msgs.findIndex((m) => m.id === visitorMsg.id);
+    const hasAgentOrAiReply = msgs
+      .slice(visitorMsgIndex + 1)
+      .some((m) => m.sender_type === 'agent' || m.sender_type === 'ai');
+
+    if (hasAgentOrAiReply) {
+      return NextResponse.json({ replied: false, reason: 'Already responded' });
+    }
+
+    // 3. Generate RAG First Response using workspace Help Desk sections and articles
     const aiResponseText = await generateAutoFirstResponse({
       workspaceId: workspace_id,
       conversationId: conversation_id,
@@ -91,6 +94,7 @@ export async function POST(req: NextRequest) {
       .select('id')
       .eq('conversation_id', conversation_id)
       .in('sender_type', ['agent', 'ai'])
+      .gt('created_at', visitorMsg.created_at)
       .limit(1);
 
     if (lateCheckMessages && lateCheckMessages.length > 0) {

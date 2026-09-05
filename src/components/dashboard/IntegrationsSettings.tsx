@@ -3,9 +3,12 @@
 import React, { useState, useEffect } from 'react';
 import {
   Bell,
+  BookOpen,
   Bot,
   Check,
   CheckCircle2,
+  ChevronDown,
+  ChevronUp,
   Copy,
   Globe,
   Link2,
@@ -81,21 +84,47 @@ export function IntegrationsSettings({
   const [testSlackTesting, setTestSlackTesting] = useState(false);
   const [slackTestResult, setSlackTestResult] = useState<{ success: boolean; message: string } | null>(null);
 
+  // Help Desk stats for Built-in Knowledge Agent
+  const [helpStats, setHelpStats] = useState<{ sectionsCount: number; articlesCount: number }>({
+    sectionsCount: 0,
+    articlesCount: 0,
+  });
+  const [showAdvancedWebhook, setShowAdvancedWebhook] = useState(false);
+
   // 1. Fetch current integration settings
   useEffect(() => {
     if (!workspace?.id) return;
 
     async function loadIntegrations() {
       try {
-        const { data, error } = await supabase
-          .from('workspace_integrations')
-          .select('*')
-          .eq('workspace_id', workspace!.id)
-          .maybeSingle();
+        const [{ data }, { count: secCount }, { count: artCount }] = await Promise.all([
+          supabase
+            .from('workspace_integrations')
+            .select('*')
+            .eq('workspace_id', workspace!.id)
+            .maybeSingle(),
+          supabase
+            .from('help_sections')
+            .select('id', { count: 'exact', head: true })
+            .eq('workspace_id', workspace!.id),
+          supabase
+            .from('articles')
+            .select('id', { count: 'exact', head: true })
+            .eq('workspace_id', workspace!.id)
+            .eq('status', 'published'),
+        ]);
 
         if (data) {
           setFormData((prev) => ({ ...prev, ...data }));
+          if (data.langgraph_webhook_url) {
+            setShowAdvancedWebhook(true);
+          }
         }
+
+        setHelpStats({
+          sectionsCount: secCount || 0,
+          articlesCount: artCount || 0,
+        });
       } catch (err) {
         console.error('Error fetching integrations:', err);
       } finally {
@@ -135,49 +164,65 @@ export function IntegrationsSettings({
     }
   };
 
-  // 3. Test LangGraph connection
+  // 3. Test AI Agent connection (Built-in Help Desk RAG or external webhook)
   const handleTestLangGraph = async () => {
-    if (!formData.langgraph_webhook_url) {
-      setTestResult({ success: false, message: 'Please enter a LangGraph Webhook URL first.' });
-      return;
-    }
-
     setTestTesting(true);
     setTestResult(null);
 
     try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 10000);
+      if (formData.langgraph_webhook_url?.trim()) {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 10000);
 
-      const res = await fetch(formData.langgraph_webhook_url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(formData.langgraph_api_key ? { Authorization: `Bearer ${formData.langgraph_api_key}` } : {}),
-        },
-        body: JSON.stringify({
-          conversation_id: 'test-ping-123',
-          workspace_id: workspace?.id,
-          channel: 'test',
-          visitor: { name: 'Chatify Test User' },
-          current_message: 'ping',
-          history: [],
-        }),
-        signal: controller.signal,
-      });
-      clearTimeout(timeout);
+        const res = await fetch(formData.langgraph_webhook_url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(formData.langgraph_api_key ? { Authorization: `Bearer ${formData.langgraph_api_key}` } : {}),
+          },
+          body: JSON.stringify({
+            conversation_id: 'test-ping-123',
+            workspace_id: workspace?.id,
+            channel: 'test',
+            visitor: { name: 'Chatify Test User' },
+            current_message: 'ping',
+            history: [],
+          }),
+          signal: controller.signal,
+        });
+        clearTimeout(timeout);
 
-      if (res.ok) {
-        const json = await res.json().catch(() => ({}));
+        if (res.ok) {
+          const json = await res.json().catch(() => ({}));
+          setTestResult({
+            success: true,
+            message: `External agent replied: "${json.response || json.content || json.message || 'OK'}"`,
+          });
+        } else {
+          const text = await res.text().catch(() => '');
+          setTestResult({
+            success: false,
+            message: `Agent endpoint returned HTTP ${res.status}: ${text.slice(0, 120)}`,
+          });
+        }
+      } else {
+        // Test Built-in Help Desk Knowledge Agent
+        const res = await fetch('/api/agent/suggest', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            conversation_id: 'test-knowledge-conv',
+            workspace_id: workspace?.id,
+            incoming_message: 'Hello, what services or support articles do you have?',
+            visitor: { name: 'Test Visitor' },
+          }),
+        });
+
+        const json = await res.json();
+        const reply = json.draft || '';
         setTestResult({
           success: true,
-          message: `Connection successful! LangGraph replied: "${json.response || json.content || json.message || 'OK'}"`,
-        });
-      } else {
-        const text = await res.text().catch(() => '');
-        setTestResult({
-          success: false,
-          message: `Agent endpoint returned HTTP ${res.status}: ${text.slice(0, 120)}`,
+          message: `✓ Built-in Help Desk AI responded: "${reply.slice(0, 160)}${reply.length > 160 ? '...' : ''}"`,
         });
       }
     } catch (err: any) {
@@ -300,7 +345,7 @@ export function IntegrationsSettings({
         {/* Navigation Tabs */}
         <div className="flex items-center gap-2 border-b border-line pb-px">
           {[
-            { id: 'langgraph', label: 'LangGraph AI Agent', icon: Bot, activeClass: 'text-accent border-accent' },
+            { id: 'langgraph', label: 'AI Knowledge Agent', icon: Bot, activeClass: 'text-accent border-accent' },
             { id: 'whatsapp', label: 'WhatsApp Business', icon: Phone, activeClass: 'text-[#25D366] border-[#25D366]' },
             { id: 'meta', label: 'Facebook & Instagram', icon: Globe, activeClass: 'text-[#0084FF] border-[#0084FF]' },
             { id: 'linkedin', label: 'LinkedIn Messaging', icon: Link2, activeClass: 'text-[#0A66C2] border-[#0A66C2]' },
@@ -327,23 +372,30 @@ export function IntegrationsSettings({
         </>
         )}
 
-        {/* ── TAB 1: LANGGRAPH AI AGENT ── */}
+        {/* ── TAB 1: BUILT-IN HELP DESK AI AGENT ── */}
         {activeTab === 'langgraph' && (
           <div className="space-y-6 animate-rise">
             <div className="card p-6 space-y-5">
               <div className="flex items-start justify-between">
                 <div>
-                  <h3 className="text-[15px] font-semibold text-ink flex items-center gap-2">
-                    <Bot className="w-4 h-4 text-accent" />
-                    LangGraph Agent Connection
-                  </h3>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-[15px] font-semibold text-ink flex items-center gap-2">
+                      <Bot className="w-4 h-4 text-accent" />
+                      AI Knowledge Base Agent
+                    </h3>
+                    <span className="text-[11px] px-2 py-0.5 rounded-full bg-accent/10 text-accent font-medium">
+                      Built-in RAG (Zero-Config)
+                    </span>
+                  </div>
                   <p className="mt-1 text-[12.5px] text-ink-3 max-w-2xl">
-                    Chatify sends incoming conversation events (visitor questions, message history, channel type) to your LangGraph webhook, and your agent responds back automatically.
+                    Automatically answers customer questions across Website Widget, WhatsApp, Instagram, Messenger, and LinkedIn using your Help Desk sections and articles. Zero external server or webhook URL required!
                   </p>
                 </div>
 
                 <label className="flex items-center gap-2.5 cursor-pointer select-none">
-                  <span className="text-[12.5px] font-medium text-ink-2">Enable Agent</span>
+                  <span className="text-[12.5px] font-medium text-ink-2">
+                    {formData.langgraph_enabled ? 'Agent Active' : 'Agent Disabled'}
+                  </span>
                   <input
                     type="checkbox"
                     checked={formData.langgraph_enabled}
@@ -353,50 +405,29 @@ export function IntegrationsSettings({
                 </label>
               </div>
 
+              {/* Connected Help Desk Knowledge Status Card */}
+              <div className="p-4 rounded-xl bg-surface-2 border border-line flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-lg bg-accent/10 text-accent flex items-center justify-center">
+                    <BookOpen className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h4 className="text-[13px] font-semibold text-ink">Ground Truth: Help Desk Documentation</h4>
+                      <span className="text-[11px] px-2 py-0.5 rounded-full bg-success-soft text-success font-medium">
+                        ✓ Connected
+                      </span>
+                    </div>
+                    <p className="text-[12px] text-ink-3 mt-0.5">
+                      Trained on <strong className="text-ink">{helpStats.sectionsCount} Sections</strong> and <strong className="text-ink">{helpStats.articlesCount} Published Articles</strong>. The AI formulates answers strictly from your documented knowledge base.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
               <div className="space-y-4 pt-2">
-                <div>
-                  <label className="field-label flex items-center justify-between">
-                    <span>LangGraph Webhook Endpoint URL <span className="text-danger">*</span></span>
-                    <span className="text-[11px] text-ink-3">Accepts POST payloads</span>
-                  </label>
-                  <input
-                    type="url"
-                    placeholder="https://your-agent-server.com/chat or http://localhost:8000/chat"
-                    value={formData.langgraph_webhook_url || ''}
-                    onChange={(e) => setFormData({ ...formData, langgraph_webhook_url: e.target.value })}
-                    className="input"
-                  />
-                  <p className="mt-1 text-[11.5px] text-ink-3">
-                    Your FastAPI / LangGraph Server URL where Chatify should dispatch conversation turns.
-                  </p>
-                </div>
-
-                <div>
-                  <label className="field-label flex items-center justify-between">
-                    <span>Authorization Bearer Token (Optional)</span>
-                    <span className="text-[11px] text-ink-3">Sent in Authorization header</span>
-                  </label>
-                  <input
-                    type="password"
-                    placeholder="e.g. sk-langgraph-secret-key-..."
-                    value={formData.langgraph_api_key || ''}
-                    onChange={(e) => setFormData({ ...formData, langgraph_api_key: e.target.value })}
-                    className="input"
-                  />
-                </div>
-
-                <div>
-                  <label className="field-label">Agent Instructions / System Prompt</label>
-                  <textarea
-                    rows={3}
-                    placeholder="Enter guidelines for how your LangGraph agent should behave when answering customer questions..."
-                    value={formData.langgraph_system_prompt || ''}
-                    onChange={(e) => setFormData({ ...formData, langgraph_system_prompt: e.target.value })}
-                    className="input resize-none py-2"
-                  />
-                </div>
-
-                <div className="flex items-center gap-6 pt-2 border-t border-line">
+                {/* Auto-Pilot Toggle */}
+                <div className="flex items-center gap-6 py-2 border-b border-line">
                   <label className="flex items-center gap-2.5 cursor-pointer">
                     <input
                       type="checkbox"
@@ -405,42 +436,103 @@ export function IntegrationsSettings({
                       className="w-4 h-4 accent-accent rounded"
                     />
                     <div>
-                      <span className="text-[13px] font-medium text-ink block">Auto-Pilot by Default</span>
+                      <span className="text-[13px] font-medium text-ink block">Auto-Pilot Mode</span>
                       <span className="text-[11.5px] text-ink-3 block">
-                        Automatically reply to new chats across all channels without waiting for a human agent.
+                        Automatically send AI replies immediately when a customer asks a question across any channel.
                       </span>
                     </div>
                   </label>
                 </div>
 
-                <div className="pt-3 flex items-center justify-between">
+                {/* System Prompt Instructions */}
+                <div>
+                  <label className="field-label flex items-center justify-between">
+                    <span>Agent Persona & Guidelines (Optional)</span>
+                    <span className="text-[11px] text-ink-3">Tone instructions</span>
+                  </label>
+                  <textarea
+                    rows={3}
+                    placeholder="e.g. You are the official AI Support Assistant. Be polite, concise, and helpful. Answer based strictly on our Help Desk documentation and escalate to a human agent when needed."
+                    value={formData.langgraph_system_prompt || ''}
+                    onChange={(e) => setFormData({ ...formData, langgraph_system_prompt: e.target.value })}
+                    className="input resize-none py-2"
+                  />
+                </div>
+
+                {/* Custom API Key */}
+                <div>
+                  <label className="field-label flex items-center justify-between">
+                    <span>Anthropic Claude API Key (Optional)</span>
+                    <span className="text-[11px] text-ink-3">Leave blank to use system default / semantic engine</span>
+                  </label>
+                  <input
+                    type="password"
+                    placeholder="sk-ant-api03-..."
+                    value={formData.langgraph_api_key || ''}
+                    onChange={(e) => setFormData({ ...formData, langgraph_api_key: e.target.value })}
+                    className="input"
+                  />
+                </div>
+
+                {/* Test Agent Connection */}
+                <div className="pt-2 flex items-center justify-between">
                   <button
                     type="button"
                     onClick={handleTestLangGraph}
-                    disabled={testTesting || !formData.langgraph_webhook_url}
+                    disabled={testTesting}
                     className="btn btn-sm btn-secondary gap-2"
                   >
                     {testTesting ? (
                       <>
                         <span className="w-3.5 h-3.5 rounded-full border-2 border-current border-t-transparent animate-spin" />
-                        Testing Connection…
+                        Generating Test Reply…
                       </>
                     ) : (
                       <>
                         <Sparkles className="w-3.5 h-3.5 text-accent" />
-                        Test Agent Connection
+                        Test AI Agent Response
                       </>
                     )}
                   </button>
 
                   {testResult && (
                     <div
-                      className={`text-[12px] px-3 py-1.5 rounded-lg flex items-center gap-2 ${
+                      className={`text-[12px] px-3 py-1.5 rounded-lg flex items-center gap-2 max-w-xl ${
                         testResult.success ? 'bg-success-soft text-success' : 'bg-danger-soft text-danger'
                       }`}
                     >
-                      {testResult.success ? <CheckCircle2 className="w-3.5 h-3.5" /> : null}
-                      <span>{testResult.message}</span>
+                      {testResult.success ? <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" /> : null}
+                      <span className="truncate">{testResult.message}</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Advanced External Webhook Accordion */}
+                <div className="pt-4 border-t border-line">
+                  <button
+                    type="button"
+                    onClick={() => setShowAdvancedWebhook(!showAdvancedWebhook)}
+                    className="flex items-center gap-2 text-[12.5px] font-medium text-ink-3 hover:text-ink transition-colors"
+                  >
+                    {showAdvancedWebhook ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                    <span>Advanced: External Custom Webhook (LangGraph / FastAPI)</span>
+                  </button>
+
+                  {showAdvancedWebhook && (
+                    <div className="mt-4 p-4 rounded-xl bg-surface-2 border border-line space-y-4 animate-rise">
+                      <p className="text-[12px] text-ink-3">
+                        If you have a dedicated Python LangGraph server and wish to use external custom tools instead of the built-in Help Desk RAG, enter your endpoint URL below.
+                      </p>
+                      <div>
+                        <label className="field-label">External Webhook URL</label>
+                        <input
+                          type="url"
+                          placeholder="https://your-agent-server.com/chat"
+                          value={formData.langgraph_webhook_url || ''}
+                          onChange={(e) => setFormData({ ...formData, langgraph_webhook_url: e.target.value })}
+                          className="input"
+                        />
+                      </div>
                     </div>
                   )}
                 </div>
