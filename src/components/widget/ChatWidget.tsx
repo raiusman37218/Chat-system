@@ -63,8 +63,13 @@ export default function ChatWidget({
   const [widgetPosition, setWidgetPosition] = useState<'bottom-right' | 'bottom-left'>(
     config.position || 'bottom-right'
   );
-  const companyName = config.companyName || 'Range4ex Support';
-  const welcomeText = config.welcomeText || 'welcome to the Range4ex';
+  const companyName = config.companyName || 'Support';
+  const [workspaceName, setWorkspaceName] = useState<string>(config.companyName || '');
+  const rawBusiness = (config.companyName || 'our business')
+    .replace(/^Welcome to\s+/i, '')
+    .replace(/\s*Support\s*$/i, '')
+    .trim() || config.companyName || 'our business';
+  const welcomeText = config.welcomeText || `welcome to the ${rawBusiness}`;
   const autoGreetingDelay = config.autoGreetingDelaySeconds ?? 5;
   const autoGreetingText = config.autoGreetingText || welcomeText;
 
@@ -110,7 +115,7 @@ export default function ChatWidget({
         const [{ data: wsData }, { data: articlesData }] = await Promise.all([
           supabase
             .from('workspaces')
-            .select('id, slug, custom_domain, custom_domain_status, website_url, help_center_tab_label, show_help_tab, widget_position')
+            .select('id, name, slug, custom_domain, custom_domain_status, website_url, help_center_tab_label, show_help_tab, widget_position')
             .eq('id', config.workspaceId)
             .maybeSingle(),
           supabase
@@ -122,6 +127,7 @@ export default function ChatWidget({
         ]);
 
         if (wsData) {
+          if (wsData.name) setWorkspaceName(wsData.name);
           if (wsData.help_center_tab_label) setHelpTabLabel(wsData.help_center_tab_label);
           if (typeof wsData.show_help_tab === 'boolean') setShowHelpTab(wsData.show_help_tab);
           if (wsData.widget_position) {
@@ -456,7 +462,13 @@ export default function ChatWidget({
         .limit(1);
 
       if (!existingMsgs || existingMsgs.length === 0) {
-        const welcomeContent = config.welcomeText || 'welcome to the Range4ex';
+        const rawName = (workspaceName || config.companyName || 'our company')
+          .replace(/^Welcome to\s+/i, '')
+          .replace(/\s*Support\s*$/i, '')
+          .replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}️]+\s*$/u, '')
+          .trim() || (workspaceName || config.companyName || 'our company');
+
+        const welcomeContent = config.welcomeText || `welcome to the ${rawName}`;
         const { data: savedMsg } = await supabase
           .from('messages')
           .insert({

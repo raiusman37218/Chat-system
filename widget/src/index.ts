@@ -18,6 +18,7 @@ interface WidgetConfig {
   logoUrl?: string;
   greetingTitle?: string;
   welcomeText?: string;
+  businessName?: string;
 }
 
 interface MessageItem {
@@ -113,6 +114,7 @@ class ChatifyWidget {
       helpTabLabel: script?.getAttribute('data-help-label') || 'Help',
       showHelpTab: script?.getAttribute('data-show-help') !== 'false',
       helpTabIcon: script?.getAttribute('data-help-icon') || '📖',
+      businessName: script?.getAttribute('data-business-name') || script?.getAttribute('data-company-name') || undefined,
     };
   }
 
@@ -136,6 +138,7 @@ class ChatifyWidget {
       });
 
       if (!error && data) {
+        if (data.name) this.config.businessName = data.name;
         if (data.brand_color) this.config.primaryColor = data.brand_color;
         if (data.greeting_title) this.config.title = data.greeting_title;
         if (data.greeting_message) this.config.subtitle = data.greeting_message;
@@ -2230,7 +2233,13 @@ class ChatifyWidget {
       .limit(1);
 
     if (!existingMsgs || existingMsgs.length === 0) {
-      const welcomeContent = this.config.welcomeText || 'welcome to the Range4ex';
+      const rawName = (this.config.businessName || this.config.title || 'our company')
+        .replace(/^Welcome to\s+/i, '')
+        .replace(/\s*Support\s*$/i, '')
+        .replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}️]+\s*$/u, '')
+        .trim() || (this.config.businessName || this.config.title || 'our company');
+
+      const welcomeContent = this.config.welcomeText || `welcome to the ${rawName}`;
       const { data: savedMsg } = await this.supabase
         .from('messages')
         .insert({
