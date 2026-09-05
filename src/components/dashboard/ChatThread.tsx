@@ -561,9 +561,12 @@ export function ChatThread({
       ? visitor.email.split('@')[0]
       : `Visitor ${conversation.visitor_id.slice(0, 6)}`);
 
-  const isOnline = visitor?.last_seen
-    ? (Date.now() - new Date(visitor.last_seen).getTime()) / 1000 < 60
-    : false;
+  const isOnline = Boolean(
+    visitor?.is_online ||
+    (visitor?.last_seen || visitor?.last_seen_at
+      ? (Date.now() - new Date(visitor.last_seen || visitor.last_seen_at!).getTime()) / 1000 < 180
+      : false)
+  );
 
   const currentPriority: ConversationPriority = conversation.priority || 'normal';
   const isInternalMode = composerMode === 'internal';
@@ -724,13 +727,20 @@ export function ChatThread({
                 title={
                   msg.read_at
                     ? `Seen by customer at ${new Date(msg.read_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
-                    : 'Sent (Not seen by customer yet)'
+                    : isOnline
+                    ? 'Delivered (customer is online)'
+                    : 'Sent'
                 }
               >
                 {msg.read_at ? (
                   <CheckCheck
                     className="w-3.5 h-3.5 text-blue-500 dark:text-blue-400 stroke-[2.5]"
                     aria-label="Seen by customer"
+                  />
+                ) : isOnline ? (
+                  <CheckCheck
+                    className="w-3.5 h-3.5 text-ink-3/70 dark:text-slate-400 stroke-[2]"
+                    aria-label="Delivered"
                   />
                 ) : (
                   <Check

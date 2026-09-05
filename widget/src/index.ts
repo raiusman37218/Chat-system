@@ -484,6 +484,8 @@ class ChatifyWidget {
             if (!this.isOpen || this.activeTab !== 'messages') {
               this.unreadCount += 1;
               this.updateUnreadBadge();
+            } else {
+              this.markMessagesAsRead();
             }
           }
         }
@@ -521,6 +523,27 @@ class ChatifyWidget {
     if (data) {
       this.messages = data as MessageItem[];
       this.renderMessages();
+      if (this.isOpen && this.activeTab === 'messages') {
+        this.markMessagesAsRead();
+      }
+    }
+  }
+
+  private async markMessagesAsRead() {
+    if (!this.conversationId) return;
+    try {
+      await this.supabase.rpc('fn_mark_conversation_messages_as_read', {
+        p_conversation_id: this.conversationId,
+        p_reader_type: 'visitor',
+      });
+      await this.supabase
+        .from('messages')
+        .update({ read_at: new Date().toISOString() })
+        .eq('conversation_id', this.conversationId)
+        .neq('sender_type', 'visitor')
+        .is('read_at', null);
+    } catch (e) {
+      console.warn('[Chatify] Error marking messages as read:', e);
     }
   }
 
@@ -883,6 +906,7 @@ class ChatifyWidget {
     if (tab === 'messages') {
       this.unreadCount = 0;
       this.updateUnreadBadge();
+      this.markMessagesAsRead();
       const body = this.shadow?.getElementById('chatifyBody');
       if (body) body.scrollTop = body.scrollHeight;
       setTimeout(() => {
@@ -2218,6 +2242,7 @@ class ChatifyWidget {
         this.updateUnreadBadge();
 
         if (this.activeTab === 'messages') {
+          this.markMessagesAsRead();
           const body = this.shadow?.getElementById('chatifyBody');
           if (body) body.scrollTop = body.scrollHeight;
           setTimeout(() => {

@@ -356,6 +356,13 @@ export default function ChatWidget({
   useEffect(() => {
     if (!conversationId || !isOpen) return;
     supabase
+      .rpc('fn_mark_conversation_messages_as_read', {
+        p_conversation_id: conversationId,
+        p_reader_type: 'visitor',
+      })
+      .then();
+
+    supabase
       .from('messages')
       .update({ read_at: new Date().toISOString() })
       .eq('conversation_id', conversationId)
