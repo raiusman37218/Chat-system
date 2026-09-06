@@ -348,6 +348,12 @@ export async function verifyWorkspaceDomainAction(
         })
         .eq('id', workspaceId);
 
+      // Trigger automatic Vercel domain provisioning & SSL certificate if configured
+      const vercel = await addDomainToProject(domain);
+      if (vercel.configured && !vercel.ok) {
+        console.warn('[domain] Vercel auto-registration notice:', vercel.error);
+      }
+
       const liveNotice = reachable
         ? `Live — your help centre is actively being served on https://${domain}.`
         : `DNS Verified! Domain ownership confirmed for ${domain}. Your Help Center is linked to this domain. Note: SSL certificate provisioning may take a few minutes. (Diagnostics: ${diagnosticLogs.join(' | ')})`;
