@@ -229,12 +229,13 @@ export async function createArticleAction(
     summary?: string | null;
     content: string;
     status?: 'published' | 'draft';
+    slug?: string;
   }
 ) {
   const { agent } = await assertAgent(workspaceId);
   const supabase = await createClient();
 
-  const slug = generateSlug(data.title);
+  const slug = data.slug?.trim() ? generateSlug(data.slug) : generateSlug(data.title);
 
   // If section_id provided, fetch section name for backward compatibility category
   let category = data.category?.trim() || 'General';
@@ -280,6 +281,7 @@ export async function updateArticleAction(
     summary?: string | null;
     content?: string;
     status?: 'published' | 'draft';
+    slug?: string;
   }
 ) {
   await assertAgent(workspaceId);
@@ -288,6 +290,10 @@ export async function updateArticleAction(
   const updatePayload: any = { updated_at: new Date().toISOString() };
   if (data.title !== undefined) {
     updatePayload.title = data.title.trim();
+  }
+  if (data.slug !== undefined && data.slug.trim()) {
+    updatePayload.slug = generateSlug(data.slug);
+  } else if (data.title !== undefined) {
     updatePayload.slug = generateSlug(data.title);
   }
   if (data.section_id !== undefined) updatePayload.section_id = data.section_id || null;

@@ -453,7 +453,25 @@ export function MarkdownArticleContent({
       continue;
     }
 
-    // 11. Normal Paragraph
+    // 11. Standalone Images (![alt](url))
+    const imgMatch = trimmed.match(/^!\[(.*?)\]\((.*?)\)$/);
+    if (imgMatch) {
+      const [, alt, src] = imgMatch;
+      elements.push(
+        <figure key={`img-${index}`} className="my-4 rounded-xl overflow-hidden border border-line bg-surface-2/40 shadow-xs">
+          <img src={src} alt={alt} className="w-full h-auto object-contain max-h-[500px] mx-auto rounded-t-xl" loading="lazy" />
+          {alt && (
+            <figcaption className="text-[12px] text-ink-3 text-center py-2 px-4 italic border-t border-line/50 bg-surface">
+              {alt}
+            </figcaption>
+          )}
+        </figure>
+      );
+      index++;
+      continue;
+    }
+
+    // 12. Normal Paragraph
     elements.push(
       <p key={`p-${index}`} className="text-[14px] text-ink leading-relaxed">
         {formatInlineText(trimmed)}

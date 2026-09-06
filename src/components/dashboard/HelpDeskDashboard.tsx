@@ -45,6 +45,14 @@ import {
   Maximize2,
   Minimize2,
   Columns2,
+  Image as ImageIcon,
+  Check,
+  Lock,
+  Unlock,
+  RotateCcw,
+  LayoutTemplate,
+  Info,
+  Keyboard,
 } from 'lucide-react';
 import { Agent, Article, HelpSection, Workspace } from '@/types/database';
 import { EmojiPickerPopover } from '@/components/dashboard/EmojiPickerPopover';
@@ -693,6 +701,130 @@ interface ArticleEditorModalProps {
   onSaved: (article: Article) => void;
 }
 
+// ============================================================================
+// ARTICLE BLUEPRINTS (Quick Start Professional Templates)
+// ============================================================================
+const ARTICLE_BLUEPRINTS = [
+  {
+    id: 'step-guide',
+    label: '📋 Step Guide',
+    name: 'Step-by-Step Tutorial',
+    desc: 'Actionable walkthrough with prerequisites, step numbers & callouts',
+    content: `# 📋 Step-by-Step Guide Title
+
+A clear, concise walkthrough explaining how to achieve this goal.
+
+> [!NOTE]
+> Before you begin, ensure you have your account credentials and required permissions ready.
+
+## 1. Prerequisites
+- [ ] Active verified account
+- [ ] Required client credentials
+- [ ] Access to the client portal
+
+## 2. Step-by-Step Instructions
+1. Navigate to your **Dashboard** and open the configuration menu.
+2. Under the general settings, locate the **Options** panel.
+3. Review your preferences and click **Save Changes**.
+
+> [!TIP]
+> Changes usually take effect within 60 seconds across all connected devices.
+
+## 3. Common Troubleshooting
+- **Option not showing?** Make sure you are logged in with administrator privileges.
+- **Save button disabled?** Verify all required fields are filled out.
+
+---
+*Still need help? Reach out to our 24/7 support team via live chat.*`,
+  },
+  {
+    id: 'faq',
+    label: '❓ FAQ',
+    name: 'Frequently Asked Questions',
+    desc: 'Structured Q&A format for common customer queries',
+    content: `# ❓ Frequently Asked Questions
+
+Find quick answers to the most common questions regarding our services and policies.
+
+### Q: How long does verification take?
+Verification is typically processed automatically within **5 to 15 minutes**. In rare cases requiring manual review, it may take up to 24 hours.
+
+### Q: What payment and payout options are supported?
+We support all major payment providers including:
+- Credit / Debit Cards (Visa, MasterCard, Amex)
+- Bank Wire Transfer
+- Crypto (USDT, BTC)
+
+> [!NOTE]
+> All transactions are encrypted and processed through PCI-DSS compliant gateways.
+
+### Q: Can I update my account email address?
+Yes. You can edit your contact information at any time from your Account Settings tab.`,
+  },
+  {
+    id: 'rules-table',
+    label: '📊 Rules & Plans',
+    name: 'Rules & Plan Matrix',
+    desc: 'Comparison table, requirements matrix, and best practices',
+    content: `# 📊 Policy & Plan Guidelines
+
+Detailed criteria and rules applicable to all active accounts and evaluations.
+
+> [!WARNING]
+> Violating maximum drawdown limits will result in automatic rule breaches.
+
+## Rule Summary Matrix
+
+| Rule / Requirement | Standard Plan | Pro Plan | VIP Enterprise |
+|:---|:---|:---|:---|
+| Minimum Active Days | 5 Days | 3 Days | 0 Days |
+| Maximum Daily Loss | 5% | 5% | 6% |
+| Maximum Overall Loss | 10% | 12% | 14% |
+| Profit Split | 80% | 85% | 90% |
+
+## Key Best Practices
+- Always use a stop-loss order on open positions.
+- Keep your total risk per trade below **1-2%**.
+- Avoid holding oversized positions through major high-impact economic news releases.`,
+  },
+  {
+    id: 'troubleshooting',
+    label: '🛠️ Troubleshooting',
+    name: 'Troubleshooting Guide',
+    desc: 'Error symptoms, root causes, and verified fix steps',
+    content: `# 🛠️ Troubleshooting & Fix Guide
+
+Quick solutions for unexpected errors or issues you might encounter.
+
+> [!IMPORTANT]
+> Always make sure you are running the latest browser version before proceeding.
+
+## Symptoms
+- Connection timed out when attempting to log in.
+- Data on the dashboard is not refreshing in real time.
+
+## Solution Steps
+1. **Clear browser cache**: Press \`Ctrl + Shift + R\` (\`Cmd + Shift + R\` on Mac) for a hard reload.
+2. **Check network status**: Disable any active VPN or proxy connections that might interfere.
+3. **Verify server status**: Check our public status page for any scheduled maintenance.
+
+> [!TIP]
+> If the problem persists, try accessing through an incognito window or contact support.`,
+  },
+];
+
+// ============================================================================
+// ARTICLE EDITOR MODAL COMPONENT (with live markdown toolbar & preview)
+// ============================================================================
+interface ArticleEditorModalProps {
+  workspace: Workspace | null;
+  workspaceId: string;
+  sections: HelpSection[];
+  article: Article | null;
+  onClose: () => void;
+  onSaved: (article: Article) => void;
+}
+
 function ArticleEditorModal({
   workspace,
   workspaceId,
@@ -702,6 +834,8 @@ function ArticleEditorModal({
   onSaved,
 }: ArticleEditorModalProps) {
   const [title, setTitle] = useState(article?.title || '');
+  const [slug, setSlug] = useState(article?.slug || '');
+  const [isSlugCustom, setIsSlugCustom] = useState(Boolean(article?.slug));
   const [sectionId, setSectionId] = useState<string>(article?.section_id || sections[0]?.id || '');
   const [summary, setSummary] = useState(article?.summary || '');
   const [content, setContent] = useState(article?.content || '');
@@ -713,8 +847,28 @@ function ArticleEditorModal({
 
   const [showContentEmojiPicker, setShowContentEmojiPicker] = useState(false);
   const [showTitleEmojiPicker, setShowTitleEmojiPicker] = useState(false);
+  const [showShortcutsModal, setShowShortcutsModal] = useState(false);
+  const [showImageModal, setShowImageModal] = useState(false);
+  const [imageUrl, setImageUrl] = useState('');
+  const [imageAlt, setImageAlt] = useState('');
+  const [copiedLink, setCopiedLink] = useState(false);
 
   const textareaRef = React.useRef<HTMLTextAreaElement>(null);
+
+  // Auto-generate slug when title changes (unless admin custom-edited the slug)
+  const handleTitleChange = (newTitle: string) => {
+    setTitle(newTitle);
+    if (!isSlugCustom) {
+      const generated = newTitle
+        .toLowerCase()
+        .trim()
+        .replace(/[^a-z0-9\s-]/g, '')
+        .replace(/\s+/g, '-')
+        .replace(/-+/g, '-')
+        .slice(0, 80);
+      setSlug(generated);
+    }
+  };
 
   // Statistics
   const stats = useMemo(() => {
@@ -736,13 +890,12 @@ function ArticleEditorModal({
     const selected = text.substring(start, end);
 
     if (!selected) {
-      // If nothing is selected, insert prefix and suffix and place cursor in middle
       const newText = text.substring(0, start) + prefix + suffix + text.substring(end);
       setContent(newText);
       setTimeout(() => {
         el.focus();
         el.setSelectionRange(start + prefix.length, start + prefix.length);
-      }, 30);
+      }, 20);
       return;
     }
 
@@ -751,7 +904,7 @@ function ArticleEditorModal({
     setTimeout(() => {
       el.focus();
       el.setSelectionRange(start + prefix.length, start + prefix.length + selected.length);
-    }, 30);
+    }, 20);
   };
 
   const insertText = (str: string) => {
@@ -768,7 +921,7 @@ function ArticleEditorModal({
     setTimeout(() => {
       el.focus();
       el.setSelectionRange(start + str.length, start + str.length);
-    }, 30);
+    }, 20);
   };
 
   // ─────────────────────────────────────────────────────────────
@@ -789,20 +942,24 @@ function ArticleEditorModal({
     const selectedBlock = text.substring(lineStart, lineEnd);
     const lines = selectedBlock.split('\n');
 
-    // If all lines already start with bullet, toggle them OFF
     const allBulleted = lines.every((l) => /^\s*[-*]\s+/.test(l));
 
-    const newLines = lines.map((l) => {
+    let firstLineDiff = 0;
+    const newLines = lines.map((l, idx) => {
+      let result = l;
       if (allBulleted) {
-        return l.replace(/^(\s*)[-*]\s+/, '$1');
+        result = l.replace(/^(\s*)[-*]\s+/, '$1');
       } else {
-        // If it starts with a number, convert to bullet
         if (/^\s*\d+\.\s+/.test(l)) {
-          return l.replace(/^(\s*)\d+\.\s+/, '$1- ');
+          result = l.replace(/^(\s*)\d+\.\s+/, '$1- ');
+        } else if (/^\s*[-*]\s+/.test(l)) {
+          result = l;
+        } else {
+          result = l.replace(/^(\s*)/, '$1- ');
         }
-        if (/^\s*[-*]\s+/.test(l)) return l;
-        return l.replace(/^(\s*)/, '$1- ');
       }
+      if (idx === 0) firstLineDiff = result.length - l.length;
+      return result;
     });
 
     const replacement = newLines.join('\n');
@@ -811,8 +968,13 @@ function ArticleEditorModal({
 
     setTimeout(() => {
       el.focus();
-      el.setSelectionRange(lineStart, lineStart + replacement.length);
-    }, 30);
+      if (start === end) {
+        const newPos = Math.max(lineStart, start + firstLineDiff);
+        el.setSelectionRange(newPos, newPos);
+      } else {
+        el.setSelectionRange(lineStart, lineStart + replacement.length);
+      }
+    }, 20);
   };
 
   // ─────────────────────────────────────────────────────────────
@@ -836,18 +998,22 @@ function ArticleEditorModal({
     const allNumbered = lines.every((l) => /^\s*\d+\.\s+/.test(l));
 
     let counter = 1;
-    const newLines = lines.map((l) => {
+    let firstLineDiff = 0;
+    const newLines = lines.map((l, idx) => {
+      let result = l;
       if (allNumbered) {
-        return l.replace(/^(\s*)\d+\.\s+/, '$1');
+        result = l.replace(/^(\s*)\d+\.\s+/, '$1');
       } else {
         if (/^\s*[-*]\s+/.test(l)) {
-          return l.replace(/^(\s*)[-*]\s+/, `$1${counter++}. `);
+          result = l.replace(/^(\s*)[-*]\s+/, `$1${counter++}. `);
+        } else if (/^\s*\d+\.\s+/.test(l)) {
+          result = l.replace(/^(\s*)\d+\.\s+/, `$1${counter++}. `);
+        } else {
+          result = l.replace(/^(\s*)/, `$1${counter++}. `);
         }
-        if (/^\s*\d+\.\s+/.test(l)) {
-          return l.replace(/^(\s*)\d+\.\s+/, `$1${counter++}. `);
-        }
-        return l.replace(/^(\s*)/, `$1${counter++}. `);
       }
+      if (idx === 0) firstLineDiff = result.length - l.length;
+      return result;
     });
 
     const replacement = newLines.join('\n');
@@ -856,8 +1022,13 @@ function ArticleEditorModal({
 
     setTimeout(() => {
       el.focus();
-      el.setSelectionRange(lineStart, lineStart + replacement.length);
-    }, 30);
+      if (start === end) {
+        const newPos = Math.max(lineStart, start + firstLineDiff);
+        el.setSelectionRange(newPos, newPos);
+      } else {
+        el.setSelectionRange(lineStart, lineStart + replacement.length);
+      }
+    }, 20);
   };
 
   // ─────────────────────────────────────────────────────────────
@@ -880,15 +1051,20 @@ function ArticleEditorModal({
 
     const allTasks = lines.every((l) => /^\s*-\s*\[[ x]\]\s+/.test(l));
 
-    const newLines = lines.map((l) => {
+    let firstLineDiff = 0;
+    const newLines = lines.map((l, idx) => {
+      let result = l;
       if (allTasks) {
-        return l.replace(/^(\s*)-\s*\[[ x]\]\s+/, '$1');
+        result = l.replace(/^(\s*)-\s*\[[ x]\]\s+/, '$1');
       } else {
         if (/^\s*[-*]\s+/.test(l)) {
-          return l.replace(/^(\s*)[-*]\s+/, '$1- [ ] ');
+          result = l.replace(/^(\s*)[-*]\s+/, '$1- [ ] ');
+        } else {
+          result = l.replace(/^(\s*)/, '$1- [ ] ');
         }
-        return l.replace(/^(\s*)/, '$1- [ ] ');
       }
+      if (idx === 0) firstLineDiff = result.length - l.length;
+      return result;
     });
 
     const replacement = newLines.join('\n');
@@ -897,8 +1073,13 @@ function ArticleEditorModal({
 
     setTimeout(() => {
       el.focus();
-      el.setSelectionRange(lineStart, lineStart + replacement.length);
-    }, 30);
+      if (start === end) {
+        const newPos = Math.max(lineStart, start + firstLineDiff);
+        el.setSelectionRange(newPos, newPos);
+      } else {
+        el.setSelectionRange(lineStart, lineStart + replacement.length);
+      }
+    }, 20);
   };
 
   // ─────────────────────────────────────────────────────────────
@@ -909,57 +1090,74 @@ function ArticleEditorModal({
     if (!el) return;
 
     // Shortcuts:
-    // Ctrl+B / Cmd+B -> Bold
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'b') {
       e.preventDefault();
       insertMarkdown('**', '**');
       return;
     }
-
-    // Ctrl+I / Cmd+I -> Italic
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'i') {
       e.preventDefault();
       insertMarkdown('*', '*');
       return;
     }
-
-    // Ctrl+K / Cmd+K -> Link
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
       e.preventDefault();
       insertMarkdown('[', '](https://)');
       return;
     }
-
-    // Ctrl+Enter / Cmd+Enter -> Save Article
     if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
       e.preventDefault();
       handleSave();
       return;
     }
 
-    // Tab key -> Indent / Unindent
+    // Backspace: If cursor is right after list prefix, remove prefix (Notion style)
+    if (e.key === 'Backspace') {
+      const start = el.selectionStart;
+      const end = el.selectionEnd;
+      if (start === end) {
+        const text = el.value;
+        const lineStart = text.lastIndexOf('\n', start - 1) + 1;
+        const lineBeforeCursor = text.substring(lineStart, start);
+
+        const prefixMatch = lineBeforeCursor.match(/^(\s*)([-*]\s+|\d+\.\s+|-\s*\[[ x]\]\s+)$/);
+        if (prefixMatch) {
+          e.preventDefault();
+          const indent = prefixMatch[1];
+          const newContent = text.substring(0, lineStart) + indent + text.substring(start);
+          setContent(newContent);
+          setTimeout(() => {
+            el.setSelectionRange(lineStart + indent.length, lineStart + indent.length);
+          }, 0);
+          return;
+        }
+      }
+    }
+
+    // Tab key -> Indent / Outdent
     if (e.key === 'Tab') {
       e.preventDefault();
       const start = el.selectionStart;
       const end = el.selectionEnd;
       const text = el.value;
+      const lineStart = text.lastIndexOf('\n', start - 1) + 1;
 
       if (e.shiftKey) {
-        // Shift+Tab: Unindent
-        const lineStart = text.lastIndexOf('\n', start - 1) + 1;
+        // Unindent
         if (text.substring(lineStart, lineStart + 2) === '  ') {
           const newContent = text.substring(0, lineStart) + text.substring(lineStart + 2);
           setContent(newContent);
           setTimeout(() => {
-            el.setSelectionRange(Math.max(lineStart, start - 2), Math.max(lineStart, end - 2));
+            const newPos = Math.max(lineStart, start - 2);
+            el.setSelectionRange(newPos, newPos);
           }, 0);
         }
       } else {
-        // Tab: Indent 2 spaces
-        const newContent = text.substring(0, start) + '  ' + text.substring(end);
+        // Indent
+        const newContent = text.substring(0, lineStart) + '  ' + text.substring(lineStart);
         setContent(newContent);
         setTimeout(() => {
-          el.setSelectionRange(start + 2, start + 2);
+          el.setSelectionRange(start + 2, end + 2);
         }, 0);
       }
       return;
@@ -972,7 +1170,7 @@ function ArticleEditorModal({
       const lineStart = text.lastIndexOf('\n', start - 1) + 1;
       const currentLine = text.substring(lineStart, start);
 
-      // A. Empty bullet: "- " or "* " -> exit list
+      // A. Empty bullet: "- " -> exit list & start clean line
       const emptyBulletMatch = currentLine.match(/^(\s*)[-*]\s*$/);
       if (emptyBulletMatch) {
         e.preventDefault();
@@ -1011,7 +1209,7 @@ function ArticleEditorModal({
         return;
       }
 
-      // D. Numbered item with text: "3. something" -> continue next number "4. "
+      // D. Numbered item with text -> continue next number "4. "
       const numMatch = currentLine.match(/^(\s*)(\d+)\.\s+(.+)$/);
       if (numMatch) {
         e.preventDefault();
@@ -1055,6 +1253,27 @@ function ArticleEditorModal({
     }
   };
 
+  const handleApplyBlueprint = (blueprintContent: string) => {
+    if (content.trim().length > 30) {
+      if (!confirm('Apply this blueprint? This will replace your current editor content.')) {
+        return;
+      }
+    }
+    setContent(blueprintContent);
+    setTimeout(() => {
+      textareaRef.current?.focus();
+    }, 50);
+  };
+
+  const handleInsertImage = () => {
+    if (!imageUrl.trim()) return;
+    const md = `\n![${imageAlt.trim() || 'Image'}](${imageUrl.trim()})\n`;
+    insertText(md);
+    setImageUrl('');
+    setImageAlt('');
+    setShowImageModal(false);
+  };
+
   const handleSave = async () => {
     if (!title.trim()) {
       setErrorMsg('Please enter an article title.');
@@ -1071,6 +1290,7 @@ function ArticleEditorModal({
       if (article?.id) {
         const res = await updateArticleAction(workspaceId, article.id, {
           title,
+          slug: slug.trim() || undefined,
           section_id: sectionId || null,
           summary,
           content,
@@ -1080,6 +1300,7 @@ function ArticleEditorModal({
       } else {
         const res = await createArticleAction(workspaceId, {
           title,
+          slug: slug.trim() || undefined,
           section_id: sectionId || null,
           summary,
           content,
@@ -1090,6 +1311,21 @@ function ArticleEditorModal({
     } catch (err: any) {
       setErrorMsg(err.message || 'Failed to save article');
       setSaving(false);
+    }
+  };
+
+  const resolvedPublicUrl = workspace
+    ? getWorkspaceHelpCenterUrl(workspace, {
+        id: article?.id || 'new',
+        slug: slug || 'article',
+      })
+    : '';
+
+  const handleCopyPublicUrl = () => {
+    if (resolvedPublicUrl) {
+      navigator.clipboard.writeText(resolvedPublicUrl);
+      setCopiedLink(true);
+      setTimeout(() => setCopiedLink(false), 2000);
     }
   };
 
@@ -1105,11 +1341,11 @@ function ArticleEditorModal({
           'bg-surface border border-line flex flex-col overflow-hidden transition-all shadow-2xl',
           isFullscreen
             ? 'w-full h-full rounded-none border-0'
-            : 'max-w-5xl w-full max-h-[92vh] rounded-2xl'
+            : 'max-w-6xl w-full max-h-[94vh] rounded-2xl'
         )}
       >
         {/* ─────────────────────────────────────────────────────────────
-            MODAL HEADER & STUDIO CONTROLS
+            1. MODAL HEADER & STUDIO CONTROLS
             ───────────────────────────────────────────────────────────── */}
         <div className="px-5 py-3.5 border-b border-line flex items-center justify-between bg-surface-2/60 shrink-0">
           <div className="flex items-center gap-3">
@@ -1117,11 +1353,16 @@ function ArticleEditorModal({
               <FileText className="w-4 h-4" />
             </div>
             <div>
-              <h2 className="text-[15px] font-bold text-ink">
-                {article ? 'Edit Help Article' : 'Author Knowledge Base Article'}
-              </h2>
+              <div className="flex items-center gap-2">
+                <h2 className="text-[15px] font-bold text-ink">
+                  {article ? 'Edit Knowledge Base Article' : 'Author Knowledge Base Article'}
+                </h2>
+                <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-accent-soft text-accent">
+                  Pro Studio
+                </span>
+              </div>
               <p className="text-[11.5px] text-ink-3">
-                Smart formatting, automated list continuation, and real-time live preview.
+                Smart formatting, automated list continuation, blueprints &amp; live preview.
               </p>
             </div>
           </div>
@@ -1171,6 +1412,17 @@ function ArticleEditorModal({
               </button>
             </div>
 
+            {/* Shortcuts Help Button */}
+            <button
+              type="button"
+              onClick={() => setShowShortcutsModal((prev) => !prev)}
+              className="h-8 px-2 rounded-lg border border-line hover:bg-surface-3 flex items-center gap-1 text-[11px] font-medium text-ink-3 hover:text-ink transition-colors"
+              title="Keyboard Shortcuts & Tips"
+            >
+              <Keyboard className="w-3.5 h-3.5 text-accent" />
+              <span className="hidden sm:inline">Shortcuts</span>
+            </button>
+
             {/* Fullscreen Toggle */}
             <button
               type="button"
@@ -1193,7 +1445,7 @@ function ArticleEditorModal({
         </div>
 
         {/* ─────────────────────────────────────────────────────────────
-            MODAL BODY: METADATA & EDITOR PANE
+            2. MODAL BODY: METADATA & EDITOR PANE
             ───────────────────────────────────────────────────────────── */}
         <div className="p-5 overflow-y-auto flex-1 space-y-4">
           {errorMsg && (
@@ -1203,7 +1455,7 @@ function ArticleEditorModal({
             </div>
           )}
 
-          {/* Title & Category Row */}
+          {/* Title & Section Row */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
             <div className="md:col-span-2 space-y-1">
               <div className="flex items-center justify-between">
@@ -1220,7 +1472,7 @@ function ArticleEditorModal({
                   {showTitleEmojiPicker && (
                     <div className="absolute right-0 top-6 z-50">
                       <EmojiPickerPopover
-                        onSelect={(em) => setTitle((prev) => (prev ? `${prev} ${em}` : `${em} `))}
+                        onSelect={(em) => handleTitleChange(title ? `${title} ${em}` : `${em} `)}
                         onClose={() => setShowTitleEmojiPicker(false)}
                       />
                     </div>
@@ -1230,7 +1482,7 @@ function ArticleEditorModal({
               <input
                 type="text"
                 value={title}
-                onChange={(e) => setTitle(e.target.value)}
+                onChange={(e) => handleTitleChange(e.target.value)}
                 placeholder="e.g. 🚀 How to pass evaluation challenge guidelines"
                 className="w-full h-10 px-3.5 rounded-xl border border-line bg-surface text-[14px] text-ink focus:outline-none focus:border-accent font-medium shadow-2xs"
               />
@@ -1243,7 +1495,7 @@ function ArticleEditorModal({
                 onChange={(e) => setSectionId(e.target.value)}
                 className="w-full h-10 px-3 rounded-xl border border-line bg-surface text-[13px] text-ink focus:outline-none focus:border-accent font-medium shadow-2xs"
               >
-                <option value="">(No Section)</option>
+                <option value="">(No Section - General)</option>
                 {sections.map((sec) => (
                   <option key={sec.id} value={sec.id}>
                     {sec.icon} {sec.name}
@@ -1255,65 +1507,157 @@ function ArticleEditorModal({
 
           {/* Excerpt / Summary */}
           <div className="space-y-1">
-            <label className="text-[12px] font-semibold text-ink">
-              Short Summary <span className="font-normal text-ink-3">(Shown on cards &amp; search)</span>
-            </label>
+            <div className="flex items-center justify-between">
+              <label className="text-[12px] font-semibold text-ink">
+                Short Summary <span className="font-normal text-ink-3">(Displayed on cards, preview &amp; search)</span>
+              </label>
+              <span className="text-[11px] text-ink-3 font-mono">{summary.length}/200</span>
+            </div>
             <input
               type="text"
               value={summary}
+              maxLength={220}
               onChange={(e) => setSummary(e.target.value)}
-              placeholder="Brief summary of what this article explains..."
+              placeholder="Brief summary explaining what customer learns from this guide..."
               className="w-full h-9.5 px-3.5 rounded-xl border border-line bg-surface text-[13px] text-ink focus:outline-none focus:border-accent shadow-2xs"
             />
           </div>
 
-          {/* Publishing Status */}
-          <div className="flex items-center justify-between p-3 rounded-xl bg-surface-2/60 border border-line/70">
-            <div className="flex items-center gap-4">
-              <span className="text-[12px] font-semibold text-ink">Status:</span>
-              <label className="flex items-center gap-1.5 cursor-pointer text-[12.5px]">
-                <input
-                  type="radio"
-                  name="status"
-                  value="published"
-                  checked={status === 'published'}
-                  onChange={() => setStatus('published')}
-                  className="text-accent"
-                />
-                <span className="font-semibold text-emerald-600 dark:text-emerald-400">
-                  Published (Live)
-                </span>
-              </label>
-              <label className="flex items-center gap-1.5 cursor-pointer text-[12.5px]">
-                <input
-                  type="radio"
-                  name="status"
-                  value="draft"
-                  checked={status === 'draft'}
-                  onChange={() => setStatus('draft')}
-                  className="text-accent"
-                />
-                <span className="font-medium text-amber-600 dark:text-amber-400">
-                  Draft (Private)
-                </span>
-              </label>
+          {/* Custom Slug & Live URL Preview Banner */}
+          <div className="p-3 rounded-xl bg-surface-2/60 border border-line/70 space-y-2">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+              {/* Publishing Status Radio */}
+              <div className="flex items-center gap-4">
+                <span className="text-[12px] font-semibold text-ink">Status:</span>
+                <label className="flex items-center gap-1.5 cursor-pointer text-[12.5px]">
+                  <input
+                    type="radio"
+                    name="status"
+                    value="published"
+                    checked={status === 'published'}
+                    onChange={() => setStatus('published')}
+                    className="text-accent"
+                  />
+                  <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+                    Published (Live)
+                  </span>
+                </label>
+                <label className="flex items-center gap-1.5 cursor-pointer text-[12.5px]">
+                  <input
+                    type="radio"
+                    name="status"
+                    value="draft"
+                    checked={status === 'draft'}
+                    onChange={() => setStatus('draft')}
+                    className="text-accent"
+                  />
+                  <span className="font-medium text-amber-600 dark:text-amber-400">
+                    Draft (Private)
+                  </span>
+                </label>
+              </div>
+
+              {/* URL Customizer & Copy */}
+              <div className="flex items-center gap-2 text-xs">
+                <div className="flex items-center gap-1.5 bg-surface px-2.5 py-1 rounded-lg border border-line font-mono text-[11px] text-ink-2">
+                  <Globe className="w-3.5 h-3.5 text-accent shrink-0" />
+                  <span className="text-ink-3 hidden md:inline">URL:</span>
+                  <span className="text-ink font-semibold truncate max-w-[220px] sm:max-w-xs">
+                    /{slug || 'article-slug'}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setIsSlugCustom(!isSlugCustom)}
+                    className="ml-1 text-ink-3 hover:text-ink"
+                    title={isSlugCustom ? 'Custom slug unlocked' : 'Auto-generating slug from title'}
+                  >
+                    {isSlugCustom ? <Unlock className="w-3 h-3 text-accent" /> : <Lock className="w-3 h-3" />}
+                  </button>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleCopyPublicUrl}
+                  className="h-7 px-2.5 rounded-lg border border-line bg-surface hover:bg-surface-3 text-[11px] font-medium text-ink flex items-center gap-1 transition-colors"
+                  title="Copy full article link"
+                >
+                  {copiedLink ? (
+                    <>
+                      <Check className="w-3 h-3 text-emerald-500" />
+                      <span className="text-emerald-500">Copied!</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-3 h-3 text-ink-3" />
+                      <span>Copy</span>
+                    </>
+                  )}
+                </button>
+
+                {article && (
+                  <a
+                    href={resolvedPublicUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="h-7 px-2.5 rounded-lg border border-line bg-surface hover:bg-surface-3 text-[11px] font-medium text-ink flex items-center gap-1 transition-colors"
+                    title="Open live article page"
+                  >
+                    <ExternalLink className="w-3 h-3 text-ink-3" />
+                    <span>Live</span>
+                  </a>
+                )}
+              </div>
             </div>
 
-            {workspace && (
-              <div className="hidden sm:flex items-center gap-1.5 text-[11px] text-ink-3 font-mono">
-                <Globe className="w-3.5 h-3.5 text-accent" />
-                <span>
-                  {getWorkspaceHelpCenterUrl(workspace, {
-                    id: article?.id || 'new',
-                    slug: title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'article',
-                  })}
-                </span>
+            {/* Custom Slug Input (if unlocked) */}
+            {isSlugCustom && (
+              <div className="flex items-center gap-2 pt-1 border-t border-line/40">
+                <span className="text-[11.5px] text-ink-3 font-medium">Custom URL Slug:</span>
+                <input
+                  type="text"
+                  value={slug}
+                  onChange={(e) => setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
+                  placeholder="custom-article-slug"
+                  className="h-7 px-2 rounded-md border border-line bg-surface text-[12px] font-mono text-ink flex-1 max-w-sm focus:outline-none focus:border-accent"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsSlugCustom(false);
+                    handleTitleChange(title);
+                  }}
+                  className="text-[11px] text-accent hover:underline flex items-center gap-1"
+                >
+                  <RotateCcw className="w-3 h-3" />
+                  <span>Reset to Title</span>
+                </button>
               </div>
             )}
           </div>
 
           {/* ─────────────────────────────────────────────────────────────
-              EDITOR WRAPPER (TOOLBAR + TEXTAREA + SPLIT VIEW)
+              3. INSTANT BLUEPRINTS (Quick-Start Templates)
+              ───────────────────────────────────────────────────────────── */}
+          <div className="flex items-center gap-2 overflow-x-auto pb-1">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-ink-3 flex items-center gap-1 shrink-0">
+              <Sparkles className="w-3 h-3 text-accent" />
+              <span>Blueprints:</span>
+            </span>
+            {ARTICLE_BLUEPRINTS.map((bp) => (
+              <button
+                key={bp.id}
+                type="button"
+                onClick={() => handleApplyBlueprint(bp.content)}
+                className="h-7 px-2.5 rounded-lg border border-line/80 bg-surface hover:border-accent hover:bg-accent-soft/40 text-[11.5px] font-medium text-ink hover:text-accent transition-all whitespace-nowrap shadow-2xs flex items-center gap-1"
+                title={bp.desc}
+              >
+                <span>{bp.label}</span>
+              </button>
+            ))}
+          </div>
+
+          {/* ─────────────────────────────────────────────────────────────
+              4. EDITOR WRAPPER (TOOLBAR + TEXTAREA + SPLIT VIEW)
               ───────────────────────────────────────────────────────────── */}
           <div className="border border-line rounded-xl overflow-hidden shadow-xs focus-within:border-accent transition-colors">
             {/* Rich Formatting Toolbar */}
@@ -1349,7 +1693,7 @@ function ArticleEditorModal({
                 </button>
               </div>
 
-              {/* Text Styling */}
+              {/* Text Typography */}
               <div className="flex items-center gap-0.5 bg-surface rounded-lg p-0.5 border border-line/60">
                 <button
                   type="button"
@@ -1385,13 +1729,13 @@ function ArticleEditorModal({
                 </button>
               </div>
 
-              {/* Smart Lists (Bullets & Numbering & Checklists) */}
+              {/* Smart Lists (Bullets, Numbering, Checklists) */}
               <div className="flex items-center gap-0.5 bg-surface rounded-lg p-0.5 border border-line/60">
                 <button
                   type="button"
                   onClick={toggleBulletList}
                   className="h-7 px-2 rounded hover:bg-surface-2 flex items-center gap-1 text-[12px] font-semibold text-ink hover:text-accent"
-                  title="Smart Bullet List (Ctrl+Shift+8)"
+                  title="Smart Bullet List (- item)"
                 >
                   <List className="w-3.5 h-3.5" />
                   <span className="text-[11px]">Bullet</span>
@@ -1400,7 +1744,7 @@ function ArticleEditorModal({
                   type="button"
                   onClick={toggleNumberedList}
                   className="h-7 px-2 rounded hover:bg-surface-2 flex items-center gap-1 text-[12px] font-semibold text-ink hover:text-accent"
-                  title="Smart Numbered List (Ctrl+Shift+7)"
+                  title="Smart Numbered List (1. 2. 3.)"
                 >
                   <ListOrdered className="w-3.5 h-3.5" />
                   <span className="text-[11px]">1. 2. 3.</span>
@@ -1408,36 +1752,37 @@ function ArticleEditorModal({
                 <button
                   type="button"
                   onClick={toggleTaskList}
-                  className="h-7 w-7 rounded hover:bg-surface-2 flex items-center justify-center text-ink hover:text-accent"
+                  className="h-7 px-2 rounded hover:bg-surface-2 flex items-center gap-1 text-[12px] font-semibold text-ink hover:text-accent"
                   title="Task Checklist (- [ ] item)"
                 >
                   <CheckSquare className="w-3.5 h-3.5" />
+                  <span className="text-[11px]">Tasks</span>
                 </button>
               </div>
 
-              {/* Callouts (Intercom / GitHub Style) */}
+              {/* Intercom / GitHub Callouts */}
               <div className="flex items-center gap-0.5 bg-surface rounded-lg p-0.5 border border-line/60">
                 <button
                   type="button"
-                  onClick={() => insertText('\n> [!NOTE]\n> Write important guidance here...\n\n')}
+                  onClick={() => insertText('\n> [!NOTE]\n> Important guidance or key fact...\n\n')}
                   className="h-7 px-2 rounded hover:bg-blue-500/10 text-blue-600 dark:text-blue-400 text-[11px] font-semibold flex items-center gap-1"
-                  title="Info Box"
+                  title="Note Callout Box"
                 >
                   <Lightbulb className="w-3.5 h-3.5" />
                   <span>Note</span>
                 </button>
                 <button
                   type="button"
-                  onClick={() => insertText('\n> [!TIP]\n> Pro-tip or best practice recommendation...\n\n')}
+                  onClick={() => insertText('\n> [!TIP]\n> Pro-tip: Recommended best practice...\n\n')}
                   className="h-7 px-2 rounded hover:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[11px] font-semibold flex items-center gap-1"
-                  title="Pro Tip"
+                  title="Pro Tip Box"
                 >
                   <Sparkles className="w-3.5 h-3.5" />
                   <span>Tip</span>
                 </button>
                 <button
                   type="button"
-                  onClick={() => insertText('\n> [!WARNING]\n> Caution: Do not skip this step...\n\n')}
+                  onClick={() => insertText('\n> [!WARNING]\n> Caution: Do not skip this requirement...\n\n')}
                   className="h-7 px-2 rounded hover:bg-amber-500/10 text-amber-600 dark:text-amber-400 text-[11px] font-semibold flex items-center gap-1"
                   title="Warning Box"
                 >
@@ -1446,17 +1791,25 @@ function ArticleEditorModal({
                 </button>
               </div>
 
-              {/* Blocks: Table, Quote, Code Block, Link */}
+              {/* Rich Blocks: Images, Tables, Quotes, Links */}
               <div className="flex items-center gap-0.5 bg-surface rounded-lg p-0.5 border border-line/60">
+                <button
+                  type="button"
+                  onClick={() => setShowImageModal(true)}
+                  className="h-7 w-7 rounded hover:bg-surface-2 flex items-center justify-center text-ink hover:text-accent"
+                  title="Insert Image"
+                >
+                  <ImageIcon className="w-3.5 h-3.5" />
+                </button>
                 <button
                   type="button"
                   onClick={() =>
                     insertText(
-                      '\n| Column 1 | Column 2 | Column 3 |\n|:---|:---|:---|\n| Feature A | Starter plan | Included |\n| Feature B | Pro plan | Optional |\n\n'
+                      '\n| Feature | Free Plan | Pro Plan |\n|:---|:---|:---|\n| Support | Community | 24/7 Priority |\n| Storage | 5 GB | Unlimited |\n\n'
                     )
                   }
                   className="h-7 w-7 rounded hover:bg-surface-2 flex items-center justify-center text-ink hover:text-accent"
-                  title="Insert Table"
+                  title="Insert Comparison Table"
                 >
                   <TableIcon className="w-3.5 h-3.5" />
                 </button>
@@ -1470,7 +1823,7 @@ function ArticleEditorModal({
                 </button>
                 <button
                   type="button"
-                  onClick={() => insertText('\n```javascript\n// Code snippet here\nconst client = new Chatify();\n```\n\n')}
+                  onClick={() => insertText('\n```javascript\n// Sample code snippet\nconst app = new Chatify();\n```\n\n')}
                   className="h-7 px-1.5 rounded hover:bg-surface-2 text-[11px] font-mono text-ink hover:text-accent"
                   title="Code Block"
                 >
@@ -1480,7 +1833,7 @@ function ArticleEditorModal({
                   type="button"
                   onClick={() => insertMarkdown('[', '](https://)')}
                   className="h-7 w-7 rounded hover:bg-surface-2 flex items-center justify-center text-ink hover:text-accent"
-                  title="Link (Ctrl+K)"
+                  title="Insert Link (Ctrl+K)"
                 >
                   <Link2 className="w-3.5 h-3.5" />
                 </button>
@@ -1488,13 +1841,13 @@ function ArticleEditorModal({
                   type="button"
                   onClick={() => insertText('\n---\n\n')}
                   className="h-7 w-7 rounded hover:bg-surface-2 flex items-center justify-center text-ink hover:text-accent"
-                  title="Divider"
+                  title="Divider Line"
                 >
                   <Minus className="w-3.5 h-3.5" />
                 </button>
               </div>
 
-              {/* Emoji Picker Button */}
+              {/* Emoji Picker */}
               <div className="relative ml-auto">
                 <button
                   type="button"
@@ -1528,14 +1881,18 @@ function ArticleEditorModal({
                 <div className="flex flex-col bg-surface relative">
                   <textarea
                     ref={textareaRef}
-                    rows={isFullscreen ? 24 : 14}
+                    rows={isFullscreen ? 26 : 16}
                     value={content}
                     onChange={(e) => setContent(e.target.value)}
                     onKeyDown={handleKeyDown}
-                    placeholder="Write your article steps, FAQs, or troubleshooting instructions here...
+                    placeholder="Write your article content here...
 
-Tip: Type '-' or '1.' and press Enter to auto-continue lists. Use Tab to indent."
-                    className="w-full h-full p-4 bg-transparent text-[13.5px] text-ink placeholder:text-ink-3 focus:outline-none resize-none font-mono leading-relaxed"
+Tip:
+- Type '-' or '1.' and press Enter to auto-continue lists.
+- Press Backspace on an empty bullet to exit the list.
+- Use Tab to indent and Shift+Tab to outdent.
+- Press Ctrl+B for Bold, Ctrl+I for Italic, Ctrl+K for Links, Ctrl+Enter to Save."
+                    className="w-full h-full p-4.5 bg-transparent text-[14px] text-ink placeholder:text-ink-3 focus:outline-none resize-none font-mono leading-relaxed selection:bg-accent/20"
                   />
                 </div>
               )}
@@ -1544,19 +1901,26 @@ Tip: Type '-' or '1.' and press Enter to auto-continue lists. Use Tab to indent.
               {(viewMode === 'preview' || viewMode === 'split') && (
                 <div
                   className={cn(
-                    'p-5 bg-surface-2/40 overflow-y-auto leading-relaxed',
-                    isFullscreen ? 'max-h-[calc(100vh-220px)]' : 'max-h-[460px] min-h-[300px]'
+                    'p-6 bg-surface-2/40 overflow-y-auto leading-relaxed',
+                    isFullscreen ? 'max-h-[calc(100vh-250px)]' : 'max-h-[500px] min-h-[320px]'
                   )}
                 >
-                  <div className="pb-2 mb-3 border-b border-line flex items-center justify-between text-[11.5px] text-ink-3">
-                    <span className="font-semibold uppercase tracking-wider">Live Document Preview</span>
-                    <span>Formatted as seen by customers &amp; AI</span>
+                  <div className="pb-2.5 mb-4 border-b border-line flex items-center justify-between text-[11.5px] text-ink-3">
+                    <span className="font-semibold uppercase tracking-wider text-accent flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5" />
+                      <span>Live Customer Preview</span>
+                    </span>
+                    <span>Synchronized live rendering</span>
                   </div>
                   {content.trim() ? (
                     <MarkdownArticleContent content={content} />
                   ) : (
-                    <div className="p-8 text-center text-ink-3 italic text-[13px] border border-dashed border-line rounded-xl">
-                      Nothing to preview yet. Start typing or formatting on the left to see live rendering.
+                    <div className="p-12 text-center text-ink-3 italic text-[13px] border border-dashed border-line rounded-xl space-y-2">
+                      <LayoutTemplate className="w-8 h-8 text-ink-3 mx-auto stroke-1" />
+                      <p>Nothing to preview yet.</p>
+                      <p className="text-[12px] not-italic text-ink-4">
+                        Pick a blueprint from the top or start typing to see real-time formatting.
+                      </p>
                     </div>
                   )}
                 </div>
@@ -1566,9 +1930,9 @@ Tip: Type '-' or '1.' and press Enter to auto-continue lists. Use Tab to indent.
         </div>
 
         {/* ─────────────────────────────────────────────────────────────
-            MODAL FOOTER WITH LIVE METRICS & 1-CLICK SAVE
+            5. MODAL FOOTER WITH LIVE METRICS & 1-CLICK SAVE
             ───────────────────────────────────────────────────────────── */}
-        <div className="px-5 py-3 border-t border-line flex items-center justify-between bg-surface-2/50 shrink-0">
+        <div className="px-5 py-3.5 border-t border-line flex items-center justify-between bg-surface-2/50 shrink-0">
           <div className="flex items-center gap-3 text-[12px] text-ink-3">
             <span className="font-medium">
               <strong className="text-ink font-semibold">{stats.words}</strong> words
@@ -1603,6 +1967,144 @@ Tip: Type '-' or '1.' and press Enter to auto-continue lists. Use Tab to indent.
           </div>
         </div>
       </div>
+
+      {/* ─────────────────────────────────────────────────────────────
+          IMAGE INSERTION MODAL
+          ───────────────────────────────────────────────────────────── */}
+      {showImageModal && (
+        <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+          <div className="bg-surface border border-line rounded-2xl max-w-md w-full p-5 space-y-4 shadow-2xl animate-in zoom-in-95">
+            <div className="flex items-center justify-between border-b border-line pb-2.5">
+              <div className="flex items-center gap-2">
+                <ImageIcon className="w-4 h-4 text-accent" />
+                <h3 className="text-[14px] font-bold text-ink">Insert Image</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowImageModal(false)}
+                className="text-ink-3 hover:text-ink"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <div className="space-y-1">
+                <label className="text-[12px] font-semibold text-ink">Image Web URL (HTTPS)</label>
+                <input
+                  type="url"
+                  value={imageUrl}
+                  onChange={(e) => setImageUrl(e.target.value)}
+                  placeholder="https://example.com/images/guide-screenshot.png"
+                  className="w-full h-9 px-3 rounded-lg border border-line bg-surface text-[13px] text-ink focus:outline-none focus:border-accent font-mono"
+                  autoFocus
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[12px] font-semibold text-ink">Alt Text / Caption (Optional)</label>
+                <input
+                  type="text"
+                  value={imageAlt}
+                  onChange={(e) => setImageAlt(e.target.value)}
+                  placeholder="e.g. Dashboard Settings Panel"
+                  className="w-full h-9 px-3 rounded-lg border border-line bg-surface text-[13px] text-ink focus:outline-none focus:border-accent"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-line">
+              <button
+                type="button"
+                onClick={() => setShowImageModal(false)}
+                className="h-8.5 px-3 rounded-lg border border-line hover:bg-surface-2 text-[12px] text-ink font-medium"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={!imageUrl.trim()}
+                onClick={handleInsertImage}
+                className="btn btn-primary h-8.5 px-4 text-[12px] font-semibold"
+              >
+                Insert into Article
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─────────────────────────────────────────────────────────────
+          SHORTCUTS & TIPS POPUP
+          ───────────────────────────────────────────────────────────── */}
+      {showShortcutsModal && (
+        <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+          <div className="bg-surface border border-line rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-2xl animate-in zoom-in-95">
+            <div className="flex items-center justify-between border-b border-line pb-3">
+              <div className="flex items-center gap-2">
+                <Keyboard className="w-5 h-5 text-accent" />
+                <h3 className="text-[15px] font-bold text-ink">Keyboard Shortcuts &amp; Markdown Tricks</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowShortcutsModal(false)}
+                className="text-ink-3 hover:text-ink"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-[12.5px]">
+              <div className="grid grid-cols-2 gap-2 text-ink">
+                <div className="p-2.5 rounded-lg bg-surface-2/60 border border-line/60 flex items-center justify-between">
+                  <span>Bold text</span>
+                  <kbd className="px-1.5 py-0.5 rounded bg-surface border border-line text-[11px] font-mono text-ink-2">Ctrl+B</kbd>
+                </div>
+                <div className="p-2.5 rounded-lg bg-surface-2/60 border border-line/60 flex items-center justify-between">
+                  <span>Italic text</span>
+                  <kbd className="px-1.5 py-0.5 rounded bg-surface border border-line text-[11px] font-mono text-ink-2">Ctrl+I</kbd>
+                </div>
+                <div className="p-2.5 rounded-lg bg-surface-2/60 border border-line/60 flex items-center justify-between">
+                  <span>Insert Link</span>
+                  <kbd className="px-1.5 py-0.5 rounded bg-surface border border-line text-[11px] font-mono text-ink-2">Ctrl+K</kbd>
+                </div>
+                <div className="p-2.5 rounded-lg bg-surface-2/60 border border-line/60 flex items-center justify-between">
+                  <span>Save Article</span>
+                  <kbd className="px-1.5 py-0.5 rounded bg-surface border border-line text-[11px] font-mono text-ink-2">Ctrl+Enter</kbd>
+                </div>
+                <div className="p-2.5 rounded-lg bg-surface-2/60 border border-line/60 flex items-center justify-between">
+                  <span>Indent List</span>
+                  <kbd className="px-1.5 py-0.5 rounded bg-surface border border-line text-[11px] font-mono text-ink-2">Tab</kbd>
+                </div>
+                <div className="p-2.5 rounded-lg bg-surface-2/60 border border-line/60 flex items-center justify-between">
+                  <span>Outdent List</span>
+                  <kbd className="px-1.5 py-0.5 rounded bg-surface border border-line text-[11px] font-mono text-ink-2">Shift+Tab</kbd>
+                </div>
+              </div>
+
+              <div className="space-y-1.5 pt-2 border-t border-line/60">
+                <h4 className="font-semibold text-ink text-[13px]">Smart List Behavior (Notion-grade):</h4>
+                <ul className="list-disc pl-5 space-y-1 text-ink-2 text-[12px]">
+                  <li>Press <strong className="text-ink">Enter</strong> on any list line to auto-continue bullets, sequential numbers, or checklist tasks.</li>
+                  <li>Press <strong className="text-ink">Enter</strong> on an empty bullet to instantly exit the list and write standard paragraphs.</li>
+                  <li>Press <strong className="text-ink">Backspace</strong> at the beginning of a list line to convert it back to normal text.</li>
+                  <li>Highlight multiple lines and click <strong className="text-ink">Bullet</strong> or <strong className="text-ink">1. 2. 3.</strong> to format the entire block sequentially.</li>
+                </ul>
+              </div>
+            </div>
+
+            <div className="flex justify-end pt-2 border-t border-line">
+              <button
+                type="button"
+                onClick={() => setShowShortcutsModal(false)}
+                className="btn btn-primary h-8.5 px-4 text-[12px] font-semibold"
+              >
+                Got it
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
