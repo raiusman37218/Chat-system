@@ -2849,17 +2849,23 @@ class ChatifyWidget {
     const attachOrInject = () => {
       if (typeof document === 'undefined') return;
 
-      // 1. Check if an injected button already exists
-      const existingInjected = document.getElementById('chatifyNavTriggerBtn');
-
-      // 2. Smart Hooking: Look for existing matching links in header/nav
-      const links = Array.from(
-        document.querySelectorAll<HTMLElement>('header a, nav a, .navbar a, [role="navigation"] a, a')
+      // 1. SMART HOOKING: Look for existing matching links ONLY in header/nav (never match footer or body)
+      const navLinks = Array.from(
+        document.querySelectorAll<HTMLElement>(
+          'header nav a, nav a, header .navbar a, [role="navigation"] a, header [role="menubar"] a, header a'
+        )
       );
+
       let alreadyHooked = false;
 
-      for (const link of links) {
-        if (link.closest('#chatifyWidgetContainer') || link.id === 'chatifyNavTriggerBtn') continue;
+      for (const link of navLinks) {
+        if (
+          link.closest('#chatifyWidgetContainer') ||
+          link.id === 'chatifyNavTriggerBtn' ||
+          link.id === 'chatifyNavTriggerBtnMobile'
+        ) {
+          continue;
+        }
         if (link.hasAttribute('data-chatify-hooked')) {
           alreadyHooked = true;
           break;
@@ -2868,82 +2874,152 @@ class ChatifyWidget {
         const text = (link.textContent || '').trim().toLowerCase();
         const href = (link.getAttribute('href') || '').toLowerCase();
 
-        // Exact match (e.g. "FAQ" === "faq") or href contains /faq or /help
-        const textMatch = text === labelLower || (labelLower.length >= 3 && text.includes(labelLower));
+        // Exact match or matching path
+        const exactTextMatch = text === labelLower;
         const hrefMatch =
           href === `/${labelLower}` ||
           href === `/en/${labelLower}` ||
-          (labelLower === 'faq' && href.includes('/faq')) ||
-          (labelLower === 'help' && href.includes('/help'));
+          (labelLower === 'faq' && (href.endsWith('/faq') || href.includes('/faq'))) ||
+          (labelLower === 'help' && (href.endsWith('/help') || href.includes('/help')));
 
-        if (textMatch || hrefMatch) {
+        if (exactTextMatch || hrefMatch) {
           link.setAttribute('data-chatify-hooked', 'true');
           link.setAttribute('data-chatify-help', 'true');
           link.style.cursor = 'pointer';
           link.addEventListener('click', (e) => performAction(e));
           alreadyHooked = true;
-          // If we had an injected button from earlier, remove it in favor of native link
-          if (existingInjected) existingInjected.remove();
+
+          // Remove any injected buttons since native link matches
+          document.getElementById('chatifyNavTriggerBtn')?.remove();
+          document.getElementById('chatifyNavTriggerBtnMobile')?.remove();
           break;
         }
       }
 
-      if (alreadyHooked || existingInjected) return;
+      // If a native link in the header/nav was hooked, no need to inject
+      if (alreadyHooked) return;
 
-      // 3. Auto-Injection: If not hooked and auto_inject is true, inject into navbar
+      // 2. AUTO-INJECTION: Inject into desktop navbar and mobile header
       if (navConfig.auto_inject !== false) {
+        // Find desktop navigation container
         const selector =
           navConfig.target_selector ||
-          'header nav ul, nav ul, header nav, nav, [role="navigation"], .navbar-nav, .navbar, header';
-        const container = document.querySelector(selector);
-        if (!container) return;
+          'header nav ul, nav ul, header nav, nav, [role="navigation"] ul, [role="navigation"], .navbar-nav, .navbar';
+        const container = document.querySelector<HTMLElement>(selector);
 
-        const isList = container.tagName.toLowerCase() === 'ul' || container.tagName.toLowerCase() === 'ol';
-        const wrapper = document.createElement(isList ? 'li' : 'span');
-        wrapper.className = 'chatify-nav-item';
-        wrapper.style.display = 'inline-flex';
-        wrapper.style.alignItems = 'center';
+        if (container && !document.getElementById('chatifyNavTriggerBtn')) {
+          const isList = container.tagName.toLowerCase() === 'ul' || container.tagName.toLowerCase() === 'ol';
 
-        const btn = document.createElement('a');
-        btn.id = 'chatifyNavTriggerBtn';
-        btn.href = 'javascript:void(0)';
-        btn.textContent = label;
-        btn.setAttribute('data-chatify-help', 'true');
+          // Look for sibling link to mirror style and classes
+          const sibling = container.querySelector('a');
 
-        // Check if there is an existing sibling link to clone class
-        const sibling = container.querySelector('a');
-        if (sibling && sibling.className && navConfig.style !== 'pill') {
-          btn.className = sibling.className;
-        } else {
-          btn.style.cssText = `
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            padding: 6px 14px;
-            font-size: 14px;
-            font-weight: 600;
-            border-radius: 9999px;
-            text-decoration: none;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            background: ${this.config.primaryColor || '#480576'};
-            color: #ffffff;
-            border: 1px solid rgba(255,255,255,0.25);
-            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-          `;
+          const btn = document.createElement('a');
+          btn.id = 'chatifyNavTriggerBtn';
+          btn.textContent = label;
+          btn.setAttribute('data-chatify-help', 'true');
+          btn.setAttribute('data-chatify-injected', 'true');
+
+          if (action === 'redirect' && this.config.customDomain) {
+            btn.href = `https://${this.config.customDomain}`;
+            btn.target = '_blank';
+          } else {
+            btn.href = 'javascript:void(0)';
+          }
+
+          if (navConfig.style === 'pill') {
+            btn.style.cssText = `
+              display: inline-flex;
+              align-items: center;
+              justify-content: center;
+              padding: 6px 16px;
+              font-size: 14px;
+              font-weight: 600;
+              border-radius: 9999px;
+              text-decoration: none;
+              cursor: pointer;
+              z-index: 10;
+              transition: all 0.2s ease;
+              background: ${this.config.primaryColor || '#480576'};
+              color: #ffffff;
+              border: 1px solid rgba(255,255,255,0.25);
+              box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+              margin-left: 4px;
+            `;
+          } else {
+            // Auto-match nav link style
+            if (sibling && sibling.className) {
+              btn.className = sibling.className;
+              // Also clone sibling inline styles if any (e.g. min-width on Range4ex)
+              if (sibling.getAttribute('style')) {
+                btn.setAttribute('style', sibling.getAttribute('style') || '');
+              }
+              btn.style.cursor = 'pointer';
+              btn.style.zIndex = '10';
+            } else {
+              btn.style.cssText = `
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                padding: 6px 14px;
+                font-size: 14px;
+                font-weight: 500;
+                color: inherit;
+                text-decoration: none;
+                cursor: pointer;
+                z-index: 10;
+                transition: color 0.2s ease;
+              `;
+            }
+          }
+
+          btn.addEventListener('click', (e) => performAction(e));
+
+          if (isList) {
+            const li = document.createElement('li');
+            li.className = 'chatify-nav-item';
+            li.appendChild(btn);
+            container.appendChild(li);
+          } else {
+            container.appendChild(btn);
+          }
         }
 
-        btn.addEventListener('click', (e) => performAction(e));
-        wrapper.appendChild(btn);
-
-        // Try to insert before CTA buttons (like "Dashboard" or "Sign in" or "Register")
-        const actionBtn = container.querySelector(
-          'button, .btn, [href*="dashboard"], [href*="login"], [href*="signup"]'
-        );
-        if (actionBtn && actionBtn.parentElement === container) {
-          container.insertBefore(wrapper, actionBtn);
-        } else {
-          container.appendChild(wrapper);
+        // 3. MOBILE ADAPTATION: If header has action area or hamburger, also inject mobile-friendly trigger
+        if (!document.getElementById('chatifyNavTriggerBtnMobile')) {
+          const mobileTriggerTarget = document.querySelector<HTMLElement>(
+            'header button.lg\\:hidden, header [aria-label*="Toggle" i], header [aria-label*="menu" i], header .flex.items-center.justify-end'
+          );
+          if (mobileTriggerTarget && mobileTriggerTarget.parentElement) {
+            const mBtn = document.createElement('a');
+            mBtn.id = 'chatifyNavTriggerBtnMobile';
+            mBtn.textContent = label;
+            mBtn.setAttribute('data-chatify-help', 'true');
+            mBtn.setAttribute('data-chatify-injected', 'true');
+            mBtn.className = 'chatify-mobile-nav-btn lg:hidden';
+            mBtn.style.cssText = `
+              display: inline-flex;
+              align-items: center;
+              justify-content: center;
+              padding: 4px 10px;
+              font-size: 12px;
+              font-weight: 600;
+              border-radius: 9999px;
+              background: ${this.config.primaryColor || '#480576'};
+              color: #ffffff;
+              text-decoration: none;
+              cursor: pointer;
+              margin-right: 4px;
+              white-space: nowrap;
+            `;
+            if (action === 'redirect' && this.config.customDomain) {
+              mBtn.href = `https://${this.config.customDomain}`;
+              mBtn.target = '_blank';
+            } else {
+              mBtn.href = 'javascript:void(0)';
+            }
+            mBtn.addEventListener('click', (e) => performAction(e));
+            mobileTriggerTarget.parentElement.insertBefore(mBtn, mobileTriggerTarget);
+          }
         }
       }
     };
@@ -2956,7 +3032,11 @@ class ChatifyWidget {
       let timer: any = null;
       const observer = new MutationObserver(() => {
         clearTimeout(timer);
-        timer = setTimeout(() => attachOrInject(), 400);
+        timer = setTimeout(() => {
+          if (!document.getElementById('chatifyNavTriggerBtn')) {
+            attachOrInject();
+          }
+        }, 300);
       });
       observer.observe(document.body, { childList: true, subtree: true });
     }
