@@ -31,12 +31,16 @@ export async function generateMetadata({
   const { data: ws } = isUuid
     ? await supabase
         .from('public_workspaces')
-        .select('id, name, slug, custom_domain, custom_domain_status, help_center_title, help_center_subtitle')
+        .select(
+          'id, name, slug, custom_domain, custom_domain_status, help_center_title, help_center_subtitle, logo_url, help_center_logo_url, website_url'
+        )
         .eq('id', workspaceId)
         .maybeSingle()
     : await supabase
         .from('public_workspaces')
-        .select('id, name, slug, custom_domain, custom_domain_status, help_center_title, help_center_subtitle')
+        .select(
+          'id, name, slug, custom_domain, custom_domain_status, help_center_title, help_center_subtitle, logo_url, help_center_logo_url, website_url'
+        )
         .or(`slug.eq.${workspaceId},custom_domain.eq.${workspaceId}`)
         .maybeSingle();
 
@@ -58,14 +62,71 @@ export async function generateMetadata({
     host: h.get('x-forwarded-host') || h.get('host'),
   });
 
+  let domain = '';
+  if (ws.website_url) {
+    try {
+      const u = new URL(
+        ws.website_url.startsWith('http') ? ws.website_url : `https://${ws.website_url}`
+      );
+      domain = u.hostname;
+    } catch {}
+  } else if (ws.custom_domain) {
+    domain = ws.custom_domain;
+  }
+
+  const rawLogo =
+    (ws as any).help_center_logo_url?.trim() || (ws as any).logo_url?.trim();
+  const faviconUrl =
+    rawLogo ||
+    (domain ? `https://www.google.com/s2/favicons?domain=${domain}&sz=128` : '/favicon.ico');
+
   return {
     title,
     description,
+    icons: {
+      icon: [
+        { url: faviconUrl },
+        ...(domain
+          ? [
+              {
+                url: `https://www.google.com/s2/favicons?domain=${domain}&sz=128`,
+                sizes: '128x128',
+                type: 'image/png',
+              },
+            ]
+          : []),
+      ],
+      shortcut: faviconUrl,
+      apple: [
+        { url: faviconUrl },
+        ...(domain
+          ? [
+              {
+                url: `https://www.google.com/s2/favicons?domain=${domain}&sz=128`,
+                sizes: '128x128',
+                type: 'image/png',
+              },
+            ]
+          : []),
+      ],
+    },
     alternates: { canonical },
     // Nothing here should advertise the platform: this page belongs to the
     // customer's brand, on the customer's domain.
-    openGraph: { title, description, siteName: helpTitle, type: 'website', url: canonical },
-    twitter: { card: 'summary', title, description },
+    openGraph: {
+      title,
+      description,
+      siteName: helpTitle,
+      type: 'website',
+      url: canonical,
+      ...(rawLogo ? { images: [{ url: rawLogo }] } : {}),
+    },
+    twitter: {
+      card: 'summary',
+      title,
+      description,
+      ...(rawLogo ? { images: [rawLogo] } : {}),
+    },
   };
 }
 

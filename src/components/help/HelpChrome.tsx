@@ -35,6 +35,71 @@ export function helpTitleOf(workspace: Workspace | null | undefined): string {
   return workspace?.help_center_title || workspace?.name || 'Help Center';
 }
 
+/** Resolves the logo to display on the page: explicit help logo, workspace logo, or website icon. */
+export function logoOf(workspace: Workspace | null | undefined): string | null {
+  if (!workspace) return null;
+  const explicit = workspace.help_center_logo_url?.trim() || workspace.logo_url?.trim();
+  if (explicit) return explicit;
+  if (workspace.website_url?.trim()) {
+    try {
+      const u = new URL(
+        workspace.website_url.trim().startsWith('http')
+          ? workspace.website_url.trim()
+          : `https://${workspace.website_url.trim()}`
+      );
+      return `https://www.google.com/s2/favicons?domain=${u.hostname}&sz=128`;
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+/** Resolves the favicon URL for browser tabs. */
+export function faviconOf(workspace: Workspace | null | undefined): string {
+  if (!workspace) return '/favicon.ico';
+  const explicit = workspace.help_center_logo_url?.trim() || workspace.logo_url?.trim();
+  if (explicit) return explicit;
+  if (workspace.website_url?.trim()) {
+    try {
+      const u = new URL(
+        workspace.website_url.trim().startsWith('http')
+          ? workspace.website_url.trim()
+          : `https://${workspace.website_url.trim()}`
+      );
+      return `https://www.google.com/s2/favicons?domain=${u.hostname}&sz=128`;
+    } catch {
+      // ignore
+    }
+  }
+  return '/favicon.ico';
+}
+
+/** Dynamically sets the browser tab favicon to match the workspace/website brand. */
+export function useHelpFavicon(workspace: Workspace | null | undefined) {
+  React.useEffect(() => {
+    if (!workspace || typeof document === 'undefined') return;
+    const iconUrl = faviconOf(workspace);
+    if (!iconUrl) return;
+
+    let link = document.querySelector<HTMLLinkElement>("link[rel*='icon']");
+    if (!link) {
+      link = document.createElement('link');
+      link.rel = 'icon';
+      document.head.appendChild(link);
+    }
+    link.href = iconUrl;
+
+    let appleLink = document.querySelector<HTMLLinkElement>("link[rel='apple-touch-icon']");
+    if (!appleLink) {
+      appleLink = document.createElement('link');
+      appleLink.rel = 'apple-touch-icon';
+      document.head.appendChild(appleLink);
+    }
+    appleLink.href = iconUrl;
+  }, [workspace]);
+}
+
 /** Opens the embedded chat widget if it has loaded. */
 export function openChat() {
   const w = window as unknown as { Chatify?: { open?: () => void } };
@@ -84,8 +149,9 @@ export function HelpHeader({
   trailing,
   onHome,
 }: HelpHeaderProps) {
+  useHelpFavicon(workspace);
   const title = helpTitleOf(workspace);
-  const logo = workspace.help_center_logo_url || workspace.logo_url;
+  const logo = logoOf(workspace);
   const links = headerLinksOf(workspace);
   const brand = brandOf(workspace);
 
@@ -102,13 +168,13 @@ export function HelpHeader({
         <button
           type="button"
           onClick={onHome}
-          className="flex items-center gap-2.5 min-w-0 group cursor-pointer"
+          className="flex items-center gap-3 min-w-0 group cursor-pointer text-left"
         >
           {logo ? (
             <img
               src={logo}
-              alt=""
-              className="w-8 h-8 rounded-lg object-contain shrink-0"
+              alt={title}
+              className="h-8 sm:h-9 w-auto max-h-9 max-w-[150px] sm:max-w-[180px] object-contain shrink-0 rounded-md"
             />
           ) : (
             <span
@@ -118,7 +184,7 @@ export function HelpHeader({
               {title.slice(0, 2).toUpperCase()}
             </span>
           )}
-          <span className="text-[15px] font-semibold text-white truncate group-hover:text-white/80 transition-colors">
+          <span className="text-[15.5px] font-semibold text-white truncate group-hover:text-white/80 transition-colors">
             {title}
           </span>
         </button>
