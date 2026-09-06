@@ -375,59 +375,81 @@ export function MarkdownArticleContent({
 
     // 8. Task Checklists (- [ ] or - [x])
     if (trimmed.startsWith('- [ ] ') || trimmed.startsWith('- [x] ')) {
-      const isChecked = trimmed.startsWith('- [x] ');
-      const label = trimmed.replace(/^- \[( |x)\]\s*/, '');
+      const taskItems: React.ReactNode[] = [];
+      while (
+        index < lines.length &&
+        (lines[index].trim().startsWith('- [ ] ') || lines[index].trim().startsWith('- [x] '))
+      ) {
+        const curTrim = lines[index].trim();
+        const isChecked = curTrim.startsWith('- [x] ');
+        const label = curTrim.replace(/^- \[( |x)\]\s*/, '');
+        taskItems.push(
+          <div key={`task-item-${index}`} className="flex items-center gap-2.5 py-1 text-[13.5px]">
+            <input
+              type="checkbox"
+              readOnly
+              checked={isChecked}
+              className="w-4 h-4 rounded border-line text-accent cursor-default pointer-events-none"
+            />
+            <span className={isChecked ? 'line-through text-ink-3' : 'text-ink leading-relaxed'}>
+              {formatInlineText(label)}
+            </span>
+          </div>
+        );
+        index++;
+      }
       elements.push(
-        <div
-          key={`task-${index}`}
-          className="flex items-center gap-2.5 py-1 text-[13.5px]"
-        >
-          <input
-            type="checkbox"
-            readOnly
-            checked={isChecked}
-            className="w-4 h-4 rounded border-line text-accent cursor-default pointer-events-none"
-          />
-          <span
-            className={
-              isChecked
-                ? 'line-through text-ink-3'
-                : 'text-ink leading-relaxed'
-            }
-          >
-            {formatInlineText(label)}
-          </span>
+        <div key={`task-group-${index}`} className="my-2 space-y-1">
+          {taskItems}
         </div>
       );
-      index++;
       continue;
     }
 
     // 9. Bullet Lists (- or *)
     if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
+      const listItems: React.ReactNode[] = [];
+      while (
+        index < lines.length &&
+        (lines[index].trim().startsWith('- ') || lines[index].trim().startsWith('* ')) &&
+        !lines[index].trim().startsWith('- [ ] ') &&
+        !lines[index].trim().startsWith('- [x] ')
+      ) {
+        const curTrim = lines[index].trim();
+        const itemText = curTrim.substring(2).trim();
+        listItems.push(
+          <li key={`bullet-item-${index}`} className="text-[14px] text-ink-2 leading-relaxed">
+            {formatInlineText(itemText)}
+          </li>
+        );
+        index++;
+      }
       elements.push(
-        <li
-          key={`bullet-${index}`}
-          className="ml-5 list-disc text-[14px] text-ink-2 leading-relaxed py-0.5"
-        >
-          {formatInlineText(trimmed.substring(2))}
-        </li>
+        <ul key={`ul-${index}`} className="list-disc pl-6 space-y-1 my-2 text-ink">
+          {listItems}
+        </ul>
       );
-      index++;
       continue;
     }
 
-    // 10. Numbered Lists (1., 2.)
+    // 10. Numbered Lists (1., 2., etc.)
     if (/^\d+\.\s/.test(trimmed)) {
+      const listItems: React.ReactNode[] = [];
+      while (index < lines.length && /^\d+\.\s/.test(lines[index].trim())) {
+        const curTrim = lines[index].trim();
+        const itemText = curTrim.replace(/^\d+\.\s+/, '').trim();
+        listItems.push(
+          <li key={`ordered-item-${index}`} className="text-[14px] text-ink-2 leading-relaxed">
+            {formatInlineText(itemText)}
+          </li>
+        );
+        index++;
+      }
       elements.push(
-        <li
-          key={`ordered-${index}`}
-          className="ml-5 list-decimal text-[14px] text-ink-2 leading-relaxed py-0.5"
-        >
-          {formatInlineText(trimmed.replace(/^\d+\.\s/, ''))}
-        </li>
+        <ol key={`ol-${index}`} className="list-decimal pl-6 space-y-1 my-2 text-ink">
+          {listItems}
+        </ol>
       );
-      index++;
       continue;
     }
 

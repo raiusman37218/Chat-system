@@ -42,6 +42,9 @@ import {
   Lightbulb,
   Globe,
   Copy,
+  Maximize2,
+  Minimize2,
+  Columns2,
 } from 'lucide-react';
 import { Agent, Article, HelpSection, Workspace } from '@/types/database';
 import { EmojiPickerPopover } from '@/components/dashboard/EmojiPickerPopover';
@@ -703,7 +706,8 @@ function ArticleEditorModal({
   const [summary, setSummary] = useState(article?.summary || '');
   const [content, setContent] = useState(article?.content || '');
   const [status, setStatus] = useState<'published' | 'draft'>(article?.status || 'published');
-  const [activeTab, setActiveTab] = useState<'write' | 'preview'>('write');
+  const [viewMode, setViewMode] = useState<'write' | 'split' | 'preview'>('split');
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -712,6 +716,16 @@ function ArticleEditorModal({
 
   const textareaRef = React.useRef<HTMLTextAreaElement>(null);
 
+  // Statistics
+  const stats = useMemo(() => {
+    const trimmed = content.trim();
+    const words = trimmed ? trimmed.split(/\s+/).length : 0;
+    const chars = content.length;
+    const readMinutes = Math.max(1, Math.ceil(words / 200));
+    return { words, chars, readMinutes };
+  }, [content]);
+
+  // Insert markdown wrapper (e.g. **bold**)
   const insertMarkdown = (prefix: string, suffix: string = '') => {
     const el = textareaRef.current;
     if (!el) return;
@@ -719,14 +733,25 @@ function ArticleEditorModal({
     const start = el.selectionStart;
     const end = el.selectionEnd;
     const text = el.value;
-    const selected = text.substring(start, end) || 'text';
-    const replacement = `${prefix}${selected}${suffix}`;
+    const selected = text.substring(start, end);
 
+    if (!selected) {
+      // If nothing is selected, insert prefix and suffix and place cursor in middle
+      const newText = text.substring(0, start) + prefix + suffix + text.substring(end);
+      setContent(newText);
+      setTimeout(() => {
+        el.focus();
+        el.setSelectionRange(start + prefix.length, start + prefix.length);
+      }, 30);
+      return;
+    }
+
+    const replacement = `${prefix}${selected}${suffix}`;
     setContent(text.substring(0, start) + replacement + text.substring(end));
     setTimeout(() => {
       el.focus();
       el.setSelectionRange(start + prefix.length, start + prefix.length + selected.length);
-    }, 50);
+    }, 30);
   };
 
   const insertText = (str: string) => {
@@ -743,7 +768,291 @@ function ArticleEditorModal({
     setTimeout(() => {
       el.focus();
       el.setSelectionRange(start + str.length, start + str.length);
-    }, 50);
+    }, 30);
+  };
+
+  // ─────────────────────────────────────────────────────────────
+  // 1. SMART BULLET LIST TOGGLER (Single or Multi-Line)
+  // ─────────────────────────────────────────────────────────────
+  const toggleBulletList = () => {
+    const el = textareaRef.current;
+    if (!el) return;
+
+    const start = el.selectionStart;
+    const end = el.selectionEnd;
+    const text = el.value;
+
+    const lineStart = text.lastIndexOf('\n', start - 1) + 1;
+    let lineEnd = text.indexOf('\n', end);
+    if (lineEnd === -1) lineEnd = text.length;
+
+    const selectedBlock = text.substring(lineStart, lineEnd);
+    const lines = selectedBlock.split('\n');
+
+    // If all lines already start with bullet, toggle them OFF
+    const allBulleted = lines.every((l) => /^\s*[-*]\s+/.test(l));
+
+    const newLines = lines.map((l) => {
+      if (allBulleted) {
+        return l.replace(/^(\s*)[-*]\s+/, '$1');
+      } else {
+        // If it starts with a number, convert to bullet
+        if (/^\s*\d+\.\s+/.test(l)) {
+          return l.replace(/^(\s*)\d+\.\s+/, '$1- ');
+        }
+        if (/^\s*[-*]\s+/.test(l)) return l;
+        return l.replace(/^(\s*)/, '$1- ');
+      }
+    });
+
+    const replacement = newLines.join('\n');
+    const newContent = text.substring(0, lineStart) + replacement + text.substring(lineEnd);
+    setContent(newContent);
+
+    setTimeout(() => {
+      el.focus();
+      el.setSelectionRange(lineStart, lineStart + replacement.length);
+    }, 30);
+  };
+
+  // ─────────────────────────────────────────────────────────────
+  // 2. SMART NUMBERED LIST TOGGLER (Sequential Multi-Line)
+  // ─────────────────────────────────────────────────────────────
+  const toggleNumberedList = () => {
+    const el = textareaRef.current;
+    if (!el) return;
+
+    const start = el.selectionStart;
+    const end = el.selectionEnd;
+    const text = el.value;
+
+    const lineStart = text.lastIndexOf('\n', start - 1) + 1;
+    let lineEnd = text.indexOf('\n', end);
+    if (lineEnd === -1) lineEnd = text.length;
+
+    const selectedBlock = text.substring(lineStart, lineEnd);
+    const lines = selectedBlock.split('\n');
+
+    const allNumbered = lines.every((l) => /^\s*\d+\.\s+/.test(l));
+
+    let counter = 1;
+    const newLines = lines.map((l) => {
+      if (allNumbered) {
+        return l.replace(/^(\s*)\d+\.\s+/, '$1');
+      } else {
+        if (/^\s*[-*]\s+/.test(l)) {
+          return l.replace(/^(\s*)[-*]\s+/, `$1${counter++}. `);
+        }
+        if (/^\s*\d+\.\s+/.test(l)) {
+          return l.replace(/^(\s*)\d+\.\s+/, `$1${counter++}. `);
+        }
+        return l.replace(/^(\s*)/, `$1${counter++}. `);
+      }
+    });
+
+    const replacement = newLines.join('\n');
+    const newContent = text.substring(0, lineStart) + replacement + text.substring(lineEnd);
+    setContent(newContent);
+
+    setTimeout(() => {
+      el.focus();
+      el.setSelectionRange(lineStart, lineStart + replacement.length);
+    }, 30);
+  };
+
+  // ─────────────────────────────────────────────────────────────
+  // 3. SMART TASK CHECKLIST TOGGLER
+  // ─────────────────────────────────────────────────────────────
+  const toggleTaskList = () => {
+    const el = textareaRef.current;
+    if (!el) return;
+
+    const start = el.selectionStart;
+    const end = el.selectionEnd;
+    const text = el.value;
+
+    const lineStart = text.lastIndexOf('\n', start - 1) + 1;
+    let lineEnd = text.indexOf('\n', end);
+    if (lineEnd === -1) lineEnd = text.length;
+
+    const selectedBlock = text.substring(lineStart, lineEnd);
+    const lines = selectedBlock.split('\n');
+
+    const allTasks = lines.every((l) => /^\s*-\s*\[[ x]\]\s+/.test(l));
+
+    const newLines = lines.map((l) => {
+      if (allTasks) {
+        return l.replace(/^(\s*)-\s*\[[ x]\]\s+/, '$1');
+      } else {
+        if (/^\s*[-*]\s+/.test(l)) {
+          return l.replace(/^(\s*)[-*]\s+/, '$1- [ ] ');
+        }
+        return l.replace(/^(\s*)/, '$1- [ ] ');
+      }
+    });
+
+    const replacement = newLines.join('\n');
+    const newContent = text.substring(0, lineStart) + replacement + text.substring(lineEnd);
+    setContent(newContent);
+
+    setTimeout(() => {
+      el.focus();
+      el.setSelectionRange(lineStart, lineStart + replacement.length);
+    }, 30);
+  };
+
+  // ─────────────────────────────────────────────────────────────
+  // 4. INTELLIGENT KEYBOARD AUTO-CONTINUATION (Notion/Slack Grade)
+  // ─────────────────────────────────────────────────────────────
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    const el = textareaRef.current;
+    if (!el) return;
+
+    // Shortcuts:
+    // Ctrl+B / Cmd+B -> Bold
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'b') {
+      e.preventDefault();
+      insertMarkdown('**', '**');
+      return;
+    }
+
+    // Ctrl+I / Cmd+I -> Italic
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'i') {
+      e.preventDefault();
+      insertMarkdown('*', '*');
+      return;
+    }
+
+    // Ctrl+K / Cmd+K -> Link
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+      e.preventDefault();
+      insertMarkdown('[', '](https://)');
+      return;
+    }
+
+    // Ctrl+Enter / Cmd+Enter -> Save Article
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+      e.preventDefault();
+      handleSave();
+      return;
+    }
+
+    // Tab key -> Indent / Unindent
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      const start = el.selectionStart;
+      const end = el.selectionEnd;
+      const text = el.value;
+
+      if (e.shiftKey) {
+        // Shift+Tab: Unindent
+        const lineStart = text.lastIndexOf('\n', start - 1) + 1;
+        if (text.substring(lineStart, lineStart + 2) === '  ') {
+          const newContent = text.substring(0, lineStart) + text.substring(lineStart + 2);
+          setContent(newContent);
+          setTimeout(() => {
+            el.setSelectionRange(Math.max(lineStart, start - 2), Math.max(lineStart, end - 2));
+          }, 0);
+        }
+      } else {
+        // Tab: Indent 2 spaces
+        const newContent = text.substring(0, start) + '  ' + text.substring(end);
+        setContent(newContent);
+        setTimeout(() => {
+          el.setSelectionRange(start + 2, start + 2);
+        }, 0);
+      }
+      return;
+    }
+
+    // Enter key -> Auto-continuation for lists
+    if (e.key === 'Enter' && !e.shiftKey) {
+      const start = el.selectionStart;
+      const text = el.value;
+      const lineStart = text.lastIndexOf('\n', start - 1) + 1;
+      const currentLine = text.substring(lineStart, start);
+
+      // A. Empty bullet: "- " or "* " -> exit list
+      const emptyBulletMatch = currentLine.match(/^(\s*)[-*]\s*$/);
+      if (emptyBulletMatch) {
+        e.preventDefault();
+        const newContent = text.substring(0, lineStart) + text.substring(start);
+        setContent(newContent);
+        setTimeout(() => {
+          el.setSelectionRange(lineStart, lineStart);
+        }, 0);
+        return;
+      }
+
+      // B. Bullet with text: "- something" -> continue bullet
+      const bulletMatch = currentLine.match(/^(\s*)([-*])\s+(.+)$/);
+      if (bulletMatch) {
+        e.preventDefault();
+        const indent = bulletMatch[1];
+        const symbol = bulletMatch[2];
+        const insertion = `\n${indent}${symbol} `;
+        const newContent = text.substring(0, start) + insertion + text.substring(start);
+        setContent(newContent);
+        setTimeout(() => {
+          el.setSelectionRange(start + insertion.length, start + insertion.length);
+        }, 0);
+        return;
+      }
+
+      // C. Empty numbered item: "3. " -> exit list
+      const emptyNumMatch = currentLine.match(/^(\s*)\d+\.\s*$/);
+      if (emptyNumMatch) {
+        e.preventDefault();
+        const newContent = text.substring(0, lineStart) + text.substring(start);
+        setContent(newContent);
+        setTimeout(() => {
+          el.setSelectionRange(lineStart, lineStart);
+        }, 0);
+        return;
+      }
+
+      // D. Numbered item with text: "3. something" -> continue next number "4. "
+      const numMatch = currentLine.match(/^(\s*)(\d+)\.\s+(.+)$/);
+      if (numMatch) {
+        e.preventDefault();
+        const indent = numMatch[1];
+        const currentNum = parseInt(numMatch[2], 10);
+        const nextNum = currentNum + 1;
+        const insertion = `\n${indent}${nextNum}. `;
+        const newContent = text.substring(0, start) + insertion + text.substring(start);
+        setContent(newContent);
+        setTimeout(() => {
+          el.setSelectionRange(start + insertion.length, start + insertion.length);
+        }, 0);
+        return;
+      }
+
+      // E. Empty task checklist: "- [ ] " -> exit checklist
+      const emptyTaskMatch = currentLine.match(/^(\s*)-\s*\[[ x]\]\s*$/);
+      if (emptyTaskMatch) {
+        e.preventDefault();
+        const newContent = text.substring(0, lineStart) + text.substring(start);
+        setContent(newContent);
+        setTimeout(() => {
+          el.setSelectionRange(lineStart, lineStart);
+        }, 0);
+        return;
+      }
+
+      // F. Task checklist with text -> continue "- [ ] "
+      const taskMatch = currentLine.match(/^(\s*)-\s*\[[ x]\]\s+(.+)$/);
+      if (taskMatch) {
+        e.preventDefault();
+        const indent = taskMatch[1];
+        const insertion = `\n${indent}- [ ] `;
+        const newContent = text.substring(0, start) + insertion + text.substring(start);
+        setContent(newContent);
+        setTimeout(() => {
+          el.setSelectionRange(start + insertion.length, start + insertion.length);
+        }, 0);
+        return;
+      }
+    }
   };
 
   const handleSave = async () => {
@@ -785,45 +1094,125 @@ function ArticleEditorModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in">
-      <div className="bg-surface border border-line rounded-2xl shadow-2xl max-w-3xl w-full max-h-[92vh] flex flex-col overflow-hidden">
-        {/* Modal Header */}
-        <div className="px-6 py-4 border-b border-line flex items-center justify-between bg-surface-2/50">
-          <div>
-            <h2 className="text-[16px] font-bold text-ink">
-              {article ? 'Edit Knowledge Base Article' : 'Author New Help Article'}
-            </h2>
-            <p className="text-[11.5px] text-ink-3">
-              Write rich guides, FAQs, and solutions formatted for customers & AI.
-            </p>
+    <div
+      className={cn(
+        'fixed z-50 flex items-center justify-center p-2 sm:p-4 bg-black/70 backdrop-blur-xs animate-in fade-in',
+        isFullscreen ? 'inset-0 p-0' : 'inset-0'
+      )}
+    >
+      <div
+        className={cn(
+          'bg-surface border border-line flex flex-col overflow-hidden transition-all shadow-2xl',
+          isFullscreen
+            ? 'w-full h-full rounded-none border-0'
+            : 'max-w-5xl w-full max-h-[92vh] rounded-2xl'
+        )}
+      >
+        {/* ─────────────────────────────────────────────────────────────
+            MODAL HEADER & STUDIO CONTROLS
+            ───────────────────────────────────────────────────────────── */}
+        <div className="px-5 py-3.5 border-b border-line flex items-center justify-between bg-surface-2/60 shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-accent/10 text-accent flex items-center justify-center font-bold">
+              <FileText className="w-4 h-4" />
+            </div>
+            <div>
+              <h2 className="text-[15px] font-bold text-ink">
+                {article ? 'Edit Help Article' : 'Author Knowledge Base Article'}
+              </h2>
+              <p className="text-[11.5px] text-ink-3">
+                Smart formatting, automated list continuation, and real-time live preview.
+              </p>
+            </div>
           </div>
-          <button
-            onClick={onClose}
-            className="w-8 h-8 rounded-lg hover:bg-surface-3 flex items-center justify-center text-ink-3 hover:text-ink transition-colors"
-          >
-            <X className="w-4 h-4" />
-          </button>
+
+          <div className="flex items-center gap-2">
+            {/* View Mode Switcher: Write | Split (Live) | Preview */}
+            <div className="flex items-center bg-surface rounded-lg p-0.5 border border-line shadow-2xs">
+              <button
+                type="button"
+                onClick={() => setViewMode('write')}
+                className={cn(
+                  'px-2.5 py-1 rounded text-[11px] font-semibold transition-all',
+                  viewMode === 'write'
+                    ? 'bg-surface-3 text-ink shadow-xs'
+                    : 'text-ink-3 hover:text-ink'
+                )}
+                title="Editor Only"
+              >
+                Write
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode('split')}
+                className={cn(
+                  'px-2.5 py-1 rounded text-[11px] font-semibold transition-all flex items-center gap-1',
+                  viewMode === 'split'
+                    ? 'bg-accent text-accent-ink shadow-xs'
+                    : 'text-ink-3 hover:text-ink'
+                )}
+                title="Side-by-side Live Split View"
+              >
+                <Columns2 className="w-3.5 h-3.5" />
+                <span>Split View</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode('preview')}
+                className={cn(
+                  'px-2.5 py-1 rounded text-[11px] font-semibold transition-all',
+                  viewMode === 'preview'
+                    ? 'bg-surface-3 text-ink shadow-xs'
+                    : 'text-ink-3 hover:text-ink'
+                )}
+                title="Preview Only"
+              >
+                Preview
+              </button>
+            </div>
+
+            {/* Fullscreen Toggle */}
+            <button
+              type="button"
+              onClick={() => setIsFullscreen(!isFullscreen)}
+              className="w-8 h-8 rounded-lg hover:bg-surface-3 flex items-center justify-center text-ink-3 hover:text-ink transition-colors"
+              title={isFullscreen ? 'Exit Fullscreen' : 'Fullscreen Editor'}
+            >
+              {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+            </button>
+
+            {/* Close Button */}
+            <button
+              type="button"
+              onClick={onClose}
+              className="w-8 h-8 rounded-lg hover:bg-surface-3 flex items-center justify-center text-ink-3 hover:text-ink transition-colors ml-1"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
         </div>
 
-        {/* Modal Body */}
-        <div className="p-6 overflow-y-auto flex-1 space-y-4">
+        {/* ─────────────────────────────────────────────────────────────
+            MODAL BODY: METADATA & EDITOR PANE
+            ───────────────────────────────────────────────────────────── */}
+        <div className="p-5 overflow-y-auto flex-1 space-y-4">
           {errorMsg && (
-            <div className="p-3 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400 text-[12px] flex items-center gap-2">
+            <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400 text-[12.5px] flex items-center gap-2">
               <AlertCircle className="w-4 h-4 shrink-0" />
               <span>{errorMsg}</span>
             </div>
           )}
 
-          {/* Title & Section */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          {/* Title & Category Row */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
             <div className="md:col-span-2 space-y-1">
               <div className="flex items-center justify-between">
-                <label className="text-[11.5px] font-semibold text-ink-2">Article Title</label>
+                <label className="text-[12px] font-semibold text-ink">Article Title</label>
                 <div className="relative">
                   <button
                     type="button"
                     onClick={() => setShowTitleEmojiPicker((prev) => !prev)}
-                    className="text-[11px] text-accent hover:underline flex items-center gap-1"
+                    className="text-[11px] text-accent hover:underline flex items-center gap-1 font-medium"
                   >
                     <Smile className="w-3.5 h-3.5" />
                     <span>Insert Emoji</span>
@@ -842,29 +1231,17 @@ function ArticleEditorModal({
                 type="text"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                placeholder="e.g. 🚀 How to install the chat widget on WordPress"
-                className="w-full h-9.5 px-3 rounded-lg border border-line bg-surface text-[13px] text-ink focus:outline-none focus:border-accent"
+                placeholder="e.g. 🚀 How to pass evaluation challenge guidelines"
+                className="w-full h-10 px-3.5 rounded-xl border border-line bg-surface text-[14px] text-ink focus:outline-none focus:border-accent font-medium shadow-2xs"
               />
-              {workspace && (
-                <div className="flex items-center gap-1.5 text-[11px] text-ink-3 font-mono bg-surface-2/60 px-2.5 py-1 rounded border border-line/60 overflow-hidden">
-                  <Globe className="w-3 h-3 text-accent shrink-0" />
-                  <span className="text-accent font-semibold shrink-0">Public Link:</span>
-                  <span className="truncate">
-                    {getWorkspaceHelpCenterUrl(workspace, {
-                      id: article?.id || 'new-article',
-                      slug: title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'article-slug',
-                    })}
-                  </span>
-                </div>
-              )}
             </div>
 
             <div className="space-y-1">
-              <label className="text-[11.5px] font-semibold text-ink-2">Section / Category</label>
+              <label className="text-[12px] font-semibold text-ink">Section / Collection</label>
               <select
                 value={sectionId}
                 onChange={(e) => setSectionId(e.target.value)}
-                className="w-full h-9.5 px-2.5 rounded-lg border border-line bg-surface text-[13px] text-ink focus:outline-none focus:border-accent"
+                className="w-full h-10 px-3 rounded-xl border border-line bg-surface text-[13px] text-ink focus:outline-none focus:border-accent font-medium shadow-2xs"
               >
                 <option value="">(No Section)</option>
                 {sections.map((sec) => (
@@ -878,23 +1255,23 @@ function ArticleEditorModal({
 
           {/* Excerpt / Summary */}
           <div className="space-y-1">
-            <label className="text-[11.5px] font-semibold text-ink-2">
-              Short Summary <span className="font-normal text-ink-3">(Search result snippet)</span>
+            <label className="text-[12px] font-semibold text-ink">
+              Short Summary <span className="font-normal text-ink-3">(Shown on cards &amp; search)</span>
             </label>
             <input
               type="text"
               value={summary}
               onChange={(e) => setSummary(e.target.value)}
-              placeholder="Brief summary shown in search results and cards..."
-              className="w-full h-9 px-3 rounded-lg border border-line bg-surface text-[13px] text-ink focus:outline-none focus:border-accent"
+              placeholder="Brief summary of what this article explains..."
+              className="w-full h-9.5 px-3.5 rounded-xl border border-line bg-surface text-[13px] text-ink focus:outline-none focus:border-accent shadow-2xs"
             />
           </div>
 
-          {/* Status Switcher */}
-          <div className="flex items-center gap-4 p-3 rounded-xl bg-surface-2/60 border border-line/70">
-            <span className="text-[12px] font-semibold text-ink">Publish Status:</span>
-            <div className="flex items-center gap-2">
-              <label className="flex items-center gap-1.5 cursor-pointer text-[12.5px] text-ink">
+          {/* Publishing Status */}
+          <div className="flex items-center justify-between p-3 rounded-xl bg-surface-2/60 border border-line/70">
+            <div className="flex items-center gap-4">
+              <span className="text-[12px] font-semibold text-ink">Status:</span>
+              <label className="flex items-center gap-1.5 cursor-pointer text-[12.5px]">
                 <input
                   type="radio"
                   name="status"
@@ -903,12 +1280,11 @@ function ArticleEditorModal({
                   onChange={() => setStatus('published')}
                   className="text-accent"
                 />
-                <span className="font-medium text-emerald-600 dark:text-emerald-400">
+                <span className="font-semibold text-emerald-600 dark:text-emerald-400">
                   Published (Live)
                 </span>
               </label>
-
-              <label className="flex items-center gap-1.5 cursor-pointer text-[12.5px] text-ink ml-3">
+              <label className="flex items-center gap-1.5 cursor-pointer text-[12.5px]">
                 <input
                   type="radio"
                   name="status"
@@ -918,277 +1294,313 @@ function ArticleEditorModal({
                   className="text-accent"
                 />
                 <span className="font-medium text-amber-600 dark:text-amber-400">
-                  Draft (Team only)
+                  Draft (Private)
                 </span>
               </label>
             </div>
-          </div>
 
-          {/* Content Editor with Toolbar */}
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between">
-              <label className="text-[11.5px] font-semibold text-ink-2">
-                Article Content (Rich Markdown with Emojis &amp; Callouts)
-              </label>
-              <div className="flex items-center gap-1 bg-surface-2 rounded-lg p-0.5 border border-line">
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('write')}
-                  className={cn(
-                    'px-3 py-1 rounded text-[11px] font-semibold transition-all',
-                    activeTab === 'write' ? 'bg-surface text-ink shadow-xs' : 'text-ink-3 hover:text-ink'
-                  )}
-                >
-                  Write
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('preview')}
-                  className={cn(
-                    'px-3 py-1 rounded text-[11px] font-semibold transition-all',
-                    activeTab === 'preview' ? 'bg-surface text-ink shadow-xs' : 'text-ink-3 hover:text-ink'
-                  )}
-                >
-                  Preview
-                </button>
-              </div>
-            </div>
-
-            {activeTab === 'write' ? (
-              <div className="border border-line rounded-xl overflow-hidden focus-within:border-accent">
-                {/* Advanced Formatting Toolbar */}
-                <div className="flex items-center gap-1 px-2.5 py-2 bg-surface-2 border-b border-line flex-wrap text-ink-2">
-                  {/* Headings */}
-                  <div className="flex items-center gap-0.5 bg-surface rounded-lg p-0.5 border border-line/60">
-                    <button
-                      type="button"
-                      onClick={() => insertMarkdown('\n# ', '\n')}
-                      className="h-7 px-1.5 rounded hover:bg-surface-2 text-[11px] font-bold text-ink hover:text-accent flex items-center gap-0.5"
-                      title="Heading 1"
-                    >
-                      <Heading1 className="w-3.5 h-3.5" />
-                      <span>H1</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => insertMarkdown('\n## ', '\n')}
-                      className="h-7 px-1.5 rounded hover:bg-surface-2 text-[11px] font-bold text-ink hover:text-accent flex items-center gap-0.5"
-                      title="Heading 2"
-                    >
-                      <Heading2 className="w-3.5 h-3.5" />
-                      <span>H2</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => insertMarkdown('\n### ', '\n')}
-                      className="h-7 px-1.5 rounded hover:bg-surface-2 text-[11px] font-bold text-ink hover:text-accent flex items-center gap-0.5"
-                      title="Heading 3"
-                    >
-                      <Heading3 className="w-3.5 h-3.5" />
-                      <span>H3</span>
-                    </button>
-                  </div>
-
-                  {/* Text Formatting */}
-                  <div className="flex items-center gap-0.5 bg-surface rounded-lg p-0.5 border border-line/60">
-                    <button
-                      type="button"
-                      onClick={() => insertMarkdown('**', '**')}
-                      className="h-7 w-7 rounded hover:bg-surface-2 flex items-center justify-center font-bold text-ink hover:text-accent"
-                      title="Bold (**text**)"
-                    >
-                      <Bold className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => insertMarkdown('*', '*')}
-                      className="h-7 w-7 rounded hover:bg-surface-2 flex items-center justify-center italic text-ink hover:text-accent"
-                      title="Italic (*text*)"
-                    >
-                      <Italic className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => insertMarkdown('~~', '~~')}
-                      className="h-7 w-7 rounded hover:bg-surface-2 flex items-center justify-center text-ink hover:text-accent"
-                      title="Strikethrough (~~text~~)"
-                    >
-                      <Strikethrough className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => insertMarkdown('`', '`')}
-                      className="h-7 w-7 rounded hover:bg-surface-2 flex items-center justify-center font-mono text-[11px] text-ink hover:text-accent"
-                      title="Inline Code (`code`)"
-                    >
-                      <Code className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-
-                  {/* Lists & Tasks */}
-                  <div className="flex items-center gap-0.5 bg-surface rounded-lg p-0.5 border border-line/60">
-                    <button
-                      type="button"
-                      onClick={() => insertMarkdown('\n- ')}
-                      className="h-7 w-7 rounded hover:bg-surface-2 flex items-center justify-center text-ink hover:text-accent"
-                      title="Bullet List (- item)"
-                    >
-                      <List className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => insertMarkdown('\n1. ')}
-                      className="h-7 w-7 rounded hover:bg-surface-2 flex items-center justify-center text-ink hover:text-accent"
-                      title="Numbered List (1. item)"
-                    >
-                      <ListOrdered className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => insertText('\n- [ ] ')}
-                      className="h-7 w-7 rounded hover:bg-surface-2 flex items-center justify-center text-ink hover:text-accent"
-                      title="Checklist Task (- [ ] item)"
-                    >
-                      <CheckSquare className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-
-                  {/* Callouts (Intercom / GitHub Style) */}
-                  <div className="flex items-center gap-0.5 bg-surface rounded-lg p-0.5 border border-line/60">
-                    <button
-                      type="button"
-                      onClick={() => insertText('\n> [!NOTE]\n> Add important guidance or notice here...\n\n')}
-                      className="h-7 px-1.5 rounded hover:bg-blue-500/10 text-blue-600 dark:text-blue-400 text-[11px] font-semibold flex items-center gap-1"
-                      title="Info Note Box"
-                    >
-                      <Lightbulb className="w-3.5 h-3.5" />
-                      <span>Note</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => insertText('\n> [!TIP]\n> Pro-tip or best practice recommendation...\n\n')}
-                      className="h-7 px-1.5 rounded hover:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[11px] font-semibold flex items-center gap-1"
-                      title="Pro-Tip Box"
-                    >
-                      <Sparkles className="w-3.5 h-3.5" />
-                      <span>Tip</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => insertText('\n> [!WARNING]\n> Caution: Make sure you do not skip this step...\n\n')}
-                      className="h-7 px-1.5 rounded hover:bg-amber-500/10 text-amber-600 dark:text-amber-400 text-[11px] font-semibold flex items-center gap-1"
-                      title="Warning Box"
-                    >
-                      <AlertTriangle className="w-3.5 h-3.5" />
-                      <span>Warn</span>
-                    </button>
-                  </div>
-
-                  {/* Blocks & Extras */}
-                  <div className="flex items-center gap-0.5 bg-surface rounded-lg p-0.5 border border-line/60">
-                    <button
-                      type="button"
-                      onClick={() => insertMarkdown('\n> ')}
-                      className="h-7 w-7 rounded hover:bg-surface-2 flex items-center justify-center text-ink hover:text-accent"
-                      title="Blockquote (> quote)"
-                    >
-                      <Quote className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => insertText('\n| Column 1 | Column 2 | Column 3 |\n|:---|:---|:---|\n| Feature A | Starter plan | Included |\n| Feature B | Pro plan | Optional |\n\n')}
-                      className="h-7 w-7 rounded hover:bg-surface-2 flex items-center justify-center text-ink hover:text-accent"
-                      title="Insert Table"
-                    >
-                      <TableIcon className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => insertText('\n```javascript\n// Code snippet\nconst app = new ChatifyClient();\n```\n\n')}
-                      className="h-7 px-1.5 rounded hover:bg-surface-2 text-[11px] font-mono text-ink hover:text-accent flex items-center gap-1"
-                      title="Code Block"
-                    >
-                      <span>```</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => insertText('\n---\n\n')}
-                      className="h-7 w-7 rounded hover:bg-surface-2 flex items-center justify-center text-ink hover:text-accent"
-                      title="Horizontal Divider (---)"
-                    >
-                      <Minus className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => insertMarkdown('[', '](https://example.com)')}
-                      className="h-7 w-7 rounded hover:bg-surface-2 flex items-center justify-center text-ink hover:text-accent"
-                      title="Insert Link ([text](url))"
-                    >
-                      <Link2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-
-                  {/* Emoji Picker Button */}
-                  <div className="relative ml-auto">
-                    <button
-                      type="button"
-                      onClick={() => setShowContentEmojiPicker((prev) => !prev)}
-                      className="h-7 px-2.5 rounded-lg bg-accent/10 border border-accent/20 hover:bg-accent/20 text-accent text-[11.5px] font-semibold flex items-center gap-1.5 transition-colors shadow-2xs"
-                      title="Insert Emoji"
-                    >
-                      <Smile className="w-3.5 h-3.5" />
-                      <span>😊 Emojis</span>
-                    </button>
-
-                    {showContentEmojiPicker && (
-                      <div className="absolute right-0 top-8 z-50">
-                        <EmojiPickerPopover
-                          onSelect={(em) => insertText(em)}
-                          onClose={() => setShowContentEmojiPicker(false)}
-                        />
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                <textarea
-                  ref={textareaRef}
-                  rows={12}
-                  value={content}
-                  onChange={(e) => setContent(e.target.value)}
-                  placeholder="Write comprehensive article steps, tips, and guidelines here... Full Markdown & Emojis supported."
-                  className="w-full p-4 bg-surface text-[13px] text-ink placeholder:text-ink-3 focus:outline-none resize-y font-mono leading-relaxed"
-                />
-              </div>
-            ) : (
-              <div className="border border-line rounded-xl p-5 bg-surface min-h-[260px] max-h-[420px] overflow-y-auto leading-relaxed shadow-inner">
-                {content.trim() ? (
-                  <MarkdownArticleContent content={content} />
-                ) : (
-                  <p className="text-ink-3 italic text-[13px]">Nothing to preview yet. Switch to Write tab to add content.</p>
-                )}
+            {workspace && (
+              <div className="hidden sm:flex items-center gap-1.5 text-[11px] text-ink-3 font-mono">
+                <Globe className="w-3.5 h-3.5 text-accent" />
+                <span>
+                  {getWorkspaceHelpCenterUrl(workspace, {
+                    id: article?.id || 'new',
+                    slug: title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'article',
+                  })}
+                </span>
               </div>
             )}
           </div>
+
+          {/* ─────────────────────────────────────────────────────────────
+              EDITOR WRAPPER (TOOLBAR + TEXTAREA + SPLIT VIEW)
+              ───────────────────────────────────────────────────────────── */}
+          <div className="border border-line rounded-xl overflow-hidden shadow-xs focus-within:border-accent transition-colors">
+            {/* Rich Formatting Toolbar */}
+            <div className="flex items-center gap-1 px-3 py-2 bg-surface-2 border-b border-line flex-wrap text-ink-2">
+              {/* Headings */}
+              <div className="flex items-center gap-0.5 bg-surface rounded-lg p-0.5 border border-line/60">
+                <button
+                  type="button"
+                  onClick={() => insertMarkdown('\n# ', '\n')}
+                  className="h-7 px-2 rounded hover:bg-surface-2 text-[11px] font-bold text-ink hover:text-accent flex items-center gap-0.5"
+                  title="Heading 1"
+                >
+                  <Heading1 className="w-3.5 h-3.5" />
+                  <span>H1</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => insertMarkdown('\n## ', '\n')}
+                  className="h-7 px-2 rounded hover:bg-surface-2 text-[11px] font-bold text-ink hover:text-accent flex items-center gap-0.5"
+                  title="Heading 2"
+                >
+                  <Heading2 className="w-3.5 h-3.5" />
+                  <span>H2</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => insertMarkdown('\n### ', '\n')}
+                  className="h-7 px-2 rounded hover:bg-surface-2 text-[11px] font-bold text-ink hover:text-accent flex items-center gap-0.5"
+                  title="Heading 3"
+                >
+                  <Heading3 className="w-3.5 h-3.5" />
+                  <span>H3</span>
+                </button>
+              </div>
+
+              {/* Text Styling */}
+              <div className="flex items-center gap-0.5 bg-surface rounded-lg p-0.5 border border-line/60">
+                <button
+                  type="button"
+                  onClick={() => insertMarkdown('**', '**')}
+                  className="h-7 w-7 rounded hover:bg-surface-2 flex items-center justify-center font-bold text-ink hover:text-accent"
+                  title="Bold (Ctrl+B)"
+                >
+                  <Bold className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => insertMarkdown('*', '*')}
+                  className="h-7 w-7 rounded hover:bg-surface-2 flex items-center justify-center italic text-ink hover:text-accent"
+                  title="Italic (Ctrl+I)"
+                >
+                  <Italic className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => insertMarkdown('~~', '~~')}
+                  className="h-7 w-7 rounded hover:bg-surface-2 flex items-center justify-center text-ink hover:text-accent"
+                  title="Strikethrough"
+                >
+                  <Strikethrough className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => insertMarkdown('`', '`')}
+                  className="h-7 w-7 rounded hover:bg-surface-2 flex items-center justify-center font-mono text-[11px] text-ink hover:text-accent"
+                  title="Inline Code"
+                >
+                  <Code className="w-3.5 h-3.5" />
+                </button>
+              </div>
+
+              {/* Smart Lists (Bullets & Numbering & Checklists) */}
+              <div className="flex items-center gap-0.5 bg-surface rounded-lg p-0.5 border border-line/60">
+                <button
+                  type="button"
+                  onClick={toggleBulletList}
+                  className="h-7 px-2 rounded hover:bg-surface-2 flex items-center gap-1 text-[12px] font-semibold text-ink hover:text-accent"
+                  title="Smart Bullet List (Ctrl+Shift+8)"
+                >
+                  <List className="w-3.5 h-3.5" />
+                  <span className="text-[11px]">Bullet</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={toggleNumberedList}
+                  className="h-7 px-2 rounded hover:bg-surface-2 flex items-center gap-1 text-[12px] font-semibold text-ink hover:text-accent"
+                  title="Smart Numbered List (Ctrl+Shift+7)"
+                >
+                  <ListOrdered className="w-3.5 h-3.5" />
+                  <span className="text-[11px]">1. 2. 3.</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={toggleTaskList}
+                  className="h-7 w-7 rounded hover:bg-surface-2 flex items-center justify-center text-ink hover:text-accent"
+                  title="Task Checklist (- [ ] item)"
+                >
+                  <CheckSquare className="w-3.5 h-3.5" />
+                </button>
+              </div>
+
+              {/* Callouts (Intercom / GitHub Style) */}
+              <div className="flex items-center gap-0.5 bg-surface rounded-lg p-0.5 border border-line/60">
+                <button
+                  type="button"
+                  onClick={() => insertText('\n> [!NOTE]\n> Write important guidance here...\n\n')}
+                  className="h-7 px-2 rounded hover:bg-blue-500/10 text-blue-600 dark:text-blue-400 text-[11px] font-semibold flex items-center gap-1"
+                  title="Info Box"
+                >
+                  <Lightbulb className="w-3.5 h-3.5" />
+                  <span>Note</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => insertText('\n> [!TIP]\n> Pro-tip or best practice recommendation...\n\n')}
+                  className="h-7 px-2 rounded hover:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[11px] font-semibold flex items-center gap-1"
+                  title="Pro Tip"
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>Tip</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => insertText('\n> [!WARNING]\n> Caution: Do not skip this step...\n\n')}
+                  className="h-7 px-2 rounded hover:bg-amber-500/10 text-amber-600 dark:text-amber-400 text-[11px] font-semibold flex items-center gap-1"
+                  title="Warning Box"
+                >
+                  <AlertTriangle className="w-3.5 h-3.5" />
+                  <span>Warn</span>
+                </button>
+              </div>
+
+              {/* Blocks: Table, Quote, Code Block, Link */}
+              <div className="flex items-center gap-0.5 bg-surface rounded-lg p-0.5 border border-line/60">
+                <button
+                  type="button"
+                  onClick={() =>
+                    insertText(
+                      '\n| Column 1 | Column 2 | Column 3 |\n|:---|:---|:---|\n| Feature A | Starter plan | Included |\n| Feature B | Pro plan | Optional |\n\n'
+                    )
+                  }
+                  className="h-7 w-7 rounded hover:bg-surface-2 flex items-center justify-center text-ink hover:text-accent"
+                  title="Insert Table"
+                >
+                  <TableIcon className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => insertMarkdown('\n> ')}
+                  className="h-7 w-7 rounded hover:bg-surface-2 flex items-center justify-center text-ink hover:text-accent"
+                  title="Quote"
+                >
+                  <Quote className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => insertText('\n```javascript\n// Code snippet here\nconst client = new Chatify();\n```\n\n')}
+                  className="h-7 px-1.5 rounded hover:bg-surface-2 text-[11px] font-mono text-ink hover:text-accent"
+                  title="Code Block"
+                >
+                  {'```'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => insertMarkdown('[', '](https://)')}
+                  className="h-7 w-7 rounded hover:bg-surface-2 flex items-center justify-center text-ink hover:text-accent"
+                  title="Link (Ctrl+K)"
+                >
+                  <Link2 className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => insertText('\n---\n\n')}
+                  className="h-7 w-7 rounded hover:bg-surface-2 flex items-center justify-center text-ink hover:text-accent"
+                  title="Divider"
+                >
+                  <Minus className="w-3.5 h-3.5" />
+                </button>
+              </div>
+
+              {/* Emoji Picker Button */}
+              <div className="relative ml-auto">
+                <button
+                  type="button"
+                  onClick={() => setShowContentEmojiPicker((prev) => !prev)}
+                  className="h-7 px-2.5 rounded-lg bg-accent/10 border border-accent/20 hover:bg-accent/20 text-accent text-[11.5px] font-semibold flex items-center gap-1.5 transition-colors"
+                >
+                  <Smile className="w-3.5 h-3.5" />
+                  <span>Emojis</span>
+                </button>
+
+                {showContentEmojiPicker && (
+                  <div className="absolute right-0 top-8 z-50">
+                    <EmojiPickerPopover
+                      onSelect={(em) => insertText(em)}
+                      onClose={() => setShowContentEmojiPicker(false)}
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Editor Panes based on viewMode */}
+            <div
+              className={cn(
+                'grid transition-all',
+                viewMode === 'split' ? 'grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-line' : 'grid-cols-1'
+              )}
+            >
+              {/* Write Textarea Pane */}
+              {(viewMode === 'write' || viewMode === 'split') && (
+                <div className="flex flex-col bg-surface relative">
+                  <textarea
+                    ref={textareaRef}
+                    rows={isFullscreen ? 24 : 14}
+                    value={content}
+                    onChange={(e) => setContent(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    placeholder="Write your article steps, FAQs, or troubleshooting instructions here...
+
+Tip: Type '-' or '1.' and press Enter to auto-continue lists. Use Tab to indent."
+                    className="w-full h-full p-4 bg-transparent text-[13.5px] text-ink placeholder:text-ink-3 focus:outline-none resize-none font-mono leading-relaxed"
+                  />
+                </div>
+              )}
+
+              {/* Live Preview Pane */}
+              {(viewMode === 'preview' || viewMode === 'split') && (
+                <div
+                  className={cn(
+                    'p-5 bg-surface-2/40 overflow-y-auto leading-relaxed',
+                    isFullscreen ? 'max-h-[calc(100vh-220px)]' : 'max-h-[460px] min-h-[300px]'
+                  )}
+                >
+                  <div className="pb-2 mb-3 border-b border-line flex items-center justify-between text-[11.5px] text-ink-3">
+                    <span className="font-semibold uppercase tracking-wider">Live Document Preview</span>
+                    <span>Formatted as seen by customers &amp; AI</span>
+                  </div>
+                  {content.trim() ? (
+                    <MarkdownArticleContent content={content} />
+                  ) : (
+                    <div className="p-8 text-center text-ink-3 italic text-[13px] border border-dashed border-line rounded-xl">
+                      Nothing to preview yet. Start typing or formatting on the left to see live rendering.
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
         </div>
 
-        {/* Modal Footer */}
-        <div className="px-6 py-3.5 border-t border-line flex items-center justify-end gap-2.5 bg-surface-2/40">
-          <button
-            type="button"
-            onClick={onClose}
-            className="h-9 px-4 rounded-lg border border-line bg-surface hover:bg-surface-2 text-ink text-[12.5px] font-medium transition-colors"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            disabled={saving}
-            onClick={handleSave}
-            className="h-9 px-5 rounded-lg bg-accent text-accent-ink hover:opacity-90 text-[12.5px] font-semibold transition-all shadow-xs disabled:opacity-50"
-          >
-            {saving ? 'Saving...' : article ? 'Update Article' : 'Publish Article'}
-          </button>
+        {/* ─────────────────────────────────────────────────────────────
+            MODAL FOOTER WITH LIVE METRICS & 1-CLICK SAVE
+            ───────────────────────────────────────────────────────────── */}
+        <div className="px-5 py-3 border-t border-line flex items-center justify-between bg-surface-2/50 shrink-0">
+          <div className="flex items-center gap-3 text-[12px] text-ink-3">
+            <span className="font-medium">
+              <strong className="text-ink font-semibold">{stats.words}</strong> words
+            </span>
+            <span>•</span>
+            <span>
+              <strong className="text-ink font-semibold">{stats.chars}</strong> chars
+            </span>
+            <span>•</span>
+            <span>~{stats.readMinutes} min read</span>
+            <span className="hidden sm:inline">•</span>
+            <span className="hidden sm:inline text-ink-4">Press ⌘/Ctrl+Enter to save</span>
+          </div>
+
+          <div className="flex items-center gap-2.5">
+            <button
+              type="button"
+              onClick={onClose}
+              className="h-9 px-4 rounded-xl border border-line bg-surface hover:bg-surface-2 text-ink text-[12.5px] font-medium transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              disabled={saving}
+              onClick={handleSave}
+              className="btn btn-primary h-9 px-5 text-[12.5px] font-semibold gap-1.5 shadow-sm"
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>{saving ? 'Saving...' : article ? 'Update Article' : 'Publish Article'}</span>
+            </button>
+          </div>
         </div>
       </div>
     </div>
