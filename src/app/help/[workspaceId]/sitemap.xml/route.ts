@@ -15,8 +15,8 @@ export async function GET(
     // 1. Fetch workspace by UUID, slug, or custom domain
     const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(workspaceId);
     const { data: ws } = isUuid
-      ? await supabase.from('workspaces').select('*').eq('id', workspaceId).maybeSingle()
-      : await supabase.from('workspaces').select('*').or(`slug.eq.${workspaceId},custom_domain.eq.${workspaceId}`).maybeSingle();
+      ? await supabase.from('public_workspaces').select('*').eq('id', workspaceId).maybeSingle()
+      : await supabase.from('public_workspaces').select('*').or(`slug.eq.${workspaceId},custom_domain.eq.${workspaceId}`).maybeSingle();
 
     if (!ws) {
       return new NextResponse('Workspace not found', { status: 404 });

@@ -36,11 +36,33 @@ interface MessageItem {
 
 interface FAQItem {
   id?: string;
+  slug?: string;
   q: string;
   a: string;
   summary?: string;
   category: string;
   icon?: string;
+}
+
+export interface ChatifyAPI {
+  open: (tab?: 'home' | 'messages' | 'help') => void;
+  close: () => void;
+  toggle: () => void;
+  openHelp: () => void;
+  openMessages: () => void;
+  openArticle: (idOrSlug: string) => void;
+  search: (query: string) => void;
+  isOpen: () => boolean;
+  resetSession: () => void;
+  switchTab: (tab: 'home' | 'messages' | 'help') => void;
+  instance: ChatifyWidget;
+}
+
+declare global {
+  interface Window {
+    Chatify?: ChatifyAPI | any;
+    __ChatifyInstance?: ChatifyWidget;
+  }
 }
 
 class ChatifyWidget {
@@ -82,6 +104,7 @@ class ChatifyWidget {
     }
 
     this.initDOM();
+    this.bindGlobalTriggers();
     this.loadWorkspaceArticles();
     this.fetchWorkspaceSettingsAndApply().then(() => {
       this.initVisitorTracking();
@@ -226,7 +249,7 @@ class ChatifyWidget {
     try {
       const { data: articles, error } = await this.supabase
         .from('articles')
-        .select('id, title, summary, content, category, section:help_sections(name, icon)')
+        .select('id, title, slug, summary, content, category, section:help_sections(name, icon)')
         .eq('workspace_id', this.config.workspaceId)
         .eq('status', 'published')
         .order('created_at', { ascending: false });
@@ -234,6 +257,7 @@ class ChatifyWidget {
       if (!error && articles && articles.length > 0) {
         this.faqs = articles.map((a: any) => ({
           id: a.id,
+          slug: a.slug,
           q: a.title,
           summary: a.summary || '',
           a: a.content,
@@ -249,6 +273,91 @@ class ChatifyWidget {
       this.faqs = [];
       this.renderFaqList();
     }
+  }
+
+  private formatMarkdownToHtml(markdown: string): string {
+    if (!markdown) return '';
+
+    // 1. Pre-escape HTML entities to prevent XSS
+    let text = markdown
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+
+    // 2. Fenced code blocks ```lang\ncode\n```
+    text = text.replace(/```(?:[a-zA-Z0-9_-]+)?\n([\s\S]*?)```/g, (_m, code) => {
+      return `<pre class="chatify-code-block"><code>${code.trim()}</code></pre>`;
+    });
+
+    // 3. Inline code `code`
+    text = text.replace(/`([^`\n]+)`/g, '<code class="chatify-inline-code">$1</code>');
+
+    // 4. Images ![alt](url)
+    text = text.replace(/!\[([^\]]*)\]\((https?:\/\/[^\s)]+)\)/g, '<img src="$2" alt="$1" class="chatify-art-img" style="max-width:100%;border-radius:6px;margin:6px 0;" />');
+
+    // 5. Links [text](url) - only allow http/https/mailto
+    text = text.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+|mailto:[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer" class="chatify-art-link">$1</a>');
+
+    // 6. Headings (h1 - h4)
+    text = text.replace(/^#### (.*$)/gim, '<h5 style="margin:10px 0 4px;font-size:12.5px;font-weight:700;color:var(--w-ink);">$1</h5>');
+    text = text.replace(/^### (.*$)/gim, '<h4 style="margin:12px 0 4px;font-size:13px;font-weight:700;color:var(--w-ink);">$1</h4>');
+    text = text.replace(/^## (.*$)/gim, '<h3 style="margin:14px 0 6px;font-size:14px;font-weight:700;color:var(--w-ink);">$1</h3>');
+    text = text.replace(/^# (.*$)/gim, '<h2 style="margin:16px 0 6px;font-size:15px;font-weight:700;color:var(--w-ink);">$1</h2>');
+
+    // 7. Bold & Italic
+    text = text.replace(/\*\*\*([^*]+)\*\*\*/g, '<strong><em>$1</em></strong>');
+    text = text.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+    text = text.replace(/__([^_]+)__/g, '<strong>$1</strong>');
+    text = text.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+    text = text.replace(/_([^_]+)_/g, '<em>$1</em>');
+
+    // 8. Blockquotes
+    text = text.replace(/^>\s?(.*$)/gim, '<blockquote style="border-left:3px solid var(--w-brand);margin:6px 0;padding-left:8px;color:var(--w-ink-2);font-style:italic;">$1</blockquote>');
+
+    // 9. Unordered Lists (- item or * item)
+    text = text.replace(/((?:^(?:[-*]\s+.+)(?:\n|$))+)/gm, (match) => {
+      const items = match
+        .trim()
+        .split('\n')
+        .map((line) => line.replace(/^[-*]\s+/, '').trim())
+        .filter(Boolean)
+        .map((item) => `<li style="margin-bottom:3px;">${item}</li>`)
+        .join('');
+      return `<ul style="margin:6px 0 8px 18px;padding:0;">${items}</ul>`;
+    });
+
+    // 10. Ordered Lists (1. item)
+    text = text.replace(/((?:^\d+\.\s+.+(?:\n|$))+)/gm, (match) => {
+      const items = match
+        .trim()
+        .split('\n')
+        .map((line) => line.replace(/^\d+\.\s+/, '').trim())
+        .filter(Boolean)
+        .map((item) => `<li style="margin-bottom:3px;">${item}</li>`)
+        .join('');
+      return `<ol style="margin:6px 0 8px 18px;padding:0;">${items}</ol>`;
+    });
+
+    // 11. Paragraphs: split by double newlines, preserving structural blocks
+    const blocks = text.split(/\n\s*\n/);
+    text = blocks
+      .map((block) => {
+        const trimmed = block.trim();
+        if (!trimmed) return '';
+        if (
+          trimmed.startsWith('<h') ||
+          trimmed.startsWith('<pre') ||
+          trimmed.startsWith('<ul') ||
+          trimmed.startsWith('<ol') ||
+          trimmed.startsWith('<blockquote')
+        ) {
+          return trimmed;
+        }
+        return `<p style="margin:0 0 8px 0;line-height:1.55;">${trimmed.replace(/\n/g, '<br/>')}</p>`;
+      })
+      .join('');
+
+    return text;
   }
 
   private renderFaqList() {
@@ -275,7 +384,7 @@ class ChatifyWidget {
       ${this.faqs
         .map(
           (faq, idx) => `
-        <div class="chatify-faq-item" data-idx="${idx}" data-id="${faq.id || ''}">
+        <div class="chatify-faq-item" data-idx="${idx}" data-id="${faq.id || ''}" data-slug="${faq.slug || ''}">
           ${faq.category ? `
             <div style="font-size:11px; font-weight:600; color:var(--w-brand); margin-bottom:4px; display:flex; align-items:center; gap:4px;">
               <span>${faq.icon || '📚'}</span>
@@ -287,17 +396,24 @@ class ChatifyWidget {
             <span class="chatify-faq-arrow">›</span>
           </div>
           <div class="chatify-faq-a">
-            ${faq.summary ? `<p style="font-size:12px; font-weight:600; color:var(--w-ink); margin-bottom:6px; line-height:1.4;">${faq.summary}</p>` : ''}
-            <div style="white-space:pre-wrap; line-height:1.6;">${faq.a}</div>
-            ${faq.id ? `
-              <div style="margin-top:12px; padding-top:8px; border-top:1px solid var(--w-line); display:flex; justify-content:space-between; align-items:center;">
-                <span style="font-size:11px; color:var(--w-ink-3);">Helpful?</span>
-                <div class="chatify-vote-group" style="display:flex; gap:6px;">
+            ${faq.summary ? `<p style="font-size:12px; font-weight:600; color:var(--w-ink); margin-bottom:6px; line-height:1.4;">${this.escapeHTML(faq.summary)}</p>` : ''}
+            <div class="chatify-faq-markdown">${this.formatMarkdownToHtml(faq.a)}</div>
+            
+            <div style="margin-top:12px; padding-top:8px; border-top:1px solid var(--w-line); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+              ${this.config.workspaceId ? `
+                <a href="/help/${this.config.workspaceId}/${faq.slug || faq.id}" target="_blank" rel="noopener noreferrer" class="chatify-article-ext-link" title="Open full article in dedicated Help Center">
+                  <span>Open in full Help Center</span> ↗
+                </a>
+              ` : '<span></span>'}
+
+              ${faq.id ? `
+                <div class="chatify-vote-group" style="display:flex; align-items:center; gap:6px;">
+                  <span style="font-size:11px; color:var(--w-ink-3);">Helpful?</span>
                   <button class="chatify-vote-btn" data-art-id="${faq.id}" data-helpful="true" style="padding:3px 8px; border-radius:4px; border:1px solid var(--w-line); background:var(--w-surface); font-size:11.5px; cursor:pointer; color:var(--w-ink);">👍 Yes</button>
                   <button class="chatify-vote-btn" data-art-id="${faq.id}" data-helpful="false" style="padding:3px 8px; border-radius:4px; border:1px solid var(--w-line); background:var(--w-surface); font-size:11.5px; cursor:pointer; color:var(--w-ink);">👎 No</button>
                 </div>
-              </div>
-            ` : ''}
+              ` : ''}
+            </div>
           </div>
         </div>
       `
@@ -2067,9 +2183,66 @@ class ChatifyWidget {
       }
 
       .chatify-faq-item.open .chatify-faq-a {
-        max-height: 260px;
+        max-height: 480px;
+        overflow-y: auto;
         opacity: 1;
         margin-top: 9px;
+        padding-right: 4px;
+      }
+
+      .chatify-faq-markdown {
+        font-size: 12.5px;
+        line-height: 1.6;
+        color: var(--w-ink-2);
+      }
+      .chatify-faq-markdown p { margin: 0 0 8px 0; }
+      .chatify-faq-markdown p:last-child { margin-bottom: 0; }
+      .chatify-faq-markdown pre {
+        background: var(--w-surface-2, #f1f5f9);
+        border: 1px solid var(--w-line);
+        border-radius: 6px;
+        padding: 8px 10px;
+        overflow-x: auto;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        font-size: 11.5px;
+        margin: 8px 0;
+      }
+      .chatify-faq-markdown code {
+        background: var(--w-surface-2, #f1f5f9);
+        border-radius: 4px;
+        padding: 2px 4px;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        font-size: 11.5px;
+      }
+      .chatify-faq-markdown a {
+        color: var(--w-brand);
+        text-decoration: underline;
+      }
+      .chatify-faq-markdown ul, .chatify-faq-markdown ol {
+        margin: 6px 0 8px 18px;
+        padding: 0;
+      }
+      .chatify-faq-markdown li { margin-bottom: 3px; }
+      .chatify-faq-markdown blockquote {
+        border-left: 3px solid var(--w-brand);
+        margin: 8px 0;
+        padding-left: 8px;
+        color: var(--w-ink-3);
+        font-style: italic;
+      }
+      .chatify-article-ext-link {
+        font-size: 11.5px;
+        color: var(--w-brand);
+        text-decoration: none;
+        font-weight: 600;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        transition: opacity .15s;
+      }
+      .chatify-article-ext-link:hover {
+        opacity: 0.8;
+        text-decoration: underline;
       }
 
       /* ── Bottom navigation ────────────────────────────────────────── */
@@ -2448,11 +2621,228 @@ class ChatifyWidget {
       if (navBadge) navBadge.style.display = 'none';
     }
   }
+  public open(tab?: 'home' | 'messages' | 'help') {
+    if (!this.isOpen) {
+      this.toggleWindow();
+    }
+    if (tab) {
+      this.switchTab(tab);
+    }
+  }
+
+  public close() {
+    if (this.isOpen) {
+      this.toggleWindow();
+    }
+  }
+
+  public toggle() {
+    this.toggleWindow();
+  }
+
+  public openHelp() {
+    this.open('help');
+    setTimeout(() => {
+      (this.shadow?.getElementById('helpSearchInput') as HTMLInputElement)?.focus();
+    }, 120);
+  }
+
+  public openMessages() {
+    this.open('messages');
+  }
+
+  public getIsOpen(): boolean {
+    return this.isOpen;
+  }
+
+  public search(query: string) {
+    this.open('help');
+    setTimeout(() => {
+      const faqSearch = this.shadow?.getElementById('helpSearchInput') as HTMLInputElement | null;
+      if (faqSearch) {
+        faqSearch.value = query;
+        const q = query.toLowerCase().trim();
+        let matchCount = 0;
+        this.shadow?.querySelectorAll('.chatify-faq-item').forEach((item) => {
+          const text = item.textContent?.toLowerCase() || '';
+          const matches = text.includes(q);
+          (item as HTMLElement).style.display = matches ? 'block' : 'none';
+          if (matches) matchCount++;
+        });
+        const noResultsEl = this.shadow?.getElementById('faqNoResults');
+        if (noResultsEl) {
+          noResultsEl.style.display = (this.faqs.length > 0 && q && matchCount === 0) ? 'block' : 'none';
+        }
+        faqSearch.focus();
+      }
+    }, 100);
+  }
+
+  public async openArticle(idOrSlug: string) {
+    if (!idOrSlug) return;
+    this.open('help');
+
+    const tryFindAndExpand = () => {
+      const clean = idOrSlug.trim().toLowerCase();
+      const items = this.shadow?.querySelectorAll('.chatify-faq-item');
+      let targetItem: HTMLElement | null = null;
+
+      items?.forEach((el) => {
+        const item = el as HTMLElement;
+        const id = (item.getAttribute('data-id') || '').toLowerCase();
+        const slug = (item.getAttribute('data-slug') || '').toLowerCase();
+        if (id === clean || slug === clean) {
+          targetItem = item;
+        }
+      });
+
+      if (targetItem) {
+        const faqSearch = this.shadow?.getElementById('helpSearchInput') as HTMLInputElement | null;
+        if (faqSearch && faqSearch.value) {
+          faqSearch.value = '';
+          items?.forEach((el) => {
+            (el as HTMLElement).style.display = 'block';
+          });
+          const noResultsEl = this.shadow?.getElementById('faqNoResults');
+          if (noResultsEl) noResultsEl.style.display = 'none';
+        }
+
+        if (!(targetItem as HTMLElement).classList.contains('open')) {
+          (targetItem as HTMLElement).classList.add('open');
+        }
+
+        (targetItem as HTMLElement).scrollIntoView({ behavior: 'smooth', block: 'center' });
+        return true;
+      }
+      return false;
+    };
+
+    if (!tryFindAndExpand()) {
+      setTimeout(() => {
+        tryFindAndExpand();
+      }, 350);
+    }
+  }
+
+  private bindGlobalTriggers() {
+    if (typeof document === 'undefined') return;
+
+    document.addEventListener('click', (e: MouseEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (!target) return;
+
+      // 1. Help tab trigger: [data-chatify-help] or .chatify-help-trigger
+      const helpTrigger = target.closest('[data-chatify-help], .chatify-help-trigger');
+      if (helpTrigger) {
+        e.preventDefault();
+        this.openHelp();
+        return;
+      }
+
+      // 2. Open specific article: [data-chatify-article]
+      const articleTrigger = target.closest('[data-chatify-article]');
+      if (articleTrigger) {
+        e.preventDefault();
+        const articleIdOrSlug = articleTrigger.getAttribute('data-chatify-article') || '';
+        if (articleIdOrSlug) {
+          this.openArticle(articleIdOrSlug);
+        } else {
+          this.openHelp();
+        }
+        return;
+      }
+
+      // 3. General open trigger: [data-chatify-open] or .chatify-open-trigger
+      const openTrigger = target.closest('[data-chatify-open], .chatify-open-trigger');
+      if (openTrigger) {
+        e.preventDefault();
+        const targetTab = openTrigger.getAttribute('data-chatify-tab') as 'home' | 'messages' | 'help' | null;
+        this.open(targetTab || 'home');
+        return;
+      }
+
+      // 4. Close trigger: [data-chatify-close]
+      const closeTrigger = target.closest('[data-chatify-close]');
+      if (closeTrigger) {
+        e.preventDefault();
+        this.close();
+        return;
+      }
+
+      // 5. Toggle trigger: [data-chatify-toggle]
+      const toggleTrigger = target.closest('[data-chatify-toggle]');
+      if (toggleTrigger) {
+        e.preventDefault();
+        this.toggle();
+        return;
+      }
+    });
+  }
 }
 
 if (typeof window !== 'undefined') {
+  // If window.Chatify not defined, initialize placeholder queue so early calls don't crash
+  if (!(window as any).Chatify) {
+    const queue: any[] = [];
+    const stub: any = {
+      q: queue,
+      open: (...args: any[]) => queue.push(['open', args]),
+      close: (...args: any[]) => queue.push(['close', args]),
+      toggle: (...args: any[]) => queue.push(['toggle', args]),
+      openHelp: (...args: any[]) => queue.push(['openHelp', args]),
+      openMessages: (...args: any[]) => queue.push(['openMessages', args]),
+      openArticle: (...args: any[]) => queue.push(['openArticle', args]),
+      search: (...args: any[]) => queue.push(['search', args]),
+      isOpen: () => false,
+      resetSession: () => {},
+      switchTab: (...args: any[]) => queue.push(['switchTab', args]),
+    };
+    (window as any).Chatify = stub;
+  }
+
   const init = () => {
-    (window as any).__ChatifyInstance = new ChatifyWidget();
+    const widget = new ChatifyWidget();
+    (window as any).__ChatifyInstance = widget;
+
+    // Check if window.Chatify had a queue of pre-invoked commands
+    const existingChatify = (window as any).Chatify;
+    const queue = Array.isArray(existingChatify?.q)
+      ? existingChatify.q
+      : Array.isArray(existingChatify)
+      ? existingChatify
+      : [];
+
+    const api: ChatifyAPI = {
+      open: (tab) => widget.open(tab),
+      close: () => widget.close(),
+      toggle: () => widget.toggle(),
+      openHelp: () => widget.openHelp(),
+      openMessages: () => widget.openMessages(),
+      openArticle: (idOrSlug) => widget.openArticle(idOrSlug),
+      search: (query) => widget.search(query),
+      isOpen: () => widget.getIsOpen(),
+      resetSession: () => widget.resetSession(),
+      switchTab: (tab) => widget.switchTab(tab),
+      instance: widget,
+    };
+
+    (window as any).Chatify = api;
+
+    // Flush any queued method calls if callers pushed items like ['openHelp', []]
+    if (queue.length > 0) {
+      for (const item of queue) {
+        if (Array.isArray(item)) {
+          const [method, args = []] = item;
+          if (typeof (api as any)[method] === 'function') {
+            (api as any)[method](...args);
+          }
+        } else if (typeof item === 'function') {
+          try {
+            item(api);
+          } catch (e) {}
+        }
+      }
+    }
   };
 
   if (document.readyState === 'loading') {

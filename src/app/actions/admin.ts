@@ -11,9 +11,10 @@ import {
 } from '@/types/database';
 
 /**
- * Ensures the requesting user is authenticated and has 'admin' or 'owner' role.
+ * Ensures the requesting user is authenticated, has 'admin' or 'owner' role,
+ * and belongs to or owns the specified workspace.
  */
-async function assertAdminUser(workspaceId: string): Promise<{ user: any; agent: Agent }> {
+export async function assertAdminUser(workspaceId: string): Promise<{ user: any; agent: Agent }> {
   const supabase = await createClient();
   const {
     data: { user },
@@ -36,6 +37,25 @@ async function assertAdminUser(workspaceId: string): Promise<{ user: any; agent:
 
   if (agent.role !== 'admin' && agent.role !== 'owner') {
     throw new Error('Forbidden: Only administrators can access admin settings.');
+  }
+
+  // Tenancy check: agent must belong to the workspace, or be the workspace owner
+  let isAuthorized = agent.workspace_id === workspaceId;
+
+  if (!isAuthorized) {
+    const { data: ws } = await supabase
+      .from('workspaces')
+      .select('owner_id')
+      .eq('id', workspaceId)
+      .maybeSingle();
+
+    if (ws && ws.owner_id === user.id) {
+      isAuthorized = true;
+    }
+  }
+
+  if (!isAuthorized) {
+    throw new Error('Forbidden: You do not have administrative privileges for this workspace.');
   }
 
   return { user, agent: agent as Agent };
@@ -326,6 +346,50 @@ export async function updateAISettingsAction(
     .update({
       ai_settings: settings,
     })
+    .eq('id', workspaceId)
+    .select()
+    .single();
+
+  if (error) throw new Error(error.message);
+  return { success: true, workspace: updated as Workspace };
+}
+
+/**
+ * SECTION 8: Help Center Branding & Appearance
+ */
+export async function updateHelpCenterBrandingAction(
+  workspaceId: string,
+  data: {
+    help_center_title?: string | null;
+    help_center_subtitle?: string | null;
+    help_center_logo_url?: string | null;
+    help_center_header_links?: Array<{ label: string; url: string; target?: string }>;
+    help_center_footer_text?: string | null;
+  }
+) {
+  await assertAdminUser(workspaceId);
+  const supabase = await createClient();
+
+  const updatePayload: Record<string, any> = {};
+  if (data.help_center_title !== undefined) {
+    updatePayload.help_center_title = data.help_center_title ? data.help_center_title.trim() : null;
+  }
+  if (data.help_center_subtitle !== undefined) {
+    updatePayload.help_center_subtitle = data.help_center_subtitle ? data.help_center_subtitle.trim() : null;
+  }
+  if (data.help_center_logo_url !== undefined) {
+    updatePayload.help_center_logo_url = data.help_center_logo_url ? data.help_center_logo_url.trim() : null;
+  }
+  if (data.help_center_header_links !== undefined) {
+    updatePayload.help_center_header_links = data.help_center_header_links;
+  }
+  if (data.help_center_footer_text !== undefined) {
+    updatePayload.help_center_footer_text = data.help_center_footer_text ? data.help_center_footer_text.trim() : null;
+  }
+
+  const { data: updated, error } = await supabase
+    .from('workspaces')
+    .update(updatePayload)
     .eq('id', workspaceId)
     .select()
     .single();

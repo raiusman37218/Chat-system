@@ -114,7 +114,7 @@ export default function ChatWidget({
       try {
         const [{ data: wsData }, { data: articlesData }] = await Promise.all([
           supabase
-            .from('workspaces')
+            .from('public_workspaces')
             .select('id, name, slug, custom_domain, custom_domain_status, website_url, help_center_tab_label, show_help_tab, widget_position')
             .eq('id', config.workspaceId)
             .maybeSingle(),

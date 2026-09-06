@@ -51,7 +51,7 @@ export async function middleware(request: NextRequest) {
     // a correctly configured domain showed the platform's own marketing page
     // to the customer's visitors until an admin happened to open Settings.
     const { data: matches } = await supabase
-      .from('workspaces')
+      .from('public_workspaces')
       .select('id, custom_domain, custom_domain_status')
       .ilike('custom_domain', host)
       .limit(1);

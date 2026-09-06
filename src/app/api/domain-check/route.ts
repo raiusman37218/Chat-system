@@ -34,7 +34,7 @@ export async function GET(request: Request) {
 
   const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
   const { data: ws } = await supabase
-    .from('workspaces')
+    .from('public_workspaces')
     .select('id, slug, custom_domain')
     .ilike('custom_domain', host)
     .maybeSingle();

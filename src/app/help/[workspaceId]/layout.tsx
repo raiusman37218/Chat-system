@@ -30,13 +30,13 @@ export async function generateMetadata({
   const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
   const { data: ws } = isUuid
     ? await supabase
-        .from('workspaces')
-        .select('id, name, slug, custom_domain, custom_domain_status')
+        .from('public_workspaces')
+        .select('id, name, slug, custom_domain, custom_domain_status, help_center_title, help_center_subtitle')
         .eq('id', workspaceId)
         .maybeSingle()
     : await supabase
-        .from('workspaces')
-        .select('id, name, slug, custom_domain, custom_domain_status')
+        .from('public_workspaces')
+        .select('id, name, slug, custom_domain, custom_domain_status, help_center_title, help_center_subtitle')
         .or(`slug.eq.${workspaceId},custom_domain.eq.${workspaceId}`)
         .maybeSingle();
 
@@ -44,8 +44,11 @@ export async function generateMetadata({
     return { title: 'Help Center' };
   }
 
-  const title = `${ws.name} Help Center`;
-  const description = `Guides, troubleshooting steps and answers from the ${ws.name} team.`;
+  const helpTitle = (ws as any).help_center_title || ws.name;
+  const title = `${helpTitle} Help Center`;
+  const description =
+    (ws as any).help_center_subtitle ||
+    `Guides, troubleshooting steps and answers from the ${helpTitle} team.`;
 
   // The same help centre is reachable both on the platform path and on the
   // customer's domain. Without a canonical, search engines see two copies of
@@ -61,7 +64,7 @@ export async function generateMetadata({
     alternates: { canonical },
     // Nothing here should advertise the platform: this page belongs to the
     // customer's brand, on the customer's domain.
-    openGraph: { title, description, siteName: ws.name, type: 'website', url: canonical },
+    openGraph: { title, description, siteName: helpTitle, type: 'website', url: canonical },
     twitter: { card: 'summary', title, description },
   };
 }

@@ -23,12 +23,12 @@ export async function generateMetadata({
 
   const { data: ws } = isUuid(workspaceId)
     ? await supabase
-        .from('workspaces')
+        .from('public_workspaces')
         .select('id, name, slug, custom_domain, custom_domain_status')
         .eq('id', workspaceId)
         .maybeSingle()
     : await supabase
-        .from('workspaces')
+        .from('public_workspaces')
         .select('id, name, slug, custom_domain, custom_domain_status')
         .or(`slug.eq.${workspaceId},custom_domain.eq.${workspaceId}`)
         .maybeSingle();
@@ -40,12 +40,15 @@ export async function generateMetadata({
         .from('articles')
         .select('id, slug, title, summary')
         .eq('id', articleId)
+        .eq('workspace_id', ws.id)
+        .eq('status', 'published')
         .maybeSingle()
     : await supabase
         .from('articles')
         .select('id, slug, title, summary')
         .eq('workspace_id', ws.id)
         .eq('slug', articleId)
+        .eq('status', 'published')
         .maybeSingle();
 
   if (!article) return { title: `${ws.name} Help Center` };

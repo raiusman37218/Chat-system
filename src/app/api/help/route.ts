@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
 
     // 1. Fetch Workspace Public Branding
     const { data: workspace, error: wsErr } = await supabase
-      .from('workspaces')
+      .from('public_workspaces')
       .select('id, name, website_url, brand_color, logo_url, greeting_title')
       .eq('id', workspaceId)
       .maybeSingle();

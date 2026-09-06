@@ -224,6 +224,7 @@ export interface HelpSection {
   id: string;
   workspace_id: string;
   name: string;
+  slug: string;
   description: string | null;
   icon: string;
   order_index: number;
@@ -240,7 +241,7 @@ export interface Article {
   title: string;
   slug?: string | null;
   category: string;
-  summary: string | null;
+  summary?: string | null;
   content: string;
   status?: 'published' | 'draft';
   author_id?: string | null;
@@ -265,6 +266,29 @@ export interface ArticleFeedback {
   created_at: string;
 }
 
+export interface PublicWorkspace {
+  id: string;
+  name: string;
+  website_url: string | null;
+  brand_color: string;
+  logo_url: string | null;
+  widget_position: 'right' | 'left';
+  greeting_title: string | null;
+  greeting_message: string | null;
+  help_center_tab_label: string;
+  show_help_tab: boolean;
+  help_center_tab_icon: string;
+  slug: string | null;
+  custom_domain: string | null;
+  custom_domain_status: 'pending' | 'verified' | 'failed' | null;
+  help_center_title: string | null;
+  help_center_subtitle: string | null;
+  help_center_logo_url: string | null;
+  help_center_header_links: Array<{ label: string; url: string; target?: string }>;
+  help_center_footer_text: string | null;
+  created_at: string;
+}
+
 export interface Workspace {
   id: string;
   name: string;
@@ -286,6 +310,11 @@ export interface Workspace {
   custom_domain_status?: 'pending' | 'verified' | 'failed' | null;
   custom_domain_verified_at?: string | null;
   custom_domain_verification_token?: string | null;
+  help_center_title?: string | null;
+  help_center_subtitle?: string | null;
+  help_center_logo_url?: string | null;
+  help_center_header_links?: Array<{ label: string; url: string; target?: string }> | null;
+  help_center_footer_text?: string | null;
   created_at: string;
 }
 
@@ -407,6 +436,9 @@ export interface Database {
       };
     };
     Views: {
+      public_workspaces: {
+        Row: PublicWorkspace;
+      };
       [key: string]: {
         Row: any;
       };

@@ -8,7 +8,7 @@ export default async function HelpRootPage() {
 
   // Redirect to first active workspace or fallback default
   const { data: ws } = await supabase
-    .from('workspaces')
+    .from('public_workspaces')
     .select('id')
     .order('created_at', { ascending: true })
     .limit(1)

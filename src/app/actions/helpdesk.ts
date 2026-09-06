@@ -27,7 +27,22 @@ async function assertAgent(workspaceId: string): Promise<{ user: any; agent: Age
     throw new Error('Forbidden: Agent profile not found.');
   }
 
-  if (agent.workspace_id && agent.workspace_id !== workspaceId) {
+  // Tenancy check: agent must belong to the workspace, or be the workspace owner
+  let isAuthorized = agent.workspace_id === workspaceId;
+
+  if (!isAuthorized) {
+    const { data: ws } = await supabase
+      .from('workspaces')
+      .select('owner_id')
+      .eq('id', workspaceId)
+      .maybeSingle();
+
+    if (ws && ws.owner_id === user.id) {
+      isAuthorized = true;
+    }
+  }
+
+  if (!isAuthorized) {
     throw new Error('Forbidden: Agent does not belong to this workspace.');
   }
 
@@ -128,11 +143,14 @@ export async function createHelpSectionAction(
   await assertAgent(workspaceId);
   const supabase = await createClient();
 
+  const slug = generateSlug(data.name);
+
   const { data: inserted, error } = await supabase
     .from('help_sections')
     .insert({
       workspace_id: workspaceId,
       name: data.name.trim(),
+      slug,
       description: data.description?.trim() || null,
       icon: data.icon?.trim() || '📚',
       order_index: data.order_index ?? 0,
@@ -158,7 +176,10 @@ export async function updateHelpSectionAction(
   const supabase = await createClient();
 
   const updatePayload: any = { updated_at: new Date().toISOString() };
-  if (data.name !== undefined) updatePayload.name = data.name.trim();
+  if (data.name !== undefined) {
+    updatePayload.name = data.name.trim();
+    updatePayload.slug = generateSlug(data.name);
+  }
   if (data.description !== undefined) updatePayload.description = data.description.trim();
   if (data.icon !== undefined) updatePayload.icon = data.icon.trim();
   if (data.order_index !== undefined) updatePayload.order_index = data.order_index;

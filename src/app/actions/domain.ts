@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/server';
 import { Workspace } from '@/types/database';
 import { cleanDomain, CNAME_TARGET, APEX_A_RECORD, splitDomain } from '@/lib/domain';
 import { addDomainToProject, removeDomainFromProject } from '@/lib/vercel';
+import { assertAdminUser } from '@/app/actions/admin';
 
 interface ActionResult<T = any> {
   success: boolean;
@@ -28,6 +29,7 @@ export async function updateWorkspaceDomainAction(
   }>
 > {
   try {
+    await assertAdminUser(workspaceId);
     const supabase = await createClient();
 
     const domain = cleanDomain(rawDomain);
@@ -89,6 +91,23 @@ export async function updateWorkspaceDomainAction(
 }
 
 /**
+ * Recognises the hosting provider's own CNAME targets.
+ *
+ * Vercel no longer hands every project the same `cname.vercel-dns.com`; each
+ * domain gets its own target on a numbered zone, e.g.
+ * `bd746ae204036aab.vercel-dns-017.com`. Matching only the literal
+ * `.vercel-dns.com` suffix rejected those as "not this platform" — a false
+ * negative for anyone who copied the value Vercel actually showed them.
+ */
+function isHostingTarget(target: string): boolean {
+  return (
+    /.vercel-dns(-d+)?.com$/.test(target) ||
+    target.endsWith('.vercel.app') ||
+    target.endsWith('.vercel-dns.com')
+  );
+}
+
+/**
  * Perform live DNS verification check (TXT record or CNAME record) for a workspace.
  */
 export async function verifyWorkspaceDomainAction(
@@ -102,6 +121,7 @@ export async function verifyWorkspaceDomainAction(
   }>
 > {
   try {
+    await assertAdminUser(workspaceId);
     const supabase = await createClient();
 
     // 1. Fetch workspace
@@ -163,6 +183,8 @@ export async function verifyWorkspaceDomainAction(
     let cnameVerified = false;
     let txtVerified = false;
     let foundCname: string | null = null;
+    /** True when the hostname resolves to anything at all. */
+    let dnsResolves = false;
     const diagnosticLogs: string[] = [];
 
     // 3. Check CNAME record
@@ -175,10 +197,11 @@ export async function verifyWorkspaceDomainAction(
       // project does not own — which is exactly how customers ended up with a
       // certificate error on a domain we had told them was correct.
       foundCname = cnameRecords[0] || null;
+      dnsResolves = dnsResolves || cnameRecords.length > 0;
       const expected = CNAME_TARGET.toLowerCase().replace(/.$/, '');
       cnameVerified = cnameRecords.some((target) => {
         const t = target.toLowerCase().replace(/.$/, '');
-        return t === expected || t.endsWith('.vercel-dns.com') || t.endsWith('.vercel.app');
+        return t === expected || isHostingTarget(t);
       });
     } catch (err: any) {
       diagnosticLogs.push(`CNAME lookup: ${err.code || err.message}`);
@@ -192,6 +215,7 @@ export async function verifyWorkspaceDomainAction(
       try {
         const aRecords = await dns.resolve4(domain);
         diagnosticLogs.push(`A records found: ${aRecords.join(', ')}`);
+        dnsResolves = dnsResolves || aRecords.length > 0;
         if (aRecords.includes(APEX_A_RECORD)) {
           cnameVerified = true;
         } else {
@@ -230,29 +254,44 @@ export async function verifyWorkspaceDomainAction(
     // DNS alone told owners their help centre was live when visitors were
     // getting a 404, so the last word belongs to a real request.
     let reachable = false;
-    if (dnsOk) {
+    /** Something answered over HTTPS on this hostname — but was it us? */
+    let servedBySomeoneElse = false;
+    if (dnsOk || dnsResolves) {
       try {
         const probe = await fetch(`https://${domain}/api/domain-check`, {
           headers: { accept: 'application/json' },
           cache: 'no-store',
           signal: AbortSignal.timeout(8000),
         });
-        if (probe.ok) {
-          const body = await probe.json();
-          reachable = body?.app === 'chatify' && body?.workspaceId === workspaceId;
-          diagnosticLogs.push(
-            `Live probe: HTTP ${probe.status}, resolved workspace ${body?.workspaceId ?? 'none'}`
-          );
-        } else {
-          diagnosticLogs.push(`Live probe: HTTP ${probe.status}`);
+
+        let body: any = null;
+        try {
+          body = await probe.clone().json();
+        } catch {
+          // Someone else's site answering with HTML, not our JSON.
         }
+
+        reachable =
+          probe.ok && body?.app === 'chatify' && body?.workspaceId === workspaceId;
+
+        // A clean HTTPS answer that is not this app means the hostname is
+        // wired up correctly — to a different site. On Vercel that is almost
+        // always the domain sitting in the customer's own project rather than
+        // ours, and a domain can only live in one project at a time.
+        servedBySomeoneElse = !reachable && body?.app !== 'chatify';
+
+        diagnosticLogs.push(
+          `Live probe: HTTP ${probe.status}` +
+            (body?.app ? `, app "${body.app}"` : ', non-JSON response') +
+            (body?.workspaceId ? `, workspace ${body.workspaceId}` : '')
+        );
       } catch (err) {
         const e = err as { name?: string; message?: string };
         diagnosticLogs.push(`Live probe failed: ${e?.name || e?.message}`);
       }
     }
 
-    const isVerified = dnsOk && reachable;
+    const isVerified = reachable;
 
     if (isVerified) {
       await supabase
@@ -271,9 +310,10 @@ export async function verifyWorkspaceDomainAction(
           details: 'Live — your help centre is being served on this domain.',
         },
       };
-    } else if (dnsOk) {
-      // The most common real-world state: DNS is right, but nobody added the
-      // domain to the hosting project yet. Say exactly that.
+    } else if (dnsOk || servedBySomeoneElse) {
+      // The most common real-world states: DNS is right but nobody attached
+      // the domain to the hosting project, or the domain is attached to the
+      // wrong project. Neither is a DNS fault, so don't report one.
       await supabase
         .from('workspaces')
         .update({ custom_domain_status: 'pending' })
@@ -284,7 +324,13 @@ export async function verifyWorkspaceDomainAction(
         data: {
           verified: false,
           status: 'pending',
-          details: !hosting.configured
+          details: servedBySomeoneElse
+            ? `${domain} is already being served by a different site. A hostname ` +
+              `can only belong to one project at a time, so it has to be removed ` +
+              `from wherever it is connected now (most often the customer's own ` +
+              `website project) before it can serve this help centre. ` +
+              `Diagnostics: ${diagnosticLogs.join(' | ')}`
+            : !hosting.configured
             ? `DNS looks correct, but ${domain} is not serving your help centre yet. ` +
               `This platform has no hosting credentials configured, so the domain ` +
               `must be added to the hosting project by hand (Vercel → Project → ` +
@@ -341,6 +387,7 @@ export async function removeWorkspaceDomainAction(
   workspaceId: string
 ): Promise<ActionResult> {
   try {
+    await assertAdminUser(workspaceId);
     const supabase = await createClient();
 
     // Read it before clearing, so the hostname can be released upstream too.

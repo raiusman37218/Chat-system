@@ -486,11 +486,19 @@
         <a onclick="navigateTo('#solutions')">Solutions</a>
         <a onclick="navigateTo('#pricing')">Pricing</a>
         <a onclick="navigateTo('#docs')">API Docs</a>
+        <a href="javascript:void(0)" data-chatify-help style="color: #93c5fd; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;">
+          📖 Help &amp; FAQs
+        </a>
       </nav>
 
-      <button class="btn-primary" onclick="openChatBubble()">
-        Talk to Support
-      </button>
+      <div style="display:flex; align-items:center; gap:8px;">
+        <button class="sim-action-btn" data-chatify-help style="background: rgba(59, 130, 246, 0.15); border: 1px solid rgba(59, 130, 246, 0.4); color: #93c5fd; padding: 7px 14px; border-radius: 8px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 5px;">
+          📖 Help
+        </button>
+        <button class="btn-primary" onclick="openChatBubble()">
+          Talk to Support
+        </button>
+      </div>
     </div>
   </header>
 
@@ -544,6 +552,36 @@
           <span class="page-chip" onclick="navigateTo('#pricing-enterprise')">/pricing/enterprise</span>
           <span class="page-chip" onclick="navigateTo('#checkout')">/checkout?plan=pro</span>
           <span class="page-chip" onclick="navigateTo('#api-docs')">/docs/realtime-api</span>
+        </div>
+      </div>
+
+      <!-- Phase 3: Widget SDK & Help Center Trigger Testing Console -->
+      <div class="sim-guide-box" style="margin-top: 24px; border-color: rgba(99, 102, 241, 0.4); background: rgba(99, 102, 241, 0.07);">
+        <div class="sim-guide-title" style="color: #a5b4fc; margin-bottom: 8px;">
+          <span>⚡ Phase 3: Help Center &amp; Widget SDK Trigger Console</span>
+        </div>
+        <p style="font-size: 12px; color: #cbd5e1; margin-bottom: 14px;">
+          Test the new <code style="color: #818cf8; background: #1e1b4b; padding: 2px 6px; border-radius: 4px;">window.Chatify</code> JavaScript SDK API and declarative <code style="color: #818cf8; background: #1e1b4b; padding: 2px 6px; border-radius: 4px;">data-chatify-*</code> HTML triggers:
+        </p>
+        <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+          <button data-chatify-help class="sim-action-btn" style="background: #312e81; border-color: #6366f1; color: #e0e7ff; font-weight: 600;">
+            📖 [data-chatify-help] Trigger
+          </button>
+          <button class="sim-action-btn" onclick="window.Chatify &amp;&amp; window.Chatify.openHelp()" style="background: #1e293b; border-color: #475569;">
+            ⚙️ Chatify.openHelp()
+          </button>
+          <button class="sim-action-btn" onclick="window.Chatify &amp;&amp; window.Chatify.openMessages()" style="background: #1e293b; border-color: #475569;">
+            💬 Chatify.openMessages()
+          </button>
+          <button class="sim-action-btn" onclick="window.Chatify &amp;&amp; window.Chatify.open('home')" style="background: #1e293b; border-color: #475569;">
+            🏠 Chatify.open(&apos;home&apos;)
+          </button>
+          <button class="sim-action-btn" onclick="window.Chatify &amp;&amp; window.Chatify.search('getting')" style="background: #1e293b; border-color: #475569;">
+            🔍 Chatify.search(&apos;getting&apos;)
+          </button>
+          <button data-chatify-close class="sim-action-btn" style="background: rgba(239, 68, 68, 0.15); border-color: rgba(239, 68, 68, 0.4); color: #fca5a5;">
+            ✕ [data-chatify-close]
+          </button>
         </div>
       </div>
     </section>
@@ -620,7 +658,9 @@
 
     // 4. Open chat bubble
     function openChatBubble() {
-      if (window.__ChatifyInstance && typeof window.__ChatifyInstance.toggleWindow === 'function') {
+      if (window.Chatify && typeof window.Chatify.toggle === 'function') {
+        window.Chatify.toggle();
+      } else if (window.__ChatifyInstance && typeof window.__ChatifyInstance.toggleWindow === 'function') {
         window.__ChatifyInstance.toggleWindow();
       }
     }

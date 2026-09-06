@@ -53,8 +53,8 @@ export default function ArticleDetailPage() {
         // Fetch workspace by UUID, slug, or custom domain
         const isWsUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(workspaceId);
         const { data: ws } = isWsUuid
-          ? await supabase.from('workspaces').select('*').eq('id', workspaceId).maybeSingle()
-          : await supabase.from('workspaces').select('*').or(`slug.eq.${workspaceId},custom_domain.eq.${workspaceId}`).maybeSingle();
+          ? await supabase.from('public_workspaces').select('*').eq('id', workspaceId).maybeSingle()
+          : await supabase.from('public_workspaces').select('*').or(`slug.eq.${workspaceId},custom_domain.eq.${workspaceId}`).maybeSingle();
 
         if (!ws) {
           setLoading(false);
@@ -69,7 +69,8 @@ export default function ArticleDetailPage() {
         const artQuery = supabase
           .from('articles')
           .select('*, author:agents(id, name, avatar_url), section:help_sections(id, name, icon)')
-          .eq('workspace_id', actualWorkspaceId);
+          .eq('workspace_id', actualWorkspaceId)
+          .eq('status', 'published');
 
         const { data: art } = isArtUuid
           ? await artQuery.eq('id', articleId).maybeSingle()
@@ -219,12 +220,17 @@ export default function ArticleDetailPage() {
     );
   }
 
+  const helpTitle = workspace.help_center_title || workspace.name;
+  const headerLinks = Array.isArray(workspace.help_center_header_links)
+    ? workspace.help_center_header_links
+    : [];
+
   return (
     <div className="min-h-screen bg-canvas text-ink flex flex-col">
       <head>
-        <title>{`${article.title} - ${workspace.name} Help Center`}</title>
+        <title>{`${article.title} - ${helpTitle} Help Center`}</title>
         <link rel="canonical" href={getWorkspaceHelpCenterUrl(workspace, article)} />
-        <meta property="og:title" content={`${article.title} | ${workspace.name}`} />
+        <meta property="og:title" content={`${article.title} | ${helpTitle}`} />
         {article.summary && <meta property="og:description" content={article.summary} />}
         <meta property="og:url" content={getWorkspaceHelpCenterUrl(workspace, article)} />
       </head>
@@ -241,6 +247,19 @@ export default function ArticleDetailPage() {
           </button>
 
           <div className="flex items-center gap-2.5">
+            {/* Custom Header Links */}
+            {headerLinks.map((link, idx) => (
+              <a
+                key={idx}
+                href={link.url}
+                target={link.target || '_blank'}
+                rel={link.target === '_self' ? undefined : 'noreferrer'}
+                className="text-[12px] font-medium text-ink-2 hover:text-ink hidden md:flex items-center gap-1 transition-colors"
+              >
+                <span>{link.label}</span>
+                {link.target !== '_self' && <ExternalLink className="w-3 h-3 text-ink-3" />}
+              </a>
+            ))}
             <button
               onClick={handleShare}
               className="h-8 px-3 rounded-lg border border-line bg-surface hover:bg-surface-2 text-[12px] font-medium text-ink flex items-center gap-1.5 transition-colors shadow-xs"
@@ -413,8 +432,12 @@ export default function ArticleDetailPage() {
       <footer className="border-t border-line/80 py-6 px-6 text-center text-[12px] text-ink-3 bg-surface mt-12">
         <div className="max-w-4xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
           <span>
-            © {new Date().getFullYear()} {workspace.name}. Powered by{' '}
-            <strong className="text-ink">Chatify</strong>.
+            {workspace.help_center_footer_text || (
+              <>
+                © {new Date().getFullYear()} {helpTitle}. Powered by{' '}
+                <strong className="text-ink">Chatify</strong>.
+              </>
+            )}
           </span>
           <button
             onClick={handleOpenChat}

@@ -6,6 +6,7 @@ import {
   Search,
   BookOpen,
   ArrowRight,
+  ArrowLeft,
   ExternalLink,
   MessageCircle,
   HelpCircle,
@@ -42,8 +43,8 @@ export default function PublicHelpCenterPage() {
         // Fetch workspace by UUID, slug, or custom domain
         const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(workspaceId);
         const { data: ws } = isUuid
-          ? await supabase.from('workspaces').select('*').eq('id', workspaceId).maybeSingle()
-          : await supabase.from('workspaces').select('*').or(`slug.eq.${workspaceId},custom_domain.eq.${workspaceId}`).maybeSingle();
+          ? await supabase.from('public_workspaces').select('*').eq('id', workspaceId).maybeSingle()
+          : await supabase.from('public_workspaces').select('*').or(`slug.eq.${workspaceId},custom_domain.eq.${workspaceId}`).maybeSingle();
 
         if (!ws) {
           setLoading(false);
@@ -163,22 +164,31 @@ export default function PublicHelpCenterPage() {
     );
   }
 
+  const helpTitle = workspace.help_center_title || workspace.name;
+  const helpLogo = workspace.help_center_logo_url || workspace.logo_url;
+  const helpSubtitle =
+    workspace.help_center_subtitle ||
+    'Search our guides, troubleshooting steps, and documentation for instant answers.';
+  const headerLinks = Array.isArray(workspace.help_center_header_links)
+    ? workspace.help_center_header_links
+    : [];
+
   return (
     <div className="min-h-screen bg-canvas text-ink flex flex-col">
       <head>
-        <title>{`${workspace.name} Help Center`}</title>
+        <title>{`${helpTitle} Help Center`}</title>
         <link rel="canonical" href={getWorkspaceHelpCenterUrl(workspace)} />
-        <meta property="og:title" content={`${workspace.name} Help Center & Documentation`} />
+        <meta property="og:title" content={`${helpTitle} Help Center & Documentation`} />
         <meta property="og:url" content={getWorkspaceHelpCenterUrl(workspace)} />
       </head>
       {/* Top Brand Banner & Navigation */}
       <header className="border-b border-line/80 bg-surface sticky top-0 z-30 shadow-xs">
         <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3 min-w-0">
-            {workspace.logo_url ? (
+            {helpLogo ? (
               <img
-                src={workspace.logo_url}
-                alt={workspace.name}
+                src={helpLogo}
+                alt={helpTitle}
                 className="w-8 h-8 rounded-lg object-contain bg-surface-2 p-1 border border-line"
               />
             ) : (
@@ -186,12 +196,12 @@ export default function PublicHelpCenterPage() {
                 className="w-8 h-8 rounded-lg flex items-center justify-center text-white font-bold text-[14px] shadow-xs"
                 style={{ backgroundColor: brandColor }}
               >
-                {workspace.name.slice(0, 1).toUpperCase()}
+                {helpTitle.slice(0, 1).toUpperCase()}
               </div>
             )}
             <div className="min-w-0">
               <span className="text-[15px] font-bold text-ink truncate block">
-                {workspace.name}
+                {helpTitle}
               </span>
               <span className="text-[11px] font-medium text-ink-3 uppercase tracking-wider">
                 Help Center
@@ -200,7 +210,21 @@ export default function PublicHelpCenterPage() {
           </div>
 
           <div className="flex items-center gap-3">
-            {workspace.website_url && (
+            {/* Custom Header Links */}
+            {headerLinks.map((link, idx) => (
+              <a
+                key={idx}
+                href={link.url}
+                target={link.target || '_blank'}
+                rel={link.target === '_self' ? undefined : 'noreferrer'}
+                className="text-[12.5px] font-medium text-ink-2 hover:text-ink flex items-center gap-1.5 transition-colors hidden md:flex"
+              >
+                <span>{link.label}</span>
+                {link.target !== '_self' && <ExternalLink className="w-3 h-3 text-ink-3" />}
+              </a>
+            ))}
+
+            {workspace.website_url && headerLinks.length === 0 && (
               <a
                 href={workspace.website_url}
                 target="_blank"
@@ -233,10 +257,10 @@ export default function PublicHelpCenterPage() {
       >
         <div className="max-w-3xl mx-auto space-y-4">
           <h1 className="text-[32px] sm:text-[38px] font-extrabold text-ink tracking-tight">
-            Advice and answers from the {workspace.name} Team
+            Advice and answers from the {helpTitle} Team
           </h1>
           <p className="text-[15px] text-ink-2 max-w-xl mx-auto">
-            Search our guides, troubleshooting steps, and documentation for instant answers.
+            {helpSubtitle}
           </p>
 
           {/* Search Box */}
@@ -339,6 +363,64 @@ export default function PublicHelpCenterPage() {
               </div>
             )}
           </div>
+        ) : activeSectionId ? (
+          /* Single Collection View */
+          <div className="space-y-6">
+            <button
+              onClick={() => setActiveSectionId(null)}
+              className="inline-flex items-center gap-2 text-[13px] font-semibold text-accent hover:underline cursor-pointer"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              <span>Back to all collections</span>
+            </button>
+
+            {(() => {
+              const sec = sections.find((s) => s.id === activeSectionId);
+              const secArticles = articlesBySection[activeSectionId] || [];
+              return (
+                <div className="space-y-6">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-xl bg-surface-2 flex items-center justify-center text-[26px] border border-line/80">
+                      {sec?.icon || '📚'}
+                    </div>
+                    <div>
+                      <h2 className="text-[24px] font-bold text-ink">{sec?.name || 'Collection'}</h2>
+                      {sec?.description && (
+                        <p className="text-[14px] text-ink-2 mt-0.5">{sec.description}</p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    {secArticles.map((art) => (
+                      <div
+                        key={art.id}
+                        onClick={() => navigateToArticle(art)}
+                        className="p-5 rounded-xl border border-line bg-surface hover:border-ink-3/40 hover:shadow-sm transition-all cursor-pointer flex items-center justify-between group"
+                      >
+                        <div>
+                          <h4 className="text-[15px] font-semibold text-ink group-hover:text-accent transition-colors">
+                            {art.title}
+                          </h4>
+                          {art.summary && (
+                            <p className="text-[13px] text-ink-2 mt-1 line-clamp-2">
+                              {art.summary}
+                            </p>
+                          )}
+                        </div>
+                        <ChevronRight className="w-4 h-4 text-ink-3 group-hover:text-accent shrink-0 ml-4 transition-transform group-hover:translate-x-1" />
+                      </div>
+                    ))}
+                    {secArticles.length === 0 && (
+                      <p className="text-[13px] text-ink-3 italic p-8 text-center border border-dashed border-line rounded-xl">
+                        No articles in this collection yet.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
         ) : (
           /* Default View: Collections & Sections Grid */
           <div className="space-y-10">
@@ -395,9 +477,12 @@ export default function PublicHelpCenterPage() {
                         </div>
                       </div>
 
-                      <div className="pt-4 mt-2 border-t border-line/40 flex items-center justify-between text-[12px] text-ink-3">
+                      <div
+                        onClick={() => setActiveSectionId(section.id)}
+                        className="pt-4 mt-2 border-t border-line/40 flex items-center justify-between text-[12px] text-ink-3 cursor-pointer group/browse hover:text-accent transition-colors"
+                      >
                         <span>{sectionArticles.length} articles</span>
-                        <span className="font-semibold text-accent group-hover:translate-x-1 transition-transform inline-flex items-center gap-1">
+                        <span className="font-semibold text-accent group-hover/browse:translate-x-1 transition-transform inline-flex items-center gap-1">
                           <span>Browse all</span>
                           <ArrowRight className="w-3 h-3" />
                         </span>
@@ -433,8 +518,12 @@ export default function PublicHelpCenterPage() {
       <footer className="border-t border-line/80 py-6 px-6 text-center text-[12px] text-ink-3 bg-surface">
         <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
           <span>
-            © {new Date().getFullYear()} {workspace.name}. Powered by{' '}
-            <strong className="text-ink">Chatify</strong>.
+            {workspace.help_center_footer_text || (
+              <>
+                © {new Date().getFullYear()} {helpTitle}. Powered by{' '}
+                <strong className="text-ink">Chatify</strong>.
+              </>
+            )}
           </span>
           <span className="text-[11px]">Intercom-Grade Knowledge Base</span>
         </div>

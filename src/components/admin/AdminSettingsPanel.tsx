@@ -27,6 +27,8 @@ import {
   RefreshCw,
   CheckCircle2,
   XCircle,
+  BookOpen,
+  Link as LinkIcon,
 } from 'lucide-react';
 import {
   Workspace,
@@ -41,6 +43,7 @@ import {
   updateBusinessHoursAction,
   updateAutoAssignmentRulesAction,
   updateAISettingsAction,
+  updateHelpCenterBrandingAction,
   inviteAgentAction,
   updateAgentRoleAction,
   removeAgentAction,
@@ -75,13 +78,14 @@ interface AdminSettingsPanelProps {
 
 export type AdminTab =
   | 'widget'
+  | 'helpcenter'
+  | 'domain'
   | 'hours'
   | 'team'
   | 'canned'
   | 'assignment'
   | 'ai'
-  | 'snippet'
-  | 'domain';
+  | 'snippet';
 
 const DEFAULT_SCHEDULE: BusinessHoursConfig = {
   enabled: false,
@@ -194,6 +198,91 @@ export function AdminSettingsPanel({
         showStatus('Logo uploaded!');
       }
     } catch (err) {
+      showStatus('Failed to upload logo', 'error');
+    }
+  };
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // SECTION: HELP CENTER BRANDING STATE
+  // ──────────────────────────────────────────────────────────────────────────
+  const [helpCenterTitle, setHelpCenterTitle] = useState(workspace.help_center_title || '');
+  const [helpCenterSubtitle, setHelpCenterSubtitle] = useState(workspace.help_center_subtitle || '');
+  const [helpCenterLogoUrl, setHelpCenterLogoUrl] = useState(workspace.help_center_logo_url || '');
+  const [helpCenterHeaderLinks, setHelpCenterHeaderLinks] = useState<
+    Array<{ label: string; url: string; target?: string }>
+  >(
+    Array.isArray(workspace.help_center_header_links)
+      ? (workspace.help_center_header_links as any)
+      : []
+  );
+  const [helpCenterFooterText, setHelpCenterFooterText] = useState(workspace.help_center_footer_text || '');
+  const [savingHelpCenter, setSavingHelpCenter] = useState(false);
+  const [newLinkLabel, setNewLinkLabel] = useState('');
+  const [newLinkUrl, setNewLinkUrl] = useState('');
+  const [newLinkTarget, setNewLinkTarget] = useState<'_blank' | '_self'>('_blank');
+
+  const handleSaveHelpCenter = async () => {
+    setSavingHelpCenter(true);
+    try {
+      const res = await updateHelpCenterBrandingAction(workspace.id, {
+        help_center_title: helpCenterTitle.trim() || null,
+        help_center_subtitle: helpCenterSubtitle.trim() || null,
+        help_center_logo_url: helpCenterLogoUrl.trim() || null,
+        help_center_header_links: helpCenterHeaderLinks,
+        help_center_footer_text: helpCenterFooterText.trim() || null,
+      });
+
+      if (res.workspace) {
+        setWorkspace(res.workspace);
+        onWorkspaceUpdated?.(res.workspace);
+        showStatus('Help Center branding saved successfully!');
+      }
+    } catch (err: any) {
+      showStatus(err.message || 'Failed to save Help Center branding', 'error');
+    } finally {
+      setSavingHelpCenter(false);
+    }
+  };
+
+  const handleAddHeaderLink = () => {
+    if (!newLinkLabel.trim() || !newLinkUrl.trim()) return;
+    setHelpCenterHeaderLinks((prev) => [
+      ...prev,
+      {
+        label: newLinkLabel.trim(),
+        url: newLinkUrl.trim(),
+        target: newLinkTarget,
+      },
+    ]);
+    setNewLinkLabel('');
+    setNewLinkUrl('');
+    setNewLinkTarget('_blank');
+  };
+
+  const handleRemoveHeaderLink = (index: number) => {
+    setHelpCenterHeaderLinks((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleHelpCenterLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const uploadData = new FormData();
+    uploadData.append('file', file);
+
+    try {
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        body: uploadData,
+      });
+      const data = await res.json();
+      if (data.url) {
+        setHelpCenterLogoUrl(data.url);
+        showStatus('Help Center logo uploaded!');
+      } else {
+        showStatus(data.error || 'Upload failed', 'error');
+      }
+    } catch {
       showStatus('Failed to upload logo', 'error');
     }
   };
@@ -630,12 +719,13 @@ export function AdminSettingsPanel({
       <div className="px-8 border-b border-line bg-surface sticky top-16 z-10 flex gap-2">
         {[
           { id: 'widget', label: 'Widget Customization', icon: Palette },
+          { id: 'helpcenter', label: 'Help Center Branding', icon: BookOpen },
+          { id: 'domain', label: 'Custom Domains', icon: Globe },
           { id: 'hours', label: 'Business Hours', icon: Clock },
           { id: 'team', label: 'Team & Roles', icon: Users, badge: agents.length },
           { id: 'canned', label: 'Canned Replies', icon: MessageSquareText, badge: cannedResponses.length },
           { id: 'assignment', label: 'Auto-Assignment', icon: Sliders },
           { id: 'ai', label: 'Claude AI Assistant', icon: Sparkles },
-          { id: 'domain', label: 'Custom Domains', icon: Globe },
           { id: 'snippet', label: 'Install Snippet', icon: Code },
         ].map((tab) => {
           const active = activeTab === tab.id;
@@ -983,6 +1073,348 @@ export function AdminSettingsPanel({
                       )}
                     </button>
                   </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ─────────────────────────────────────────────────────────────────── */}
+        {/* TAB: HELP CENTER BRANDING & LIVE PREVIEW */}
+        {/* ─────────────────────────────────────────────────────────────────── */}
+        {activeTab === 'helpcenter' && (
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start animate-rise">
+            {/* Left Column: Form Controls */}
+            <div className="lg:col-span-7 space-y-6">
+              {/* Card 1: Identity & Messaging */}
+              <div className="card p-6 space-y-5">
+                <div className="flex items-center justify-between border-b border-line pb-4">
+                  <div>
+                    <h3 className="text-[15px] font-semibold text-ink">Help Center Identity</h3>
+                    <p className="text-[12px] text-ink-3">
+                      Customize your public knowledge base branding, titles, and messaging.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <a
+                      href={getWorkspaceHelpCenterUrl(workspace)}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="btn btn-xs btn-secondary gap-1"
+                    >
+                      <ExternalLink className="w-3 h-3" />
+                      <span>Live Site</span>
+                    </a>
+                    <button
+                      onClick={handleSaveHelpCenter}
+                      disabled={savingHelpCenter}
+                      className="btn btn-sm btn-primary gap-1.5 shadow-xs"
+                    >
+                      {savingHelpCenter ? 'Saving…' : 'Save Changes'}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Help Center Title */}
+                <div>
+                  <label className="field-label">Help Center Title</label>
+                  <input
+                    type="text"
+                    value={helpCenterTitle}
+                    onChange={(e) => setHelpCenterTitle(e.target.value)}
+                    placeholder={`${workspace.name} Help Center`}
+                    className="input"
+                  />
+                  <p className="text-[11.5px] text-ink-3 mt-1">
+                    Appears in the header navigation, browser tab, and search engine previews.
+                  </p>
+                </div>
+
+                {/* Help Center Subtitle / Tagline */}
+                <div>
+                  <label className="field-label">Hero Search Subtitle / Tagline</label>
+                  <textarea
+                    rows={2}
+                    value={helpCenterSubtitle}
+                    onChange={(e) => setHelpCenterSubtitle(e.target.value)}
+                    placeholder="Search our guides, troubleshooting steps, and documentation for instant answers."
+                    className="input resize-none"
+                  />
+                  <p className="text-[11.5px] text-ink-3 mt-1">
+                    Displayed prominently below the main heading in the hero search area.
+                  </p>
+                </div>
+
+                {/* Custom Logo */}
+                <div>
+                  <label className="field-label">Help Center Logo</label>
+                  <div className="flex items-start gap-4">
+                    <div className="w-14 h-14 rounded-2xl border border-line bg-surface-2 flex items-center justify-center overflow-hidden shrink-0">
+                      {helpCenterLogoUrl || logoUrl ? (
+                        <img
+                          src={helpCenterLogoUrl || logoUrl}
+                          alt="Logo"
+                          className="w-full h-full object-contain p-1"
+                        />
+                      ) : (
+                        <div
+                          className="w-full h-full flex items-center justify-center text-white font-bold text-base"
+                          style={{ backgroundColor: brandColor }}
+                        >
+                          {workspace.name.slice(0, 1).toUpperCase()}
+                        </div>
+                      )}
+                    </div>
+                    <div className="space-y-2 flex-1">
+                      <div className="flex items-center gap-2">
+                        <label className="btn btn-xs btn-secondary cursor-pointer inline-flex items-center gap-1.5">
+                          <Upload className="w-3.5 h-3.5" />
+                          <span>Upload Logo</span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={handleHelpCenterLogoUpload}
+                            className="hidden"
+                          />
+                        </label>
+                        {logoUrl && (
+                          <button
+                            type="button"
+                            onClick={() => setHelpCenterLogoUrl(logoUrl)}
+                            className="btn btn-xs btn-ghost text-ink-3 hover:text-ink text-[11px]"
+                          >
+                            Use Main Workspace Logo
+                          </button>
+                        )}
+                        {helpCenterLogoUrl && (
+                          <button
+                            type="button"
+                            onClick={() => setHelpCenterLogoUrl('')}
+                            className="btn btn-xs btn-ghost text-rose-500 hover:text-rose-600 text-[11px]"
+                          >
+                            Reset
+                          </button>
+                        )}
+                      </div>
+                      <input
+                        type="url"
+                        placeholder="Or enter image URL: https://example.com/logo.png"
+                        value={helpCenterLogoUrl}
+                        onChange={(e) => setHelpCenterLogoUrl(e.target.value)}
+                        className="input text-xs"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Custom Footer Text */}
+                <div>
+                  <label className="field-label">Custom Footer Text / Copyright</label>
+                  <input
+                    type="text"
+                    value={helpCenterFooterText}
+                    onChange={(e) => setHelpCenterFooterText(e.target.value)}
+                    placeholder={`© ${new Date().getFullYear()} ${workspace.name}. Powered by Chatify.`}
+                    className="input"
+                  />
+                  <p className="text-[11.5px] text-ink-3 mt-1">
+                    Displayed at the bottom of every Help Center page and article.
+                  </p>
+                </div>
+              </div>
+
+              {/* Card 2: Header Navigation Links */}
+              <div className="card p-6 space-y-5">
+                <div className="border-b border-line pb-4">
+                  <h3 className="text-[15px] font-semibold text-ink">Header Navigation Links</h3>
+                  <p className="text-[12px] text-ink-3">
+                    Add custom links in the Help Center navigation bar (e.g. to your main website, API docs, or status page).
+                  </p>
+                </div>
+
+                {/* Current Links List */}
+                <div className="space-y-2">
+                  {helpCenterHeaderLinks.length === 0 ? (
+                    <div className="p-4 rounded-xl border border-dashed border-line text-center text-[12px] text-ink-3">
+                      No custom header links added yet. Use the form below to add navigation links.
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {helpCenterHeaderLinks.map((link, idx) => (
+                        <div
+                          key={idx}
+                          className="flex items-center justify-between p-3 rounded-xl border border-line bg-surface-2/60 text-[13px]"
+                        >
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <LinkIcon className="w-3.5 h-3.5 text-ink-3 shrink-0" />
+                            <span className="font-semibold text-ink truncate">{link.label}</span>
+                            <span className="text-ink-3 text-[11.5px] truncate font-mono">
+                              ({link.url})
+                            </span>
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-surface border border-line text-ink-3 font-mono">
+                              {link.target === '_self' ? 'Same Tab' : 'New Tab'}
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveHeaderLink(idx)}
+                            className="text-ink-3 hover:text-rose-500 p-1 transition-colors"
+                            title="Remove Link"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Add Link Form */}
+                <div className="pt-2 border-t border-line/60 space-y-3">
+                  <h4 className="text-[13px] font-semibold text-ink">Add Navigation Link</h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5 items-end">
+                    <div className="sm:col-span-4 space-y-1">
+                      <label className="text-[11px] font-medium text-ink-3">Link Label</label>
+                      <input
+                        type="text"
+                        value={newLinkLabel}
+                        onChange={(e) => setNewLinkLabel(e.target.value)}
+                        placeholder="e.g. Main Website"
+                        className="input text-xs"
+                      />
+                    </div>
+                    <div className="sm:col-span-5 space-y-1">
+                      <label className="text-[11px] font-medium text-ink-3">URL</label>
+                      <input
+                        type="url"
+                        value={newLinkUrl}
+                        onChange={(e) => setNewLinkUrl(e.target.value)}
+                        placeholder="https://mycompany.com"
+                        className="input text-xs font-mono"
+                      />
+                    </div>
+                    <div className="sm:col-span-3">
+                      <button
+                        type="button"
+                        onClick={handleAddHeaderLink}
+                        disabled={!newLinkLabel.trim() || !newLinkUrl.trim()}
+                        className="btn btn-sm btn-secondary w-full gap-1 text-xs"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>Add Link</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Right Column: Live Interactive Preview */}
+            <div className="lg:col-span-5 sticky top-32 space-y-3">
+              <div className="flex items-center justify-between px-1">
+                <span className="text-[12px] font-semibold text-ink uppercase tracking-wider">
+                  Live Preview
+                </span>
+                <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                  Updates in Real Time
+                </span>
+              </div>
+
+              {/* Mock Browser Container */}
+              <div className="rounded-2xl border border-line bg-surface shadow-md overflow-hidden text-[12px]">
+                {/* Browser Top Bar */}
+                <div className="px-3 py-2 bg-surface-2 border-b border-line flex items-center gap-2">
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-2.5 h-2.5 rounded-full bg-rose-400" />
+                    <div className="w-2.5 h-2.5 rounded-full bg-amber-400" />
+                    <div className="w-2.5 h-2.5 rounded-full bg-emerald-400" />
+                  </div>
+                  <div className="flex-1 px-2 py-0.5 rounded bg-surface border border-line text-[10.5px] font-mono text-ink-3 truncate text-center">
+                    {getWorkspaceHelpCenterUrl(workspace)}
+                  </div>
+                </div>
+
+                {/* Help Center Navigation Bar */}
+                <div className="px-4 py-3 border-b border-line bg-surface flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    {helpCenterLogoUrl || logoUrl ? (
+                      <img
+                        src={helpCenterLogoUrl || logoUrl}
+                        alt="Logo"
+                        className="w-6 h-6 rounded-lg object-contain bg-surface-2 p-0.5 border border-line shrink-0"
+                      />
+                    ) : (
+                      <div
+                        className="w-6 h-6 rounded-lg flex items-center justify-center text-white font-bold text-[11px] shadow-xs shrink-0"
+                        style={{ backgroundColor: brandColor }}
+                      >
+                        {workspace.name.slice(0, 1).toUpperCase()}
+                      </div>
+                    )}
+                    <div className="min-w-0">
+                      <span className="text-[12px] font-bold text-ink truncate block">
+                        {helpCenterTitle || workspace.name}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    {helpCenterHeaderLinks.slice(0, 2).map((l, i) => (
+                      <span key={i} className="text-[11px] text-ink-3 font-medium truncate max-w-[80px]">
+                        {l.label}
+                      </span>
+                    ))}
+                    <span
+                      className="px-2 py-1 rounded-md text-white text-[10.5px] font-semibold"
+                      style={{ backgroundColor: brandColor }}
+                    >
+                      Ask Support
+                    </span>
+                  </div>
+                </div>
+
+                {/* Help Center Hero Section */}
+                <div
+                  className="px-5 py-8 text-center relative overflow-hidden"
+                  style={{
+                    background: `radial-gradient(ellipse 90% 60% at 50% -20%, ${brandColor}25, transparent 80%)`,
+                  }}
+                >
+                  <h4 className="text-[16px] font-extrabold text-ink tracking-tight">
+                    Advice and answers from the {helpCenterTitle || workspace.name} Team
+                  </h4>
+                  <p className="text-[11.5px] text-ink-2 mt-1.5 max-w-xs mx-auto leading-relaxed">
+                    {helpCenterSubtitle ||
+                      'Search our guides, troubleshooting steps, and documentation for instant answers.'}
+                  </p>
+
+                  <div className="mt-4 max-w-xs mx-auto">
+                    <div className="h-8 rounded-xl border border-line bg-surface text-ink-3 text-[11px] flex items-center px-3 gap-2 shadow-xs">
+                      <span>🔍</span>
+                      <span>Search for articles, features...</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Mock Sample Collections Grid */}
+                <div className="p-4 bg-surface-2/40 border-t border-line space-y-2">
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="p-2.5 rounded-xl border border-line bg-surface space-y-1">
+                      <div className="text-[14px]">📚</div>
+                      <div className="text-[11px] font-bold text-ink truncate">Getting Started</div>
+                      <div className="text-[10px] text-ink-3">3 articles</div>
+                    </div>
+                    <div className="p-2.5 rounded-xl border border-line bg-surface space-y-1">
+                      <div className="text-[14px]">💳</div>
+                      <div className="text-[11px] font-bold text-ink truncate">Account & Billing</div>
+                      <div className="text-[10px] text-ink-3">2 articles</div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Mock Footer */}
+                <div className="px-4 py-2.5 bg-surface border-t border-line text-center text-[10px] text-ink-3">
+                  {helpCenterFooterText || `© ${new Date().getFullYear()} ${workspace.name}. Powered by Chatify.`}
                 </div>
               </div>
             </div>
@@ -2177,6 +2609,289 @@ export function AdminSettingsPanel({
                   </div>
                 </div>
               )}
+            </div>
+          </div>
+        )}
+
+        {/* ─────────────────────────────────────────────────────────────────── */}
+        {/* TAB 9: INSTALL SNIPPET & EMBED CODE HELPER */}
+        {/* ─────────────────────────────────────────────────────────────────── */}
+        {activeTab === 'snippet' && (
+          <div className="space-y-8 animate-rise max-w-5xl">
+            {/* Header Banner */}
+            <div className="card p-6 border-accent/20 bg-gradient-to-r from-accent/5 via-surface to-surface">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-9 h-9 rounded-xl bg-accent/10 border border-accent/20 flex items-center justify-center text-accent">
+                      <Code className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-[17px] font-bold text-ink">Install Chatify &amp; Help Center Widget</h3>
+                      <p className="text-[12.5px] text-ink-3">
+                        Embed live chat, knowledge base search, and custom Help buttons onto any website or app.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <a
+                    href={`/demo.html?workspaceId=${workspace.id}&name=${encodeURIComponent(workspace.name)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="btn btn-sm btn-primary gap-1.5 shadow-sm shrink-0"
+                  >
+                    <span>Test in Simulator</span>
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </a>
+                </div>
+              </div>
+            </div>
+
+            {/* Step 1: Base Script Tag */}
+            <div className="card p-6 space-y-4">
+              <div className="flex items-center justify-between border-b border-line pb-3">
+                <div className="flex items-center gap-2">
+                  <span className="w-6 h-6 rounded-full bg-accent text-white flex items-center justify-center text-[12px] font-bold">
+                    1
+                  </span>
+                  <div>
+                    <h4 className="text-[14px] font-semibold text-ink">Add the Widget Script Tag</h4>
+                    <p className="text-[12px] text-ink-3">
+                      Paste this script right before the closing <code className="font-mono text-accent text-xs">&lt;/body&gt;</code> tag on your HTML pages.
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    const host = typeof window !== 'undefined' ? window.location.origin : 'https://chatify.com';
+                    const snippet = `<script\n  src="${host}/widget.js"\n  data-workspace-id="${workspace.id}"\n  data-color="${workspace.brand_color || '#2563eb'}"\n  data-title="${workspace.name} Support"\n  async>\n</script>`;
+                    navigator.clipboard.writeText(snippet);
+                    setCopiedSnippet(true);
+                    setTimeout(() => setCopiedSnippet(false), 2000);
+                    showStatus('Widget embed script copied to clipboard!');
+                  }}
+                  className="btn btn-sm btn-secondary gap-1.5 shadow-xs"
+                >
+                  {copiedSnippet ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+                  <span>{copiedSnippet ? 'Copied!' : 'Copy Script Tag'}</span>
+                </button>
+              </div>
+
+              {/* Code Display */}
+              {(() => {
+                const host = typeof window !== 'undefined' ? window.location.origin : 'https://chatify.com';
+                const snippet = `<script\n  src="${host}/widget.js"\n  data-workspace-id="${workspace.id}"\n  data-color="${workspace.brand_color || '#2563eb'}"\n  data-title="${workspace.name} Support"\n  async>\n</script>`;
+                return (
+                  <div className="relative rounded-xl border border-line bg-surface-2 p-4 font-mono text-[12.5px] text-ink overflow-x-auto leading-relaxed">
+                    <pre><code>{snippet}</code></pre>
+                  </div>
+                );
+              })()}
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-2 text-[12px] text-ink-3">
+                <div className="p-3 rounded-xl border border-line/60 bg-surface">
+                  <div className="font-semibold text-ink text-[12.5px]">Workspace ID</div>
+                  <div className="font-mono text-xs text-accent mt-0.5 truncate">{workspace.id}</div>
+                </div>
+                <div className="p-3 rounded-xl border border-line/60 bg-surface">
+                  <div className="font-semibold text-ink text-[12.5px]">Brand Color</div>
+                  <div className="font-mono text-xs text-ink mt-0.5">{workspace.brand_color || '#2563eb'}</div>
+                </div>
+                <div className="p-3 rounded-xl border border-line/60 bg-surface">
+                  <div className="font-semibold text-ink text-[12.5px]">Bundle Optimization</div>
+                  <div className="text-xs text-ink mt-0.5">Asynchronous zero-blocking loading</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Step 2: Help Button & Trigger Triggers */}
+            <div className="card p-6 space-y-4">
+              <div className="flex items-center justify-between border-b border-line pb-3">
+                <div className="flex items-center gap-2">
+                  <span className="w-6 h-6 rounded-full bg-accent text-white flex items-center justify-center text-[12px] font-bold">
+                    2
+                  </span>
+                  <div>
+                    <h4 className="text-[14px] font-semibold text-ink">Add a Help Button to Your Website Navbar</h4>
+                    <p className="text-[12px] text-ink-3">
+                      Use declarative HTML data attributes to trigger the widget tabs without writing any JavaScript.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                {/* Help Trigger */}
+                <div className="p-4 rounded-xl border border-line bg-surface space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[13px] font-semibold text-ink">1. Dedicated Help &amp; FAQs Button</span>
+                      <span className="text-[11px] px-2 py-0.5 rounded-full bg-accent/10 text-accent font-semibold">Recommended</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const code = `<button data-chatify-help class="help-btn">\n  📖 Help & FAQs\n</button>`;
+                        navigator.clipboard.writeText(code);
+                        showStatus('Help button trigger copied!');
+                      }}
+                      className="btn btn-xs btn-secondary gap-1"
+                    >
+                      <Copy className="w-3 h-3" />
+                      <span>Copy</span>
+                    </button>
+                  </div>
+                  <p className="text-[12px] text-ink-3">
+                    Clicking this element opens the widget directly into the Help tab and focuses the article search bar.
+                  </p>
+                  <div className="rounded-lg bg-surface-2 p-3 font-mono text-xs text-ink overflow-x-auto">
+                    <code>&lt;button data-chatify-help class=&quot;help-btn&quot;&gt;&#10;  📖 Help &amp; FAQs&#10;&lt;/button&gt;</code>
+                  </div>
+                </div>
+
+                {/* Specific Article Trigger */}
+                <div className="p-4 rounded-xl border border-line bg-surface space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[13px] font-semibold text-ink">2. Deep Link to a Specific Article</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const code = `<button data-chatify-article="your-article-slug">\n  Read Getting Started Guide ↗\n</button>`;
+                        navigator.clipboard.writeText(code);
+                        showStatus('Article trigger copied!');
+                      }}
+                      className="btn btn-xs btn-secondary gap-1"
+                    >
+                      <Copy className="w-3 h-3" />
+                      <span>Copy</span>
+                    </button>
+                  </div>
+                  <p className="text-[12px] text-ink-3">
+                    Directly opens and expands an article accordion inside the widget using its slug or ID.
+                  </p>
+                  <div className="rounded-lg bg-surface-2 p-3 font-mono text-xs text-ink overflow-x-auto">
+                    <code>&lt;button data-chatify-article=&quot;your-article-slug&quot;&gt;&#10;  Read Getting Started Guide ↗&#10;&lt;/button&gt;</code>
+                  </div>
+                </div>
+
+                {/* Open Chat Trigger */}
+                <div className="p-4 rounded-xl border border-line bg-surface space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[13px] font-semibold text-ink">3. Open Live Chat Directly</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const code = `<button data-chatify-open data-chatify-tab="messages">\n  Chat with Support\n</button>`;
+                        navigator.clipboard.writeText(code);
+                        showStatus('Live chat trigger copied!');
+                      }}
+                      className="btn btn-xs btn-secondary gap-1"
+                    >
+                      <Copy className="w-3 h-3" />
+                      <span>Copy</span>
+                    </button>
+                  </div>
+                  <p className="text-[12px] text-ink-3">
+                    Opens the widget straight into the live chat messenger screen.
+                  </p>
+                  <div className="rounded-lg bg-surface-2 p-3 font-mono text-xs text-ink overflow-x-auto">
+                    <code>&lt;button data-chatify-open data-chatify-tab=&quot;messages&quot;&gt;&#10;  Chat with Support&#10;&lt;/button&gt;</code>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Step 3: JavaScript SDK API */}
+            <div className="card p-6 space-y-4">
+              <div className="flex items-center justify-between border-b border-line pb-3">
+                <div className="flex items-center gap-2">
+                  <span className="w-6 h-6 rounded-full bg-accent text-white flex items-center justify-center text-[12px] font-bold">
+                    3
+                  </span>
+                  <div>
+                    <h4 className="text-[14px] font-semibold text-ink">JavaScript SDK API (`window.Chatify`)</h4>
+                    <p className="text-[12px] text-ink-3">
+                      Control the widget programmatically in your frontend framework (React, Vue, Angular, Next.js).
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    const jsCode = `// Open Help Center Tab directly\nwindow.Chatify.openHelp();\n\n// Open Live Chat screen\nwindow.Chatify.openMessages();\n\n// Search articles programmatically\nwindow.Chatify.search('billing');\n\n// Open specific article by slug\nwindow.Chatify.openArticle('how-to-reset-password');\n\n// Toggle widget\nwindow.Chatify.toggle();\n\n// Check if widget is open\nconsole.log(window.Chatify.isOpen());`;
+                    navigator.clipboard.writeText(jsCode);
+                    showStatus('JavaScript SDK cheat-sheet copied!');
+                  }}
+                  className="btn btn-sm btn-secondary gap-1.5 shadow-xs"
+                >
+                  <Copy className="w-3.5 h-3.5" />
+                  <span>Copy SDK Code</span>
+                </button>
+              </div>
+
+              <div className="rounded-xl border border-line bg-surface-2 p-4 font-mono text-[12px] text-ink overflow-x-auto leading-relaxed">
+                <pre><code>{`// 1. Open Help Center Tab directly
+window.Chatify.openHelp();
+
+// 2. Open Live Chat screen
+window.Chatify.openMessages();
+
+// 3. Search articles programmatically
+window.Chatify.search('billing');
+
+// 4. Open specific article by slug
+window.Chatify.openArticle('how-to-reset-password');
+
+// 5. Toggle or close widget
+window.Chatify.toggle();
+window.Chatify.close();`}</code></pre>
+              </div>
+            </div>
+
+            {/* Step 4: Next.js & React Frameworks */}
+            <div className="card p-6 space-y-4">
+              <div className="flex items-center justify-between border-b border-line pb-3">
+                <div className="flex items-center gap-2">
+                  <span className="w-6 h-6 rounded-full bg-accent text-white flex items-center justify-center text-[12px] font-bold">
+                    4
+                  </span>
+                  <div>
+                    <h4 className="text-[14px] font-semibold text-ink">Next.js &amp; React Integration</h4>
+                    <p className="text-[12px] text-ink-3">
+                      Using Next.js App Router or Pages Router? Use the <code className="font-mono text-accent text-xs">next/script</code> component.
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    const host = typeof window !== 'undefined' ? window.location.origin : 'https://chatify.com';
+                    const nextSnippet = `import Script from 'next/script';\n\nexport default function RootLayout({ children }) {\n  return (\n    <html lang="en">\n      <body>\n        {children}\n        <Script\n          src="${host}/widget.js"\n          data-workspace-id="${workspace.id}"\n          strategy="afterInteractive"\n        />\n      </body>\n    </html>\n  );\n}`;
+                    navigator.clipboard.writeText(nextSnippet);
+                    showStatus('Next.js component snippet copied!');
+                  }}
+                  className="btn btn-sm btn-secondary gap-1.5 shadow-xs"
+                >
+                  <Copy className="w-3.5 h-3.5" />
+                  <span>Copy Next.js Snippet</span>
+                </button>
+              </div>
+
+              {(() => {
+                const host = typeof window !== 'undefined' ? window.location.origin : 'https://chatify.com';
+                const nextSnippet = `import Script from 'next/script';\n\nexport default function RootLayout({ children }) {\n  return (\n    <html lang="en">\n      <body>\n        {children}\n        <Script\n          src="${host}/widget.js"\n          data-workspace-id="${workspace.id}"\n          strategy="afterInteractive"\n        />\n      </body>\n    </html>\n  );\n}`;
+                return (
+                  <div className="rounded-xl border border-line bg-surface-2 p-4 font-mono text-[12px] text-ink overflow-x-auto leading-relaxed">
+                    <pre><code>{nextSnippet}</code></pre>
+                  </div>
+                );
+              })()}
             </div>
           </div>
         )}
