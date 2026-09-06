@@ -236,11 +236,11 @@ export default function ArticleDetailPage() {
       </head>
 
       {/* Top Header */}
-      <header className="border-b border-line/80 bg-surface sticky top-0 z-30 shadow-xs">
-        <div className="max-w-4xl mx-auto px-6 h-16 flex items-center justify-between gap-4">
+      <header className="bg-black border-b border-zinc-800/80 sticky top-0 z-30 transition-colors">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
           <button
             onClick={navigateToRoot}
-            className="flex items-center gap-2 text-[13px] font-semibold text-ink-2 hover:text-ink transition-colors group"
+            className="flex items-center gap-2 text-[13px] font-semibold text-zinc-300 hover:text-white transition-colors group cursor-pointer"
           >
             <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
             <span>All Collections</span>
@@ -254,24 +254,37 @@ export default function ArticleDetailPage() {
                 href={link.url}
                 target={link.target || '_blank'}
                 rel={link.target === '_self' ? undefined : 'noreferrer'}
-                className="text-[12px] font-medium text-ink-2 hover:text-ink hidden md:flex items-center gap-1 transition-colors"
+                className="text-[12.5px] font-medium text-zinc-300 hover:text-white hidden md:flex items-center gap-1 transition-colors"
               >
                 <span>{link.label}</span>
-                {link.target !== '_self' && <ExternalLink className="w-3 h-3 text-ink-3" />}
+                {link.target !== '_self' && <ExternalLink className="w-3 h-3 text-zinc-500" />}
               </a>
             ))}
+
+            {workspace.website_url && headerLinks.length === 0 && (
+              <a
+                href={workspace.website_url}
+                target="_blank"
+                rel="noreferrer"
+                className="text-[12.5px] font-medium text-zinc-300 hover:text-white hidden sm:flex items-center gap-1 transition-colors"
+              >
+                <span>Website</span>
+                <ExternalLink className="w-3.5 h-3.5 text-zinc-500" />
+              </a>
+            )}
+
             <button
               onClick={handleShare}
-              className="h-8 px-3 rounded-lg border border-line bg-surface hover:bg-surface-2 text-[12px] font-medium text-ink flex items-center gap-1.5 transition-colors shadow-xs"
+              className="h-8 px-3 rounded-lg border border-zinc-700 bg-zinc-900 hover:bg-zinc-800 text-[12px] font-medium text-zinc-200 flex items-center gap-1.5 transition-colors shadow-xs cursor-pointer"
             >
               {copiedLink ? (
                 <>
-                  <Check className="w-3.5 h-3.5 text-emerald-500" />
-                  <span className="text-emerald-600 dark:text-emerald-400">Link Copied!</span>
+                  <Check className="w-3.5 h-3.5 text-emerald-400" />
+                  <span className="text-emerald-400">Link Copied!</span>
                 </>
               ) : (
                 <>
-                  <Share2 className="w-3.5 h-3.5 text-ink-3" />
+                  <Share2 className="w-3.5 h-3.5 text-zinc-400" />
                   <span>Share</span>
                 </>
               )}
@@ -279,8 +292,7 @@ export default function ArticleDetailPage() {
 
             <button
               onClick={handleOpenChat}
-              className="h-8 px-3.5 rounded-lg text-white text-[12px] font-semibold flex items-center gap-1.5 transition-all shadow-xs hover:opacity-90"
-              style={{ backgroundColor: brandColor }}
+              className="h-8 px-3.5 rounded-lg text-white text-[12px] font-semibold flex items-center gap-1.5 transition-all shadow-xs hover:opacity-90 bg-blue-600 hover:bg-blue-700 cursor-pointer"
             >
               <MessageCircle className="w-3.5 h-3.5" />
               <span>Ask Support</span>
