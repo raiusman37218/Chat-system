@@ -35,11 +35,12 @@ export async function generateMetadata({
 
   if (!ws) return { title: 'Help Center' };
 
-  const { data: article } = isUuid(articleId)
+  const cleanArticleId = decodeURIComponent(articleId).trim();
+  const { data: article } = isUuid(cleanArticleId)
     ? await supabase
         .from('articles')
         .select('id, slug, title, summary')
-        .eq('id', articleId)
+        .eq('id', cleanArticleId)
         .eq('workspace_id', ws.id)
         .eq('status', 'published')
         .maybeSingle()
@@ -47,7 +48,7 @@ export async function generateMetadata({
         .from('articles')
         .select('id, slug, title, summary')
         .eq('workspace_id', ws.id)
-        .eq('slug', articleId)
+        .ilike('slug', cleanArticleId)
         .eq('status', 'published')
         .maybeSingle();
 

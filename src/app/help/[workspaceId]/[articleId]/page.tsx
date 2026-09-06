@@ -51,10 +51,15 @@ export default function ArticleDetailPage() {
         setLoading(true);
 
         // Fetch workspace by UUID, slug, or custom domain
-        const isWsUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(workspaceId);
-        const { data: ws } = isWsUuid
-          ? await supabase.from('public_workspaces').select('*').eq('id', workspaceId).maybeSingle()
-          : await supabase.from('public_workspaces').select('*').or(`slug.eq.${workspaceId},custom_domain.eq.${workspaceId}`).maybeSingle();
+        const cleanWsId = decodeURIComponent(workspaceId).trim();
+        const isWsUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(cleanWsId);
+        const { data: ws, error: wsError } = isWsUuid
+          ? await supabase.from('public_workspaces').select('*').eq('id', cleanWsId).maybeSingle()
+          : await supabase.from('public_workspaces').select('*').or(`slug.eq.${cleanWsId},custom_domain.eq.${cleanWsId}`).maybeSingle();
+
+        if (wsError) {
+          console.error('Failed to load workspace:', wsError);
+        }
 
         if (!ws) {
           setLoading(false);
@@ -65,16 +70,30 @@ export default function ArticleDetailPage() {
         const actualWorkspaceId = ws.id;
 
         // Fetch article by UUID or slug
-        const isArtUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(articleId);
+        const cleanArticleId = decodeURIComponent(articleId).trim();
+        const isArtUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(cleanArticleId);
         const artQuery = supabase
           .from('articles')
           .select('*, author:agents(id, name, avatar_url), section:help_sections(id, name, icon)')
           .eq('workspace_id', actualWorkspaceId)
           .eq('status', 'published');
 
-        const { data: art } = isArtUuid
-          ? await artQuery.eq('id', articleId).maybeSingle()
-          : await artQuery.or(`slug.eq.${articleId},id.eq.${articleId}`).maybeSingle();
+        let { data: art, error: artError } = isArtUuid
+          ? await artQuery.or(`id.eq.${cleanArticleId},slug.eq.${cleanArticleId}`).maybeSingle()
+          : await artQuery.ilike('slug', cleanArticleId).maybeSingle();
+
+        if (artError) {
+          console.error('Failed to load article:', artError);
+        }
+
+        // Resilient fallback: match by clean title if slug lookup yielded nothing
+        if (!art && !isArtUuid) {
+          const titleSearch = cleanArticleId.replace(/-/g, ' ').trim();
+          const { data: fallbackArt } = await artQuery.ilike('title', `%${titleSearch}%`).limit(1).maybeSingle();
+          if (fallbackArt) {
+            art = fallbackArt;
+          }
+        }
 
         if (art) {
           setArticle(art as Article);
@@ -306,7 +325,7 @@ export default function ArticleDetailPage() {
         {/* Breadcrumb Navigation */}
         <nav className="flex items-center gap-2 text-[12.5px] text-ink-3 flex-wrap">
           <span
-            onClick={() => router.push(`/help/${workspaceId}`)}
+            onClick={navigateToRoot}
             className="hover:text-accent cursor-pointer transition-colors"
           >
             Help Center

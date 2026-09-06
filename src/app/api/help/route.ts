@@ -28,13 +28,17 @@ export async function GET(request: NextRequest) {
 
     // 2. Fetch Single Article if requested
     if (articleId) {
-      const { data: article, error: artErr } = await supabase
+      const cleanArticleId = decodeURIComponent(articleId).trim();
+      const isArtUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(cleanArticleId);
+      const artQuery = supabase
         .from('articles')
         .select('*, author:agents(id, name, avatar_url), section:help_sections(id, name, icon)')
-        .eq('id', articleId)
         .eq('workspace_id', workspaceId)
-        .eq('status', 'published')
-        .maybeSingle();
+        .eq('status', 'published');
+
+      const { data: article, error: artErr } = isArtUuid
+        ? await artQuery.or(`id.eq.${cleanArticleId},slug.eq.${cleanArticleId}`).maybeSingle()
+        : await artQuery.ilike('slug', cleanArticleId).maybeSingle();
 
       if (artErr || !article) {
         return NextResponse.json({ error: 'Article not found' }, { status: 404 });
