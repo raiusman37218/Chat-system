@@ -86,8 +86,11 @@ export default function OnboardingPage() {
           owner_id: session.user.id,
           slug,
           custom_domain: customDomain,
-          custom_domain_status: 'pending',
-          custom_domain_verification_token: verificationToken,
+          // A status only makes sense once there is a domain to have a status
+          // about. Writing 'pending' with a null domain left workspaces showing
+          // "verification pending" for a domain nobody had entered.
+          custom_domain_status: customDomain ? 'pending' : null,
+          custom_domain_verification_token: customDomain ? verificationToken : null,
         })
         .select()
         .single();

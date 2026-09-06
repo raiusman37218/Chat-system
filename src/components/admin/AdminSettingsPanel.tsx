@@ -495,7 +495,7 @@ export function AdminSettingsPanel({
   const [verifyingDomain, setVerifyingDomain] = useState(false);
   const [verificationResult, setVerificationResult] = useState<{
     verified: boolean;
-    status: 'verified' | 'failed';
+    status: 'verified' | 'pending' | 'failed';
     details: string;
   } | null>(null);
   const [copiedToken, setCopiedToken] = useState(false);

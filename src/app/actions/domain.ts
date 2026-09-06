@@ -73,7 +73,14 @@ export async function updateWorkspaceDomainAction(
  */
 export async function verifyWorkspaceDomainAction(
   workspaceId: string
-): Promise<ActionResult<{ verified: boolean; status: 'verified' | 'failed'; details: string }>> {
+): Promise<
+  ActionResult<{
+    verified: boolean;
+    /** `pending` means DNS is right but the domain is not serving us yet. */
+    status: 'verified' | 'pending' | 'failed';
+    details: string;
+  }>
+> {
   try {
     const supabase = await createClient();
 
@@ -161,7 +168,37 @@ export async function verifyWorkspaceDomainAction(
       }
     }
 
-    const isVerified = cnameVerified || txtVerified;
+    const dnsOk = cnameVerified || txtVerified;
+
+    // DNS is necessary but not sufficient. On Vercel (and most hosts) the
+    // domain must also be attached to the project, or the edge answers with
+    // its own 404 and this app never sees the request. Marking "verified" off
+    // DNS alone told owners their help centre was live when visitors were
+    // getting a 404, so the last word belongs to a real request.
+    let reachable = false;
+    if (dnsOk) {
+      try {
+        const probe = await fetch(`https://${domain}/api/domain-check`, {
+          headers: { accept: 'application/json' },
+          cache: 'no-store',
+          signal: AbortSignal.timeout(8000),
+        });
+        if (probe.ok) {
+          const body = await probe.json();
+          reachable = body?.app === 'chatify' && body?.workspaceId === workspaceId;
+          diagnosticLogs.push(
+            `Live probe: HTTP ${probe.status}, resolved workspace ${body?.workspaceId ?? 'none'}`
+          );
+        } else {
+          diagnosticLogs.push(`Live probe: HTTP ${probe.status}`);
+        }
+      } catch (err) {
+        const e = err as { name?: string; message?: string };
+        diagnosticLogs.push(`Live probe failed: ${e?.name || e?.message}`);
+      }
+    }
+
+    const isVerified = dnsOk && reachable;
 
     if (isVerified) {
       await supabase
@@ -177,9 +214,27 @@ export async function verifyWorkspaceDomainAction(
         data: {
           verified: true,
           status: 'verified',
-          details: cnameVerified
-            ? 'CNAME routing verified and active!'
-            : 'TXT ownership challenge successfully verified!',
+          details: 'Live — your help centre is being served on this domain.',
+        },
+      };
+    } else if (dnsOk) {
+      // The most common real-world state: DNS is right, but nobody added the
+      // domain to the hosting project yet. Say exactly that.
+      await supabase
+        .from('workspaces')
+        .update({ custom_domain_status: 'pending' })
+        .eq('id', workspaceId);
+
+      return {
+        success: false,
+        data: {
+          verified: false,
+          status: 'pending',
+          details:
+            `DNS looks correct, but ${domain} is not serving your help centre yet. ` +
+            `Add ${domain} as a domain on the hosting project (Vercel → Project → ` +
+            `Settings → Domains), then verify again. New certificates can also take ` +
+            `a few minutes. Diagnostics: ${diagnosticLogs.join(' | ')}`,
         },
       };
     } else {
