@@ -8,6 +8,7 @@ import {
   BusinessHoursConfig,
   AutoAssignmentConfig,
   AISettingsConfig,
+  NavbarTriggerConfig,
 } from '@/types/database';
 
 /**
@@ -397,4 +398,28 @@ export async function updateHelpCenterBrandingAction(
   if (error) throw new Error(error.message);
   return { success: true, workspace: updated as Workspace };
 }
+
+/**
+ * SECTION 8: Zero-Code Navbar Trigger Button
+ */
+export async function updateNavbarTriggerConfigAction(
+  workspaceId: string,
+  config: NavbarTriggerConfig
+) {
+  await assertAdminUser(workspaceId);
+  const supabase = await createClient();
+
+  const { data: updated, error } = await supabase
+    .from('workspaces')
+    .update({
+      navbar_trigger_config: config,
+    })
+    .eq('id', workspaceId)
+    .select()
+    .single();
+
+  if (error) throw new Error(error.message);
+  return { success: true, workspace: updated as Workspace };
+}
+
 

@@ -4,6 +4,15 @@ import { CHATIFY_ICON_DATA_URI } from './icon';
 const DEFAULT_SUPABASE_URL = 'https://vfjsaynnubxywdbevxtx.supabase.co';
 const DEFAULT_SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZmanNheW5udWJ4eXdkYmV2eHR4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgyNTA5MDEsImV4cCI6MjEwMzgyNjkwMX0.YyBCXMqwrOk5BRhQafYLFw8tiM5PC8lc8Yocodw9wf0';
 
+interface NavbarTriggerConfig {
+  enabled: boolean;
+  label: string;
+  action: 'help' | 'messages' | 'redirect';
+  auto_inject: boolean;
+  style: 'navbar_link' | 'pill';
+  target_selector?: string;
+}
+
 interface WidgetConfig {
   supabaseUrl: string;
   supabaseKey: string;
@@ -20,6 +29,7 @@ interface WidgetConfig {
   welcomeText?: string;
   businessName?: string;
   customDomain?: string;
+  navbarTriggerConfig?: NavbarTriggerConfig;
 }
 
 interface MessageItem {
@@ -181,6 +191,13 @@ class ChatifyWidget {
         if (data.help_center_tab_icon) {
           this.config.helpTabIcon = data.help_center_tab_icon;
         }
+        if (data.custom_domain) {
+          this.config.customDomain = data.custom_domain;
+        }
+        if (data.navbar_trigger_config) {
+          this.config.navbarTriggerConfig = data.navbar_trigger_config;
+        }
+        this.initNavbarAutoTrigger();
 
         this.updateThemeAndTexts();
 
@@ -2795,6 +2812,154 @@ class ChatifyWidget {
         return;
       }
     });
+  }
+
+  /**
+   * Automatic Website Navbar Hooking & Injection:
+   * 1. Smart-hooks any matching links already present in host website navbar (e.g. "FAQ" or "Help")
+   * 2. If no matching link exists and auto_inject is enabled, creates a styled button and inserts into <nav>/<header>
+   * 3. Uses MutationObserver for resilience against React / Next.js SPA client-side navigations
+   */
+  private initNavbarAutoTrigger() {
+    const navConfig = this.config.navbarTriggerConfig;
+    if (!navConfig || navConfig.enabled === false) return;
+
+    const label = (navConfig.label || 'FAQ').trim();
+    if (!label) return;
+
+    const labelLower = label.toLowerCase();
+    const action = navConfig.action || 'help';
+
+    const performAction = (e?: Event) => {
+      if (e) e.preventDefault();
+      if (action === 'messages') {
+        this.openMessages();
+      } else if (action === 'redirect') {
+        const domain = this.config.customDomain;
+        if (domain) {
+          window.open(`https://${domain}`, '_blank');
+        } else {
+          this.openHelp();
+        }
+      } else {
+        this.openHelp();
+      }
+    };
+
+    const attachOrInject = () => {
+      if (typeof document === 'undefined') return;
+
+      // 1. Check if an injected button already exists
+      const existingInjected = document.getElementById('chatifyNavTriggerBtn');
+
+      // 2. Smart Hooking: Look for existing matching links in header/nav
+      const links = Array.from(
+        document.querySelectorAll<HTMLElement>('header a, nav a, .navbar a, [role="navigation"] a, a')
+      );
+      let alreadyHooked = false;
+
+      for (const link of links) {
+        if (link.closest('#chatifyWidgetContainer') || link.id === 'chatifyNavTriggerBtn') continue;
+        if (link.hasAttribute('data-chatify-hooked')) {
+          alreadyHooked = true;
+          break;
+        }
+
+        const text = (link.textContent || '').trim().toLowerCase();
+        const href = (link.getAttribute('href') || '').toLowerCase();
+
+        // Exact match (e.g. "FAQ" === "faq") or href contains /faq or /help
+        const textMatch = text === labelLower || (labelLower.length >= 3 && text.includes(labelLower));
+        const hrefMatch =
+          href === `/${labelLower}` ||
+          href === `/en/${labelLower}` ||
+          (labelLower === 'faq' && href.includes('/faq')) ||
+          (labelLower === 'help' && href.includes('/help'));
+
+        if (textMatch || hrefMatch) {
+          link.setAttribute('data-chatify-hooked', 'true');
+          link.setAttribute('data-chatify-help', 'true');
+          link.style.cursor = 'pointer';
+          link.addEventListener('click', (e) => performAction(e));
+          alreadyHooked = true;
+          // If we had an injected button from earlier, remove it in favor of native link
+          if (existingInjected) existingInjected.remove();
+          break;
+        }
+      }
+
+      if (alreadyHooked || existingInjected) return;
+
+      // 3. Auto-Injection: If not hooked and auto_inject is true, inject into navbar
+      if (navConfig.auto_inject !== false) {
+        const selector =
+          navConfig.target_selector ||
+          'header nav ul, nav ul, header nav, nav, [role="navigation"], .navbar-nav, .navbar, header';
+        const container = document.querySelector(selector);
+        if (!container) return;
+
+        const isList = container.tagName.toLowerCase() === 'ul' || container.tagName.toLowerCase() === 'ol';
+        const wrapper = document.createElement(isList ? 'li' : 'span');
+        wrapper.className = 'chatify-nav-item';
+        wrapper.style.display = 'inline-flex';
+        wrapper.style.alignItems = 'center';
+
+        const btn = document.createElement('a');
+        btn.id = 'chatifyNavTriggerBtn';
+        btn.href = 'javascript:void(0)';
+        btn.textContent = label;
+        btn.setAttribute('data-chatify-help', 'true');
+
+        // Check if there is an existing sibling link to clone class
+        const sibling = container.querySelector('a');
+        if (sibling && sibling.className && navConfig.style !== 'pill') {
+          btn.className = sibling.className;
+        } else {
+          btn.style.cssText = `
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 6px 14px;
+            font-size: 14px;
+            font-weight: 600;
+            border-radius: 9999px;
+            text-decoration: none;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            background: ${this.config.primaryColor || '#480576'};
+            color: #ffffff;
+            border: 1px solid rgba(255,255,255,0.25);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+          `;
+        }
+
+        btn.addEventListener('click', (e) => performAction(e));
+        wrapper.appendChild(btn);
+
+        // Try to insert before CTA buttons (like "Dashboard" or "Sign in" or "Register")
+        const actionBtn = container.querySelector(
+          'button, .btn, [href*="dashboard"], [href*="login"], [href*="signup"]'
+        );
+        if (actionBtn && actionBtn.parentElement === container) {
+          container.insertBefore(wrapper, actionBtn);
+        } else {
+          container.appendChild(wrapper);
+        }
+      }
+    };
+
+    // Run on initial load
+    attachOrInject();
+
+    // SPA Resilience: Observe DOM changes when user navigates pages in Next.js / React
+    if (typeof MutationObserver !== 'undefined' && typeof document !== 'undefined' && document.body) {
+      let timer: any = null;
+      const observer = new MutationObserver(() => {
+        clearTimeout(timer);
+        timer = setTimeout(() => attachOrInject(), 400);
+      });
+      observer.observe(document.body, { childList: true, subtree: true });
+    }
   }
 }
 

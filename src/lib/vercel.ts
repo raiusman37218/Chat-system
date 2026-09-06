@@ -110,3 +110,69 @@ export async function removeDomainFromProject(
     return { configured: true, ok: false, error: e?.message };
   }
 }
+
+/** Check verification and status of a domain in Vercel project */
+export async function getVercelDomainStatus(domain: string): Promise<{
+  configured: boolean;
+  verified: boolean;
+  misconfigured?: boolean;
+  verification?: Array<{
+    type: string;
+    domain: string;
+    value: string;
+    reason: string;
+  }>;
+}> {
+  const { token, projectId, teamId, configured } = credentials();
+  if (!configured) return { configured: false, verified: false };
+
+  try {
+    const res = await fetch(
+      withTeam(`${API}/v9/projects/${projectId}/domains/${domain}`, teamId),
+      {
+        headers: { Authorization: `Bearer ${token}` },
+        signal: AbortSignal.timeout(8000),
+      }
+    );
+    if (!res.ok) return { configured: true, verified: false };
+    const data = await res.json();
+    return {
+      configured: true,
+      verified: !!data.verified,
+      misconfigured: !!data.misconfigured,
+      verification: data.verification || [],
+    };
+  } catch {
+    return { configured: true, verified: false };
+  }
+}
+
+/** Triggers Vercel verification check for a domain */
+export async function verifyVercelDomain(domain: string): Promise<{
+  configured: boolean;
+  verified: boolean;
+  error?: string;
+}> {
+  const { token, projectId, teamId, configured } = credentials();
+  if (!configured) return { configured: false, verified: false };
+
+  try {
+    const res = await fetch(
+      withTeam(`${API}/v9/projects/${projectId}/domains/${domain}/verify`, teamId),
+      {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        signal: AbortSignal.timeout(8000),
+      }
+    );
+    const data = await res.json();
+    return {
+      configured: true,
+      verified: !data.error && !!data.verified,
+      error: data.error?.message,
+    };
+  } catch (err: any) {
+    return { configured: true, verified: false, error: err.message };
+  }
+}
+

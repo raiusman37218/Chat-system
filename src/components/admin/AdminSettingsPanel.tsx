@@ -37,6 +37,7 @@ import {
   BusinessHoursConfig,
   AutoAssignmentConfig,
   AISettingsConfig,
+  NavbarTriggerConfig,
 } from '@/types/database';
 import {
   updateWidgetSettingsAction,
@@ -44,6 +45,7 @@ import {
   updateAutoAssignmentRulesAction,
   updateAISettingsAction,
   updateHelpCenterBrandingAction,
+  updateNavbarTriggerConfigAction,
   inviteAgentAction,
   updateAgentRoleAction,
   removeAgentAction,
@@ -667,6 +669,36 @@ export function AdminSettingsPanel({
       }
     } catch (err: any) {
       showStatus(err.message || 'Failed to remove domain', 'error');
+    }
+  };
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // SECTION 9: ZERO-CODE NAVBAR AUTO-TRIGGER BUTTON STATE & HANDLER
+  // ──────────────────────────────────────────────────────────────────────────
+  const [navbarConfig, setNavbarConfig] = useState<NavbarTriggerConfig>(
+    workspace.navbar_trigger_config || {
+      enabled: true,
+      label: 'FAQ',
+      action: 'help',
+      auto_inject: true,
+      style: 'navbar_link',
+    }
+  );
+  const [savingNavbar, setSavingNavbar] = useState(false);
+
+  const handleSaveNavbarConfig = async () => {
+    setSavingNavbar(true);
+    try {
+      const res = await updateNavbarTriggerConfigAction(workspace.id, navbarConfig);
+      if (res.workspace) {
+        setWorkspace(res.workspace);
+        onWorkspaceUpdated?.(res.workspace);
+        showStatus('Navbar button updated! Changes are live on your website.');
+      }
+    } catch (err: any) {
+      showStatus(err.message || 'Failed to update navbar button settings', 'error');
+    } finally {
+      setSavingNavbar(false);
     }
   };
 
@@ -2615,6 +2647,182 @@ export function AdminSettingsPanel({
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                       <span>Remove Custom Domain</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* 3. Website Navbar Launcher Button (Zero-Code) */}
+            <div className="card p-6 space-y-5 border border-accent/30 bg-surface">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-line pb-4">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="px-2 py-0.5 rounded text-[10.5px] font-bold uppercase tracking-wider bg-accent/10 text-accent border border-accent/20">
+                      Zero-Code Automation
+                    </span>
+                    <h3 className="text-[16px] font-semibold text-ink flex items-center gap-1.5">
+                      <span>Website Navbar Button Auto-Injector</span>
+                    </h3>
+                  </div>
+                  <p className="text-[12px] text-ink-3">
+                    Automatically connects to or injects a button into your website navbar (e.g. on <code className="font-mono text-ink">{cleanDomain(workspace.website_url) || 'yourbrand.com'}</code>) without touching your website code.
+                  </p>
+                </div>
+
+                {/* Main Toggle */}
+                <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                  <input
+                    type="checkbox"
+                    className="sr-only peer"
+                    checked={navbarConfig.enabled}
+                    onChange={(e) => setNavbarConfig({ ...navbarConfig, enabled: e.target.checked })}
+                  />
+                  <div className="w-11 h-6 bg-surface-3 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-accent"></div>
+                </label>
+              </div>
+
+              {navbarConfig.enabled && (
+                <div className="space-y-5 pt-1 animate-in fade-in">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                    {/* Button Name Input */}
+                    <div className="space-y-1.5">
+                      <label className="field-label flex items-center justify-between">
+                        <span>Button Text / Name in Navbar</span>
+                        <span className="text-[11px] text-ink-4">Case-insensitive</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={navbarConfig.label}
+                        onChange={(e) => setNavbarConfig({ ...navbarConfig, label: e.target.value })}
+                        placeholder="FAQ"
+                        className="input font-semibold text-[14px]"
+                      />
+                      <p className="text-[11px] text-ink-3">
+                        If your website already has a link named &quot;{navbarConfig.label || 'FAQ'}&quot;, the widget auto-hooks it. If not, it creates a new one.
+                      </p>
+                    </div>
+
+                    {/* Action Selector */}
+                    <div className="space-y-1.5">
+                      <label className="field-label">When Clicked By Visitor</label>
+                      <select
+                        value={navbarConfig.action}
+                        onChange={(e) =>
+                          setNavbarConfig({
+                            ...navbarConfig,
+                            action: e.target.value as 'help' | 'messages' | 'redirect',
+                          })
+                        }
+                        className="input text-[13px]"
+                      >
+                        <option value="help">📖 Open Help &amp; FAQs Slide-out Panel</option>
+                        <option value="messages">💬 Open Live Chat Messenger</option>
+                        <option value="redirect">
+                          🌐 Open Dedicated Help Center ({workspace.custom_domain ? `https://${workspace.custom_domain}` : 'Custom Domain'})
+                        </option>
+                      </select>
+                      <p className="text-[11px] text-ink-3">
+                        Choose whether to slide open the in-page Help &amp; FAQ modal or redirect.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Auto-Inject & Styling Row */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-3 border-t border-line/60">
+                    <label className="flex items-start gap-3 p-3.5 rounded-xl border border-line bg-surface-2 cursor-pointer hover:border-accent/40 transition-colors">
+                      <input
+                        type="checkbox"
+                        checked={navbarConfig.auto_inject}
+                        onChange={(e) => setNavbarConfig({ ...navbarConfig, auto_inject: e.target.checked })}
+                        className="mt-0.5 rounded border-line text-accent focus:ring-accent"
+                      />
+                      <div>
+                        <div className="text-[13px] font-semibold text-ink">Auto-Inject if not present</div>
+                        <p className="text-[11.5px] text-ink-3 mt-0.5">
+                          If your navbar does not already have an &quot;{navbarConfig.label}&quot; link, the widget will dynamically append it into your navbar.
+                        </p>
+                      </div>
+                    </label>
+
+                    <div className="space-y-1.5 p-3.5 rounded-xl border border-line bg-surface-2">
+                      <label className="text-[12.5px] font-semibold text-ink block">Button Styling Variant</label>
+                      <div className="grid grid-cols-2 gap-2 mt-1">
+                        <button
+                          type="button"
+                          onClick={() => setNavbarConfig({ ...navbarConfig, style: 'navbar_link' })}
+                          className={cn(
+                            'px-3 py-1.5 rounded-lg border text-center text-[12px] font-medium transition-all',
+                            navbarConfig.style === 'navbar_link'
+                              ? 'border-accent bg-accent/10 text-accent font-semibold'
+                              : 'border-line bg-surface text-ink-2 hover:bg-surface-3'
+                          )}
+                        >
+                          Auto-Match Nav Links
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setNavbarConfig({ ...navbarConfig, style: 'pill' })}
+                          className={cn(
+                            'px-3 py-1.5 rounded-lg border text-center text-[12px] font-medium transition-all',
+                            navbarConfig.style === 'pill'
+                              ? 'border-accent bg-accent/10 text-accent font-semibold'
+                              : 'border-line bg-surface text-ink-2 hover:bg-surface-3'
+                          )}
+                        >
+                          Modern Pill Button
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Simulated Navbar Live Preview */}
+                  <div className="space-y-2 pt-2">
+                    <span className="text-[11.5px] font-semibold text-ink-3 uppercase tracking-wider">Live Simulation Preview</span>
+                    <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between shadow-inner">
+                      <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold text-[11px]">
+                          R4
+                        </div>
+                        <span className="font-bold text-white text-[13px] tracking-wide">{workspace.name || 'BRAND'}</span>
+                      </div>
+
+                      <div className="flex items-center gap-3 text-[13px]">
+                        <span className="text-slate-400 hover:text-white cursor-default">Accounts</span>
+                        <span className="text-slate-400 hover:text-white cursor-default">Rules</span>
+                        {/* The Configured Button Preview */}
+                        {navbarConfig.style === 'pill' ? (
+                          <span
+                            className="px-3 py-1 rounded-full text-white font-semibold text-[12px] shadow-sm animate-pulse"
+                            style={{ backgroundColor: workspace.brand_color || '#480576' }}
+                          >
+                            {navbarConfig.label || 'FAQ'}
+                          </span>
+                        ) : (
+                          <span className="text-white font-semibold underline decoration-accent underline-offset-4 cursor-pointer">
+                            {navbarConfig.label || 'FAQ'}
+                          </span>
+                        )}
+                        <span className="px-3 py-1 rounded-full bg-slate-800 text-slate-200 text-[12px] font-medium">Dashboard</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Save Button */}
+                  <div className="flex items-center justify-between pt-2">
+                    <span className="text-[11.5px] text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5 font-medium">
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      <span>Zero-code: Updates live on your website instantly upon saving.</span>
+                    </span>
+
+                    <button
+                      type="button"
+                      onClick={handleSaveNavbarConfig}
+                      disabled={savingNavbar}
+                      className="btn btn-primary px-5 gap-1.5"
+                    >
+                      <Sparkles className="w-3.5 h-3.5" />
+                      <span>{savingNavbar ? 'Saving…' : 'Save & Activate on Website'}</span>
                     </button>
                   </div>
                 </div>
