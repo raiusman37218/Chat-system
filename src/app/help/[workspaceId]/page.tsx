@@ -11,6 +11,10 @@ import {
   ChevronRight,
   X,
   CornerDownLeft,
+  LayoutGrid,
+  Grid3X3,
+  Columns4,
+  Rows3,
 } from 'lucide-react';
 import { Article, HelpSection, Workspace } from '@/types/database';
 import { createClient } from '@/lib/supabase/client';
@@ -73,6 +77,30 @@ export default function PublicHelpCenterPage() {
       router.push(qs ? `?${qs}` : '?', { scroll: true });
     },
     [router, searchParams]
+  );
+
+  const [layout, setLayout] = useState<'grid-2' | 'grid-3' | 'grid-4' | 'list'>('grid-2');
+
+  useEffect(() => {
+    if (workspace?.help_center_layout) {
+      setLayout(workspace.help_center_layout as any);
+    }
+    try {
+      const saved = localStorage.getItem(`help_layout_${workspaceId}`);
+      if (saved && ['grid-2', 'grid-3', 'grid-4', 'list'].includes(saved)) {
+        setLayout(saved as any);
+      }
+    } catch {}
+  }, [workspace, workspaceId]);
+
+  const handleSetLayout = useCallback(
+    (nextLayout: 'grid-2' | 'grid-3' | 'grid-4' | 'list') => {
+      setLayout(nextLayout);
+      try {
+        localStorage.setItem(`help_layout_${workspaceId}`, nextLayout);
+      } catch {}
+    },
+    [workspaceId]
   );
 
   useEffect(() => {
@@ -356,7 +384,17 @@ export default function PublicHelpCenterPage() {
         </div>
       </section>
 
-      <main className="flex-1 w-full mx-auto max-w-3xl px-4 sm:px-6 py-8 sm:py-10">
+      <main
+        className={`flex-1 w-full mx-auto px-4 sm:px-6 py-8 sm:py-10 transition-all duration-300 ${
+          layout === 'grid-4'
+            ? 'max-w-6xl'
+            : layout === 'grid-3'
+            ? 'max-w-5xl'
+            : layout === 'grid-2'
+            ? 'max-w-4xl'
+            : 'max-w-3xl'
+        }`}
+      >
         {query.trim() ? (
           <SearchResults
             query={query}
@@ -377,6 +415,8 @@ export default function PublicHelpCenterPage() {
         ) : (
           <CollectionGrid
             collections={collections}
+            layout={layout}
+            onSetLayout={handleSetLayout}
             onOpen={(slug) => setOpenCollection(slug)}
             onSelect={goToArticle}
             href={articleHref}
@@ -421,13 +461,54 @@ interface Collection {
   articles: ListArticle[];
 }
 
+/** Renders an image logo if icon starts with http/data/path, otherwise renders emoji/symbol */
+function CollectionIcon({
+  icon,
+  className = 'w-11 h-11',
+  imgClassName = 'w-6 h-6',
+}: {
+  icon?: string | null;
+  className?: string;
+  imgClassName?: string;
+}) {
+  const isImg =
+    icon &&
+    (icon.startsWith('http://') ||
+      icon.startsWith('https://') ||
+      icon.startsWith('/') ||
+      icon.startsWith('data:image/'));
+
+  return (
+    <span
+      aria-hidden
+      className={`shrink-0 rounded-xl grid place-items-center bg-surface-2 border border-line overflow-hidden select-none transition-transform group-hover:scale-105 ${className}`}
+    >
+      {isImg ? (
+        <img
+          src={icon}
+          alt=""
+          className={`object-contain ${imgClassName}`}
+        />
+      ) : (
+        <span className="text-[20px] leading-none">
+          {icon?.trim() || '📚'}
+        </span>
+      )}
+    </span>
+  );
+}
+
 function CollectionGrid({
   collections,
+  layout,
+  onSetLayout,
   onOpen,
   onSelect,
   href,
 }: {
   collections: Collection[];
+  layout: 'grid-2' | 'grid-3' | 'grid-4' | 'list';
+  onSetLayout: (l: 'grid-2' | 'grid-3' | 'grid-4' | 'list') => void;
   onOpen: (slug: string) => void;
   onSelect: (a: ListArticle) => void;
   href: (a: ListArticle) => string;
@@ -445,75 +526,325 @@ function CollectionGrid({
   }
 
   return (
-    <div className="space-y-3">
-      {collections.map((c) => (
-        <article
-          key={c.key}
-          className="group rounded-2xl border border-line bg-surface transition-colors hover:border-ink-3/35"
-        >
+    <div className="space-y-4">
+      {/* Top Controls: Collections Header + Intercom-style Layout Variation Switcher */}
+      <div className="flex items-center justify-between gap-3 pb-1">
+        <div className="flex items-center gap-2">
+          <h2 className="text-[13px] font-bold text-ink uppercase tracking-wider">
+            Collections
+          </h2>
+          <span className="text-[11.5px] px-2 py-0.5 rounded-full bg-surface-2 border border-line text-ink-3 font-medium">
+            {collections.length}
+          </span>
+        </div>
+
+        {/* Layout Switcher (List / Row-wise, 2-Col, 3-Col, 4-Col) */}
+        <div className="flex items-center gap-1 p-1 rounded-xl bg-surface-2 border border-line">
           <button
             type="button"
-            onClick={() => onOpen(c.slug)}
-            className="w-full text-left p-5 sm:p-6 flex items-start gap-4 cursor-pointer"
+            onClick={() => onSetLayout('list')}
+            title="Row-wise / List View"
+            className={`p-1.5 rounded-lg transition-all ${
+              layout === 'list'
+                ? 'bg-surface text-ink shadow-xs'
+                : 'text-ink-3 hover:text-ink'
+            }`}
           >
-            <span
-              aria-hidden
-              className="shrink-0 w-11 h-11 rounded-xl grid place-items-center text-[20px] bg-surface-2 border border-line"
-            >
-              {c.icon}
-            </span>
-
-            <span className="min-w-0 flex-1">
-              <span className="flex items-center gap-2">
-                <h2 className="text-[16.5px] font-semibold text-ink truncate">
-                  {c.name}
-                </h2>
-                <ChevronRight className="w-4 h-4 text-ink-3 shrink-0 transition-transform group-hover:translate-x-0.5" />
-              </span>
-              {c.description && (
-                <p className="mt-1 text-[13.5px] text-ink-2 leading-relaxed line-clamp-2">
-                  {c.description}
-                </p>
-              )}
-              <p className="mt-1.5 text-[12px] text-ink-3">
-                {c.articles.length} {c.articles.length === 1 ? 'article' : 'articles'}
-              </p>
-            </span>
+            <Rows3 className="w-4 h-4" />
           </button>
+          <button
+            type="button"
+            onClick={() => onSetLayout('grid-2')}
+            title="2 in a row (2 Columns)"
+            className={`p-1.5 rounded-lg transition-all ${
+              layout === 'grid-2'
+                ? 'bg-surface text-ink shadow-xs'
+                : 'text-ink-3 hover:text-ink'
+            }`}
+          >
+            <LayoutGrid className="w-4 h-4" />
+          </button>
+          <button
+            type="button"
+            onClick={() => onSetLayout('grid-3')}
+            title="3 in a row (3 Columns)"
+            className={`p-1.5 rounded-lg transition-all ${
+              layout === 'grid-3'
+                ? 'bg-surface text-ink shadow-xs'
+                : 'text-ink-3 hover:text-ink'
+            }`}
+          >
+            <Grid3X3 className="w-4 h-4" />
+          </button>
+          <button
+            type="button"
+            onClick={() => onSetLayout('grid-4')}
+            title="4 in a row (4 Columns)"
+            className={`p-1.5 rounded-lg transition-all ${
+              layout === 'grid-4'
+                ? 'bg-surface text-ink shadow-xs'
+                : 'text-ink-3 hover:text-ink'
+            }`}
+          >
+            <Columns4 className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
 
-          {/* A preview of what is inside saves a click for the common case. */}
-          {c.articles.length > 0 && (
-            <ul className="border-t border-line/70 divide-y divide-line/60">
-              {c.articles.slice(0, 3).map((a) => (
-                <li key={a.id}>
-                  <a
-                    href={href(a)}
-                    onClick={(e) => {
-                      e.preventDefault();
-                      onSelect(a);
-                    }}
-                    className="flex items-center gap-3 px-5 sm:px-6 py-2.5 text-[13.5px] text-ink-2 hover:text-ink hover:bg-surface-2/60 transition-colors"
-                  >
-                    <FileText className="w-3.5 h-3.5 text-ink-3 shrink-0" />
-                    <span className="truncate">{a.title}</span>
-                  </a>
-                </li>
-              ))}
-              {c.articles.length > 3 && (
-                <li>
-                  <button
-                    type="button"
-                    onClick={() => onOpen(c.slug)}
-                    className="w-full text-left px-5 sm:px-6 py-2.5 text-[13px] font-medium text-ink-3 hover:text-ink hover:bg-surface-2/60 transition-colors"
-                  >
-                    Show all {c.articles.length} articles
-                  </button>
-                </li>
+      {/* ── VARIATION 1: ROW-WISE / LIST VIEW ── */}
+      {layout === 'list' && (
+        <div className="space-y-3">
+          {collections.map((c) => (
+            <article
+              key={c.key}
+              className="group rounded-2xl border border-line bg-surface transition-all hover:border-ink-3/35 hover:shadow-xs"
+            >
+              <button
+                type="button"
+                onClick={() => onOpen(c.slug)}
+                className="w-full text-left p-5 sm:p-6 flex items-start sm:items-center gap-4 cursor-pointer"
+              >
+                <CollectionIcon
+                  icon={c.icon}
+                  className="w-12 h-12 rounded-xl text-[22px]"
+                  imgClassName="w-7 h-7"
+                />
+
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-[16.5px] font-semibold text-ink group-hover:text-accent transition-colors truncate">
+                      {c.name}
+                    </h3>
+                  </div>
+                  {c.description && (
+                    <p className="mt-1 text-[13.5px] text-ink-2 leading-relaxed line-clamp-1">
+                      {c.description}
+                    </p>
+                  )}
+                  <p className="mt-1 text-[12px] text-ink-3">
+                    {c.articles.length} {c.articles.length === 1 ? 'article' : 'articles'}
+                  </p>
+                </div>
+
+                <ChevronRight className="w-5 h-5 text-ink-3 shrink-0 transition-transform group-hover:translate-x-1" />
+              </button>
+
+              {c.articles.length > 0 && (
+                <ul className="border-t border-line/70 divide-y divide-line/60">
+                  {c.articles.slice(0, 3).map((a) => (
+                    <li key={a.id}>
+                      <a
+                        href={href(a)}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          onSelect(a);
+                        }}
+                        className="flex items-center gap-3 px-5 sm:px-6 py-2.5 text-[13.5px] text-ink-2 hover:text-ink hover:bg-surface-2/60 transition-colors"
+                      >
+                        <FileText className="w-3.5 h-3.5 text-ink-3 shrink-0" />
+                        <span className="truncate">{a.title}</span>
+                      </a>
+                    </li>
+                  ))}
+                  {c.articles.length > 3 && (
+                    <li>
+                      <button
+                        type="button"
+                        onClick={() => onOpen(c.slug)}
+                        className="w-full text-left px-5 sm:px-6 py-2.5 text-[13px] font-medium text-accent hover:underline hover:bg-surface-2/60 transition-colors"
+                      >
+                        Show all {c.articles.length} articles →
+                      </button>
+                    </li>
+                  )}
+                </ul>
               )}
-            </ul>
-          )}
-        </article>
-      ))}
+            </article>
+          ))}
+        </div>
+      )}
+
+      {/* ── VARIATION 2: 2 IN A ROW (GRID-2) ── */}
+      {layout === 'grid-2' && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
+          {collections.map((c) => (
+            <article
+              key={c.key}
+              className="group rounded-2xl border border-line bg-surface transition-all hover:border-ink-3/35 hover:shadow-xs flex flex-col justify-between"
+            >
+              <button
+                type="button"
+                onClick={() => onOpen(c.slug)}
+                className="w-full text-left p-6 flex items-start gap-4 cursor-pointer"
+              >
+                <CollectionIcon
+                  icon={c.icon}
+                  className="w-12 h-12 rounded-2xl text-[24px]"
+                  imgClassName="w-7 h-7"
+                />
+
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center justify-between gap-2">
+                    <h3 className="text-[17px] font-bold text-ink group-hover:text-accent transition-colors truncate">
+                      {c.name}
+                    </h3>
+                    <ChevronRight className="w-4 h-4 text-ink-3 shrink-0 transition-transform group-hover:translate-x-0.5" />
+                  </div>
+                  {c.description && (
+                    <p className="mt-1 text-[13.5px] text-ink-2 leading-relaxed line-clamp-2">
+                      {c.description}
+                    </p>
+                  )}
+                  <span className="inline-block mt-2 text-[11.5px] font-medium px-2 py-0.5 rounded-md bg-surface-2 border border-line text-ink-3">
+                    {c.articles.length} {c.articles.length === 1 ? 'article' : 'articles'}
+                  </span>
+                </div>
+              </button>
+
+              {c.articles.length > 0 && (
+                <ul className="border-t border-line/70 divide-y divide-line/60 mt-auto">
+                  {c.articles.slice(0, 3).map((a) => (
+                    <li key={a.id}>
+                      <a
+                        href={href(a)}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          onSelect(a);
+                        }}
+                        className="flex items-center gap-2.5 px-6 py-2.5 text-[13.5px] text-ink-2 hover:text-ink hover:bg-surface-2/60 transition-colors"
+                      >
+                        <FileText className="w-3.5 h-3.5 text-ink-3 shrink-0" />
+                        <span className="truncate">{a.title}</span>
+                      </a>
+                    </li>
+                  ))}
+                  {c.articles.length > 3 && (
+                    <li>
+                      <button
+                        type="button"
+                        onClick={() => onOpen(c.slug)}
+                        className="w-full text-left px-6 py-2 text-[12.5px] font-medium text-accent hover:underline transition-colors"
+                      >
+                        Show all {c.articles.length} articles →
+                      </button>
+                    </li>
+                  )}
+                </ul>
+              )}
+            </article>
+          ))}
+        </div>
+      )}
+
+      {/* ── VARIATION 3: 3 IN A ROW (GRID-3) ── */}
+      {layout === 'grid-3' && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {collections.map((c) => (
+            <article
+              key={c.key}
+              className="group rounded-2xl border border-line bg-surface transition-all hover:border-ink-3/35 hover:shadow-xs flex flex-col justify-between"
+            >
+              <button
+                type="button"
+                onClick={() => onOpen(c.slug)}
+                className="w-full text-left p-5 flex flex-col gap-3 cursor-pointer"
+              >
+                <div className="flex items-center justify-between w-full">
+                  <CollectionIcon
+                    icon={c.icon}
+                    className="w-11 h-11 rounded-xl text-[20px]"
+                    imgClassName="w-6 h-6"
+                  />
+                  <ChevronRight className="w-4 h-4 text-ink-3 transition-transform group-hover:translate-x-0.5" />
+                </div>
+
+                <div>
+                  <h3 className="text-[16px] font-bold text-ink group-hover:text-accent transition-colors truncate">
+                    {c.name}
+                  </h3>
+                  {c.description && (
+                    <p className="mt-1 text-[13px] text-ink-2 leading-relaxed line-clamp-2">
+                      {c.description}
+                    </p>
+                  )}
+                  <p className="mt-2 text-[11.5px] text-ink-3 font-medium">
+                    {c.articles.length} {c.articles.length === 1 ? 'article' : 'articles'}
+                  </p>
+                </div>
+              </button>
+
+              {c.articles.length > 0 && (
+                <ul className="border-t border-line/70 divide-y divide-line/60 mt-auto">
+                  {c.articles.slice(0, 2).map((a) => (
+                    <li key={a.id}>
+                      <a
+                        href={href(a)}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          onSelect(a);
+                        }}
+                        className="flex items-center gap-2 px-5 py-2 text-[12.5px] text-ink-2 hover:text-ink hover:bg-surface-2/60 transition-colors"
+                      >
+                        <FileText className="w-3 h-3 text-ink-3 shrink-0" />
+                        <span className="truncate">{a.title}</span>
+                      </a>
+                    </li>
+                  ))}
+                  {c.articles.length > 2 && (
+                    <li>
+                      <button
+                        type="button"
+                        onClick={() => onOpen(c.slug)}
+                        className="w-full text-left px-5 py-1.5 text-[12px] font-medium text-accent hover:underline transition-colors"
+                      >
+                        +{c.articles.length - 2} more →
+                      </button>
+                    </li>
+                  )}
+                </ul>
+              )}
+            </article>
+          ))}
+        </div>
+      )}
+
+      {/* ── VARIATION 4: 4 IN A ROW (GRID-4) ── */}
+      {layout === 'grid-4' && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+          {collections.map((c) => (
+            <article
+              key={c.key}
+              onClick={() => onOpen(c.slug)}
+              className="group rounded-xl border border-line bg-surface p-4 transition-all hover:border-ink-3/40 hover:shadow-xs cursor-pointer flex flex-col justify-between"
+            >
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <CollectionIcon
+                    icon={c.icon}
+                    className="w-10 h-10 rounded-lg text-[18px]"
+                    imgClassName="w-5 h-5"
+                  />
+                  <ChevronRight className="w-4 h-4 text-ink-3 transition-transform group-hover:translate-x-0.5" />
+                </div>
+
+                <h3 className="text-[15px] font-bold text-ink group-hover:text-accent transition-colors line-clamp-1">
+                  {c.name}
+                </h3>
+                {c.description && (
+                  <p className="mt-1 text-[12px] text-ink-3 leading-snug line-clamp-2">
+                    {c.description}
+                  </p>
+                )}
+              </div>
+
+              <div className="mt-3 pt-2.5 border-t border-line/60 flex items-center justify-between text-[11.5px] font-medium text-ink-3">
+                <span>{c.articles.length} {c.articles.length === 1 ? 'article' : 'articles'}</span>
+                <span className="text-accent opacity-0 group-hover:opacity-100 transition-opacity">View →</span>
+              </div>
+            </article>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -530,39 +861,26 @@ function CollectionView({
   href: (a: ListArticle) => string;
 }) {
   return (
-    <div className="space-y-5">
-      <button
-        type="button"
-        onClick={onBack}
-        className="inline-flex items-center gap-1.5 text-[13px] font-medium text-ink-3 hover:text-ink transition-colors group cursor-pointer"
-      >
-        <ArrowLeft className="w-3.5 h-3.5 transition-transform group-hover:-translate-x-0.5" />
-        All collections
-      </button>
-
-      <header className="flex items-start gap-4">
-        <span
-          aria-hidden
-          className="shrink-0 w-12 h-12 rounded-xl grid place-items-center text-[22px] bg-surface-2 border border-line"
+    <div className="space-y-4 animate-in fade-in">
+      {/* Clean Top Bar: Back button and count badge (NO duplicate section header card) */}
+      <div className="flex items-center justify-between pb-1">
+        <button
+          type="button"
+          onClick={onBack}
+          className="inline-flex items-center gap-2 text-[13.5px] font-semibold text-accent hover:underline cursor-pointer group"
         >
-          {collection.icon}
-        </span>
-        <div className="min-w-0">
-          <h2 className="text-[22px] sm:text-[25px] font-semibold tracking-tight text-ink">
-            {collection.name}
-          </h2>
-          {collection.description && (
-            <p className="mt-1 text-[14px] text-ink-2 leading-relaxed">
-              {collection.description}
-            </p>
-          )}
-          <p className="mt-1.5 text-[12.5px] text-ink-3">
+          <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+          <span>All collections</span>
+        </button>
+        {collection.articles.length > 0 && (
+          <span className="text-[12.5px] text-ink-3 font-medium">
             {collection.articles.length}{' '}
             {collection.articles.length === 1 ? 'article' : 'articles'}
-          </p>
-        </div>
-      </header>
+          </span>
+        )}
+      </div>
 
+      {/* Articles inside collection */}
       <ul className="rounded-2xl border border-line bg-surface divide-y divide-line/70 overflow-hidden">
         {collection.articles.map((a) => (
           <li key={a.id}>
@@ -572,27 +890,28 @@ function CollectionView({
                 e.preventDefault();
                 onSelect(a);
               }}
-              className="group flex items-center gap-4 p-4 sm:px-5 hover:bg-surface-2/60 transition-colors"
+              className="group flex items-center justify-between gap-4 p-4 sm:p-5 hover:bg-surface-2/60 transition-colors"
             >
               <div className="min-w-0 flex-1">
-                <h3 className="text-[14.5px] font-medium text-ink truncate">
+                <h3 className="text-[15px] sm:text-[15.5px] font-medium text-ink group-hover:text-accent transition-colors">
                   {a.title}
                 </h3>
                 {a.summary && (
-                  <p className="mt-0.5 text-[13px] text-ink-3 line-clamp-1">
+                  <p className="mt-1 text-[13px] text-ink-3 line-clamp-2 leading-relaxed">
                     {a.summary}
                   </p>
                 )}
-                {formatDate(a.updated_at || a.created_at) && (
-                  <p className="mt-1 text-[11.5px] text-ink-3/80">
-                    Updated {formatDate(a.updated_at || a.created_at)}
-                  </p>
-                )}
               </div>
-              <ChevronRight className="w-4 h-4 text-ink-3 shrink-0 transition-transform group-hover:translate-x-0.5" />
+              <ChevronRight className="w-4 h-4 text-ink-3 shrink-0 group-hover:text-accent group-hover:translate-x-0.5 transition-all" />
             </a>
           </li>
         ))}
+
+        {collection.articles.length === 0 && (
+          <li className="p-12 text-center text-ink-3 text-[13.5px]">
+            No published articles in this collection yet.
+          </li>
+        )}
       </ul>
     </div>
   );

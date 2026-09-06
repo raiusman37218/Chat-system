@@ -295,6 +295,7 @@ export interface PublicWorkspace {
   help_center_logo_url: string | null;
   help_center_header_links: Array<{ label: string; url: string; target?: string }>;
   help_center_footer_text: string | null;
+  help_center_layout?: 'grid-2' | 'grid-3' | 'grid-4' | 'list' | null;
   navbar_trigger_config?: NavbarTriggerConfig | null;
   created_at: string;
 }
@@ -325,6 +326,7 @@ export interface Workspace {
   help_center_logo_url?: string | null;
   help_center_header_links?: Array<{ label: string; url: string; target?: string }> | null;
   help_center_footer_text?: string | null;
+  help_center_layout?: 'grid-2' | 'grid-3' | 'grid-4' | 'list' | null;
   navbar_trigger_config?: NavbarTriggerConfig | null;
   created_at: string;
 }

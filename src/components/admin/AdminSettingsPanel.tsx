@@ -29,6 +29,10 @@ import {
   XCircle,
   BookOpen,
   Link as LinkIcon,
+  LayoutGrid,
+  Grid3X3,
+  Columns4,
+  Rows3,
 } from 'lucide-react';
 import {
   Workspace,
@@ -218,6 +222,9 @@ export function AdminSettingsPanel({
       : []
   );
   const [helpCenterFooterText, setHelpCenterFooterText] = useState(workspace.help_center_footer_text || '');
+  const [helpCenterLayout, setHelpCenterLayout] = useState<'grid-2' | 'grid-3' | 'grid-4' | 'list'>(
+    (workspace as any).help_center_layout || 'grid-2'
+  );
   const [savingHelpCenter, setSavingHelpCenter] = useState(false);
   const [newLinkLabel, setNewLinkLabel] = useState('');
   const [newLinkUrl, setNewLinkUrl] = useState('');
@@ -232,6 +239,7 @@ export function AdminSettingsPanel({
         help_center_logo_url: helpCenterLogoUrl.trim() || null,
         help_center_header_links: helpCenterHeaderLinks,
         help_center_footer_text: helpCenterFooterText.trim() || null,
+        help_center_layout: helpCenterLayout,
       });
 
       if (res.workspace) {
@@ -1238,6 +1246,75 @@ export function AdminSettingsPanel({
                         className="input text-xs"
                       />
                     </div>
+                  </div>
+                </div>
+
+                {/* Collections Layout Variation (Intercom-style) */}
+                <div>
+                  <label className="field-label">Default Section Layout (Intercom Style)</label>
+                  <p className="text-[11.5px] text-ink-3 mb-2.5">
+                    Choose how collections and sections are displayed on your public Help Center.
+                  </p>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                    {[
+                      {
+                        id: 'list',
+                        label: 'Row-wise',
+                        desc: 'Full-width stacked rows (1 per row)',
+                        icon: Rows3,
+                      },
+                      {
+                        id: 'grid-2',
+                        label: '2 Columns',
+                        desc: 'Spacious 2 in a line cards',
+                        icon: LayoutGrid,
+                      },
+                      {
+                        id: 'grid-3',
+                        label: '3 Columns',
+                        desc: 'Classic 3 in a line grid',
+                        icon: Grid3X3,
+                      },
+                      {
+                        id: 'grid-4',
+                        label: '4 Columns',
+                        desc: 'Compact 4 in a line grid',
+                        icon: Columns4,
+                      },
+                    ].map((opt) => {
+                      const Icon = opt.icon;
+                      const active = helpCenterLayout === opt.id;
+                      return (
+                        <button
+                          key={opt.id}
+                          type="button"
+                          onClick={() => setHelpCenterLayout(opt.id as any)}
+                          className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                            active
+                              ? 'border-accent bg-accent/5 ring-2 ring-accent/20'
+                              : 'border-line bg-surface hover:border-ink-3/30'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2 mb-1.5">
+                            <div
+                              className={`w-7 h-7 rounded-lg grid place-items-center ${
+                                active
+                                  ? 'bg-accent text-white'
+                                  : 'bg-surface-2 text-ink-2'
+                              }`}
+                            >
+                              <Icon className="w-4 h-4" />
+                            </div>
+                            <span className="text-[12.5px] font-semibold text-ink">
+                              {opt.label}
+                            </span>
+                          </div>
+                          <p className="text-[10.5px] text-ink-3 leading-tight">
+                            {opt.desc}
+                          </p>
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
 

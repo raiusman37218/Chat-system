@@ -366,6 +366,7 @@ export async function updateHelpCenterBrandingAction(
     help_center_logo_url?: string | null;
     help_center_header_links?: Array<{ label: string; url: string; target?: string }>;
     help_center_footer_text?: string | null;
+    help_center_layout?: 'grid-2' | 'grid-3' | 'grid-4' | 'list' | null;
   }
 ) {
   await assertAdminUser(workspaceId);
@@ -386,6 +387,9 @@ export async function updateHelpCenterBrandingAction(
   }
   if (data.help_center_footer_text !== undefined) {
     updatePayload.help_center_footer_text = data.help_center_footer_text ? data.help_center_footer_text.trim() : null;
+  }
+  if (data.help_center_layout !== undefined) {
+    updatePayload.help_center_layout = data.help_center_layout || 'grid-2';
   }
 
   const { data: updated, error } = await supabase

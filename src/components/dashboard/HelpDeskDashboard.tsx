@@ -53,6 +53,7 @@ import {
   LayoutTemplate,
   Info,
   Keyboard,
+  Upload,
 } from 'lucide-react';
 import { Agent, Article, HelpSection, Workspace } from '@/types/database';
 import { EmojiPickerPopover } from '@/components/dashboard/EmojiPickerPopover';
@@ -2234,6 +2235,58 @@ interface SectionsManagerModalProps {
   onSectionsChanged: () => void;
 }
 
+function SectionIconPreview({
+  icon,
+  className = 'w-9 h-9 rounded-xl',
+  imgClassName = 'w-6 h-6',
+}: {
+  icon?: string | null;
+  className?: string;
+  imgClassName?: string;
+}) {
+  const isImg =
+    icon &&
+    (icon.startsWith('http://') ||
+      icon.startsWith('https://') ||
+      icon.startsWith('/') ||
+      icon.startsWith('data:image/'));
+
+  return (
+    <span
+      className={`grid place-items-center bg-surface-2 border border-line overflow-hidden shrink-0 select-none ${className}`}
+    >
+      {isImg ? (
+        <img
+          src={icon}
+          alt=""
+          className={`object-contain ${imgClassName}`}
+        />
+      ) : (
+        <span className="text-[18px] leading-none">{icon?.trim() || '📚'}</span>
+      )}
+    </span>
+  );
+}
+
+const SECTION_ICON_GROUPS = [
+  {
+    name: 'Trading & Finance',
+    icons: ['📈', '💳', '💵', '📊', '🪙', '📉', '🏦', '💹'],
+  },
+  {
+    name: 'Security & Rules',
+    icons: ['🛡️', '🔒', '⚖️', '🔑', '📜', '🔏', '🪪', '⚠️'],
+  },
+  {
+    name: 'Tech & Platform',
+    icons: ['🚀', '⚡', '⚙️', '💡', '📱', '🌐', '💻', '🔧'],
+  },
+  {
+    name: 'General & Support',
+    icons: ['📚', '📄', '📁', '💬', '❓', '🎯', '👤', '🎧'],
+  },
+];
+
 function SectionsManagerModal({
   workspaceId,
   sections,
@@ -2246,6 +2299,8 @@ function SectionsManagerModal({
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [icon, setIcon] = useState('📚');
+  const [iconTab, setIconTab] = useState<'presets' | 'custom'>('presets');
+  const [uploadingIcon, setUploadingIcon] = useState(false);
   const [orderIndex, setOrderIndex] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -2257,6 +2312,11 @@ function SectionsManagerModal({
     setDescription(sec.description || '');
     setIcon(sec.icon || '📚');
     setOrderIndex(sec.order_index ?? 0);
+    if (sec.icon && (sec.icon.startsWith('http') || sec.icon.startsWith('/'))) {
+      setIconTab('custom');
+    } else {
+      setIconTab('presets');
+    }
   };
 
   const handleResetForm = () => {
@@ -2264,7 +2324,30 @@ function SectionsManagerModal({
     setName('');
     setDescription('');
     setIcon('📚');
+    setIconTab('presets');
     setOrderIndex(sectionList.length + 1);
+  };
+
+  const handleUploadIcon = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingIcon(true);
+    try {
+      const uploadData = new FormData();
+      uploadData.append('file', file);
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        body: uploadData,
+      });
+      const data = await res.json();
+      if (data.url) {
+        setIcon(data.url);
+      }
+    } catch {
+      setErrorMsg('Failed to upload icon image');
+    } finally {
+      setUploadingIcon(false);
+    }
   };
 
   const handleSaveSection = async (e: React.FormEvent) => {
@@ -2325,18 +2408,18 @@ function SectionsManagerModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in">
-      <div className="bg-surface border border-line rounded-2xl shadow-2xl max-w-xl w-full max-h-[85vh] flex flex-col overflow-hidden">
+      <div className="bg-surface border border-line rounded-2xl shadow-2xl max-w-xl w-full max-h-[88vh] flex flex-col overflow-hidden">
         {/* Header */}
         <div className="px-6 py-4 border-b border-line flex items-center justify-between bg-surface-2/50">
           <div>
             <h2 className="text-[16px] font-bold text-ink">Manage Help Sections</h2>
             <p className="text-[11.5px] text-ink-3">
-              Categories help organize your guides for visitors &amp; AI answers.
+              Categories &amp; custom section icons/logos for your Help Center.
             </p>
           </div>
           <button
             onClick={onClose}
-            className="w-8 h-8 rounded-lg hover:bg-surface-3 flex items-center justify-center text-ink-3 hover:text-ink transition-colors"
+            className="w-8 h-8 rounded-lg hover:bg-surface-3 flex items-center justify-center text-ink-3 hover:text-ink transition-colors cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
@@ -2345,7 +2428,7 @@ function SectionsManagerModal({
         {/* Content */}
         <div className="p-6 overflow-y-auto flex-1 space-y-6">
           {/* Create / Edit Form */}
-          <form onSubmit={handleSaveSection} className="p-4 rounded-xl border border-line bg-surface-2/60 space-y-3">
+          <form onSubmit={handleSaveSection} className="p-4 rounded-xl border border-line bg-surface-2/60 space-y-3.5">
             <div className="flex items-center justify-between">
               <span className="text-[12.5px] font-bold text-ink">
                 {editingSec ? `Edit Section: ${editingSec.name}` : 'Add New Section'}
@@ -2354,7 +2437,7 @@ function SectionsManagerModal({
                 <button
                   type="button"
                   onClick={handleResetForm}
-                  className="text-[11px] text-accent hover:underline"
+                  className="text-[11px] text-accent hover:underline cursor-pointer"
                 >
                   Cancel Edit
                 </button>
@@ -2365,77 +2448,170 @@ function SectionsManagerModal({
               <p className="text-[11.5px] text-rose-500 font-medium">{errorMsg}</p>
             )}
 
-            <div className="grid grid-cols-4 gap-2">
-              <div className="col-span-1 space-y-1">
-                <label className="text-[11px] font-semibold text-ink-2">Icon / Emoji</label>
-                <div className="flex items-center gap-1.5 relative">
-                  <input
-                    type="text"
-                    value={icon}
-                    onChange={(e) => setIcon(e.target.value)}
-                    className="w-full h-8 px-2 text-center text-[16px] rounded-lg border border-line bg-surface focus:outline-none focus:border-accent"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowSectionEmojiPicker((prev) => !prev)}
-                    className="h-8 px-2 rounded-lg border border-line bg-surface hover:bg-surface-2 text-ink text-[12px] shrink-0"
-                    title="Choose from emoji collection"
-                  >
-                    😊
-                  </button>
-                  {showSectionEmojiPicker && (
-                    <div className="absolute left-0 top-9 z-50">
-                      <EmojiPickerPopover
-                        onSelect={(em) => setIcon(em)}
-                        onClose={() => setShowSectionEmojiPicker(false)}
-                      />
-                    </div>
-                  )}
+            {/* Live Section Preview Card */}
+            <div className="p-3 rounded-xl border border-line bg-surface flex items-center gap-3">
+              <SectionIconPreview
+                icon={icon}
+                className="w-11 h-11 rounded-xl text-[20px]"
+                imgClassName="w-7 h-7"
+              />
+              <div className="min-w-0 flex-1">
+                <div className="text-[14px] font-bold text-ink truncate">
+                  {name.trim() || 'Section Title Preview'}
+                </div>
+                <div className="text-[11.5px] text-ink-3 truncate">
+                  {description.trim() || 'Short description preview will appear here'}
                 </div>
               </div>
+              <span className="text-[10.5px] font-medium px-2 py-0.5 rounded bg-surface-2 border border-line text-ink-3">
+                Live Preview
+              </span>
+            </div>
 
-              <div className="col-span-3 space-y-1">
+            {/* Section Name & Description */}
+            <div className="space-y-2">
+              <div>
                 <label className="text-[11px] font-semibold text-ink-2">Section Name</label>
                 <input
                   type="text"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder="e.g. Account & Billing"
+                  placeholder="e.g. Account Types, Withdrawals, Risk Limits"
+                  className="w-full h-8 px-3 rounded-lg border border-line bg-surface text-[12.5px] text-ink focus:outline-none focus:border-accent"
+                />
+              </div>
+
+              <div>
+                <label className="text-[11px] font-semibold text-ink-2">Short Description</label>
+                <input
+                  type="text"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="e.g. Learn about live accounts, funded steps, and payout rules"
                   className="w-full h-8 px-3 rounded-lg border border-line bg-surface text-[12.5px] text-ink focus:outline-none focus:border-accent"
                 />
               </div>
             </div>
 
-            {/* Quick Emoji Presets */}
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <span className="text-[10.5px] text-ink-3">Quick Icons:</span>
-              {COMMON_EMOJIS.map((em) => (
-                <button
-                  key={em}
-                  type="button"
-                  onClick={() => setIcon(em)}
-                  className="w-6 h-6 rounded hover:bg-surface-3 flex items-center justify-center text-[13px] transition-colors"
-                >
-                  {em}
-                </button>
-              ))}
-            </div>
+            {/* Section Icon / Logo Picker Tabs */}
+            <div className="space-y-2 pt-1">
+              <div className="flex items-center justify-between">
+                <label className="text-[11px] font-semibold text-ink-2">Section Icon / Logo</label>
+                <div className="flex items-center gap-1 p-0.5 rounded-lg bg-surface border border-line text-[11px]">
+                  <button
+                    type="button"
+                    onClick={() => setIconTab('presets')}
+                    className={`px-2 py-0.5 rounded font-medium transition-all ${
+                      iconTab === 'presets'
+                        ? 'bg-accent text-white shadow-xs'
+                        : 'text-ink-3 hover:text-ink'
+                    }`}
+                  >
+                    Icon Presets
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIconTab('custom')}
+                    className={`px-2 py-0.5 rounded font-medium transition-all ${
+                      iconTab === 'custom'
+                        ? 'bg-accent text-white shadow-xs'
+                        : 'text-ink-3 hover:text-ink'
+                    }`}
+                  >
+                    Custom Logo / URL
+                  </button>
+                </div>
+              </div>
 
-            <div className="space-y-1">
-              <label className="text-[11px] font-semibold text-ink-2">Short Description</label>
-              <input
-                type="text"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="e.g. Invoices, subscriptions, and payment methods"
-                className="w-full h-8 px-3 rounded-lg border border-line bg-surface text-[12.5px] text-ink focus:outline-none focus:border-accent"
-              />
+              {iconTab === 'presets' ? (
+                <div className="p-2.5 rounded-xl border border-line bg-surface space-y-2">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={icon}
+                      onChange={(e) => setIcon(e.target.value)}
+                      className="w-16 h-8 px-2 text-center text-[17px] rounded-lg border border-line bg-surface-2 focus:outline-none focus:border-accent"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowSectionEmojiPicker((prev) => !prev)}
+                      className="h-8 px-2.5 rounded-lg border border-line bg-surface hover:bg-surface-2 text-ink text-[11.5px] shrink-0 font-medium inline-flex items-center gap-1 cursor-pointer"
+                    >
+                      <span>😊</span>
+                      <span>More Emojis</span>
+                    </button>
+                    {showSectionEmojiPicker && (
+                      <div className="absolute left-10 z-50">
+                        <EmojiPickerPopover
+                          onSelect={(em) => {
+                            setIcon(em);
+                            setShowSectionEmojiPicker(false);
+                          }}
+                          onClose={() => setShowSectionEmojiPicker(false)}
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Categorized Icon Presets */}
+                  <div className="space-y-1.5 pt-1">
+                    {SECTION_ICON_GROUPS.map((grp) => (
+                      <div key={grp.name} className="flex items-center gap-1.5 flex-wrap">
+                        <span className="text-[10px] text-ink-3 w-28 shrink-0 font-medium">
+                          {grp.name}:
+                        </span>
+                        {grp.icons.map((em) => (
+                          <button
+                            key={em}
+                            type="button"
+                            onClick={() => setIcon(em)}
+                            className={`w-6 h-6 rounded flex items-center justify-center text-[13px] transition-all cursor-pointer ${
+                              icon === em ? 'bg-accent text-white scale-110' : 'hover:bg-surface-2'
+                            }`}
+                          >
+                            {em}
+                          </button>
+                        ))}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                /* Custom Logo / Image URL or Upload */
+                <div className="p-3 rounded-xl border border-line bg-surface space-y-2.5">
+                  <div className="flex items-center gap-2">
+                    <label className="h-8 px-3 rounded-lg border border-line bg-surface hover:bg-surface-2 text-ink text-[11.5px] font-medium inline-flex items-center gap-1.5 cursor-pointer shrink-0">
+                      <Upload className="w-3.5 h-3.5" />
+                      <span>{uploadingIcon ? 'Uploading…' : 'Upload Section Logo'}</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        disabled={uploadingIcon}
+                        onChange={handleUploadIcon}
+                        className="hidden"
+                      />
+                    </label>
+                    <span className="text-[11px] text-ink-3">or paste image link:</span>
+                  </div>
+
+                  <input
+                    type="url"
+                    value={icon.startsWith('http') || icon.startsWith('/') ? icon : ''}
+                    onChange={(e) => setIcon(e.target.value)}
+                    placeholder="https://example.com/section-icon.png"
+                    className="w-full h-8 px-3 rounded-lg border border-line bg-surface text-[11.5px] text-ink focus:outline-none focus:border-accent"
+                  />
+                  <p className="text-[10.5px] text-ink-3">
+                    Supports SVG, PNG, WebP, JPG. Displays directly on the section card in your Help Center.
+                  </p>
+                </div>
+              )}
             </div>
 
             <button
               type="submit"
-              disabled={submitting}
-              className="h-8 px-4 rounded-lg bg-accent text-accent-ink text-[12px] font-semibold transition-all shadow-xs disabled:opacity-50"
+              disabled={submitting || uploadingIcon}
+              className="w-full h-8 px-4 rounded-lg bg-accent text-accent-ink text-[12px] font-semibold transition-all shadow-xs disabled:opacity-50 cursor-pointer"
             >
               {submitting ? 'Saving...' : editingSec ? 'Update Section' : '+ Add Section'}
             </button>
@@ -2457,7 +2633,11 @@ function SectionsManagerModal({
                     className="p-3 flex items-center justify-between gap-3 hover:bg-surface-2/50 transition-colors"
                   >
                     <div className="flex items-center gap-2.5 min-w-0">
-                      <span className="text-[18px]">{sec.icon || '📚'}</span>
+                      <SectionIconPreview
+                        icon={sec.icon}
+                        className="w-8 h-8 rounded-lg text-[16px]"
+                        imgClassName="w-5 h-5"
+                      />
                       <div className="min-w-0">
                         <div className="text-[13px] font-semibold text-ink truncate">{sec.name}</div>
                         {sec.description && (
@@ -2469,7 +2649,7 @@ function SectionsManagerModal({
                     <div className="flex items-center gap-1.5 shrink-0">
                       <button
                         onClick={() => handleStartEdit(sec)}
-                        className="h-7 w-7 rounded hover:bg-surface-2 flex items-center justify-center text-ink-2 hover:text-ink transition-colors"
+                        className="h-7 w-7 rounded hover:bg-surface-2 flex items-center justify-center text-ink-2 hover:text-ink transition-colors cursor-pointer"
                         title="Edit section"
                       >
                         <Edit2 className="w-3 h-3" />
@@ -2477,7 +2657,7 @@ function SectionsManagerModal({
 
                       <button
                         onClick={() => handleDeleteSection(sec.id, sec.name)}
-                        className="h-7 w-7 rounded hover:bg-rose-500/10 flex items-center justify-center text-ink-3 hover:text-rose-500 transition-colors"
+                        className="h-7 w-7 rounded hover:bg-rose-500/10 flex items-center justify-center text-ink-3 hover:text-rose-500 transition-colors cursor-pointer"
                         title="Delete section"
                       >
                         <Trash2 className="w-3 h-3" />
@@ -2494,7 +2674,7 @@ function SectionsManagerModal({
         <div className="px-6 py-3.5 border-t border-line flex items-center justify-end bg-surface-2/40">
           <button
             onClick={onClose}
-            className="h-8 px-4 rounded-lg bg-surface border border-line text-ink text-[12px] font-medium hover:bg-surface-2 transition-colors"
+            className="h-8 px-4 rounded-lg bg-surface border border-line text-ink text-[12px] font-medium hover:bg-surface-2 transition-colors cursor-pointer"
           >
             Done
           </button>
