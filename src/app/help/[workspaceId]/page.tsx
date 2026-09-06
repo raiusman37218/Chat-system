@@ -439,38 +439,28 @@ export default function PublicHelpCenterPage() {
           </div>
         ) : activeSectionId ? (
           /* CASE B: SINGLE COLLECTION VIEW (Articles inside clicked collection) */
-          <div className="space-y-6 animate-in fade-in">
-            <button
-              type="button"
-              onClick={() => setActiveSectionId(null)}
-              className="inline-flex items-center gap-2 text-[13.5px] font-semibold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer group"
-            >
-              <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
-              <span>All Collections</span>
-            </button>
-
+          <div className="space-y-4 animate-in fade-in">
             {(() => {
               const sec = sections.find((s) => s.id === activeSectionId);
               const secArticles = articlesBySection[activeSectionId] || [];
 
               return (
-                <div className="space-y-5">
-                  {/* Collection Banner */}
-                  <div className="p-6 rounded-2xl border border-zinc-200 dark:border-zinc-800/80 bg-white dark:bg-[#121216] flex items-start gap-4 sm:gap-5 shadow-xs">
-                    <ModernFolderIcon className="w-13 h-13" />
-                    <div>
-                      <h2 className="text-[20px] sm:text-[23px] font-bold text-zinc-900 dark:text-white">
-                        {sec?.name || 'Collection'}
-                      </h2>
-                      {sec?.description && (
-                        <p className="text-[14px] text-zinc-600 dark:text-zinc-400 mt-1 leading-relaxed">
-                          {sec.description}
-                        </p>
-                      )}
-                      <div className="text-[12px] font-medium text-zinc-400 dark:text-zinc-500 mt-2">
-                        {secArticles.length} {secArticles.length === 1 ? 'article' : 'articles'} in this collection
-                      </div>
-                    </div>
+                <div className="space-y-4">
+                  {/* Top Bar with All Collections button & article count */}
+                  <div className="flex items-center justify-between pb-1">
+                    <button
+                      type="button"
+                      onClick={() => setActiveSectionId(null)}
+                      className="inline-flex items-center gap-2 text-[13.5px] font-semibold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer group"
+                    >
+                      <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+                      <span>All Collections</span>
+                    </button>
+                    {secArticles.length > 0 && (
+                      <span className="text-[12.5px] text-zinc-500 dark:text-zinc-400 font-medium">
+                        {secArticles.length} {secArticles.length === 1 ? 'article' : 'articles'}
+                      </span>
+                    )}
                   </div>
 
                   {/* Articles List */}
