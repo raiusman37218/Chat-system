@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { providerConfigFrom } from '@/lib/ai/help-answer';
 import { createClient } from '@supabase/supabase-js';
 import { generateSuggestedReplies } from '@/lib/ai/anthropic';
 
@@ -45,7 +46,7 @@ export async function POST(req: NextRequest) {
       incomingMessage: lastVisitorMsg?.content || 'Hello, I have a question.',
       conversationHistory: msgList,
       visitorName: conv?.visitor?.name || 'Customer',
-      apiKey: aiSettings?.anthropic_api_key,
+      providerConfig: providerConfigFrom(aiSettings),
     });
 
     return NextResponse.json({ suggestions });

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { providerConfigFrom } from '@/lib/ai/help-answer';
 import { createClient } from '@supabase/supabase-js';
 import {
   analyzeVisitorSentiment,
@@ -46,7 +47,7 @@ export async function POST(req: NextRequest) {
     }
 
     const msgList = messages || [];
-    const apiKey = aiSettings?.anthropic_api_key;
+    const providerConfig = providerConfigFrom(aiSettings);
     const updates: Record<string, any> = {};
 
     let sentiment = conv.sentiment || 'neutral';
@@ -57,7 +58,7 @@ export async function POST(req: NextRequest) {
     if (!aiSettings || aiSettings.sentiment_enabled) {
       sentiment = await analyzeVisitorSentiment({
         messages: msgList,
-        apiKey,
+        providerConfig,
       });
       updates.sentiment = sentiment;
     }
@@ -70,7 +71,7 @@ export async function POST(req: NextRequest) {
         tags = await generateAutoTags({
           content: allVisitorText,
           existingTags: conv.tags || [],
-          apiKey,
+          providerConfig,
         });
         if (apply_tags) {
           updates.tags = tags;
@@ -83,7 +84,7 @@ export async function POST(req: NextRequest) {
       summary = await generateConversationSummary({
         messages: msgList,
         visitorName: conv.visitor?.name,
-        apiKey,
+        providerConfig,
       });
       updates.summary = summary;
     }

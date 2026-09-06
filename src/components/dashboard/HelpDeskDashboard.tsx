@@ -54,6 +54,7 @@ import {
   Info,
   Keyboard,
   Upload,
+  MoreHorizontal,
 } from 'lucide-react';
 import { Agent, Article, HelpSection, Workspace } from '@/types/database';
 import { EmojiPickerPopover } from '@/components/dashboard/EmojiPickerPopover';
@@ -73,6 +74,8 @@ import {
   getArticleAction,
 } from '@/app/actions/helpdesk';
 import { Avatar } from '@/components/ui/Avatar';
+import { KnowledgePanel } from '@/components/dashboard/KnowledgePanel';
+import { Menu } from '@/components/ui/Menu';
 import { cn } from '@/lib/utils';
 
 interface HelpDeskDashboardProps {
@@ -113,6 +116,16 @@ export function HelpDeskDashboard({
 
   // Status feedback toast
   const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+  /**
+   * Public articles, or the internal side of the same job.
+   *
+   * Team knowledge and unanswered questions belong beside the articles rather
+   * than in Settings: they are the same work — deciding what the help centre
+   * says — just the parts that are private or not written yet.
+   */
+  const [view, setView] = useState<'articles' | 'internal'>('articles');
+  /** Bumped by the header button to ask the knowledge panel to open its editor. */
+  const [newNoteRequest, setNewNoteRequest] = useState(0);
 
   const showToast = (text: string, type: 'success' | 'error' = 'success') => {
     setToastMessage({ text, type });
@@ -302,60 +315,59 @@ export function HelpDeskDashboard({
             Help Center
           </h1>
           <p className="text-[12.5px] text-ink-3 mt-0.5">
-            Write once, and let customers answer their own questions.
+            {view === 'articles'
+              ? 'Write once, and let customers answer their own questions.'
+              : 'What your team knows but customers should not read — and what nobody has written yet.'}
           </p>
         </div>
 
-        <div className="flex items-center gap-2.5">
-          <button
-            onClick={handleCopyPublicHelpCenterLink}
-            className="h-9 px-3 rounded-lg border border-line bg-surface-2 hover:bg-surface hover:border-ink-3/40 text-ink text-[12px] font-medium flex items-center gap-1.5 transition-all shadow-xs"
-            title="Copy Public Help Center URL"
-          >
-            <Link2 className="w-3.5 h-3.5 text-accent" />
-            <span>Copy URL</span>
-          </button>
+        {/* One primary action, everything else behind the overflow.
+            Five equal-weight buttons wrapped their own labels onto three lines
+            at 1100px, none of them read as the main thing to do, and "Copy URL"
+            was duplicated by the address bar directly below. */}
+        <div className="flex items-center gap-2 shrink-0">
+          <Menu
+            value={'' as string}
+            align="end"
+            label="More Help Center actions"
+            options={[
+              { value: 'open', label: 'Open public help center' },
+              { value: 'copy', label: 'Copy public link' },
+              { value: 'sections', label: 'Manage sections' },
+              {
+                value: 'tab',
+                label: `Widget tab: ${workspaceState?.help_center_tab_label || 'Help'}`,
+              },
+            ]}
+            onChange={(v) => {
+              if (v === 'open') handleOpenPublicHelpCenter();
+              else if (v === 'copy') handleCopyPublicHelpCenterLink();
+              else if (v === 'sections') {
+                setEditingSection(null);
+                setIsSectionModalOpen(true);
+              } else if (v === 'tab') setIsTabSettingsModalOpen(true);
+            }}
+            trigger={() => (
+              <span className="h-9 w-9 grid place-items-center rounded-lg border border-line bg-surface-2 text-ink-2 hover:text-ink hover:bg-surface transition-colors">
+                <MoreHorizontal className="w-4 h-4" />
+              </span>
+            )}
+          />
 
-          <button
-            onClick={handleOpenPublicHelpCenter}
-            className="h-9 px-3.5 rounded-lg border border-line bg-surface-2 hover:bg-surface hover:border-ink-3/40 text-ink text-[12.5px] font-medium flex items-center gap-1.5 transition-all shadow-xs"
-            title="Open hosted public help center"
-          >
-            <ExternalLink className="w-3.5 h-3.5 text-ink-3" />
-            <span>View Public Help Center</span>
-          </button>
-
+          {/* The primary action follows the view, so it is never the wrong one. */}
           <button
             onClick={() => {
-              setEditingSection(null);
-              setIsSectionModalOpen(true);
+              if (view === 'internal') {
+                setNewNoteRequest(Date.now());
+              } else {
+                setEditingArticle(null);
+                setIsArticleModalOpen(true);
+              }
             }}
-            className="h-9 px-3.5 rounded-lg border border-line bg-surface-2 hover:bg-surface hover:border-ink-3/40 text-ink text-[12.5px] font-medium flex items-center gap-1.5 transition-all shadow-xs"
-          >
-            <Layers className="w-3.5 h-3.5 text-accent" />
-            <span>Manage Sections</span>
-          </button>
-
-          <button
-            onClick={() => setIsTabSettingsModalOpen(true)}
-            className="h-9 px-3.5 rounded-lg border border-line bg-surface-2 hover:bg-surface hover:border-ink-3/40 text-ink text-[12.5px] font-medium flex items-center gap-1.5 transition-all shadow-xs"
-            title="Rename and customize the Help tab on your website widget"
-          >
-            <Settings className="w-3.5 h-3.5 text-accent" />
-            <span>
-              Widget Tab: <strong className="text-accent font-semibold">{workspaceState?.help_center_tab_label || 'Help'}</strong>
-            </span>
-          </button>
-
-          <button
-            onClick={() => {
-              setEditingArticle(null);
-              setIsArticleModalOpen(true);
-            }}
-            className="h-9 px-4 rounded-lg bg-accent text-accent-ink hover:opacity-90 text-[13px] font-semibold flex items-center gap-1.5 transition-all shadow-sm"
+            className="h-9 px-4 rounded-lg bg-accent text-accent-ink hover:opacity-90 text-[13px] font-semibold flex items-center gap-1.5 transition-all shadow-sm whitespace-nowrap"
           >
             <Plus className="w-4 h-4" />
-            <span>New Article</span>
+            <span>{view === 'internal' ? 'New note' : 'New article'}</span>
           </button>
         </div>
       </header>
@@ -404,6 +416,44 @@ export function HelpDeskDashboard({
       )}
 
       <main className="p-8 space-y-6 max-w-7xl mx-auto w-full">
+        <div className="inline-flex items-center p-0.5 rounded-lg bg-surface-2 border border-line">
+          {(
+            [
+              ['articles', 'Published articles'],
+              ['internal', 'Team knowledge & gaps'],
+            ] as const
+          ).map(([id, label]) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => setView(id)}
+              className={cn(
+                'h-7 px-3 rounded-md text-[12.5px] font-medium transition-all',
+                view === id
+                  ? 'bg-surface text-ink font-semibold shadow-xs'
+                  : 'text-ink-3 hover:text-ink'
+              )}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {view === 'internal' ? (
+          <KnowledgePanel
+            workspaceId={workspace?.id || ''}
+            newNoteSignal={newNoteRequest}
+            onCreateArticle={(title) => {
+              // Straight from the question a customer actually asked into a
+              // draft, so the gap closes in one step instead of being
+              // copy-pasted into a new article later.
+              setView('articles');
+              setEditingArticle({ title } as Article);
+              setIsArticleModalOpen(true);
+            }}
+          />
+        ) : (
+        <>
         {/* KPI Metrics Cards */}
         <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="p-4 rounded-xl border border-line bg-surface-2/60">
@@ -711,6 +761,8 @@ export function HelpDeskDashboard({
             </div>
           )}
         </section>
+        </>
+        )}
       </main>
 
       {/* ARTICLE EDITOR MODAL */}
@@ -2042,7 +2094,7 @@ Tip:
                     <div className="p-12 text-center text-ink-3 italic text-[13px] border border-dashed border-line rounded-xl space-y-2">
                       <LayoutTemplate className="w-8 h-8 text-ink-3 mx-auto stroke-1" />
                       <p>Nothing to preview yet.</p>
-                      <p className="text-[12px] not-italic text-ink-4">
+                      <p className="text-[12px] not-italic text-ink-3">
                         Pick a blueprint from the top or start typing to see real-time formatting.
                       </p>
                     </div>
@@ -2068,7 +2120,7 @@ Tip:
             <span>•</span>
             <span>~{stats.readMinutes} min read</span>
             <span className="hidden sm:inline">•</span>
-            <span className="hidden sm:inline text-ink-4">Press ⌘/Ctrl+Enter to save</span>
+            <span className="hidden sm:inline text-ink-3">Press ⌘/Ctrl+Enter to save</span>
           </div>
 
           <div className="flex items-center gap-2.5">

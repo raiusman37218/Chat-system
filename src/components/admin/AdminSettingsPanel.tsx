@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { testAiProviderAction } from '@/app/actions/knowledge';
 import {
   Palette,
   Clock,
@@ -537,10 +538,43 @@ export function AdminSettingsPanel({
       auto_tagging_enabled: true,
       summary_enabled: true,
       sentiment_enabled: true,
+      // Any provider, not just one. `api_key` supersedes the old
+      // `anthropic_api_key`, which is still read for workspaces saved before
+      // the picker existed.
+      provider: 'anthropic',
+      api_key: '',
+      base_url: '',
       anthropic_api_key: '',
       model: 'claude-3-5-sonnet-20241022',
     }
   );
+
+  const [testingProvider, setTestingProvider] = useState(false);
+  const [providerTest, setProviderTest] = useState<{
+    ok: boolean;
+    model?: string;
+    error?: string;
+  } | null>(null);
+
+  const handleTestAiProvider = async () => {
+    setTestingProvider(true);
+    setProviderTest(null);
+    try {
+      // Tests what is on screen, including a key typed but not yet saved —
+      // otherwise the owner has to save a possibly-wrong key to find out.
+      const res = await testAiProviderAction(workspace.id, {
+        provider: (aiSettings.provider || 'anthropic') as any,
+        model: aiSettings.model || null,
+        apiKey: aiSettings.api_key || null,
+        baseUrl: aiSettings.base_url || null,
+      });
+      setProviderTest(res);
+    } catch (err: any) {
+      setProviderTest({ ok: false, error: err?.message || 'Test failed' });
+    } finally {
+      setTestingProvider(false);
+    }
+  };
 
   const handleSaveAISettings = async () => {
     setSaving(true);
@@ -767,7 +801,7 @@ export function AdminSettingsPanel({
           { id: 'team', label: 'Team & Roles', icon: Users, badge: agents.length },
           { id: 'canned', label: 'Canned Replies', icon: MessageSquareText, badge: cannedResponses.length },
           { id: 'assignment', label: 'Auto-Assignment', icon: Sliders },
-          { id: 'ai', label: 'Claude AI Assistant', icon: Sparkles },
+          { id: 'ai', label: 'AI assistant', icon: Sparkles },
           { id: 'snippet', label: 'Install Snippet', icon: Code },
         ].map((tab) => {
           const active = activeTab === tab.id;
@@ -2125,7 +2159,7 @@ export function AdminSettingsPanel({
                 <div>
                   <h3 className="text-[16px] font-semibold text-ink flex items-center gap-2">
                     <Sparkles className="w-5 h-5 text-accent" />
-                    Anthropic Claude AI Intelligence Layer
+                    AI assistant
                   </h3>
                   <p className="text-[12.5px] text-ink-3 mt-0.5">
                     Configure AI auto-first-responses, smart suggested replies, auto-tagging, sentiment analysis, and summaries.
@@ -2149,7 +2183,7 @@ export function AdminSettingsPanel({
                   </div>
                   <div>
                     <div className="text-[14px] font-semibold text-ink flex items-center gap-2">
-                      Claude AI Live Support Assistant
+                      AI live support assistant
                       {aiSettings.enabled && (
                         <span className="text-[10.5px] px-2 py-0.5 rounded-full bg-success-soft text-success font-bold">
                           ACTIVE
@@ -2157,7 +2191,7 @@ export function AdminSettingsPanel({
                       )}
                     </div>
                     <p className="text-[12px] text-ink-3">
-                      Master toggle for all Claude AI capabilities across this workspace.
+                      Turns the assistant on for this workspace. With no API key it still answers from your help centre and team notes.
                     </p>
                   </div>
                 </div>
@@ -2219,7 +2253,7 @@ export function AdminSettingsPanel({
                       className="w-full accent-accent cursor-pointer"
                     />
                     <p className="text-[11px] text-ink-3">
-                      If no human agent responds within this duration, Claude checks documentation and answers.
+                      If no human agent responds within this duration, the assistant checks documentation and answers.
                     </p>
                   </div>
                 </div>
@@ -2325,11 +2359,11 @@ export function AdminSettingsPanel({
                 </div>
               </div>
 
-              {/* Anthropic API Key Credentials */}
+              {/* Model provider credentials */}
               <div className="p-5 rounded-2xl border border-line bg-surface-2 space-y-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h4 className="text-[14px] font-semibold text-ink">Anthropic Claude API Credentials</h4>
+                    <h4 className="text-[14px] font-semibold text-ink">Model provider</h4>
                     <p className="text-[12px] text-ink-3">
                       Your API key is used strictly on server-side API routes and is never sent to browser clients.
                     </p>
@@ -2339,31 +2373,119 @@ export function AdminSettingsPanel({
                   </span>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="md:col-span-2 space-y-1.5">
-                    <label className="field-label">Anthropic API Key</label>
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <label className="field-label">Provider</label>
+                      <select
+                        value={aiSettings.provider || 'anthropic'}
+                        onChange={(e) =>
+                          setAiSettings({
+                            ...aiSettings,
+                            provider: e.target.value as AISettingsConfig['provider'],
+                            // The old model name means nothing to a new
+                            // provider; clearing it falls back to that
+                            // provider's default rather than sending a 404.
+                            model: '',
+                          })
+                        }
+                        className="input text-xs"
+                      >
+                        <option value="anthropic">Anthropic (Claude)</option>
+                        <option value="openai">OpenAI</option>
+                        <option value="google">Google (Gemini)</option>
+                        <option value="compatible">Other — OpenAI-compatible URL</option>
+                      </select>
+                      <p className="text-[11px] text-ink-3">
+                        {aiSettings.provider === 'compatible'
+                          ? 'OpenRouter, Groq, Together, DeepSeek, a local Ollama — anything that serves /chat/completions.'
+                          : 'Switch provider any time; your help centre answers stay the same either way.'}
+                      </p>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="field-label">Model</label>
+                      <input
+                        type="text"
+                        value={aiSettings.model || ''}
+                        onChange={(e) => setAiSettings({ ...aiSettings, model: e.target.value })}
+                        placeholder={
+                          aiSettings.provider === 'openai'
+                            ? 'gpt-5'
+                            : aiSettings.provider === 'google'
+                            ? 'gemini-2.5-pro'
+                            : aiSettings.provider === 'compatible'
+                            ? 'provider/model-name'
+                            : 'claude-opus-5'
+                        }
+                        className="input font-mono text-xs"
+                      />
+                      <p className="text-[11px] text-ink-3">
+                        {/* Typed rather than picked from a list: model names
+                            change faster than this page can be redeployed. */}
+                        Leave empty for the provider&apos;s default.
+                      </p>
+                    </div>
+                  </div>
+
+                  {aiSettings.provider === 'compatible' && (
+                    <div className="space-y-1.5">
+                      <label className="field-label">Base URL</label>
+                      <input
+                        type="text"
+                        value={aiSettings.base_url || ''}
+                        onChange={(e) => setAiSettings({ ...aiSettings, base_url: e.target.value })}
+                        placeholder="https://openrouter.ai/api/v1"
+                        className="input font-mono text-xs"
+                      />
+                      <p className="text-[11px] text-ink-3">
+                        Without the trailing <code className="font-mono">/chat/completions</code> — we add it.
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="space-y-1.5">
+                    <label className="field-label">API key</label>
                     <input
                       type="password"
-                      placeholder="sk-ant-api03-••••••••••••••••••••••••"
-                      value={aiSettings.anthropic_api_key || ''}
-                      onChange={(e) => setAiSettings({ ...aiSettings, anthropic_api_key: e.target.value })}
+                      placeholder={
+                        aiSettings.api_key || aiSettings.anthropic_api_key
+                          ? '•••••••••• (saved — type to replace)'
+                          : 'Paste your key'
+                      }
+                      value={aiSettings.api_key || ''}
+                      onChange={(e) => setAiSettings({ ...aiSettings, api_key: e.target.value })}
                       className="input font-mono text-xs"
                     />
                     <p className="text-[11px] text-ink-3">
-                      Leave empty to use the system default or built-in heuristic simulation in development.
+                      Stored server-side and never sent to the browser. Leave blank to keep
+                      the saved key. With no key, answers come from your help centre
+                      articles and team notes — which still works.
                     </p>
                   </div>
 
-                  <div className="space-y-1.5">
-                    <label className="field-label">Claude Model</label>
-                    <select
-                      value={aiSettings.model || 'claude-3-5-sonnet-20241022'}
-                      onChange={(e) => setAiSettings({ ...aiSettings, model: e.target.value })}
-                      className="input text-xs"
+                  <div className="flex items-center gap-3 pt-1">
+                    <button
+                      type="button"
+                      onClick={handleTestAiProvider}
+                      disabled={testingProvider}
+                      className="btn btn-sm btn-secondary gap-1.5"
                     >
-                      <option value="claude-3-5-sonnet-20241022">Claude 3.5 Sonnet (Recommended)</option>
-                      <option value="claude-3-haiku-20240307">Claude 3 Haiku (Fast & Lightweight)</option>
-                    </select>
+                      <Sparkles className="w-3.5 h-3.5" />
+                      {testingProvider ? 'Testing…' : 'Test connection'}
+                    </button>
+                    {providerTest && (
+                      <span
+                        className={cn(
+                          'text-[12px] font-medium',
+                          providerTest.ok ? 'text-success' : 'text-danger'
+                        )}
+                      >
+                        {providerTest.ok
+                          ? `Connected — ${providerTest.model} replied.`
+                          : providerTest.error}
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>
@@ -2766,7 +2888,7 @@ export function AdminSettingsPanel({
                     <div className="space-y-1.5">
                       <label className="field-label flex items-center justify-between">
                         <span>Button Text / Name in Navbar</span>
-                        <span className="text-[11px] text-ink-4">Case-insensitive</span>
+                        <span className="text-[11px] text-ink-3">Case-insensitive</span>
                       </label>
                       <input
                         type="text"

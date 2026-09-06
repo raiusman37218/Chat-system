@@ -6,6 +6,7 @@ import {
   executeHandoverToHuman,
 } from '@/lib/ai/anthropic';
 import { dispatchOutboundMessage } from '@/lib/channels/dispatcher';
+import { providerConfigFrom } from '@/lib/ai/help-answer';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://vfjsaynnubxywdbevxtx.supabase.co';
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZmanNheW5udWJ4eXdkYmV2eHR4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgyNTA5MDEsImV4cCI6MjEwMzgyNjkwMX0.YyBCXMqwrOk5BRhQafYLFw8tiM5PC8lc8Yocodw9wf0';
@@ -135,7 +136,31 @@ export async function POST(req: NextRequest) {
       .map((m) => m.content as string)
       .reverse();
 
+    // Retrieval searches against what the *customer* said. Including the
+    // assistant's own replies would bias the search toward whatever it already
+    // answered, which is the opposite of what a follow-up needs.
     const history = [...burstContext, ...earlier].slice(0, 4);
+
+    // The model, unlike the retriever, does need both sides. Without its own
+    // previous replies it re-greets, repeats an answer it just gave, and
+    // cannot resolve "what about the other one?".
+    const answeredIndex = msgs.indexOf(visitorMsg);
+    const turns = msgs
+      .slice(0, answeredIndex === -1 ? msgs.length : answeredIndex)
+      .filter(
+        (m) =>
+          !m.is_internal &&
+          ['visitor', 'agent', 'ai'].includes(m.sender_type) &&
+          typeof m.content === 'string' &&
+          m.content.trim()
+      )
+      .slice(-10)
+      .map((m) => ({
+        role: (m.sender_type === 'visitor' ? 'user' : 'assistant') as
+          | 'user'
+          | 'assistant',
+        content: m.content as string,
+      }));
 
     // 3. Generate RAG First Response using workspace Help Desk sections and articles
     const result = await generateHelpDeskResponseWithHandover({
@@ -143,8 +168,9 @@ export async function POST(req: NextRequest) {
       conversationId: conversation_id,
       incomingMessage: visitorMsg.content,
       visitorName: conv.visitor?.name,
-      apiKey: aiSettings?.anthropic_api_key,
+      providerConfig: providerConfigFrom(aiSettings),
       history,
+      turns,
       helpCenterUrl: helpCenterUrlFor(workspace),
     });
 

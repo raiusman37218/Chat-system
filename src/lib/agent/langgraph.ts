@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { providerConfigFrom } from '@/lib/ai/help-answer';
 import { dispatchOutboundMessage } from '@/lib/channels/dispatcher';
 import {
   generateAutoFirstResponse,
@@ -168,7 +169,7 @@ export async function triggerLangGraphAgent(params: LangGraphTriggerParams) {
       conversationId,
       incomingMessage,
       visitorName: sender.name || undefined,
-      apiKey: integration?.langgraph_api_key || workspace?.ai_settings?.anthropic_api_key || null,
+      providerConfig: providerConfigFrom(workspace?.ai_settings),
       systemPrompt: integration?.langgraph_system_prompt || null,
     });
 
@@ -252,6 +253,12 @@ export async function generateLangGraphDraft(params: LangGraphTriggerParams): Pr
   const { conversationId, workspaceId, incomingMessage, sender } = params;
 
   try {
+    const { data: workspace } = await supabase
+      .from('workspaces')
+      .select('ai_settings')
+      .eq('id', workspaceId)
+      .maybeSingle();
+
     const { data: integration } = await supabase
       .from('workspace_integrations')
       .select('*')
@@ -265,7 +272,10 @@ export async function generateLangGraphDraft(params: LangGraphTriggerParams): Pr
         conversationId,
         incomingMessage,
         visitorName: sender.name || undefined,
-        apiKey: integration?.langgraph_api_key || null,
+        // The workspace's model provider — not langgraph_api_key, which is
+        // the bearer token for the customer's own agent endpoint and means
+        // nothing to a model API.
+        providerConfig: providerConfigFrom(workspace?.ai_settings),
         systemPrompt: integration?.langgraph_system_prompt || null,
       });
       return draft || `Hi ${sender.name || 'there'}! Thank you for reaching out. How can I assist you with your request today?`;

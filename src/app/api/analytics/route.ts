@@ -179,12 +179,13 @@ export async function GET(req: NextRequest) {
     // Volume comparison
     const totalCurrent = convList.length;
     const totalPrev = prevConvList.length;
+    // null when there is nothing to compare against. Going from zero
+    // conversations to six is not "+100%" — it is the first period with any
+    // data at all, and reporting a percentage there invents a baseline.
     const volumeChangePercent =
       totalPrev > 0
         ? Number((((totalCurrent - totalPrev) / totalPrev) * 100).toFixed(1))
-        : totalCurrent > 0
-        ? 100
-        : 0;
+        : null;
 
     // 3. Status Breakdown
     const statusCounts = {

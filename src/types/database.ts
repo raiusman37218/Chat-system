@@ -218,8 +218,17 @@ export interface AISettingsConfig {
   auto_tagging_enabled: boolean;
   summary_enabled: boolean;
   sentiment_enabled: boolean;
-  anthropic_api_key?: string | null;
+  /** Which model vendor answers. Absent on workspaces saved before the picker. */
+  provider?: 'anthropic' | 'openai' | 'google' | 'compatible';
+  /** Model name as that provider spells it; empty means the provider default. */
   model?: string;
+  /** Key for whichever provider is selected. */
+  api_key?: string | null;
+  /** Only for 'compatible': base URL of an OpenAI-shaped endpoint. */
+  base_url?: string | null;
+  /** Superseded by api_key; still read so older workspaces keep working. */
+  anthropic_api_key?: string | null;
+  system_prompt?: string | null;
 }
 
 export interface HelpSection {

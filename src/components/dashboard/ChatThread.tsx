@@ -1349,13 +1349,13 @@ export function ChatThread({
           </div>
         )}
 
-        {/* Claude AI Suggested Replies */}
+        {/* Suggested replies from the configured model provider */}
         {suggestedReplies.length > 0 && (
           <div className="mb-3 p-2.5 rounded-xl bg-accent-soft/40 border border-accent-line flex flex-col gap-1.5 animate-rise">
             <div className="flex items-center justify-between text-[11px] text-accent font-semibold px-0.5">
               <span className="flex items-center gap-1.5">
                 <Sparkles className="w-3.5 h-3.5" />
-                Claude Suggested Responses (click to insert):
+                Suggested replies (click to insert):
               </span>
               <button
                 type="button"

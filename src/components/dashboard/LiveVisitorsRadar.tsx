@@ -169,8 +169,11 @@ export function LiveVisitorsRadar({
             <EmptyState
               type="no-visitors"
               title="Radar Scanning for Live Visitors"
-              description="Nobody is browsing your site right now. As soon as someone visits, their page URL, location, and device will appear here live."
-              actionLabel="Launch Demo Simulator"
+              description="Nobody is browsing your site right now. As soon as someone visits, their page URL, location, and device appear here live. If you have just installed the widget, open a test page to check it is reporting."
+              // "Demo Simulator" read like it would fabricate visitors. It
+              // opens a real page carrying this workspace's widget, which is
+              // how an owner checks the widget works — worth saying plainly.
+              actionLabel="Open a test page"
               onAction={() => {
                 const targetUrl = workspace?.id
                   ? `/demo.html?workspaceId=${workspace.id}&name=${encodeURIComponent(workspace.name || '')}`

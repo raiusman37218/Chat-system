@@ -459,15 +459,16 @@ export function IntegrationsSettings({
                   />
                 </div>
 
-                {/* Custom API Key */}
+                {/* Bearer token for the customer's own agent endpoint — not a
+                    model provider key. Those live in Settings → AI assistant. */}
                 <div>
                   <label className="field-label flex items-center justify-between">
-                    <span>Anthropic Claude API Key (Optional)</span>
-                    <span className="text-[11px] text-ink-3">Leave blank to use system default / semantic engine</span>
+                    <span>Endpoint auth token (optional)</span>
+                    <span className="text-[11px] text-ink-3">Sent as a Bearer token to your agent URL above</span>
                   </label>
                   <input
                     type="password"
-                    placeholder="sk-ant-api03-..."
+                    placeholder="Token your endpoint expects"
                     value={formData.langgraph_api_key || ''}
                     onChange={(e) => setFormData({ ...formData, langgraph_api_key: e.target.value })}
                     className="input"

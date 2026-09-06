@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import type { ProviderConfig, ProviderId } from './provider';
 import {
   buildIndex,
   search,
@@ -30,7 +31,12 @@ const SUPABASE_KEY =
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
   '';
 
+/** Where a piece of knowledge came from. */
+export type KnowledgeSource = 'article' | 'note';
+
 export interface HelpAnswer {
+  /** Whether the answer came from a published article or an internal note. */
+  source?: KnowledgeSource;
   /** null when the help centre cannot answer — the caller should hand over. */
   text: string | null;
   confidence: Confidence;
@@ -55,7 +61,7 @@ async function loadIndex(workspaceId: string): Promise<HelpIndex> {
   if (cached && Date.now() - cached.builtAt < INDEX_TTL_MS) return cached.index;
 
   const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
-  const [{ data: sections }, { data: articles }] = await Promise.all([
+  const [{ data: sections }, { data: articles }, { data: notes }] = await Promise.all([
     supabase
       .from('help_sections')
       .select('id, name')
@@ -65,6 +71,11 @@ async function loadIndex(workspaceId: string): Promise<HelpIndex> {
       .select('id, title, slug, summary, content, category, section_id')
       .eq('workspace_id', workspaceId)
       .eq('status', 'published'),
+    // Through an RPC, not a table read: knowledge_notes is behind row level
+    // security and this runs on the anonymous key, so a direct select returns
+    // nothing. The function returns only notes marked 'assistant', which makes
+    // the privacy boundary the database's job rather than this file's.
+    supabase.rpc('fn_assistant_notes', { p_workspace_id: workspaceId }),
   ]);
 
   const sectionName = new Map((sections || []).map((s) => [s.id, s.name]));
@@ -72,6 +83,21 @@ async function loadIndex(workspaceId: string): Promise<HelpIndex> {
     ...a,
     sectionName: a.section_id ? sectionName.get(a.section_id) ?? null : null,
   }));
+
+  for (const n of notes || []) {
+    docs.push({
+      // Prefixed so the id cannot collide with an article's and so the source
+      // is obvious wherever the id travels.
+      id: `note:${n.id}`,
+      title: n.title,
+      slug: null,
+      summary: null,
+      content: n.content || '',
+      category: null,
+      section_id: null,
+      sectionName: Array.isArray(n.tags) && n.tags.length ? n.tags.join(' ') : 'Team knowledge',
+    });
+  }
 
   const index = buildIndex(docs);
   indexCache.set(workspaceId, { index, builtAt: Date.now() });
@@ -93,6 +119,8 @@ export function wantsHuman(message: string): boolean {
 export interface AnswerRequest {
   workspaceId: string;
   message: string;
+  /** Recorded against the gap so the owner can read it in context. */
+  conversationId?: string | null;
   /** Earlier visitor turns, most recent first. */
   history?: string[];
   /** Used to open the reply; omitted when unknown. */
@@ -101,9 +129,40 @@ export interface AnswerRequest {
   helpCenterUrl?: string | null;
 }
 
+/**
+ * Logs a question the help centre could not answer.
+ *
+ * Deliberately fire-and-forget and deliberately silent on failure: a customer
+ * waiting on a reply must not wait on analytics, and a broken log must not
+ * break the conversation.
+ */
+export async function recordUnanswered(
+  workspaceId: string,
+  question: string,
+  reason: string,
+  conversationId?: string | null
+): Promise<void> {
+  try {
+    const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+    await supabase.rpc('fn_record_unanswered_question', {
+      p_workspace_id: workspaceId,
+      p_question: question.slice(0, 1000),
+      p_reason: reason,
+      p_conversation_id: conversationId ?? null,
+    });
+  } catch {
+    /* never let bookkeeping affect the reply */
+  }
+}
+
+const recordGap = (req: AnswerRequest, reason: string) =>
+  recordUnanswered(req.workspaceId, req.message, reason, req.conversationId);
+
 export async function answerFromHelpCenter(
   req: AnswerRequest
 ): Promise<HelpAnswer> {
+  // Asking for a person is not a gap in the documentation — logging it would
+  // fill the backlog with "can I talk to someone".
   if (wantsHuman(req.message)) {
     return {
       text: null,
@@ -119,6 +178,11 @@ export async function answerFromHelpCenter(
   const verdict = assess(hits, req.message);
 
   if (verdict.confidence === 'none' || !verdict.hit) {
+    // The questions nothing answers are the articles worth writing next.
+    // Previously the conversation was handed to a person and the question
+    // itself was thrown away, so the same gap was rediscovered every week.
+    void recordGap(req, verdict.reason);
+
     return {
       text: null,
       confidence: 'none',
@@ -150,9 +214,13 @@ export async function answerFromHelpCenter(
     };
   }
 
-  const link = req.helpCenterUrl
-    ? `${req.helpCenterUrl.replace(/\/$/, '')}/${article.slug || article.id}`
-    : null;
+  const isNote = article.id.startsWith('note:');
+
+  // A note lives nowhere a customer can visit, so it never gets a link.
+  const link =
+    !isNote && req.helpCenterUrl
+      ? `${req.helpCenterUrl.replace(/\/$/, '')}/${article.slug || article.id}`
+      : null;
 
   // A confident answer is stated plainly. A partial one says so, because a
   // hedge the customer can see beats a wrong answer they cannot.
@@ -163,15 +231,21 @@ export async function answerFromHelpCenter(
 
   const citation = link
     ? `\n\nFull article: ${article.title} — ${link}`
+    : isNote
+    ? ''
     : `\n\n(From "${article.title}" in our help centre.)`;
 
   return {
     text: `${opening}${passage}${citation}`,
+    source: isNote ? 'note' : 'article',
     confidence: verdict.confidence,
     article: { id: article.id, title: article.title, slug: article.slug },
     reason: verdict.reason,
     alternatives: hits
       .slice(1, 3)
+      // Suggesting "see also: <internal note title>" would leak the existence
+      // and wording of private knowledge.
+      .filter((h) => !h.article.id.startsWith('note:'))
       // Only near-ties are worth offering. At a looser threshold a question
       // about account types was answered with a suggestion about leverage.
       .filter((h) => h.score > verdict.hit!.score * 0.72)
@@ -180,5 +254,83 @@ export async function answerFromHelpCenter(
         title: h.article.title,
         slug: h.article.slug,
       })),
+  };
+}
+
+
+/* ── Context for a language model ─────────────────────────────────────── */
+
+export interface ModelContext {
+  /** The documentation to put in front of the model. Empty when nothing fits. */
+  text: string;
+  /** What went in, for citation and for logging what the answer was based on. */
+  used: { id: string; title: string; source: KnowledgeSource }[];
+}
+
+/**
+ * The passages a model should be given to answer this question.
+ *
+ * Uses the same ranking as the no-API path. The model path used to select its
+ * own context by counting substring hits per word — the ranker that answered
+ * questions about daily drawdown with an article about leverage — so adding an
+ * API key swapped a good retriever for a bad one without anyone noticing.
+ */
+export async function buildModelContext(
+  workspaceId: string,
+  question: string,
+  options: { history?: string[]; limit?: number } = {}
+): Promise<ModelContext> {
+  const index = await loadIndex(workspaceId);
+  const hits = search(index, question, {
+    history: options.history,
+    limit: options.limit ?? 4,
+  });
+
+  // Only what plausibly relates. Padding the prompt with the rest of the help
+  // centre invites the model to answer from whatever it finds there.
+  const relevant = hits.filter((h) => h.score >= 1);
+  if (relevant.length === 0) return { text: '', used: [] };
+
+  const used: ModelContext['used'] = [];
+  const blocks = relevant.map((h) => {
+    const a = h.article;
+    const isNote = a.id.startsWith('note:');
+    used.push({ id: a.id, title: a.title, source: isNote ? 'note' : 'article' });
+
+    const label = isNote
+      ? `${a.title} (internal team knowledge)`
+      : a.sectionName
+      ? `${a.title} — ${a.sectionName}`
+      : a.title;
+
+    // The whole article, not an excerpt: the model is better than a heuristic
+    // at finding the relevant line, once the right article is in front of it.
+    return `## ${label}\n${a.summary ? `${a.summary}\n` : ''}${a.content}`;
+  });
+
+  return { text: blocks.join('\n\n---\n\n'), used };
+}
+
+
+/**
+ * Reads a workspace's `ai_settings` into a provider config.
+ *
+ * Older workspaces stored only `anthropic_api_key`, from when Claude was the
+ * only option; that shape still works and is treated as the Anthropic provider.
+ */
+export function providerConfigFrom(
+  aiSettings: Record<string, any> | null | undefined
+): ProviderConfig | null {
+  if (!aiSettings) return null;
+  if (aiSettings.enabled === false) return null;
+
+  const legacyKey = aiSettings.anthropic_api_key;
+  const provider: ProviderId = (aiSettings.provider as ProviderId) || 'anthropic';
+
+  return {
+    provider,
+    model: aiSettings.model ?? null,
+    apiKey: aiSettings.api_key ?? legacyKey ?? null,
+    baseUrl: aiSettings.base_url ?? null,
   };
 }

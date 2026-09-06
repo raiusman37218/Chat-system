@@ -35,7 +35,8 @@ interface AnalyticsDashboardProps {
 interface AnalyticsData {
   summary: {
     totalConversations: number;
-    volumeChangePercent: number;
+    /** null when the previous period had no conversations to compare with. */
+    volumeChangePercent: number | null;
     avgFirstResponseSeconds: number | null;
     avgResolutionSeconds: number | null;
     avgCsat: number | null;
@@ -113,7 +114,7 @@ export function AnalyticsDashboard({ workspace, currentAgent }: AnalyticsDashboa
   // plausible-looking 4.8 would be indistinguishable from a real measurement.
   const summary = data?.summary || {
     totalConversations: 0,
-    volumeChangePercent: 0,
+    volumeChangePercent: null,
     avgFirstResponseSeconds: null,
     avgResolutionSeconds: null,
     avgCsat: null,
@@ -217,7 +218,8 @@ export function AnalyticsDashboard({ workspace, currentAgent }: AnalyticsDashboa
               <span className="text-2xl font-bold text-ink tracking-tight">
                 {summary.totalConversations}
               </span>
-              {summary.volumeChangePercent !== 0 && (
+              {summary.volumeChangePercent !== null &&
+                summary.volumeChangePercent !== 0 && (
                 <span
                   className={`text-xs font-semibold flex items-center gap-0.5 ${
                     summary.volumeChangePercent > 0 ? 'text-emerald-600' : 'text-amber-600'

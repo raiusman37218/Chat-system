@@ -96,7 +96,7 @@ const SECTIONS: Section[] = [
   {
     id: 'ai',
     label: 'AI assistant',
-    description: 'Claude replies and the LangGraph agent',
+    description: 'Model provider, automatic replies and agent assists',
     Icon: Bot,
     adminOnly: true,
   },
