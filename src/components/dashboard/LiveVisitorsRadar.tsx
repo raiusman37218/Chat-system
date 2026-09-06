@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Clock,
   ExternalLink,
@@ -12,6 +12,8 @@ import {
   RefreshCw,
   Smartphone,
   Users,
+  LayoutList,
+  LayoutGrid,
 } from 'lucide-react';
 import { Visitor, Workspace } from '@/types/database';
 import { formatTimeAgo, cn } from '@/lib/utils';
@@ -46,6 +48,8 @@ export function LiveVisitorsRadar({
   onOpenConversationForVisitor,
   onRefresh,
 }: LiveVisitorsRadarProps) {
+  const [viewMode, setViewMode] = useState<'rows' | 'grid'>('rows');
+
   const activeVisitors = visitors.filter(
     (v) => (Date.now() - new Date(v.last_seen).getTime()) / 1000 < LIVE_WINDOW_SECONDS
   );
@@ -77,13 +81,47 @@ export function LiveVisitorsRadar({
           </div>
         </div>
 
-        <button
-          onClick={onRefresh}
-          className="btn btn-sm btn-secondary shrink-0 shadow-xs hover:border-line-2"
-        >
-          <RefreshCw className="w-3.5 h-3.5" />
-          Refresh Radar
-        </button>
+        <div className="flex items-center gap-2.5">
+          {/* View Mode Toggle: Rows (default) vs Grid */}
+          <div className="flex items-center p-0.5 rounded-lg bg-surface-2 border border-line">
+            <button
+              type="button"
+              onClick={() => setViewMode('rows')}
+              className={cn(
+                'flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[12px] font-medium transition-all',
+                viewMode === 'rows'
+                  ? 'bg-surface text-ink font-semibold shadow-xs'
+                  : 'text-ink-3 hover:text-ink'
+              )}
+              title="Compact Row View (Multiple visitors visible at once)"
+            >
+              <LayoutList className="w-3.5 h-3.5" />
+              <span>Rows</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode('grid')}
+              className={cn(
+                'flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[12px] font-medium transition-all',
+                viewMode === 'grid'
+                  ? 'bg-surface text-ink font-semibold shadow-xs'
+                  : 'text-ink-3 hover:text-ink'
+              )}
+              title="Card Grid View"
+            >
+              <LayoutGrid className="w-3.5 h-3.5" />
+              <span>Cards</span>
+            </button>
+          </div>
+
+          <button
+            onClick={onRefresh}
+            className="btn btn-sm btn-secondary shrink-0 shadow-xs hover:border-line-2"
+          >
+            <RefreshCw className="w-3.5 h-3.5" />
+            <span>Refresh Radar</span>
+          </button>
+        </div>
       </header>
 
       {/* Telemetry Metric Cards */}
@@ -143,7 +181,138 @@ export function LiveVisitorsRadar({
               onSecondaryAction={onRefresh}
             />
           </div>
+        ) : viewMode === 'rows' ? (
+          /* Compact Row-Wise Table View (Many visitors visible in a single screen) */
+          <div className="rounded-2xl border border-line bg-surface overflow-hidden shadow-xs">
+            {/* Table Header */}
+            <div className="hidden lg:grid grid-cols-12 px-5 py-2.5 bg-surface-2/80 border-b border-line text-[11px] font-bold text-ink-3 uppercase tracking-wider items-center gap-3">
+              <div className="col-span-3">Visitor</div>
+              <div className="col-span-4">Viewing Page</div>
+              <div className="col-span-2">Location &amp; Time</div>
+              <div className="col-span-2">Device &amp; OS</div>
+              <div className="col-span-1 text-right">Action</div>
+            </div>
+
+            {/* Compact Rows */}
+            <div className="divide-y divide-line/60">
+              {activeVisitors.map((visitor) => {
+                const ua = parseUserAgentDetailed(visitor.user_agent);
+                const place = parseLocation(
+                  visitor.location,
+                  visitor.ip_location_city,
+                  visitor.ip_location_country
+                );
+                const localTime = localTimeIn(
+                  visitor.timezone || timezoneFrom(visitor.location)
+                );
+                const displayName =
+                  visitor.name ||
+                  (visitor.email
+                    ? visitor.email.split('@')[0]
+                    : `Visitor ${visitor.id.slice(0, 6)}`);
+
+                return (
+                  <div
+                    key={visitor.id}
+                    onClick={() => onOpenConversationForVisitor(visitor.id)}
+                    className="grid grid-cols-1 lg:grid-cols-12 px-5 py-2.5 items-center gap-2.5 lg:gap-3 hover:bg-surface-2/70 transition-colors cursor-pointer group"
+                  >
+                    {/* 1. Visitor Info */}
+                    <div className="lg:col-span-3 flex items-center gap-2.5 min-w-0">
+                      <Avatar
+                        name={displayName}
+                        seed={visitor.id}
+                        size="sm"
+                        online={true}
+                        className="shrink-0 shadow-xs"
+                      />
+                      <div className="min-w-0">
+                        <div className="text-[13px] font-bold text-ink truncate group-hover:text-accent transition-colors flex items-center gap-1.5">
+                          <span className="truncate">{displayName}</span>
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" title="Active online" />
+                        </div>
+                        <div className="text-[11px] text-ink-3 truncate">
+                          {visitor.email || 'Anonymous visitor'}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* 2. Viewing Page URL */}
+                    <div className="lg:col-span-4 min-w-0">
+                      <a
+                        href={visitor.current_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className="inline-flex items-center gap-1.5 max-w-full text-accent hover:underline text-[11.5px] font-mono group/link truncate"
+                        title={visitor.current_url}
+                      >
+                        <Globe className="w-3.5 h-3.5 shrink-0 text-accent/80" />
+                        <span className="truncate">{visitor.current_url}</span>
+                        <ExternalLink className="w-3 h-3 shrink-0 text-ink-3 group-hover/link:text-accent" />
+                      </a>
+                    </div>
+
+                    {/* 3. Location & Local Time */}
+                    <div className="lg:col-span-2 min-w-0 text-[11.5px] text-ink-2">
+                      <div className="flex items-center gap-1.5 truncate font-medium">
+                        <CountryFlag flag={place.flag} className="w-3.5 h-3.5 shrink-0" />
+                        <span className="truncate">
+                          {place.label || 'Location undetected'}
+                        </span>
+                      </div>
+                      <div className="text-[10.5px] text-ink-3 flex items-center gap-1 mt-0.5">
+                        <Clock className="w-3 h-3 text-ink-3 shrink-0" />
+                        <span>{localTime || `Since ${formatTimeAgo(visitor.first_seen)}`}</span>
+                      </div>
+                    </div>
+
+                    {/* 4. Device & Browser */}
+                    <div className="lg:col-span-2 min-w-0 text-[11.5px] text-ink-2">
+                      <div className="flex items-center gap-1.5 truncate font-medium">
+                        <BrowserIcon
+                          browser={ua.browser}
+                          className="w-3.5 h-3.5 shrink-0"
+                          title={ua.browserName}
+                        />
+                        <span className="truncate">
+                          {ua.browserName} {ua.browserVersion ? ua.browserVersion.split('.')[0] : ''}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1.5 text-[10.5px] text-ink-3 mt-0.5">
+                        <span className="flex items-center gap-1">
+                          <OsIcon os={ua.os} className="w-3 h-3 shrink-0" title={ua.osName} />
+                          <span>{ua.osName}</span>
+                        </span>
+                        <span>•</span>
+                        <span className="flex items-center gap-1 capitalize">
+                          <DeviceIcon device={ua.device} className="w-3 h-3 shrink-0" />
+                          <span>{ua.device}</span>
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* 5. Action */}
+                    <div className="lg:col-span-1 flex items-center justify-end">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onOpenConversationForVisitor(visitor.id);
+                        }}
+                        className="btn btn-xs btn-primary gap-1 shadow-xs hover:shadow transition-all"
+                      >
+                        <MessageSquare className="w-3 h-3" />
+                        <span>Chat</span>
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         ) : (
+          /* Card Grid View */
           <div className="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 gap-4">
             {activeVisitors.map((visitor) => {
               const ua = parseUserAgentDetailed(visitor.user_agent);

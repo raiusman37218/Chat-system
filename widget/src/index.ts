@@ -19,6 +19,7 @@ interface WidgetConfig {
   greetingTitle?: string;
   welcomeText?: string;
   businessName?: string;
+  customDomain?: string;
 }
 
 interface MessageItem {
@@ -138,6 +139,7 @@ class ChatifyWidget {
       showHelpTab: script?.getAttribute('data-show-help') !== 'false',
       helpTabIcon: script?.getAttribute('data-help-icon') || '📖',
       businessName: script?.getAttribute('data-business-name') || script?.getAttribute('data-company-name') || undefined,
+      customDomain: script?.getAttribute('data-custom-domain') || undefined,
     };
   }
 
@@ -264,6 +266,17 @@ class ChatifyWidget {
           category: a.section?.name || a.category || 'General',
           icon: a.section?.icon || '📚',
         }));
+
+        if (!this.config.customDomain) {
+          const { data: ws } = await this.supabase
+            .from('public_workspaces')
+            .select('custom_domain')
+            .eq('id', this.config.workspaceId)
+            .maybeSingle();
+          if (ws?.custom_domain) {
+            this.config.customDomain = ws.custom_domain;
+          }
+        }
       } else {
         this.faqs = [];
       }
@@ -400,11 +413,16 @@ class ChatifyWidget {
             <div class="chatify-faq-markdown">${this.formatMarkdownToHtml(faq.a)}</div>
             
             <div style="margin-top:12px; padding-top:8px; border-top:1px solid var(--w-line); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
-              ${this.config.workspaceId ? `
-                <a href="/help/${this.config.workspaceId}/${faq.slug || faq.id}" target="_blank" rel="noopener noreferrer" class="chatify-article-ext-link" title="Open full article in dedicated Help Center">
-                  <span>Open in full Help Center</span> ↗
-                </a>
-              ` : '<span></span>'}
+              ${this.config.workspaceId ? (() => {
+                const articleUrl = this.config.customDomain
+                  ? `https://${this.config.customDomain}/${faq.slug || faq.id}`
+                  : `/help/${this.config.workspaceId}/${faq.slug || faq.id}`;
+                return `
+                  <a href="${articleUrl}" target="_blank" rel="noopener noreferrer" class="chatify-article-ext-link" title="Open full article in dedicated Help Center">
+                    <span>Open in full Help Center</span> ↗
+                  </a>
+                `;
+              })() : '<span></span>'}
 
               ${faq.id ? `
                 <div class="chatify-vote-group" style="display:flex; align-items:center; gap:6px;">
