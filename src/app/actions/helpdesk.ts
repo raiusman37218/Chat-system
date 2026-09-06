@@ -75,7 +75,14 @@ export async function getHelpDeskDataAction(workspaceId: string) {
       .order('created_at', { ascending: true }),
     supabase
       .from('articles')
-      .select('*, author:agents(id, name, avatar_url), section:help_sections(id, name, icon)')
+      // The list renders titles, badges and counters — never the body. Sending
+      // every article's full text made opening the Help Desk proportional to
+      // how much the customer had written, which is exactly backwards.
+      .select(
+        'id, workspace_id, section_id, title, slug, category, summary, status, ' +
+          'author_id, views_count, helpful_count, not_helpful_count, created_at, updated_at, ' +
+          'author:agents(id, name, avatar_url), section:help_sections(id, name, slug, icon)'
+      )
       .eq('workspace_id', workspaceId)
       .order('created_at', { ascending: false }),
   ]);
@@ -88,7 +95,8 @@ export async function getHelpDeskDataAction(workspaceId: string) {
   }
 
   const sections = (sectionsRes.data as HelpSection[]) || [];
-  const articles = (articlesRes.data as Article[]) || [];
+  // The list projection omits `content`, so this is an Article minus its body.
+  const articles = (articlesRes.data as unknown as Article[]) || [];
 
   // Calculate article counts per section
   const sectionCounts: Record<string, number> = {};
@@ -111,7 +119,10 @@ export async function getHelpDeskDataAction(workspaceId: string) {
   const totalHelpful = articles.reduce((sum, a) => sum + (a.helpful_count || 0), 0);
   const totalNotHelpful = articles.reduce((sum, a) => sum + (a.not_helpful_count || 0), 0);
   const totalFeedback = totalHelpful + totalNotHelpful;
-  const helpfulRate = totalFeedback > 0 ? Math.round((totalHelpful / totalFeedback) * 100) : 100;
+  // null, not 100. A brand-new help centre with zero votes was reporting a
+  // perfect helpfulness score, which is a number nobody earned.
+  const helpfulRate =
+    totalFeedback > 0 ? Math.round((totalHelpful / totalFeedback) * 100) : null;
 
   return {
     sections: sectionsWithCount,
@@ -126,6 +137,64 @@ export async function getHelpDeskDataAction(workspaceId: string) {
       helpfulRate,
     },
   };
+}
+
+/**
+ * One article, body included.
+ *
+ * The Help Desk list no longer carries article bodies, so the editor has to
+ * ask for the one it is about to open. Without this it would load an empty
+ * textarea over a real article and save the blank back.
+ */
+export async function getArticleAction(
+  workspaceId: string,
+  articleId: string
+): Promise<Article> {
+  await assertAgent(workspaceId);
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from('articles')
+    .select('*, author:agents(id, name, avatar_url), section:help_sections(id, name, slug, icon)')
+    .eq('workspace_id', workspaceId)
+    .eq('id', articleId)
+    .single();
+
+  if (error || !data) {
+    throw new Error(error?.message || 'Article not found');
+  }
+  return data as Article;
+}
+
+/**
+ * Ids of articles whose body matches `query`.
+ *
+ * Titles and summaries are filtered in the browser from data it already has;
+ * only the bodies need the database, and they stay there.
+ */
+export async function searchArticleBodiesAction(
+  workspaceId: string,
+  query: string
+): Promise<string[]> {
+  const q = query.trim();
+  if (q.length < 2) return [];
+
+  await assertAgent(workspaceId);
+  const supabase = await createClient();
+
+  // PostgREST treats these as pattern metacharacters inside a filter list.
+  const safe = q.replace(/[%,()\\]/g, ' ').trim();
+  if (!safe) return [];
+
+  const { data, error } = await supabase
+    .from('articles')
+    .select('id')
+    .eq('workspace_id', workspaceId)
+    .ilike('content', `%${safe}%`)
+    .limit(200);
+
+  if (error) return [];
+  return (data || []).map((r) => r.id as string);
 }
 
 /**

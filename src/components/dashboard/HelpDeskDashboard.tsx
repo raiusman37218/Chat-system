@@ -68,6 +68,8 @@ import {
   deleteArticleAction,
   toggleArticleStatusAction,
   updateHelpTabSettingsAction,
+  searchArticleBodiesAction,
+  getArticleAction,
 } from '@/app/actions/helpdesk';
 import { Avatar } from '@/components/ui/Avatar';
 import { cn } from '@/lib/utils';
@@ -88,20 +90,13 @@ export function HelpDeskDashboard({
   const [loading, setLoading] = useState(true);
   const [sections, setSections] = useState<HelpSection[]>([]);
   const [articles, setArticles] = useState<Article[]>([]);
-  const [metrics, setMetrics] = useState({
-    totalArticles: 0,
-    publishedCount: 0,
-    draftCount: 0,
-    totalViews: 0,
-    totalHelpful: 0,
-    totalNotHelpful: 0,
-    helpfulRate: 100,
-  });
+
 
   // Filter and search state
   const [selectedSectionId, setSelectedSectionId] = useState<string | 'all'>('all');
   const [selectedStatus, setSelectedStatus] = useState<'all' | 'published' | 'draft'>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [bodyMatchIds, setBodyMatchIds] = useState<Set<string>>(new Set());
 
   // Modals
   const [isArticleModalOpen, setIsArticleModalOpen] = useState(false);
@@ -130,8 +125,6 @@ export function HelpDeskDashboard({
       const data = await getHelpDeskDataAction(workspace.id);
       setSections(data.sections);
       setArticles(data.articles);
-      setMetrics(data.metrics);
-      onArticlesCountChange?.(data.metrics.totalArticles);
     } catch (err: any) {
       showToast(err.message || 'Failed to load Help Desk data', 'error');
     } finally {
@@ -142,6 +135,67 @@ export function HelpDeskDashboard({
   useEffect(() => {
     loadHelpDeskData();
   }, [workspace?.id]);
+
+  // Body search runs on the server, debounced. Titles and summaries filter
+  // instantly from data already in memory, so typing stays responsive and the
+  // deeper match arrives a moment later.
+  useEffect(() => {
+    const q = searchQuery.trim();
+    if (!workspace?.id || q.length < 2) {
+      setBodyMatchIds(new Set());
+      return;
+    }
+
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      try {
+        const ids = await searchArticleBodiesAction(workspace.id, q);
+        if (!cancelled) setBodyMatchIds(new Set(ids));
+      } catch {
+        // A failed deep search just means fewer results, not a broken page.
+      }
+    }, 250);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [searchQuery, workspace?.id]);
+
+  // Derived from the list itself, so publishing or deleting an article updates
+  // the tiles immediately and cannot drift from what is on screen.
+  const metrics = useMemo(() => {
+    const totalHelpful = articles.reduce((n, a) => n + (a.helpful_count || 0), 0);
+    const totalNotHelpful = articles.reduce(
+      (n, a) => n + (a.not_helpful_count || 0),
+      0
+    );
+    const votes = totalHelpful + totalNotHelpful;
+
+    return {
+      totalArticles: articles.length,
+      publishedCount: articles.filter((a) => a.status === 'published').length,
+      draftCount: articles.filter((a) => a.status === 'draft').length,
+      totalViews: articles.reduce((n, a) => n + (a.views_count || 0), 0),
+      totalHelpful,
+      totalNotHelpful,
+      // null, not 100 — a help centre with no votes has not earned a score.
+      helpfulRate: votes > 0 ? Math.round((totalHelpful / votes) * 100) : null,
+    };
+  }, [articles]);
+
+  useEffect(() => {
+    onArticlesCountChange?.(metrics.totalArticles);
+  }, [metrics.totalArticles, onArticlesCountChange]);
+
+  // Section pills count what the list currently holds, for the same reason.
+  const sectionCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const a of articles) {
+      if (a.section_id) counts[a.section_id] = (counts[a.section_id] || 0) + 1;
+    }
+    return counts;
+  }, [articles]);
 
   // Filtered Articles
   const filteredArticles = useMemo(() => {
@@ -154,15 +208,18 @@ export function HelpDeskDashboard({
       }
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase().trim();
-        const matchesTitle = art.title.toLowerCase().includes(q);
-        const matchesSummary = art.summary?.toLowerCase().includes(q);
-        const matchesContent = art.content.toLowerCase().includes(q);
-        const matchesCategory = art.category?.toLowerCase().includes(q);
-        return matchesTitle || matchesSummary || matchesContent || matchesCategory;
+        return (
+          art.title.toLowerCase().includes(q) ||
+          art.summary?.toLowerCase().includes(q) ||
+          art.category?.toLowerCase().includes(q) ||
+          // Body matches come back from the server; the browser no longer
+          // holds a copy of every article just to search it.
+          bodyMatchIds.has(art.id)
+        );
       }
       return true;
     });
-  }, [articles, selectedSectionId, selectedStatus, searchQuery]);
+  }, [articles, selectedSectionId, selectedStatus, searchQuery, bodyMatchIds]);
 
   const handleToggleStatus = async (article: Article) => {
     if (!workspace?.id) return;
@@ -172,9 +229,10 @@ export function HelpDeskDashboard({
       if (res.article) {
         setArticles((prev) => prev.map((a) => (a.id === article.id ? res.article : a)));
         showToast(
-          `Article ${nextStatus === 'published' ? 'published to help center!' : 'saved as draft.'}`
+          nextStatus === 'published'
+            ? 'Article is live on your help centre.'
+            : 'Article moved back to drafts.'
         );
-        loadHelpDeskData();
       }
     } catch (err: any) {
       showToast(err.message || 'Failed to update article status', 'error');
@@ -188,8 +246,7 @@ export function HelpDeskDashboard({
     try {
       await deleteArticleAction(workspace.id, articleId);
       setArticles((prev) => prev.filter((a) => a.id !== articleId));
-      showToast('Article deleted successfully');
-      loadHelpDeskData();
+      showToast(`"${title}" deleted.`);
     } catch (err: any) {
       showToast(err.message || 'Failed to delete article', 'error');
     }
@@ -240,14 +297,11 @@ export function HelpDeskDashboard({
       {/* Top Navigation Bar */}
       <header className="px-8 py-5 border-b border-line/80 flex items-center justify-between gap-4 bg-surface sticky top-0 z-20">
         <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-[20px] font-bold text-ink tracking-tight">Help Desk &amp; Knowledge Base</h1>
-            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-accent-soft text-accent uppercase tracking-wider">
-              Intercom Style
-            </span>
-          </div>
+          <h1 className="text-[19px] font-semibold text-ink tracking-tight">
+            Help Center
+          </h1>
           <p className="text-[12.5px] text-ink-3 mt-0.5">
-            Empower your customers with self-service help sections and search-ready articles.
+            Write once, and let customers answer their own questions.
           </p>
         </div>
 
@@ -378,11 +432,19 @@ export function HelpDeskDashboard({
               <span className="text-[12px] font-medium text-ink-3 uppercase tracking-wider">Helpfulness Rate</span>
               <ThumbsUp className="w-4 h-4 text-emerald-500" />
             </div>
-            <div className="text-[26px] font-bold text-ink mt-2">{metrics.helpfulRate}%</div>
+            <div className="text-[26px] font-bold text-ink mt-2">
+              {metrics.helpfulRate === null ? '—' : `${metrics.helpfulRate}%`}
+            </div>
             <div className="text-[11.5px] text-ink-3 mt-1 flex items-center gap-2">
-              <span>👍 {metrics.totalHelpful} positive</span>
-              <span>•</span>
-              <span>👎 {metrics.totalNotHelpful} unhelpful</span>
+              {metrics.helpfulRate === null ? (
+                <span>No reader votes yet</span>
+              ) : (
+                <>
+                  <span>{metrics.totalHelpful} helpful</span>
+                  <span>•</span>
+                  <span>{metrics.totalNotHelpful} not helpful</span>
+                </>
+              )}
             </div>
           </div>
 
@@ -426,7 +488,7 @@ export function HelpDeskDashboard({
                 >
                   <span>{sec.icon || '📚'}</span>
                   <span>{sec.name}</span>
-                  <span className="text-[11px] opacity-75">({sec.article_count || 0})</span>
+                  <span className="text-[11px] opacity-75">({sectionCounts[sec.id] || 0})</span>
                 </button>
               ))}
 
@@ -839,6 +901,13 @@ function ArticleEditorModal({
   const [sectionId, setSectionId] = useState<string>(article?.section_id || sections[0]?.id || '');
   const [summary, setSummary] = useState(article?.summary || '');
   const [content, setContent] = useState(article?.content || '');
+  // The list hands over an article without its body, so an existing article
+  // is not editable until the body has been fetched. Saving before then would
+  // overwrite real content with an empty string.
+  const [bodyLoading, setBodyLoading] = useState(
+    Boolean(article?.id) && article?.content === undefined
+  );
+  const [bodyError, setBodyError] = useState<string | null>(null);
   const [status, setStatus] = useState<'published' | 'draft'>(article?.status || 'published');
   const [viewMode, setViewMode] = useState<'write' | 'split' | 'preview'>('split');
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -852,6 +921,30 @@ function ArticleEditorModal({
   const [imageUrl, setImageUrl] = useState('');
   const [imageAlt, setImageAlt] = useState('');
   const [copiedLink, setCopiedLink] = useState(false);
+
+  useEffect(() => {
+    if (!article?.id || article.content !== undefined || !workspaceId) return;
+
+    let cancelled = false;
+    setBodyLoading(true);
+    setBodyError(null);
+
+    getArticleAction(workspaceId, article.id)
+      .then((full) => {
+        if (cancelled) return;
+        setContent(full.content || '');
+        setBodyLoading(false);
+      })
+      .catch((err: any) => {
+        if (cancelled) return;
+        setBodyError(err?.message || 'Could not load this article.');
+        setBodyLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [article?.id, article?.content, workspaceId]);
 
   const textareaRef = React.useRef<HTMLTextAreaElement>(null);
 
@@ -1275,6 +1368,16 @@ function ArticleEditorModal({
   };
 
   const handleSave = async () => {
+    // Guard the window between opening an existing article and its body
+    // arriving; saving in it would replace the article with an empty one.
+    if (bodyLoading) {
+      setErrorMsg('Still loading this article — one moment.');
+      return;
+    }
+    if (bodyError) {
+      setErrorMsg(`${bodyError} Close and reopen the article before saving.`);
+      return;
+    }
     if (!title.trim()) {
       setErrorMsg('Please enter an article title.');
       return;
@@ -1879,10 +1982,22 @@ function ArticleEditorModal({
               {/* Write Textarea Pane */}
               {(viewMode === 'write' || viewMode === 'split') && (
                 <div className="flex flex-col bg-surface relative">
+                  {(bodyLoading || bodyError) && (
+                    <div className="absolute inset-0 z-10 grid place-items-center bg-surface/85 backdrop-blur-[1px]">
+                      {bodyError ? (
+                        <p className="text-[13px] text-rose-500 px-6 text-center">
+                          {bodyError}
+                        </p>
+                      ) : (
+                        <p className="text-[13px] text-ink-3">Loading article…</p>
+                      )}
+                    </div>
+                  )}
                   <textarea
                     ref={textareaRef}
                     rows={isFullscreen ? 26 : 16}
                     value={content}
+                    disabled={bodyLoading || Boolean(bodyError)}
                     onChange={(e) => setContent(e.target.value)}
                     onKeyDown={handleKeyDown}
                     placeholder="Write your article content here...

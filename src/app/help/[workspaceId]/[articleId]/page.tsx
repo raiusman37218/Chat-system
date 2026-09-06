@@ -1,26 +1,45 @@
 'use client';
 
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import {
-  ChevronLeft,
   Calendar,
   Clock,
   ThumbsUp,
   ThumbsDown,
   MessageCircle,
-  ExternalLink,
   Check,
-  Share2,
+  Link2,
   BookOpen,
   ArrowLeft,
+  ArrowRight,
   CheckCircle2,
+  AlertCircle,
+  List,
 } from 'lucide-react';
 import { Article, Workspace } from '@/types/database';
 import { createClient } from '@/lib/supabase/client';
 import { Avatar } from '@/components/ui/Avatar';
-import { MarkdownArticleContent } from '@/components/dashboard/MarkdownArticleContent';
+import {
+  MarkdownArticleContent,
+  extractHeadings,
+} from '@/components/dashboard/MarkdownArticleContent';
 import { getWorkspaceHelpCenterUrl, isPlatformHost } from '@/lib/domain';
+import {
+  HelpHeader,
+  HelpFooter,
+  HelpWidget,
+  brandOf,
+  openChat,
+  copyText,
+  readingTime,
+  formatDate,
+} from '@/components/help/HelpChrome';
+
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+type SiblingArticle = Pick<Article, 'id' | 'title' | 'slug' | 'summary'>;
 
 export default function ArticleDetailPage() {
   const params = useParams();
@@ -31,468 +50,593 @@ export default function ArticleDetailPage() {
   const [loading, setLoading] = useState(true);
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [article, setArticle] = useState<Article | null>(null);
-  const [relatedArticles, setRelatedArticles] = useState<Article[]>([]);
+  const [siblings, setSiblings] = useState<SiblingArticle[]>([]);
 
-  // Feedback State
-  const [feedbackSubmitted, setFeedbackSubmitted] = useState<boolean>(false);
-  const [userVote, setUserVote] = useState<'helpful' | 'unhelpful' | null>(null);
-  const [feedbackText, setFeedbackText] = useState('');
-  const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false);
-  const [copiedLink, setCopiedLink] = useState(false);
+  const [vote, setVote] = useState<'helpful' | 'unhelpful' | null>(null);
+  const [voteState, setVoteState] = useState<'idle' | 'sending' | 'done' | 'error'>(
+    'idle'
+  );
+  const [copied, setCopied] = useState(false);
+  const [activeHeading, setActiveHeading] = useState<string | null>(null);
+  const [progress, setProgress] = useState(0);
 
-  const viewTrackedRef = useRef(false);
+  const viewTracked = useRef(false);
+  const bodyRef = useRef<HTMLDivElement>(null);
   const supabase = useMemo(() => createClient(), []);
 
   useEffect(() => {
     if (!workspaceId || !articleId) return;
+    let cancelled = false;
 
-    async function loadArticle() {
+    async function load() {
       try {
-        setLoading(true);
+        const wsKey = decodeURIComponent(workspaceId).trim();
+        const { data: ws } = UUID_RE.test(wsKey)
+          ? await supabase
+              .from('public_workspaces')
+              .select('*')
+              .eq('id', wsKey)
+              .maybeSingle()
+          : await supabase
+              .from('public_workspaces')
+              .select('*')
+              .or(`slug.eq.${wsKey},custom_domain.eq.${wsKey}`)
+              .maybeSingle();
 
-        // Fetch workspace by UUID, slug, or custom domain
-        const cleanWsId = decodeURIComponent(workspaceId).trim();
-        const isWsUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(cleanWsId);
-        const { data: ws, error: wsError } = isWsUuid
-          ? await supabase.from('public_workspaces').select('*').eq('id', cleanWsId).maybeSingle()
-          : await supabase.from('public_workspaces').select('*').or(`slug.eq.${cleanWsId},custom_domain.eq.${cleanWsId}`).maybeSingle();
-
-        if (wsError) {
-          console.error('Failed to load workspace:', wsError);
-        }
-
+        if (cancelled) return;
         if (!ws) {
           setLoading(false);
           return;
         }
-
         setWorkspace(ws as Workspace);
-        const actualWorkspaceId = ws.id;
 
-        // Fetch article by UUID or slug
-        const cleanArticleId = decodeURIComponent(articleId).trim();
-        const isArtUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(cleanArticleId);
-        const artQuery = supabase
-          .from('articles')
-          .select('*, author:agents(id, name, avatar_url), section:help_sections(id, name, icon)')
-          .eq('workspace_id', actualWorkspaceId)
-          .eq('status', 'published');
+        const artKey = decodeURIComponent(articleId).trim();
+        const base = () =>
+          supabase
+            .from('articles')
+            .select(
+              '*, author:agents(id, name, avatar_url), section:help_sections(id, name, slug, icon)'
+            )
+            .eq('workspace_id', ws.id)
+            .eq('status', 'published');
 
-        let { data: art, error: artError } = isArtUuid
-          ? await artQuery.or(`id.eq.${cleanArticleId},slug.eq.${cleanArticleId}`).maybeSingle()
-          : await artQuery.ilike('slug', cleanArticleId).maybeSingle();
+        let art: Article | null = null;
 
-        if (artError) {
-          console.error('Failed to load article:', artError);
-        }
+        if (UUID_RE.test(artKey)) {
+          const { data } = await base()
+            .or(`id.eq.${artKey},slug.eq.${artKey}`)
+            .maybeSingle();
+          art = (data as Article) || null;
+        } else {
+          const { data } = await base().ilike('slug', artKey).maybeSingle();
+          art = (data as Article) || null;
 
-        // Resilient fallback: match by clean title if slug lookup yielded nothing
-        if (!art && !isArtUuid) {
-          const titleSearch = cleanArticleId.replace(/-/g, ' ').trim();
-          const { data: fallbackArt } = await artQuery.ilike('title', `%${titleSearch}%`).limit(1).maybeSingle();
-          if (fallbackArt) {
-            art = fallbackArt;
+          // An article renamed after someone shared its link still has to
+          // resolve, so fall back to matching the words in the old slug.
+          if (!art) {
+            const { data: byTitle } = await base()
+              .ilike('title', `%${artKey.replace(/-/g, ' ').trim()}%`)
+              .limit(1)
+              .maybeSingle();
+            art = (byTitle as Article) || null;
           }
         }
 
-        if (art) {
-          setArticle(art as Article);
+        if (cancelled) return;
+        if (!art) {
+          setLoading(false);
+          return;
+        }
 
-          // Track view once
-          if (!viewTrackedRef.current) {
-            viewTrackedRef.current = true;
-            fetch('/api/help/view', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ articleId: art.id }),
-            }).catch(() => {});
-          }
+        setArticle(art);
+        setLoading(false);
 
-          // Fetch related articles in same section
-          if (art.section_id) {
-            const { data: related } = await supabase
-              .from('articles')
-              .select('id, title, slug, summary, created_at')
-              .eq('section_id', art.section_id)
-              .eq('status', 'published')
-              .neq('id', art.id)
-              .limit(4);
+        if (!viewTracked.current) {
+          viewTracked.current = true;
+          fetch('/api/help/view', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ articleId: art.id }),
+          }).catch(() => {});
+        }
 
-            if (related) setRelatedArticles(related as Article[]);
-          }
+        // Siblings drive both "more in this collection" and prev/next. Ordered
+        // the same way the collection lists them, so "next" means what the
+        // reader just saw one line below.
+        if (art.section_id) {
+          const { data: sib } = await supabase
+            .from('articles')
+            .select('id, title, slug, summary')
+            .eq('workspace_id', ws.id)
+            .eq('section_id', art.section_id)
+            .eq('status', 'published')
+            .order('created_at', { ascending: false });
+
+          if (!cancelled && sib) setSiblings(sib as SiblingArticle[]);
         }
       } catch (err) {
         console.error('Failed to load article:', err);
-      } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     }
 
-    loadArticle();
+    load();
+    return () => {
+      cancelled = true;
+    };
   }, [workspaceId, articleId, supabase]);
 
-  const handleVote = async (isHelpful: boolean) => {
-    if (!article || !workspace) return;
-    setUserVote(isHelpful ? 'helpful' : 'unhelpful');
-    setIsSubmittingFeedback(true);
+  const headings = useMemo(
+    () => extractHeadings(article?.content || '').filter((h) => h.level <= 2),
+    [article?.content]
+  );
+
+  // Reading progress and the active outline entry, from one scroll listener.
+  useEffect(() => {
+    if (!article) return;
+
+    function onScroll() {
+      const el = bodyRef.current;
+      if (!el) return;
+
+      const start = el.offsetTop;
+      const span = Math.max(1, el.offsetHeight - window.innerHeight * 0.4);
+      const seen = window.scrollY - start;
+      setProgress(Math.min(1, Math.max(0, seen / span)));
+
+      let current: string | null = null;
+      for (const h of headings) {
+        const node = document.getElementById(h.id);
+        if (node && node.getBoundingClientRect().top <= 120) current = h.id;
+      }
+      setActiveHeading(current);
+    }
+
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, [article, headings]);
+
+  const homeHref = useCallback(() => {
+    if (typeof window !== 'undefined') {
+      const host = window.location.host.toLowerCase().split(':')[0];
+      if (!isPlatformHost(host)) return '/';
+    }
+    return `/help/${workspace?.slug || workspaceId}`;
+  }, [workspace, workspaceId]);
+
+  const articleHref = useCallback(
+    (a: { id: string; slug?: string | null }) => {
+      const path = a.slug || a.id;
+      if (typeof window !== 'undefined') {
+        const host = window.location.host.toLowerCase().split(':')[0];
+        if (!isPlatformHost(host)) return `/${path}`;
+      }
+      return `/help/${workspace?.slug || workspaceId}/${path}`;
+    },
+    [workspace, workspaceId]
+  );
+
+  const goHome = useCallback(() => router.push(homeHref()), [router, homeHref]);
+
+  const goToCollection = useCallback(() => {
+    const slug = article?.section?.slug || article?.section_id;
+    router.push(slug ? `${homeHref()}?c=${slug}` : homeHref());
+  }, [router, homeHref, article]);
+
+  const handleShare = async () => {
+    const ok = await copyText(getWorkspaceHelpCenterUrl(workspace, article));
+    if (!ok) return;
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2200);
+  };
+
+  const submitVote = async (isHelpful: boolean) => {
+    if (!article || !workspace || voteState === 'sending') return;
+    setVote(isHelpful ? 'helpful' : 'unhelpful');
+    setVoteState('sending');
+
+    let visitorId = 'anon';
+    try {
+      visitorId = localStorage.getItem('chatify_vid') || 'anon';
+    } catch {
+      /* storage blocked; an anonymous vote still counts */
+    }
 
     try {
-      let vid = 'anon';
-      try {
-        vid = localStorage.getItem('chatify_vid') || 'anon_visitor';
-      } catch (e) {}
-
-      await fetch('/api/help/feedback', {
+      const res = await fetch('/api/help/feedback', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           articleId: article.id,
           workspaceId: workspace.id,
-          visitorId: vid,
+          visitorId,
           isHelpful,
-          feedbackText: feedbackText.trim() || undefined,
         }),
       });
-
-      setFeedbackSubmitted(true);
-    } catch (err) {
-      console.error('Failed to submit feedback:', err);
-    } finally {
-      setIsSubmittingFeedback(false);
+      // Saying "thanks for your feedback" for a vote that never saved is worse
+      // than admitting it failed — the reader would never think to try again.
+      setVoteState(res.ok ? 'done' : 'error');
+    } catch {
+      setVoteState('error');
     }
   };
-
-  const handleShare = () => {
-    const publicArticleUrl = getWorkspaceHelpCenterUrl(workspace, article);
-    if (typeof window !== 'undefined') {
-      navigator.clipboard.writeText(publicArticleUrl);
-      setCopiedLink(true);
-      setTimeout(() => setCopiedLink(false), 2500);
-    }
-  };
-
-  const navigateToRoot = () => {
-    if (typeof window !== 'undefined') {
-      const host = window.location.host.toLowerCase().split(':')[0];
-      const isPlatform = isPlatformHost(host);
-
-      if (!isPlatform) {
-        router.push('/');
-        return;
-      }
-    }
-    router.push(`/help/${workspace?.slug || workspaceId}`);
-  };
-
-  const navigateToArticle = (rel: Article) => {
-    if (typeof window !== 'undefined') {
-      const host = window.location.host.toLowerCase().split(':')[0];
-      const isPlatform = isPlatformHost(host);
-
-      if (!isPlatform) {
-        router.push(`/${rel.slug || rel.id}`);
-        return;
-      }
-    }
-    router.push(`/help/${workspace?.slug || workspaceId}/${rel.slug || rel.id}`);
-  };
-
-  const handleOpenChat = () => {
-    if (typeof window !== 'undefined' && (window as any).Chatify) {
-      (window as any).Chatify.open();
-    }
-  };
-
-  const brandColor = workspace?.brand_color || '#2563eb';
-
-  const readingTime = useMemo(() => {
-    if (!article?.content) return '1 min read';
-    const words = article.content.split(/\s+/).length;
-    const minutes = Math.max(1, Math.round(words / 180));
-    return `${minutes} min read`;
-  }, [article?.content]);
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-canvas flex flex-col items-center justify-center gap-3">
-        <div className="w-10 h-10 border-3 border-accent border-t-transparent rounded-full animate-spin" />
-        <p className="text-[13px] text-ink-3">Loading article...</p>
+      <div className="min-h-screen bg-canvas">
+        <div className="h-16 bg-[#0b0b0f]" />
+        <div className="mx-auto max-w-3xl px-4 sm:px-6 py-10 space-y-4">
+          <div className="h-4 w-40 rounded bg-surface-2 animate-pulse" />
+          <div className="h-9 w-3/4 rounded-lg bg-surface-2 animate-pulse" />
+          <div className="h-4 w-1/2 rounded bg-surface-2 animate-pulse" />
+          <div className="pt-6 space-y-2.5">
+            {[0, 1, 2, 3, 4, 5].map((i) => (
+              <div
+                key={i}
+                className="h-3.5 rounded bg-surface-2 animate-pulse"
+                style={{ width: `${92 - i * 6}%` }}
+              />
+            ))}
+          </div>
+        </div>
       </div>
     );
   }
 
   if (!article || !workspace) {
     return (
-      <div className="min-h-screen bg-canvas flex flex-col items-center justify-center p-6 text-center space-y-4">
-        <BookOpen className="w-12 h-12 text-ink-3 mx-auto" />
-        <h1 className="text-[22px] font-bold text-ink">Article Not Found</h1>
-        <p className="text-[14px] text-ink-3 max-w-md">
-          This article might have been moved, removed, or is currently saved as an internal draft.
+      <div className="min-h-screen bg-canvas flex flex-col items-center justify-center p-6 text-center gap-3">
+        <BookOpen className="w-10 h-10 text-ink-3" />
+        <h1 className="text-[20px] font-semibold text-ink">Article not found</h1>
+        <p className="text-[14px] text-ink-3 max-w-sm">
+          It may have been moved, unpublished, or the link is out of date.
         </p>
         <button
-          onClick={navigateToRoot}
-          className="h-9 px-4 rounded-lg bg-accent text-accent-ink text-[13px] font-medium"
+          type="button"
+          onClick={goHome}
+          className="mt-1 h-9 px-4 rounded-lg border border-line bg-surface text-[13px] font-medium text-ink hover:bg-surface-2 transition-colors"
         >
-          Return to Help Center
+          Back to Help Center
         </button>
       </div>
     );
   }
 
-  const helpTitle = workspace.help_center_title || workspace.name;
-  const headerLinks = Array.isArray(workspace.help_center_header_links)
-    ? workspace.help_center_header_links
-    : [];
+  const brand = brandOf(workspace);
+  const at = siblings.findIndex((s) => s.id === article.id);
+  const prev = at > 0 ? siblings[at - 1] : null;
+  const next = at >= 0 && at < siblings.length - 1 ? siblings[at + 1] : null;
+  const related = siblings.filter((s) => s.id !== article.id).slice(0, 4);
 
   return (
-    <div className="min-h-screen bg-canvas text-ink flex flex-col">
-      <head>
-        <title>{`${article.title} - ${helpTitle} Help Center`}</title>
-        <link rel="canonical" href={getWorkspaceHelpCenterUrl(workspace, article)} />
-        <meta property="og:title" content={`${article.title} | ${helpTitle}`} />
-        {article.summary && <meta property="og:description" content={article.summary} />}
-        <meta property="og:url" content={getWorkspaceHelpCenterUrl(workspace, article)} />
-      </head>
-
-      {/* Top Header */}
-      <header className="bg-black border-b border-zinc-800/80 sticky top-0 z-30 transition-colors">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
+    <div
+      className="min-h-screen bg-canvas text-ink flex flex-col"
+      style={{ ['--brand' as string]: brand }}
+    >
+      <HelpHeader
+        workspace={workspace}
+        onHome={goHome}
+        leading={
           <button
-            onClick={navigateToRoot}
-            className="flex items-center gap-2 text-[13px] font-semibold text-zinc-300 hover:text-white transition-colors group cursor-pointer"
+            type="button"
+            onClick={goHome}
+            aria-label="Back to Help Center"
+            className="w-8 h-8 -ml-1 grid place-items-center rounded-lg text-white/60 hover:text-white hover:bg-white/10 transition-colors shrink-0 cursor-pointer"
           >
-            <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
-            <span>All Collections</span>
+            <ArrowLeft className="w-4 h-4" />
           </button>
-
-          <div className="flex items-center gap-2.5">
-            {/* Custom Header Links */}
-            {headerLinks.map((link, idx) => (
-              <a
-                key={idx}
-                href={link.url}
-                target={link.target || '_blank'}
-                rel={link.target === '_self' ? undefined : 'noreferrer'}
-                className="text-[12.5px] font-medium text-zinc-300 hover:text-white hidden md:flex items-center gap-1 transition-colors"
-              >
-                <span>{link.label}</span>
-                {link.target !== '_self' && <ExternalLink className="w-3 h-3 text-zinc-500" />}
-              </a>
-            ))}
-
-            {workspace.website_url && headerLinks.length === 0 && (
-              <a
-                href={workspace.website_url}
-                target="_blank"
-                rel="noreferrer"
-                className="text-[12.5px] font-medium text-zinc-300 hover:text-white hidden sm:flex items-center gap-1 transition-colors"
-              >
-                <span>Website</span>
-                <ExternalLink className="w-3.5 h-3.5 text-zinc-500" />
-              </a>
-            )}
-
+        }
+        trailing={
+          <>
             <button
+              type="button"
               onClick={handleShare}
-              className="h-8 px-3 rounded-lg border border-zinc-700 bg-zinc-900 hover:bg-zinc-800 text-[12px] font-medium text-zinc-200 flex items-center gap-1.5 transition-colors shadow-xs cursor-pointer"
+              className="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-lg text-[13px] font-medium text-white/70 hover:text-white hover:bg-white/5 transition-colors cursor-pointer"
             >
-              {copiedLink ? (
+              {copied ? (
                 <>
                   <Check className="w-3.5 h-3.5 text-emerald-400" />
-                  <span className="text-emerald-400">Link Copied!</span>
+                  <span className="hidden sm:inline text-emerald-400">Copied</span>
                 </>
               ) : (
                 <>
-                  <Share2 className="w-3.5 h-3.5 text-zinc-400" />
-                  <span>Share</span>
+                  <Link2 className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Share</span>
                 </>
               )}
             </button>
-
             <button
-              onClick={handleOpenChat}
-              className="h-8 px-3.5 rounded-lg text-white text-[12px] font-semibold flex items-center gap-1.5 transition-all shadow-xs hover:opacity-90 bg-blue-600 hover:bg-blue-700 cursor-pointer"
+              type="button"
+              onClick={openChat}
+              className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg text-white text-[13px] font-semibold transition-opacity hover:opacity-90 cursor-pointer"
+              style={{ backgroundColor: brand }}
             >
               <MessageCircle className="w-3.5 h-3.5" />
-              <span>Ask Support</span>
+              <span className="hidden sm:inline">Ask</span>
             </button>
-          </div>
-        </div>
-      </header>
+          </>
+        }
+      />
 
-      {/* Article Container */}
-      <main className="max-w-4xl mx-auto px-6 py-12 flex-1 w-full space-y-8">
-        {/* Breadcrumb Navigation */}
-        <nav className="flex items-center gap-2 text-[12.5px] text-ink-3 flex-wrap">
-          <span
-            onClick={navigateToRoot}
-            className="hover:text-accent cursor-pointer transition-colors"
+      {/* How far through the article the reader is. */}
+      <div
+        className="sticky top-16 z-30 h-0.5 origin-left transition-transform duration-75"
+        style={{
+          backgroundColor: brand,
+          transform: `scaleX(${progress})`,
+        }}
+        aria-hidden
+      />
+
+      <div className="flex-1 w-full mx-auto max-w-6xl px-4 sm:px-6 py-8 sm:py-10 flex gap-10">
+        {/* Centred when it is the only column; left-aligned once the outline
+            sidebar is beside it, so the pair reads as one block. */}
+        <main
+          className={`min-w-0 flex-1 max-w-3xl mx-auto ${
+            headings.length > 2 ? 'lg:mx-0' : ''
+          }`}
+        >
+          <nav
+            aria-label="Breadcrumb"
+            className="flex items-center gap-1.5 text-[12.5px] text-ink-3 flex-wrap"
           >
-            Help Center
-          </span>
-          <span>/</span>
-          {article.section && (
-            <>
-              <span className="text-ink-2 font-medium">
-                {article.section.icon} {article.section.name}
-              </span>
-              <span>/</span>
-            </>
-          )}
-          <span className="text-ink font-semibold truncate max-w-xs">{article.title}</span>
-        </nav>
-
-        {/* Article Title & Metadata Header */}
-        <div className="space-y-4 pb-6 border-b border-line">
-          <h1 className="text-[28px] sm:text-[36px] font-extrabold text-ink tracking-tight leading-tight">
-            {article.title}
-          </h1>
-
-          {article.summary && (
-            <p className="text-[16px] text-ink-2 leading-relaxed max-w-2xl font-normal">
-              {article.summary}
-            </p>
-          )}
-
-          {/* Author & Meta Row */}
-          <div className="flex items-center gap-4 text-[12.5px] text-ink-3 pt-2 flex-wrap">
-            {article.author ? (
-              <div className="flex items-center gap-2">
-                <Avatar
-                  name={article.author.name}
-                  seed={article.author.id}
-                  size="sm"
-                  className="w-6 h-6 text-[10px]"
-                />
-                <span className="text-ink-2 font-medium">Written by {article.author.name}</span>
-              </div>
-            ) : (
-              <div className="flex items-center gap-2">
-                <div
-                  className="w-6 h-6 rounded-full flex items-center justify-center text-white text-[10px] font-bold"
-                  style={{ backgroundColor: brandColor }}
-                >
-                  {workspace.name.slice(0, 1)}
-                </div>
-                <span className="text-ink-2 font-medium">{workspace.name} Support Team</span>
-              </div>
-            )}
-
-            <span>•</span>
-            <span className="flex items-center gap-1">
-              <Calendar className="w-3.5 h-3.5" />
-              <span>Updated {new Date(article.updated_at || article.created_at).toLocaleDateString()}</span>
-            </span>
-
-            <span>•</span>
-            <span className="flex items-center gap-1">
-              <Clock className="w-3.5 h-3.5" />
-              <span>{readingTime}</span>
-            </span>
-          </div>
-        </div>
-
-        {/* Article Body Content */}
-        <article className="prose dark:prose-invert max-w-none text-[15px] leading-relaxed text-ink space-y-4">
-          <RenderArticleContent content={article.content} />
-        </article>
-
-        {/* Was this article helpful? (Intercom Reaction Box) */}
-        <div className="my-12 p-6 rounded-2xl border border-line bg-surface-2/60 text-center space-y-4">
-          <div className="text-[15px] font-bold text-ink">Did this answer your question?</div>
-
-          {!feedbackSubmitted ? (
-            <div className="flex items-center justify-center gap-3">
-              <button
-                disabled={isSubmittingFeedback}
-                onClick={() => handleVote(true)}
-                className="h-10 px-5 rounded-xl border border-line bg-surface hover:bg-surface-2 hover:border-emerald-500/50 text-[13px] font-semibold text-ink flex items-center gap-2 transition-all shadow-xs group"
-              >
-                <ThumbsUp className="w-4 h-4 text-emerald-500 group-hover:scale-110 transition-transform" />
-                <span>Yes, thanks!</span>
-              </button>
-
-              <button
-                disabled={isSubmittingFeedback}
-                onClick={() => handleVote(false)}
-                className="h-10 px-5 rounded-xl border border-line bg-surface hover:bg-surface-2 hover:border-rose-500/50 text-[13px] font-semibold text-ink flex items-center gap-2 transition-all shadow-xs group"
-              >
-                <ThumbsDown className="w-4 h-4 text-rose-500 group-hover:scale-110 transition-transform" />
-                <span>Not really</span>
-              </button>
-            </div>
-          ) : (
-            <div className="flex items-center justify-center gap-2 text-emerald-600 dark:text-emerald-400 font-semibold text-[13.5px] animate-in fade-in">
-              <CheckCircle2 className="w-4 h-4" />
-              <span>
-                {userVote === 'helpful'
-                  ? 'Thank you for your feedback! Glad we could help.'
-                  : "Thank you for the feedback. We'll work to make this guide clearer."}
-              </span>
-            </div>
-          )}
-        </div>
-
-        {/* Related Articles in Same Section */}
-        {relatedArticles.length > 0 && (
-          <div className="pt-8 border-t border-line space-y-4">
-            <h3 className="text-[16px] font-bold text-ink">
-              More in this collection ({article.section?.name || 'Related'})
-            </h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {relatedArticles.map((rel) => (
-                <div
-                  key={rel.id}
-                  onClick={() => navigateToArticle(rel)}
-                  className="p-4 rounded-xl border border-line bg-surface hover:border-accent transition-all cursor-pointer space-y-1"
-                >
-                  <h4 className="text-[13.5px] font-semibold text-ink hover:text-accent">
-                    {rel.title}
-                  </h4>
-                  {rel.summary && (
-                    <p className="text-[12px] text-ink-3 line-clamp-1">{rel.summary}</p>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-      </main>
-
-      {/* Footer */}
-      <footer className="border-t border-line/80 py-6 px-6 text-center text-[12px] text-ink-3 bg-surface mt-12">
-        <div className="max-w-4xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
-          <span>
-            {workspace.help_center_footer_text || (
+            <button
+              type="button"
+              onClick={goHome}
+              className="hover:text-ink transition-colors cursor-pointer"
+            >
+              Help Center
+            </button>
+            {article.section && (
               <>
-                © {new Date().getFullYear()} {helpTitle}. Powered by{' '}
-                <strong className="text-ink">Chatify</strong>.
+                <span aria-hidden>/</span>
+                <button
+                  type="button"
+                  onClick={goToCollection}
+                  className="hover:text-ink transition-colors cursor-pointer"
+                >
+                  {article.section.icon} {article.section.name}
+                </button>
               </>
             )}
-          </span>
-          <button
-            onClick={handleOpenChat}
-            className="text-accent font-semibold hover:underline flex items-center gap-1"
-          >
-            <span>Have questions? Talk with us</span>
-            <MessageCircle className="w-3.5 h-3.5" />
-          </button>
-        </div>
-      </footer>
+          </nav>
 
-      {/* Embed Standalone Chatify Widget */}
-      <script
-        async
-        src="/widget.js"
-        data-workspace-id={workspace.id}
-        data-color={brandColor}
-        data-title={`${workspace.name} Support`}
-      />
+          <header className="mt-4 pb-6 border-b border-line space-y-3">
+            <h1 className="text-[27px] sm:text-[34px] font-semibold text-ink tracking-tight leading-[1.15]">
+              {article.title}
+            </h1>
+
+            {article.summary && (
+              <p className="text-[15.5px] text-ink-2 leading-relaxed">
+                {article.summary}
+              </p>
+            )}
+
+            <div className="flex items-center gap-x-4 gap-y-1.5 pt-1 text-[12.5px] text-ink-3 flex-wrap">
+              <span className="flex items-center gap-2 min-w-0">
+                {article.author ? (
+                  <>
+                    <Avatar
+                      name={article.author.name}
+                      seed={article.author.id}
+                      size="sm"
+                      className="w-5 h-5 shrink-0 text-[9px]"
+                    />
+                    <span className="text-ink-2">{article.author.name}</span>
+                  </>
+                ) : (
+                  <>
+                    {/* shrink-0: without it the flex row squeezes the badge
+                        under the name and the two render on top of each other. */}
+                    <span
+                      className="w-5 h-5 shrink-0 rounded-full grid place-items-center text-white text-[9px] font-bold"
+                      style={{ backgroundColor: brand }}
+                    >
+                      {workspace.name.slice(0, 1).toUpperCase()}
+                    </span>
+                    <span className="text-ink-2">{workspace.name} team</span>
+                  </>
+                )}
+              </span>
+
+              <span className="flex items-center gap-1.5">
+                <Calendar className="w-3.5 h-3.5" />
+                Updated {formatDate(article.updated_at || article.created_at)}
+              </span>
+
+              <span className="flex items-center gap-1.5">
+                <Clock className="w-3.5 h-3.5" />
+                {readingTime(article.content)}
+              </span>
+            </div>
+          </header>
+
+          {/* Outline on narrow screens, where the sidebar is hidden. */}
+          {headings.length > 2 && (
+            <details className="lg:hidden mt-6 rounded-xl border border-line bg-surface-2/50 overflow-hidden">
+              <summary className="px-4 py-3 text-[13px] font-medium text-ink cursor-pointer flex items-center gap-2 select-none">
+                <List className="w-3.5 h-3.5 text-ink-3" />
+                On this page
+              </summary>
+              <ul className="px-4 pb-3 space-y-1.5">
+                {headings.map((h) => (
+                  <li key={h.id} className={h.level === 2 ? 'pl-3' : ''}>
+                    <a
+                      href={`#${h.id}`}
+                      className="text-[13px] text-ink-2 hover:text-ink transition-colors"
+                    >
+                      {h.text}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
+
+          <div ref={bodyRef} className="mt-7 text-[15.5px] leading-[1.75]">
+            <MarkdownArticleContent content={article.content} />
+          </div>
+
+          {/* Feedback */}
+          <section className="mt-12 rounded-2xl border border-line bg-surface-2/50 p-6 text-center">
+            {voteState === 'done' ? (
+              <p className="flex items-center justify-center gap-2 text-[13.5px] font-medium text-emerald-600 dark:text-emerald-400">
+                <CheckCircle2 className="w-4 h-4" />
+                {vote === 'helpful'
+                  ? 'Thanks — glad this helped.'
+                  : "Thanks — we'll make this clearer."}
+              </p>
+            ) : voteState === 'error' ? (
+              <div className="space-y-2">
+                <p className="flex items-center justify-center gap-2 text-[13.5px] font-medium text-amber-600 dark:text-amber-400">
+                  <AlertCircle className="w-4 h-4" />
+                  We couldn&apos;t record that just now.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => submitVote(vote === 'helpful')}
+                  className="text-[13px] font-medium text-ink underline underline-offset-2 hover:no-underline cursor-pointer"
+                >
+                  Try again
+                </button>
+              </div>
+            ) : (
+              <>
+                <p className="text-[14px] font-medium text-ink">
+                  Did this answer your question?
+                </p>
+                <div className="mt-3.5 flex items-center justify-center gap-2.5">
+                  <button
+                    type="button"
+                    disabled={voteState === 'sending'}
+                    onClick={() => submitVote(true)}
+                    className="h-9 px-4 rounded-xl border border-line bg-surface text-[13px] font-medium text-ink inline-flex items-center gap-2 transition-colors hover:border-emerald-500/50 hover:bg-emerald-500/5 disabled:opacity-60 cursor-pointer"
+                  >
+                    <ThumbsUp className="w-3.5 h-3.5 text-emerald-500" />
+                    Yes
+                  </button>
+                  <button
+                    type="button"
+                    disabled={voteState === 'sending'}
+                    onClick={() => submitVote(false)}
+                    className="h-9 px-4 rounded-xl border border-line bg-surface text-[13px] font-medium text-ink inline-flex items-center gap-2 transition-colors hover:border-rose-500/50 hover:bg-rose-500/5 disabled:opacity-60 cursor-pointer"
+                  >
+                    <ThumbsDown className="w-3.5 h-3.5 text-rose-500" />
+                    No
+                  </button>
+                </div>
+              </>
+            )}
+          </section>
+
+          {/* Previous / next within the collection */}
+          {(prev || next) && (
+            <nav className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {prev ? (
+                <a
+                  href={articleHref(prev)}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    router.push(articleHref(prev));
+                  }}
+                  className="group rounded-xl border border-line bg-surface p-4 hover:border-ink-3/35 transition-colors"
+                >
+                  <span className="flex items-center gap-1.5 text-[11.5px] text-ink-3">
+                    <ArrowLeft className="w-3 h-3 transition-transform group-hover:-translate-x-0.5" />
+                    Previous
+                  </span>
+                  <span className="mt-1 block text-[13.5px] font-medium text-ink line-clamp-2">
+                    {prev.title}
+                  </span>
+                </a>
+              ) : (
+                <span />
+              )}
+
+              {next && (
+                <a
+                  href={articleHref(next)}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    router.push(articleHref(next));
+                  }}
+                  className="group rounded-xl border border-line bg-surface p-4 hover:border-ink-3/35 transition-colors sm:text-right"
+                >
+                  <span className="flex items-center gap-1.5 text-[11.5px] text-ink-3 sm:justify-end">
+                    Next
+                    <ArrowRight className="w-3 h-3 transition-transform group-hover:translate-x-0.5" />
+                  </span>
+                  <span className="mt-1 block text-[13.5px] font-medium text-ink line-clamp-2">
+                    {next.title}
+                  </span>
+                </a>
+              )}
+            </nav>
+          )}
+
+          {related.length > 0 && (
+            <section className="mt-10 pt-8 border-t border-line">
+              <h2 className="text-[15px] font-semibold text-ink">
+                More in {article.section?.name || 'this collection'}
+              </h2>
+              <ul className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                {related.map((r) => (
+                  <li key={r.id}>
+                    <a
+                      href={articleHref(r)}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        router.push(articleHref(r));
+                      }}
+                      className="block rounded-xl border border-line bg-surface p-3.5 hover:border-ink-3/35 transition-colors"
+                    >
+                      <span className="block text-[13.5px] font-medium text-ink line-clamp-1">
+                        {r.title}
+                      </span>
+                      {r.summary && (
+                        <span className="mt-0.5 block text-[12.5px] text-ink-3 line-clamp-1">
+                          {r.summary}
+                        </span>
+                      )}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+        </main>
+
+        {/* Desktop outline */}
+        {headings.length > 2 && (
+          <aside className="hidden lg:block w-56 shrink-0">
+            <nav className="sticky top-28">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-ink-3">
+                On this page
+              </p>
+              <ul className="mt-3 space-y-1.5 border-l border-line">
+                {headings.map((h) => (
+                  <li key={h.id}>
+                    <a
+                      href={`#${h.id}`}
+                      className={`block border-l-2 -ml-px pl-3 py-0.5 text-[12.5px] leading-snug transition-colors ${
+                        activeHeading === h.id
+                          ? 'border-[var(--brand)] text-ink font-medium'
+                          : 'border-transparent text-ink-3 hover:text-ink-2'
+                      } ${h.level === 2 ? 'pl-5' : ''}`}
+                    >
+                      {h.text}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </nav>
+          </aside>
+        )}
+      </div>
+
+      <HelpFooter workspace={workspace} />
+      <HelpWidget workspace={workspace} />
     </div>
   );
-}
-
-// Markdown Parser Component
-function RenderArticleContent({ content }: { content: string }) {
-  return <MarkdownArticleContent content={content} />;
 }

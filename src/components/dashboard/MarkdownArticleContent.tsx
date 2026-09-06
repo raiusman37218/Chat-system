@@ -17,6 +17,61 @@ interface MarkdownArticleContentProps {
 }
 
 /**
+ * Stable anchor for a heading, so a table of contents can link to it and a
+ * shared URL can land on the right part of a long article. Headings carried no
+ * id at all before, which made both impossible.
+ */
+export function headingId(text: string): string {
+  return (
+    text
+      .toLowerCase()
+      .replace(/[`*~_[\]()]/g, '')
+      .trim()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 60) || 'section'
+  );
+}
+
+export interface ArticleHeading {
+  id: string;
+  text: string;
+  level: 1 | 2 | 3;
+}
+
+/** Pulls the heading outline out of markdown, skipping fenced code blocks. */
+export function extractHeadings(content: string): ArticleHeading[] {
+  const out: ArticleHeading[] = [];
+  const seen = new Map<string, number>();
+  let inFence = false;
+
+  for (const line of (content || '').split('\n')) {
+    const t = line.trim();
+    if (t.startsWith('```')) {
+      inFence = !inFence;
+      continue;
+    }
+    if (inFence) continue;
+
+    const m = /^(#{1,3})\s+(.*)$/.exec(t);
+    if (!m || !m[2].trim()) continue;
+
+    const text = m[2].trim();
+    const base = headingId(text);
+    // Two headings can read the same; the anchor still has to be unique.
+    const n = (seen.get(base) || 0) + 1;
+    seen.set(base, n);
+
+    out.push({
+      id: n === 1 ? base : `${base}-${n}`,
+      text,
+      level: m[1].length as 1 | 2 | 3,
+    });
+  }
+  return out;
+}
+
+/**
  * Parses inline formatting like **bold**, *italic*, `code`, ~~strike~~, [links](url)
  */
 export function formatInlineText(text: string): React.ReactNode[] {
@@ -134,6 +189,16 @@ export function MarkdownArticleContent({
   const lines = content.split('\n');
   const elements: React.ReactNode[] = [];
   let index = 0;
+
+  // Must produce the same ids, in the same order, as extractHeadings — the
+  // table of contents links to these anchors.
+  const headingCounts = new Map<string, number>();
+  const nextHeadingId = (raw: string) => {
+    const base = headingId(raw);
+    const n = (headingCounts.get(base) || 0) + 1;
+    headingCounts.set(base, n);
+    return n === 1 ? base : `${base}-${n}`;
+  };
 
   while (index < lines.length) {
     const line = lines[index];
@@ -335,10 +400,12 @@ export function MarkdownArticleContent({
 
     // 7. Headings
     if (trimmed.startsWith('# ')) {
+      const raw = trimmed.replace('# ', '');
       elements.push(
         <h1
           key={`h1-${index}`}
-          className="text-[24px] sm:text-[28px] font-extrabold text-ink mt-7 mb-3 tracking-tight pb-2 border-b border-line"
+          id={nextHeadingId(raw)}
+          className="scroll-mt-24 text-[24px] sm:text-[28px] font-extrabold text-ink mt-7 mb-3 tracking-tight pb-2 border-b border-line"
         >
           {formatInlineText(trimmed.replace('# ', ''))}
         </h1>
@@ -348,10 +415,12 @@ export function MarkdownArticleContent({
     }
 
     if (trimmed.startsWith('## ')) {
+      const raw = trimmed.replace('## ', '');
       elements.push(
         <h2
           key={`h2-${index}`}
-          className="text-[19px] sm:text-[22px] font-bold text-ink mt-6 mb-2 tracking-tight pb-1.5 border-b border-line/60"
+          id={nextHeadingId(raw)}
+          className="scroll-mt-24 text-[19px] sm:text-[22px] font-bold text-ink mt-6 mb-2 tracking-tight pb-1.5 border-b border-line/60"
         >
           {formatInlineText(trimmed.replace('## ', ''))}
         </h2>
@@ -361,10 +430,12 @@ export function MarkdownArticleContent({
     }
 
     if (trimmed.startsWith('### ')) {
+      const raw = trimmed.replace('### ', '');
       elements.push(
         <h3
           key={`h3-${index}`}
-          className="text-[16px] sm:text-[17px] font-bold text-ink mt-5 mb-1 tracking-tight"
+          id={nextHeadingId(raw)}
+          className="scroll-mt-24 text-[16px] sm:text-[17px] font-bold text-ink mt-5 mb-1 tracking-tight"
         >
           {formatInlineText(trimmed.replace('### ', ''))}
         </h3>
