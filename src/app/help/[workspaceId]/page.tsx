@@ -194,25 +194,42 @@ export default function PublicHelpCenterPage() {
    * silently disappearing from the site, which is what used to happen.
    */
   const collections = useMemo(() => {
-    const list = sections
+    // Sort sections by order_index ascending, then created_at
+    const sorted = [...sections].sort((a, b) => {
+      const ao = a.order_index ?? 0;
+      const bo = b.order_index ?? 0;
+      if (ao !== bo) return ao - bo;
+      return new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime();
+    });
+
+    const list = sorted
       .filter((s) => (byCollection[s.id]?.length || 0) > 0)
-      .map((s) => ({
-        key: s.id,
-        slug: s.slug || s.id,
-        name: s.name,
-        description: s.description,
-        icon: s.icon || '📘',
-        articles: byCollection[s.id] || [],
-      }));
+      .map((s, idx) => {
+        const orderNum = s.order_index && s.order_index > 0 ? s.order_index : idx + 1;
+        const formattedNumber = String(orderNum).padStart(2, '0');
+        return {
+          key: s.id,
+          slug: s.slug || s.id,
+          name: s.name,
+          description: s.description,
+          icon: s.icon || '📘',
+          orderNumber: orderNum,
+          formattedNumber,
+          articles: byCollection[s.id] || [],
+        };
+      });
 
     const unsorted = byCollection[UNSORTED] || [];
     if (unsorted.length) {
+      const idx = list.length + 1;
       list.push({
         key: UNSORTED,
         slug: UNSORTED,
         name: 'Other articles',
         description: null,
         icon: '📄',
+        orderNumber: idx,
+        formattedNumber: String(idx).padStart(2, '0'),
         articles: unsorted,
       });
     }
@@ -458,6 +475,8 @@ interface Collection {
   name: string;
   description: string | null;
   icon: string;
+  orderNumber: number;
+  formattedNumber: string;
   articles: ListArticle[];
 }
 
@@ -612,6 +631,9 @@ function CollectionGrid({
 
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
+                    <span className="font-mono text-[11px] font-bold px-1.5 py-0.5 rounded-md bg-surface-2 border border-line text-ink-3 shrink-0">
+                      #{c.formattedNumber}
+                    </span>
                     <h3 className="text-[16.5px] font-semibold text-ink group-hover:text-accent transition-colors truncate">
                       {c.name}
                     </h3>
@@ -685,9 +707,14 @@ function CollectionGrid({
 
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center justify-between gap-2">
-                    <h3 className="text-[17px] font-bold text-ink group-hover:text-accent transition-colors truncate">
-                      {c.name}
-                    </h3>
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="font-mono text-[11px] font-bold px-1.5 py-0.5 rounded-md bg-surface-2 border border-line text-ink-3 shrink-0">
+                        #{c.formattedNumber}
+                      </span>
+                      <h3 className="text-[17px] font-bold text-ink group-hover:text-accent transition-colors truncate">
+                        {c.name}
+                      </h3>
+                    </div>
                     <ChevronRight className="w-4 h-4 text-ink-3 shrink-0 transition-transform group-hover:translate-x-0.5" />
                   </div>
                   {c.description && (
@@ -755,7 +782,12 @@ function CollectionGrid({
                     className="w-11 h-11 rounded-xl text-[20px]"
                     imgClassName="w-6 h-6"
                   />
-                  <ChevronRight className="w-4 h-4 text-ink-3 transition-transform group-hover:translate-x-0.5" />
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-mono text-[11px] font-bold px-1.5 py-0.5 rounded-md bg-surface-2 border border-line text-ink-3">
+                      #{c.formattedNumber}
+                    </span>
+                    <ChevronRight className="w-4 h-4 text-ink-3 transition-transform group-hover:translate-x-0.5" />
+                  </div>
                 </div>
 
                 <div>
@@ -824,7 +856,12 @@ function CollectionGrid({
                     className="w-10 h-10 rounded-lg text-[18px]"
                     imgClassName="w-5 h-5"
                   />
-                  <ChevronRight className="w-4 h-4 text-ink-3 transition-transform group-hover:translate-x-0.5" />
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-surface-2 border border-line text-ink-3">
+                      #{c.formattedNumber}
+                    </span>
+                    <ChevronRight className="w-4 h-4 text-ink-3 transition-transform group-hover:translate-x-0.5" />
+                  </div>
                 </div>
 
                 <h3 className="text-[15px] font-bold text-ink group-hover:text-accent transition-colors line-clamp-1">
@@ -862,16 +899,23 @@ function CollectionView({
 }) {
   return (
     <div className="space-y-4 animate-in fade-in">
-      {/* Clean Top Bar: Back button and count badge (NO duplicate section header card) */}
-      <div className="flex items-center justify-between pb-1">
-        <button
-          type="button"
-          onClick={onBack}
-          className="inline-flex items-center gap-2 text-[13.5px] font-semibold text-accent hover:underline cursor-pointer group"
-        >
-          <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
-          <span>All collections</span>
-        </button>
+      {/* Clean Top Bar: Back button, Section number & title, and count badge */}
+      <div className="flex items-center justify-between pb-1 flex-wrap gap-2">
+        <div className="flex items-center gap-2.5">
+          <button
+            type="button"
+            onClick={onBack}
+            className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-accent hover:underline cursor-pointer group"
+          >
+            <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+            <span>All collections</span>
+          </button>
+          <span className="text-ink-3 text-xs">/</span>
+          <span className="font-mono text-[11px] font-bold px-1.5 py-0.5 rounded-md bg-surface-2 border border-line text-ink-3">
+            #{collection.formattedNumber}
+          </span>
+          <h2 className="text-[14px] font-bold text-ink truncate">{collection.name}</h2>
+        </div>
         {collection.articles.length > 0 && (
           <span className="text-[12.5px] text-ink-3 font-medium">
             {collection.articles.length}{' '}

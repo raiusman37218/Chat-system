@@ -476,7 +476,7 @@ export function HelpDeskDashboard({
                 <span className="text-[11px] opacity-80">({articles.length})</span>
               </button>
 
-              {sections.map((sec) => (
+              {sections.map((sec, idx) => (
                 <button
                   key={sec.id}
                   onClick={() => setSelectedSectionId(sec.id)}
@@ -487,6 +487,9 @@ export function HelpDeskDashboard({
                       : 'bg-surface-2 text-ink-2 hover:bg-surface-3 hover:text-ink'
                   )}
                 >
+                  <span className="font-mono text-[10px] font-bold opacity-75">
+                    #{String(sec.order_index && sec.order_index > 0 ? sec.order_index : idx + 1).padStart(2, '0')}
+                  </span>
                   <span>{sec.icon || '📚'}</span>
                   <span>{sec.name}</span>
                   <span className="text-[11px] opacity-75">({sectionCounts[sec.id] || 0})</span>
@@ -602,6 +605,11 @@ export function HelpDeskDashboard({
 
                         {article.section ? (
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium bg-surface-2 text-ink-2 border border-line/60">
+                            {article.section.order_index ? (
+                              <span className="font-mono text-[10px] text-ink-3">
+                                #{String(article.section.order_index).padStart(2, '0')}
+                              </span>
+                            ) : null}
                             <span>{article.section.icon || '📁'}</span>
                             <span>{article.section.name}</span>
                           </span>
@@ -1600,9 +1608,9 @@ function ArticleEditorModal({
                 className="w-full h-10 px-3 rounded-xl border border-line bg-surface text-[13px] text-ink focus:outline-none focus:border-accent font-medium shadow-2xs"
               >
                 <option value="">(No Section - General)</option>
-                {sections.map((sec) => (
+                {sections.map((sec, idx) => (
                   <option key={sec.id} value={sec.id}>
-                    {sec.icon} {sec.name}
+                    #{String(sec.order_index && sec.order_index > 0 ? sec.order_index : idx + 1).padStart(2, '0')} {sec.icon} {sec.name}
                   </option>
                 ))}
               </select>
@@ -2296,12 +2304,25 @@ function SectionsManagerModal({
   const [sectionList, setSectionList] = useState<HelpSection[]>(sections);
   const [editingSec, setEditingSec] = useState<HelpSection | null>(null);
 
+  useEffect(() => {
+    setSectionList(sections);
+  }, [sections]);
+
+  const sortedSectionList = useMemo(() => {
+    return [...sectionList].sort((a, b) => {
+      const ao = a.order_index ?? 0;
+      const bo = b.order_index ?? 0;
+      if (ao !== bo) return ao - bo;
+      return new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime();
+    });
+  }, [sectionList]);
+
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [icon, setIcon] = useState('📚');
   const [iconTab, setIconTab] = useState<'presets' | 'custom'>('presets');
   const [uploadingIcon, setUploadingIcon] = useState(false);
-  const [orderIndex, setOrderIndex] = useState(0);
+  const [orderIndex, setOrderIndex] = useState(sections.length + 1);
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [showSectionEmojiPicker, setShowSectionEmojiPicker] = useState(false);
@@ -2456,10 +2477,15 @@ function SectionsManagerModal({
                 imgClassName="w-7 h-7"
               />
               <div className="min-w-0 flex-1">
-                <div className="text-[14px] font-bold text-ink truncate">
-                  {name.trim() || 'Section Title Preview'}
+                <div className="flex items-center gap-2">
+                  <span className="font-mono text-[11px] font-bold px-1.5 py-0.5 rounded bg-surface-2 border border-line text-ink-3 shrink-0">
+                    #{String(orderIndex > 0 ? orderIndex : (sectionList.length + 1)).padStart(2, '0')}
+                  </span>
+                  <div className="text-[14px] font-bold text-ink truncate">
+                    {name.trim() || 'Section Title Preview'}
+                  </div>
                 </div>
-                <div className="text-[11.5px] text-ink-3 truncate">
+                <div className="text-[11.5px] text-ink-3 truncate mt-0.5">
                   {description.trim() || 'Short description preview will appear here'}
                 </div>
               </div>
@@ -2470,15 +2496,30 @@ function SectionsManagerModal({
 
             {/* Section Name & Description */}
             <div className="space-y-2">
-              <div>
-                <label className="text-[11px] font-semibold text-ink-2">Section Name</label>
-                <input
-                  type="text"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="e.g. Account Types, Withdrawals, Risk Limits"
-                  className="w-full h-8 px-3 rounded-lg border border-line bg-surface text-[12.5px] text-ink focus:outline-none focus:border-accent"
-                />
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-2.5">
+                <div className="sm:col-span-3">
+                  <label className="text-[11px] font-semibold text-ink-2">Section Name</label>
+                  <input
+                    type="text"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="e.g. Account Types, Withdrawals, Risk Limits"
+                    className="w-full h-8 px-3 rounded-lg border border-line bg-surface text-[12.5px] text-ink focus:outline-none focus:border-accent"
+                  />
+                </div>
+                <div className="sm:col-span-1">
+                  <label className="text-[11px] font-semibold text-ink-2" title="Display Order Number">
+                    Section #
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    value={orderIndex || ''}
+                    onChange={(e) => setOrderIndex(Math.max(0, parseInt(e.target.value, 10) || 0))}
+                    placeholder="1, 2, 3..."
+                    className="w-full h-8 px-3 rounded-lg border border-line bg-surface text-[12.5px] font-mono text-ink focus:outline-none focus:border-accent"
+                  />
+                </div>
               </div>
 
               <div>
@@ -2620,51 +2661,59 @@ function SectionsManagerModal({
           {/* Current Sections List */}
           <div className="space-y-2">
             <span className="text-[12px] font-semibold text-ink uppercase tracking-wider">
-              Existing Sections ({sectionList.length})
+              Existing Sections ({sortedSectionList.length})
             </span>
 
-            {sectionList.length === 0 ? (
+            {sortedSectionList.length === 0 ? (
               <p className="text-[12px] text-ink-3 italic">No sections created yet.</p>
             ) : (
               <div className="border border-line rounded-xl divide-y divide-line/80 overflow-hidden bg-surface">
-                {sectionList.map((sec) => (
-                  <div
-                    key={sec.id}
-                    className="p-3 flex items-center justify-between gap-3 hover:bg-surface-2/50 transition-colors"
-                  >
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <SectionIconPreview
-                        icon={sec.icon}
-                        className="w-8 h-8 rounded-lg text-[16px]"
-                        imgClassName="w-5 h-5"
-                      />
-                      <div className="min-w-0">
-                        <div className="text-[13px] font-semibold text-ink truncate">{sec.name}</div>
-                        {sec.description && (
-                          <div className="text-[11.5px] text-ink-3 truncate">{sec.description}</div>
-                        )}
+                {sortedSectionList.map((sec, idx) => {
+                  const displayNum = String(
+                    sec.order_index && sec.order_index > 0 ? sec.order_index : idx + 1
+                  ).padStart(2, '0');
+                  return (
+                    <div
+                      key={sec.id}
+                      className="p-3 flex items-center justify-between gap-3 hover:bg-surface-2/50 transition-colors"
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <span className="font-mono text-[11px] font-bold px-1.5 py-0.5 rounded bg-surface-2 border border-line text-ink-3 shrink-0">
+                          #{displayNum}
+                        </span>
+                        <SectionIconPreview
+                          icon={sec.icon}
+                          className="w-8 h-8 rounded-lg text-[16px]"
+                          imgClassName="w-5 h-5"
+                        />
+                        <div className="min-w-0">
+                          <div className="text-[13px] font-semibold text-ink truncate">{sec.name}</div>
+                          {sec.description && (
+                            <div className="text-[11.5px] text-ink-3 truncate">{sec.description}</div>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <button
+                          onClick={() => handleStartEdit(sec)}
+                          className="h-7 w-7 rounded hover:bg-surface-2 flex items-center justify-center text-ink-2 hover:text-ink transition-colors cursor-pointer"
+                          title="Edit section"
+                        >
+                          <Edit2 className="w-3 h-3" />
+                        </button>
+
+                        <button
+                          onClick={() => handleDeleteSection(sec.id, sec.name)}
+                          className="h-7 w-7 rounded hover:bg-rose-500/10 flex items-center justify-center text-ink-3 hover:text-rose-500 transition-colors cursor-pointer"
+                          title="Delete section"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
                       </div>
                     </div>
-
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      <button
-                        onClick={() => handleStartEdit(sec)}
-                        className="h-7 w-7 rounded hover:bg-surface-2 flex items-center justify-center text-ink-2 hover:text-ink transition-colors cursor-pointer"
-                        title="Edit section"
-                      >
-                        <Edit2 className="w-3 h-3" />
-                      </button>
-
-                      <button
-                        onClick={() => handleDeleteSection(sec.id, sec.name)}
-                        className="h-7 w-7 rounded hover:bg-rose-500/10 flex items-center justify-center text-ink-3 hover:text-rose-500 transition-colors cursor-pointer"
-                        title="Delete section"
-                      >
-                        <Trash2 className="w-3 h-3" />
-                      </button>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>

@@ -95,7 +95,7 @@ export default function ArticleDetailPage() {
           supabase
             .from('articles')
             .select(
-              '*, author:agents(id, name, avatar_url), section:help_sections(id, name, slug, icon)'
+              '*, author:agents(id, name, avatar_url), section:help_sections(id, name, slug, icon, order_index)'
             )
             .eq('workspace_id', ws.id)
             .eq('status', 'published');
@@ -394,9 +394,14 @@ export default function ArticleDetailPage() {
                 <button
                   type="button"
                   onClick={goToCollection}
-                  className="hover:text-ink transition-colors cursor-pointer"
+                  className="hover:text-ink transition-colors cursor-pointer inline-flex items-center gap-1.5"
                 >
-                  {article.section.icon} {article.section.name}
+                  {article.section.order_index ? (
+                    <span className="font-mono text-[10.5px] font-bold px-1.5 py-0.2 rounded bg-surface-2 border border-line text-ink-3">
+                      #{String(article.section.order_index).padStart(2, '0')}
+                    </span>
+                  ) : null}
+                  <span>{article.section.icon} {article.section.name}</span>
                 </button>
               </>
             )}
