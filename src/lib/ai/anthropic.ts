@@ -1,5 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { createClient } from '@supabase/supabase-js';
+import { answerFromHelpCenter, wantsHuman } from './help-answer';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://vfjsaynnubxywdbevxtx.supabase.co';
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZmanNheW5udWJ4eXdkYmV2eHR4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgyNTA5MDEsImV4cCI6MjEwMzgyNjkwMX0.YyBCXMqwrOk5BRhQafYLFw8tiM5PC8lc8Yocodw9wf0';
@@ -31,6 +32,8 @@ export async function generateHelpDeskResponseWithHandover({
   visitorName,
   apiKey,
   systemPrompt,
+  history,
+  helpCenterUrl,
 }: {
   workspaceId: string;
   conversationId: string;
@@ -38,19 +41,20 @@ export async function generateHelpDeskResponseWithHandover({
   visitorName?: string;
   apiKey?: string | null;
   systemPrompt?: string | null;
+  /** Earlier visitor turns, most recent first, for follow-up questions. */
+  history?: string[];
+  /** Lets the answer link to the full article on the customer's own domain. */
+  helpCenterUrl?: string | null;
 }): Promise<HelpDeskResponseResult> {
   const supabase = getSupabase();
 
-  // 0. Check for explicit human agent request in incoming text
-  const humanRequestRegex =
-    /\b(human|agent|person|representative|support agent|live support|operator|real person|talk to someone|speak to someone|baat karni|insan|human support|customer care|speak with human|contact agent)\b/i;
-  const isExplicitHumanRequest = humanRequestRegex.test(incomingMessage);
-
-  if (isExplicitHumanRequest) {
+  // 0. An explicit request for a person is answered by fetching one, however
+  // well the documentation happens to match the words.
+  if (wantsHuman(incomingMessage)) {
     return {
-      replyText: `Hello ${visitorName || 'there'}! 👋 I understand you'd like to speak with a human support specialist. I have transferred your conversation to our live team, and someone will assist you shortly!`,
+      replyText: `Of course${visitorName ? `, ${visitorName}` : ''} — I'm bringing in someone from the team now. They'll pick this up here shortly.`,
       shouldHandover: true,
-      handoverReason: 'Customer explicitly requested to speak with a human agent.',
+      handoverReason: 'Customer explicitly asked to speak with a person.',
       canAnswerFromDocs: false,
     };
   }
@@ -167,26 +171,56 @@ Do not invent or hallucinate policies not found in the documentation. Do not men
     }
   }
 
-  // Heuristic RAG Fallback when API key is not configured or fails
-  const bestMatch = scoredArticles.find((item) => item.score > 0)?.article;
-  const bestScore = scoredArticles[0]?.score || 0;
+  // No model API configured, or the call failed. Answer from the workspace's
+  // own help centre instead of guessing.
+  //
+  // What used to be here counted substring hits per word and, above a score of
+  // 4, replied with the article's first 220 characters and an ellipsis. It
+  // answered questions the documentation did not cover, because a single
+  // ordinary word in common was enough to clear the bar.
+  const answer = await answerFromHelpCenter({
+    workspaceId,
+    message: incomingMessage,
+    history,
+    visitorName,
+    helpCenterUrl,
+  });
 
-  if (bestMatch && bestScore >= 4) {
-    const sectionName = bestMatch.section_id ? sectionMap.get(bestMatch.section_id) : null;
-    const prefix = sectionName ? `our Help Center (${sectionName} - "${bestMatch.title}")` : `"${bestMatch.title}"`;
-    const excerpt = bestMatch.summary || bestMatch.content.slice(0, 220);
+  if (answer.text) {
+    // Greet on the opening reply only. Repeating "Hi <name>!" on every answer
+    // reads like a bot resetting itself mid-conversation.
+    const isFirstReply = !history || history.length === 0;
+    // A greeting run into a bullet list ("Hi Sam! • Withdrawals run…") looks
+    // broken, so multi-line answers get the greeting on its own line.
+    const multiline = answer.text.includes('\n');
+    const greeting =
+      isFirstReply && visitorName
+        ? `Hi ${visitorName}!${multiline ? '\n\n' : ' '}`
+        : '';
+    let text = `${greeting}${answer.text}`;
+
+    if (answer.alternatives.length) {
+      const others = answer.alternatives.map((a) => `• ${a.title}`).join('\n');
+      text += `\n\nThese might help too:\n${others}`;
+    }
+
+    // A partial match still gets a human queued behind it: the customer has an
+    // answer to read now, and a person on the way if it was the wrong one.
     return {
-      replyText: `Hello ${visitorName || 'there'}! 👋 Based on ${prefix}:\n\n${excerpt}...\n\nLet us know if you have any questions, our support team has been alerted!`,
-      shouldHandover: false,
+      replyText: text,
+      shouldHandover: answer.confidence !== 'high',
+      handoverReason:
+        answer.confidence !== 'high'
+          ? `Answered from "${answer.article?.title}" but only a partial match (${answer.reason}).`
+          : undefined,
       canAnswerFromDocs: true,
     };
   }
 
-  // If score is 0 or low relevance, Help Desk doesn't cover this: Trigger Handover!
   return {
-    replyText: `Hello ${visitorName || 'there'}! 👋 I couldn't find specific documentation covering your inquiry in our Help Center, so I've transferred your conversation to our live support team. A specialist has been alerted and will assist you shortly!`,
+    replyText: `${visitorName ? `Hi ${visitorName}! ` : ''}That one isn't covered in our help centre, so I've passed it to the team — someone will reply here shortly.`,
     shouldHandover: true,
-    handoverReason: 'Inquiry is not covered in Help Desk documentation.',
+    handoverReason: `Help centre could not answer: ${answer.reason}`,
     canAnswerFromDocs: false,
   };
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertTriangle,
   AtSign,
@@ -27,6 +27,7 @@ import {
   ArrowLeft,
   Smile,
   Frown,
+  CornerUpLeft,
 } from 'lucide-react';
 import {
   Agent,
@@ -52,10 +53,12 @@ interface ChatThreadProps {
   messages: Message[];
   currentAgent: Agent | null;
   agentsList: Agent[];
+  /** @param replyToId - the message being quoted, when the agent used Reply. */
   onSendMessage: (
     content: string,
     isInternal?: boolean,
-    conversationId?: string
+    conversationId?: string,
+    replyToId?: string | null
   ) => Promise<void>;
   onUpdateStatus: (status: ConversationStatus) => Promise<void>;
   onAssignAgent: (agentId: string | null) => Promise<void>;
@@ -134,6 +137,11 @@ export function ChatThread({
   isDetailsSidebarOpen = true,
 }: ChatThreadProps) {
   const [inputText, setInputText] = useState('');
+  const composerRef = useRef<HTMLDivElement>(null);
+  /** The message the agent is replying to, or null for a plain message. */
+  const [replyTo, setReplyTo] = useState<Message | null>(null);
+  /** Briefly tinted after a quote is clicked, so the eye finds the original. */
+  const [highlightedId, setHighlightedId] = useState<string | null>(null);
   const [isSending, setIsSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
   const [composerMode, setComposerMode] = useState<'reply' | 'internal'>('reply');
@@ -434,7 +442,10 @@ export function ChatThread({
         setMentionedAgentIds([]);
       }
 
-      await onSendMessage(text, isInternal, conversation.id);
+      // An internal note is not a chat message, so it cannot quote one.
+      const quotedId = isInternal ? null : replyTo?.id ?? null;
+      await onSendMessage(text, isInternal, conversation.id, quotedId);
+      setReplyTo(null);
 
       // If customer is on WhatsApp, Instagram, Messenger, or LinkedIn, dispatch outbound
       if (!isInternal && conversation.channel && conversation.channel !== 'web') {
@@ -453,6 +464,8 @@ export function ChatThread({
       console.error('Failed to send message:', err);
       // Give the draft back AND say so — silently restoring the text looked
       // like the message had been sent and then reappeared.
+      // The quote is part of the draft: dropping it on failure would send a
+      // bare message on retry, answering nothing in particular.
       setInputText(text);
       setSendError(
         err instanceof Error ? err.message : 'Could not send. Try again.'
@@ -622,6 +635,43 @@ export function ChatThread({
     [agentsList, currentAgent?.id]
   );
 
+  // A quote needs the message it points at. The id is all that is stored, so
+  // resolve it from the thread already in memory rather than re-fetching.
+  const messageById = useMemo(
+    () => new Map(messages.map((m) => [m.id, m])),
+    [messages]
+  );
+
+  const startReply = useCallback((msg: Message) => {
+    setReplyTo(msg);
+    setComposerMode('reply');
+    // Focus last: the composer grows when the quote bar appears, and focusing
+    // before that leaves the caret scrolled out of view.
+    requestAnimationFrame(() => textareaRef.current?.focus());
+  }, []);
+
+  // Escape drops the quote first: the composer's other Escape behaviours
+  // (closing pickers, deselecting) would otherwise swallow it.
+  useEffect(() => {
+    if (!replyTo) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') {
+        e.stopPropagation();
+        setReplyTo(null);
+      }
+    }
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, [replyTo]);
+
+  const jumpToMessage = useCallback((id: string) => {
+    const node = document.getElementById(`msg-${id}`);
+    if (!node) return;
+    node.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    setHighlightedId(id);
+    window.setTimeout(() => setHighlightedId((c) => (c === id ? null : c)), 1600);
+  }, []);
+
   // Render list with day separators injected between calendar days.
   const rendered: React.ReactNode[] = [];
   let lastDay = '';
@@ -673,7 +723,12 @@ export function ChatThread({
     rendered.push(
       <div
         key={msg.id}
-        className={cn('flex gap-2.5', isAgent ? 'justify-end' : 'justify-start')}
+        id={`msg-${msg.id}`}
+        className={cn(
+          'flex gap-2.5 scroll-mt-24 rounded-2xl transition-colors duration-500',
+          isAgent ? 'justify-end' : 'justify-start',
+          highlightedId === msg.id && 'bg-accent-soft/60'
+        )}
       >
         {!isAgent && (
           <Avatar
@@ -684,7 +739,36 @@ export function ChatThread({
           />
         )}
 
-        <div className={cn('max-w-[min(560px,72%)]', isAgent && 'items-end')}>
+        <div
+          className={cn(
+            'group/msg relative max-w-[min(560px,72%)]',
+            isAgent && 'items-end'
+          )}
+        >
+          {/* Quote the message being answered, so "yes, that's right" is never
+              ambiguous about which of the last four questions it answers. */}
+          {msg.reply_to_message_id && (
+            <QuotedMessage
+              quoted={messageById.get(msg.reply_to_message_id) || null}
+              visitorName={displayName}
+              onJump={() => jumpToMessage(msg.reply_to_message_id!)}
+              tone={isAgent ? 'out' : 'in'}
+            />
+          )}
+
+          <button
+            type="button"
+            title="Reply to this message"
+            aria-label="Reply to this message"
+            onClick={() => startReply(msg)}
+            className={cn(
+              'absolute top-0 z-10 w-7 h-7 grid place-items-center rounded-full border border-line bg-surface text-ink-3 shadow-xs opacity-0 transition-opacity hover:text-ink focus-visible:opacity-100 group-hover/msg:opacity-100',
+              isAgent ? '-left-9' : '-right-9'
+            )}
+          >
+            <CornerUpLeft className="w-3.5 h-3.5" />
+          </button>
+
           <div
             className={cn(
               'px-4 py-2.5 text-[13.5px] leading-relaxed whitespace-pre-wrap break-words',
@@ -750,6 +834,18 @@ export function ChatThread({
   if (loading) {
     return <ChatThreadSkeleton />;
   }
+
+  const replyPreview = replyTo
+    ? {
+        who:
+          replyTo.sender_type === 'agent'
+            ? replyTo.agent?.name || 'You'
+            : replyTo.sender_type === 'ai'
+            ? 'Chatify bot'
+            : displayName,
+        text: replyTo.content,
+      }
+    : null;
 
   return (
     <div className="@container/thread flex-1 min-w-0 h-screen flex flex-col bg-canvas">
@@ -1307,6 +1403,31 @@ export function ChatThread({
               : 'bg-surface border-line focus-within:border-accent/80 focus-within:ring-2 focus-within:ring-accent/20'
           )}
         >
+          {/* Replying to — kept above the toolbar so the message being
+              answered stays in view while the answer is written. */}
+          {replyPreview && !isInternalMode && (
+            <div className="flex items-start gap-2 px-3 pt-2.5 pb-2 border-b border-line/40 bg-accent-soft/30">
+              <span className="mt-0.5 w-0.5 self-stretch rounded-full bg-accent shrink-0" />
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] font-semibold text-accent">
+                  Replying to {replyPreview.who}
+                </p>
+                <p className="text-[12px] text-ink-2 truncate">
+                  {replyPreview.text}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setReplyTo(null)}
+                title="Cancel reply"
+                aria-label="Cancel reply"
+                className="shrink-0 w-6 h-6 grid place-items-center rounded-md text-ink-3 hover:text-ink hover:bg-surface-2 transition-colors"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
+
           {/* Composer Header Bar */}
           <div className="px-3 pt-2 pb-1.5 flex items-center justify-between gap-2 border-b border-line/40 bg-surface-2/30">
             <div className="inline-flex items-center gap-1 p-0.5 rounded-lg bg-surface-2 border border-line/60">
@@ -1625,5 +1746,69 @@ export function ChatThread({
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * The message a reply is answering, shown above it.
+ *
+ * A deleted original leaves the reply intact but unquotable — say so rather
+ * than render an empty bar, which reads like a rendering bug.
+ */
+function QuotedMessage({
+  quoted,
+  visitorName,
+  onJump,
+  tone,
+}: {
+  quoted: Message | null;
+  visitorName: string;
+  onJump: () => void;
+  tone: 'in' | 'out';
+}) {
+  const who = !quoted
+    ? ''
+    : quoted.sender_type === 'agent'
+    ? quoted.agent?.name || 'Agent'
+    : quoted.sender_type === 'ai'
+    ? 'Chatify bot'
+    : visitorName;
+
+  return (
+    <button
+      type="button"
+      onClick={quoted ? onJump : undefined}
+      disabled={!quoted}
+      className={cn(
+        'mb-1 w-full flex items-stretch gap-2 rounded-xl border px-2.5 py-1.5 text-left transition-colors',
+        tone === 'out'
+          ? 'border-line/60 bg-surface-2/70'
+          : 'border-line/60 bg-surface-2/50',
+        quoted ? 'hover:bg-surface-3/60 cursor-pointer' : 'cursor-default'
+      )}
+    >
+      <span
+        className={cn(
+          'w-0.5 rounded-full shrink-0',
+          quoted ? 'bg-accent' : 'bg-line'
+        )}
+      />
+      <span className="min-w-0 flex-1">
+        {quoted ? (
+          <>
+            <span className="block text-[10.5px] font-semibold text-accent">
+              {who}
+            </span>
+            <span className="block text-[12px] text-ink-2 line-clamp-2">
+              {quoted.content}
+            </span>
+          </>
+        ) : (
+          <span className="block text-[12px] italic text-ink-3">
+            Original message deleted
+          </span>
+        )}
+      </span>
+    </button>
   );
 }

@@ -985,6 +985,33 @@ ${v}`}var T=class extends Error{constructor({message:e,code:t,cause:s,name:i}){v
 
       /* pre-wrap belongs on the text node only \u2014 on the bubble it would also
          render the markup's own indentation as blank lines. */
+      .chatify-msg-quote {
+        display: flex;
+        flex-direction: column;
+        gap: 1px;
+        margin-bottom: 6px;
+        padding: 5px 8px;
+        border-left: 2px solid currentColor;
+        border-radius: 6px;
+        background: rgba(127, 127, 127, 0.14);
+        opacity: 0.85;
+        font-size: 12px;
+        line-height: 1.35;
+      }
+      .chatify-msg-quote-who {
+        font-weight: 600;
+        font-size: 11px;
+        opacity: 0.9;
+      }
+      .chatify-msg-quote-text {
+        /* Two lines is enough to identify the message without burying the
+           reply underneath the thing it is replying to. */
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+        opacity: 0.85;
+      }
       .chatify-msg-text {
         white-space: pre-wrap;
         word-wrap: break-word;
@@ -1417,7 +1444,7 @@ ${v}`}var T=class extends Error{constructor({message:e,code:t,cause:s,name:i}){v
           <p style="color:var(--w-ink); font-size:15px; font-weight:600; letter-spacing:-.012em; margin-bottom:5px;">How can we help?</p>
           <p style="color:var(--w-ink-2); font-size:13px; line-height:1.55;">Send a message below and someone from our team will pick it up.</p>
         </div>
-      `;return}if(this.messages.forEach(t=>{if(t.is_internal)return;let s=t.sender_type==="visitor",i=new Date(t.created_at).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"}),n=document.createElement("div");n.className="chatify-message-row";let a=document.createElement("div");a.className=s?"chatify-msg-visitor":"chatify-msg-agent";let o=s?this.renderTicks(t):"";a.innerHTML=`<div class="chatify-msg-text">${this.escapeHTML(t.content)}</div><div class="chatify-msg-time">${i}${o}</div>`,n.appendChild(a),e.appendChild(n)}),this.conversationStatus==="closed"&&!this.csatRated){let t=document.createElement("div");t.className="chatify-csat-box",t.innerHTML=`
+      `;return}if(this.messages.forEach(t=>{if(t.is_internal)return;let s=t.sender_type==="visitor",i=new Date(t.created_at).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"}),n=document.createElement("div");n.className="chatify-message-row";let a=document.createElement("div");a.className=s?"chatify-msg-visitor":"chatify-msg-agent";let o=s?this.renderTicks(t):"",l=t.reply_to_message_id?this.messages.find(h=>h.id===t.reply_to_message_id):null,c=l?`<div class="chatify-msg-quote"><span class="chatify-msg-quote-who">${l.sender_type==="visitor"?"You":"Support"}</span><span class="chatify-msg-quote-text">${this.escapeHTML(l.content.length>120?`${l.content.slice(0,120)}\u2026`:l.content)}</span></div>`:"";a.innerHTML=c+`<div class="chatify-msg-text">${this.escapeHTML(t.content)}</div><div class="chatify-msg-time">${i}${o}</div>`,n.appendChild(a),e.appendChild(n)}),this.conversationStatus==="closed"&&!this.csatRated){let t=document.createElement("div");t.className="chatify-csat-box",t.innerHTML=`
         <div class="chatify-csat-title">How was your conversation?</div>
         <div class="chatify-csat-sub">Please rate the support you received today:</div>
         <div class="chatify-csat-emojis">

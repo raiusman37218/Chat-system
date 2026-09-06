@@ -71,11 +71,12 @@ export function Avatar({
     // stretch to the row in an `align-items: stretch` flex parent, dragging
     // the absolutely-positioned presence dot down with it.
     <div className={cn('relative shrink-0', SIZES[size], className)}>
+      {/* Size and text size live on the wrapper alone. Repeating SIZES[size]
+          here pinned the circle to the prop's dimensions, so a caller passing
+          `className="w-5 h-5"` got a 20px wrapper around a 32px circle — it
+          spilled out and overlapped the text beside it. */}
       <div
-        className={cn(
-          'w-full h-full rounded-full flex items-center justify-center font-semibold uppercase select-none',
-          SIZES[size]
-        )}
+        className="w-full h-full rounded-full flex items-center justify-center font-semibold uppercase select-none"
         style={{ backgroundColor: bg, color: fg }}
       >
         {(name || '?').charAt(0)}

@@ -43,6 +43,8 @@ interface MessageItem {
   read_at?: string | null;
   /** Client-only: still in flight, shown as a clock rather than a tick. */
   pending?: boolean;
+  /** The message this one answers, when the agent used Reply. */
+  reply_to_message_id?: string | null;
 }
 
 interface FAQItem {
@@ -1974,6 +1976,33 @@ class ChatifyWidget {
 
       /* pre-wrap belongs on the text node only — on the bubble it would also
          render the markup's own indentation as blank lines. */
+      .chatify-msg-quote {
+        display: flex;
+        flex-direction: column;
+        gap: 1px;
+        margin-bottom: 6px;
+        padding: 5px 8px;
+        border-left: 2px solid currentColor;
+        border-radius: 6px;
+        background: rgba(127, 127, 127, 0.14);
+        opacity: 0.85;
+        font-size: 12px;
+        line-height: 1.35;
+      }
+      .chatify-msg-quote-who {
+        font-weight: 600;
+        font-size: 11px;
+        opacity: 0.9;
+      }
+      .chatify-msg-quote-text {
+        /* Two lines is enough to identify the message without burying the
+           reply underneath the thing it is replying to. */
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+        opacity: 0.85;
+      }
       .chatify-msg-text {
         white-space: pre-wrap;
         word-wrap: break-word;
@@ -2510,7 +2539,24 @@ class ChatifyWidget {
       // Ticks only on the visitor's own messages: a receipt for something the
       // other side sent you is meaningless.
       const ticks = isVisitor ? this.renderTicks(msg) : '';
+
+      // When the agent replied to a particular message, show which one. The
+      // visitor otherwise has to guess which of their questions was answered.
+      const quoted = msg.reply_to_message_id
+        ? this.messages.find((m) => m.id === msg.reply_to_message_id)
+        : null;
+      const quoteHtml = quoted
+        ? `<div class="chatify-msg-quote"><span class="chatify-msg-quote-who">${
+            quoted.sender_type === 'visitor' ? 'You' : 'Support'
+          }</span><span class="chatify-msg-quote-text">${this.escapeHTML(
+            quoted.content.length > 120
+              ? `${quoted.content.slice(0, 120)}…`
+              : quoted.content
+          )}</span></div>`
+        : '';
+
       bubble.innerHTML =
+        quoteHtml +
         `<div class="chatify-msg-text">${this.escapeHTML(msg.content)}</div>` +
         `<div class="chatify-msg-time">${timeStr}${ticks}</div>`;
 

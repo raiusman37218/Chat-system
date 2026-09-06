@@ -10,6 +10,29 @@ import { dispatchOutboundMessage } from '@/lib/channels/dispatcher';
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://vfjsaynnubxywdbevxtx.supabase.co';
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZmanNheW5udWJ4eXdkYmV2eHR4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgyNTA5MDEsImV4cCI6MjEwMzgyNjkwMX0.YyBCXMqwrOk5BRhQafYLFw8tiM5PC8lc8Yocodw9wf0';
 
+/**
+ * Where the customer can read the full article.
+ *
+ * A verified custom domain is the customer's own; otherwise the answer links
+ * back to the platform path, which still works.
+ */
+function helpCenterUrlFor(ws: {
+  slug?: string | null;
+  custom_domain?: string | null;
+  custom_domain_status?: string | null;
+} | null): string | null {
+  if (!ws) return null;
+  if (ws.custom_domain && ws.custom_domain_status === 'verified') {
+    return `https://${ws.custom_domain}`;
+  }
+  const origin =
+    process.env.NEXT_PUBLIC_APP_URL ||
+    (process.env.VERCEL_PROJECT_PRODUCTION_URL
+      ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+      : null);
+  return origin && ws.slug ? `${origin.replace(/\/$/, '')}/help/${ws.slug}` : null;
+}
+
 // In-memory set to prevent concurrent auto-response runs for the same conversation
 const inFlightConversations = new Set<string>();
 
@@ -38,7 +61,7 @@ export async function POST(req: NextRequest) {
     // 1. Fetch workspace AI settings
     const { data: workspace } = await supabase
       .from('workspaces')
-      .select('ai_settings')
+      .select('ai_settings, slug, custom_domain, custom_domain_status')
       .eq('id', workspace_id)
       .single();
 
@@ -65,19 +88,44 @@ export async function POST(req: NextRequest) {
       .order('created_at', { ascending: true });
 
     const msgs = existingMessages || [];
-    const visitorMsg = msgs.find((m) => m.sender_type === 'visitor');
-    if (!visitorMsg) {
+
+    // A handover sets ai_mode to 'disabled'; once a person owns the thread the
+    // assistant stays out of it.
+    if (conv.ai_mode === 'disabled') {
+      return NextResponse.json({ replied: false, reason: 'AI disabled on this conversation' });
+    }
+
+    // The *latest* visitor message, not the first. Answering only the opening
+    // message meant every follow-up went unanswered until an agent appeared,
+    // even when the help centre covered it.
+    let visitorIndex = -1;
+    for (let i = msgs.length - 1; i >= 0; i--) {
+      if (msgs[i].sender_type === 'visitor' && !msgs[i].is_internal) {
+        visitorIndex = i;
+        break;
+      }
+    }
+    if (visitorIndex === -1) {
       return NextResponse.json({ replied: false, reason: 'No visitor message found' });
     }
 
-    const visitorMsgIndex = msgs.findIndex((m) => m.id === visitorMsg.id);
+    const visitorMsg = msgs[visitorIndex];
     const hasAgentOrAiReply = msgs
-      .slice(visitorMsgIndex + 1)
+      .slice(visitorIndex + 1)
       .some((m) => m.sender_type === 'agent' || m.sender_type === 'ai');
 
     if (hasAgentOrAiReply) {
       return NextResponse.json({ replied: false, reason: 'Already responded' });
     }
+
+    // Everything the visitor said before this turn, most recent first. A
+    // follow-up like "and how long does that take?" is meaningless on its own.
+    const history = msgs
+      .slice(0, visitorIndex)
+      .filter((m) => m.sender_type === 'visitor' && !m.is_internal)
+      .map((m) => m.content as string)
+      .reverse()
+      .slice(0, 4);
 
     // 3. Generate RAG First Response using workspace Help Desk sections and articles
     const result = await generateHelpDeskResponseWithHandover({
@@ -86,6 +134,8 @@ export async function POST(req: NextRequest) {
       incomingMessage: visitorMsg.content,
       visitorName: conv.visitor?.name,
       apiKey: aiSettings?.anthropic_api_key,
+      history,
+      helpCenterUrl: helpCenterUrlFor(workspace),
     });
 
     const aiResponseText = result.replyText;

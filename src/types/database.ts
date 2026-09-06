@@ -114,6 +114,8 @@ export interface Message {
   read_at: string | null;
   /** Client-only: true while an optimistic message is still in flight. */
   pending?: boolean;
+  /** The message this one quotes, when the sender replied to a specific one. */
+  reply_to_message_id?: string | null;
 
   // Joined or metadata
   agent?: Agent | null;

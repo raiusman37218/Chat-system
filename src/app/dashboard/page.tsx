@@ -569,7 +569,8 @@ export default function DashboardPage() {
   const handleSendMessage = async (
     content: string,
     isInternal: boolean = false,
-    conversationId?: string
+    conversationId?: string,
+    replyToId?: string | null
   ) => {
     const targetId = conversationId || selectedConversationIdRef.current;
     if (!targetId) {
@@ -585,6 +586,9 @@ export default function DashboardPage() {
       sender_id: currentAgent.id,
       content,
       is_internal: isInternal,
+      // Omitted rather than set to null when there is no quote, so the insert
+      // still works against a database that has not run the migration yet.
+      ...(replyToId ? { reply_to_message_id: replyToId } : {}),
     });
 
     if (error) {
