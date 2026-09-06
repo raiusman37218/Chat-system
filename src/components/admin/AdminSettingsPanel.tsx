@@ -633,6 +633,8 @@ export function AdminSettingsPanel({
           setWorkspace(updatedWs);
           onWorkspaceUpdated?.(updatedWs);
           showStatus('Domain successfully verified and active!', 'success');
+        } else if (res.data.status === 'pending') {
+          showStatus('DNS records detected! Verification in progress.');
         } else {
           showStatus('DNS records not detected yet. Check the instructions below.', 'error');
         }
@@ -2515,17 +2517,25 @@ export function AdminSettingsPanel({
                         'p-3.5 rounded-xl border text-[12.5px] flex items-start gap-2.5 animate-in fade-in',
                         verificationResult.verified
                           ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-700 dark:text-emerald-300'
+                          : verificationResult.status === 'pending'
+                          ? 'bg-amber-500/10 border-amber-500/30 text-amber-700 dark:text-amber-300'
                           : 'bg-rose-500/10 border-rose-500/30 text-rose-700 dark:text-rose-300'
                       )}
                     >
                       {verificationResult.verified ? (
                         <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-500 mt-0.5" />
+                      ) : verificationResult.status === 'pending' ? (
+                        <Clock className="w-4 h-4 shrink-0 text-amber-500 mt-0.5" />
                       ) : (
                         <AlertCircle className="w-4 h-4 shrink-0 text-rose-500 mt-0.5" />
                       )}
                       <div>
                         <div className="font-semibold">
-                          {verificationResult.verified ? 'Verification Successful!' : 'DNS Records Not Detected'}
+                          {verificationResult.verified
+                            ? 'Verification Successful!'
+                            : verificationResult.status === 'pending'
+                            ? 'DNS Records Detected — Verification Pending'
+                            : 'DNS Records Not Detected'}
                         </div>
                         <p className="mt-0.5 text-[11.5px] opacity-90">{verificationResult.details}</p>
                       </div>
