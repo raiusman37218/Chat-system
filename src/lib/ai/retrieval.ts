@@ -346,12 +346,27 @@ export function search(
   const weights = new Map<string, number>();
   for (const t of queryTerms) weights.set(t, (weights.get(t) || 0) + 1);
 
+  // Context is a tie-breaker, not a vote. Asked "are you open on saturday?"
+  // right after "i forgot my password", the history terms outweighed the two
+  // words actually asked and the password article answered the opening-hours
+  // question. Capping the total context weight below the question's own keeps
+  // the last thing said the thing being answered.
+  const questionWeight = queryTerms.length;
+  const contextBudget = questionWeight * 0.35;
+  const contextTerms = new Map<string, number>();
+
   (options.history || []).slice(0, 3).forEach((msg, i) => {
-    const decay = 0.4 / (i + 1);
+    const decay = 1 / (i + 1);
     for (const t of tokenize(msg)) {
-      weights.set(t, (weights.get(t) || 0) + decay);
+      contextTerms.set(t, (contextTerms.get(t) || 0) + decay);
     }
   });
+
+  const contextTotal = Array.from(contextTerms.values()).reduce((a, b) => a + b, 0);
+  const scale = contextTotal > contextBudget ? contextBudget / contextTotal : 1;
+  for (const [t, w] of contextTerms) {
+    weights.set(t, (weights.get(t) || 0) + w * scale);
+  }
 
   const queryPhrases = bigrams(queryTerms);
   const distinctQueryTerms = Array.from(new Set(queryTerms));
@@ -472,7 +487,7 @@ export function assess(hits: Hit[], query: string): Assessment {
   // documentation does not discuss — a chargeback, a VPN, the weather. This is
   // the gate that keeps the bot quiet instead of reaching for the nearest
   // article that shares one ordinary word.
-  if (top.unknownRatio > 0.5) {
+  if (top.unknownRatio >= 0.5) {
     return {
       confidence: 'none',
       hit: top,
@@ -484,11 +499,11 @@ export function assess(hits: Hit[], query: string): Assessment {
   // With no distinctive vocabulary to go on, only a commanding lead counts as
   // understanding rather than coincidence. A close race decided by one ordinary
   // word is the failure mode this whole gate exists to prevent.
-  if (top.distinctiveCount === 0 && terms.length >= 3 && margin < 0.35) {
+  if (top.distinctiveCount <= 1 && terms.length >= 3 && margin < 0.35) {
     return {
       confidence: 'none',
       hit: top,
-      reason: `no distinctive word in the question and no clear winner (${Math.round(margin * 100)}% ahead)`,
+      reason: `too little distinctive vocabulary and no clear winner (${Math.round(margin * 100)}% ahead)`,
       margin,
     };
   }

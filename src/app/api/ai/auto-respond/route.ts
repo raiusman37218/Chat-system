@@ -95,37 +95,47 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ replied: false, reason: 'AI disabled on this conversation' });
     }
 
-    // The *latest* visitor message, not the first. Answering only the opening
-    // message meant every follow-up went unanswered until an agent appeared,
-    // even when the help centre covered it.
-    let visitorIndex = -1;
+    // Everything the visitor has said since anyone last replied is one
+    // unanswered turn.
+    //
+    // Anchoring on "the newest visitor message with nothing after it" dropped
+    // messages: a visitor who sends two lines in quick succession has the
+    // reply to the first land *after* the second, so the second looked
+    // answered and was never picked up. Working back from the last reply
+    // instead means a burst of messages is answered once, together.
+    let lastReplyIndex = -1;
     for (let i = msgs.length - 1; i >= 0; i--) {
-      if (msgs[i].sender_type === 'visitor' && !msgs[i].is_internal) {
-        visitorIndex = i;
+      const m = msgs[i];
+      if ((m.sender_type === 'agent' || m.sender_type === 'ai') && !m.is_internal) {
+        lastReplyIndex = i;
         break;
       }
     }
-    if (visitorIndex === -1) {
-      return NextResponse.json({ replied: false, reason: 'No visitor message found' });
-    }
 
-    const visitorMsg = msgs[visitorIndex];
-    const hasAgentOrAiReply = msgs
-      .slice(visitorIndex + 1)
-      .some((m) => m.sender_type === 'agent' || m.sender_type === 'ai');
+    const unanswered = msgs
+      .slice(lastReplyIndex + 1)
+      .filter((m) => m.sender_type === 'visitor' && !m.is_internal);
 
-    if (hasAgentOrAiReply) {
+    if (unanswered.length === 0) {
       return NextResponse.json({ replied: false, reason: 'Already responded' });
     }
 
-    // Everything the visitor said before this turn, most recent first. A
-    // follow-up like "and how long does that take?" is meaningless on its own.
-    const history = msgs
-      .slice(0, visitorIndex)
+    // The newest line is the question; the rest of the burst is its context.
+    const visitorMsg = unanswered[unanswered.length - 1];
+    const burstContext = unanswered
+      .slice(0, -1)
+      .map((m) => m.content as string)
+      .reverse();
+
+    // Older turns, so a follow-up like "and how long does that take?" still
+    // resolves against what was being discussed.
+    const earlier = msgs
+      .slice(0, lastReplyIndex + 1)
       .filter((m) => m.sender_type === 'visitor' && !m.is_internal)
       .map((m) => m.content as string)
-      .reverse()
-      .slice(0, 4);
+      .reverse();
+
+    const history = [...burstContext, ...earlier].slice(0, 4);
 
     // 3. Generate RAG First Response using workspace Help Desk sections and articles
     const result = await generateHelpDeskResponseWithHandover({
