@@ -1,5 +1,7 @@
 import type { Metadata } from 'next';
+import { headers } from 'next/headers';
 import { createClient } from '@supabase/supabase-js';
+import { getWorkspaceHelpCenterUrl } from '@/lib/domain';
 
 const SUPABASE_URL =
   process.env.NEXT_PUBLIC_SUPABASE_URL ||
@@ -29,12 +31,12 @@ export async function generateMetadata({
   const { data: ws } = isUuid
     ? await supabase
         .from('workspaces')
-        .select('name, custom_domain, custom_domain_status')
+        .select('id, name, slug, custom_domain, custom_domain_status')
         .eq('id', workspaceId)
         .maybeSingle()
     : await supabase
         .from('workspaces')
-        .select('name, custom_domain, custom_domain_status')
+        .select('id, name, slug, custom_domain, custom_domain_status')
         .or(`slug.eq.${workspaceId},custom_domain.eq.${workspaceId}`)
         .maybeSingle();
 
@@ -45,12 +47,21 @@ export async function generateMetadata({
   const title = `${ws.name} Help Center`;
   const description = `Guides, troubleshooting steps and answers from the ${ws.name} team.`;
 
+  // The same help centre is reachable both on the platform path and on the
+  // customer's domain. Without a canonical, search engines see two copies of
+  // every article and split the ranking between them.
+  const h = await headers();
+  const canonical = getWorkspaceHelpCenterUrl(ws as any, null, {
+    host: h.get('x-forwarded-host') || h.get('host'),
+  });
+
   return {
     title,
     description,
+    alternates: { canonical },
     // Nothing here should advertise the platform: this page belongs to the
     // customer's brand, on the customer's domain.
-    openGraph: { title, description, siteName: ws.name, type: 'website' },
+    openGraph: { title, description, siteName: ws.name, type: 'website', url: canonical },
     twitter: { card: 'summary', title, description },
   };
 }

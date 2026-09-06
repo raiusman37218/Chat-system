@@ -30,8 +30,11 @@ export async function GET(
       .eq('status', 'published')
       .order('updated_at', { ascending: false });
 
-    // 3. Build XML sitemap using the workspace's configured domain
-    const baseUrl = getWorkspaceHelpCenterUrl(ws);
+    // 3. Build XML sitemap using the domain this request actually arrived on,
+    // so a help centre reached at help.acme.com advertises help.acme.com.
+    const host =
+      request.headers.get('x-forwarded-host') || request.headers.get('host');
+    const baseUrl = getWorkspaceHelpCenterUrl(ws, null, { host });
 
     let xml = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
@@ -43,7 +46,7 @@ export async function GET(
   </url>`;
 
     (articles || []).forEach((art) => {
-      const artUrl = getWorkspaceHelpCenterUrl(ws, art);
+      const artUrl = getWorkspaceHelpCenterUrl(ws, art, { host });
       const date = (art.updated_at || art.created_at || new Date().toISOString()).split('T')[0];
       xml += `
   <url>

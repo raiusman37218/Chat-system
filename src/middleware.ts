@@ -1,5 +1,6 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
+import { isPlatformHost } from '@/lib/domain';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://vfjsaynnubxywdbevxtx.supabase.co';
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZmanNheW5udWJ4eXdkYmV2eHR4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgyNTA5MDEsImV4cCI6MjEwMzgyNjkwMX0.YyBCXMqwrOk5BRhQafYLFw8tiM5PC8lc8Yocodw9wf0';
@@ -41,20 +42,21 @@ export async function middleware(request: NextRequest) {
 
   // Host-based routing for Custom Domains and Help Center subdomains
   const host = request.headers.get('host')?.toLowerCase().split(':')[0] || '';
-  const isPlatformHost =
-    host === 'localhost' ||
-    host === '127.0.0.1' ||
-    host.endsWith('.vercel.app') ||
-    host === 'chatify.dev' ||
-    host === 'chatify.site';
 
-  if (!isPlatformHost) {
-    const { data: ws } = await supabase
+  if (!isPlatformHost(host)) {
+    // Serve on any connected domain, not only ones someone remembered to
+    // press "Verify" on. For this request to arrive here at all, the customer's
+    // DNS already points at us and TLS already succeeded — that is the proof,
+    // and the stored status is only a record of it. Requiring 'verified' meant
+    // a correctly configured domain showed the platform's own marketing page
+    // to the customer's visitors until an admin happened to open Settings.
+    const { data: matches } = await supabase
       .from('workspaces')
       .select('id, custom_domain, custom_domain_status')
       .ilike('custom_domain', host)
-      .eq('custom_domain_status', 'verified')
-      .maybeSingle();
+      .limit(1);
+
+    const ws = matches?.[0];
 
     if (ws) {
       const pathname = request.nextUrl.pathname;

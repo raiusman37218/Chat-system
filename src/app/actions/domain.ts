@@ -3,7 +3,8 @@
 import dns from 'node:dns/promises';
 import { createClient } from '@/lib/supabase/server';
 import { Workspace } from '@/types/database';
-import { cleanDomain } from '@/lib/domain';
+import { cleanDomain, CNAME_TARGET, APEX_A_RECORD, splitDomain } from '@/lib/domain';
+import { addDomainToProject, removeDomainFromProject } from '@/lib/vercel';
 
 interface ActionResult<T = any> {
   success: boolean;
@@ -17,7 +18,15 @@ interface ActionResult<T = any> {
 export async function updateWorkspaceDomainAction(
   workspaceId: string,
   rawDomain: string
-): Promise<ActionResult<{ workspace: Workspace; token: string }>> {
+): Promise<
+  ActionResult<{
+    workspace: Workspace;
+    token: string;
+    /** null when the platform has no Vercel credentials configured. */
+    hostingReady?: boolean | null;
+    hostingError?: string;
+  }>
+> {
   try {
     const supabase = await createClient();
 
@@ -55,11 +64,22 @@ export async function updateWorkspaceDomainAction(
 
     if (error) throw new Error(error.message);
 
+    // Attach the hostname to the hosting project straight away. Without this
+    // Vercel has no certificate for it, and the customer sees a TLS warning
+    // even with perfect DNS. Failing here is not fatal: DNS still has to
+    // propagate, and verification will report what is still missing.
+    const vercel = await addDomainToProject(domain);
+    if (vercel.configured && !vercel.ok) {
+      console.warn('[domain] Vercel registration failed:', vercel.error);
+    }
+
     return {
       success: true,
       data: {
         workspace: updated as Workspace,
         token: verificationToken,
+        hostingReady: vercel.configured ? vercel.ok : null,
+        hostingError: vercel.configured && !vercel.ok ? vercel.error : undefined,
       },
     };
   } catch (err: any) {
@@ -102,13 +122,24 @@ export async function verifyWorkspaceDomainAction(
 
     const token = ws.custom_domain_verification_token;
 
+    // Re-attach on every verify, not only when the domain is first saved.
+    // Workspaces whose domain was stored before the hosting credentials
+    // existed were never registered, and there was no way to fix them from the
+    // UI short of removing and re-adding the domain. Attaching here is
+    // idempotent, so pressing Verify repairs them.
+    const hosting = await addDomainToProject(domain);
+    if (hosting.configured && !hosting.ok) {
+      console.warn('[domain] Vercel registration failed:', hosting.error);
+    }
+
     // 2. Allow test domains / local simulated domains for development
+    // Local development shortcuts only. `.chatify.dev` used to be in here and
+    // auto-verified with no checks at all, on a domain this project does not
+    // own — a real domain must always earn its "verified".
     const isTestDomain =
       domain.includes('localhost') ||
       domain.endsWith('.test') ||
-      domain.endsWith('.local') ||
-      domain.endsWith('.chatify.dev') ||
-      domain.startsWith('demo-');
+      domain.endsWith('.local');
 
     if (isTestDomain) {
       await supabase
@@ -131,6 +162,7 @@ export async function verifyWorkspaceDomainAction(
 
     let cnameVerified = false;
     let txtVerified = false;
+    let foundCname: string | null = null;
     const diagnosticLogs: string[] = [];
 
     // 3. Check CNAME record
@@ -138,14 +170,36 @@ export async function verifyWorkspaceDomainAction(
       const cnameRecords = await dns.resolveCname(domain);
       diagnosticLogs.push(`CNAME records found: ${cnameRecords.join(', ')}`);
 
-      // Match cname.chatify.dev, vercel.app, or platform target
-      cnameVerified = cnameRecords.some(
-        (target) =>
-          target.toLowerCase().includes('chatify') ||
-          target.toLowerCase().includes('vercel')
-      );
+      // Only the target we actually publish counts. Accepting "anything
+      // containing chatify" happily verified subdomains pointed at hosts this
+      // project does not own — which is exactly how customers ended up with a
+      // certificate error on a domain we had told them was correct.
+      foundCname = cnameRecords[0] || null;
+      const expected = CNAME_TARGET.toLowerCase().replace(/.$/, '');
+      cnameVerified = cnameRecords.some((target) => {
+        const t = target.toLowerCase().replace(/.$/, '');
+        return t === expected || t.endsWith('.vercel-dns.com') || t.endsWith('.vercel.app');
+      });
     } catch (err: any) {
       diagnosticLogs.push(`CNAME lookup: ${err.code || err.message}`);
+    }
+
+    // 3b. An apex domain cannot carry a CNAME, so it points at us with an A
+    // record instead. Without this branch every workspace on a bare domain
+    // fell through to the TXT path and, if they had not added a TXT record,
+    // was told its DNS was missing while it was in fact correct.
+    if (!cnameVerified && splitDomain(domain).isApex) {
+      try {
+        const aRecords = await dns.resolve4(domain);
+        diagnosticLogs.push(`A records found: ${aRecords.join(', ')}`);
+        if (aRecords.includes(APEX_A_RECORD)) {
+          cnameVerified = true;
+        } else {
+          foundCname = foundCname || aRecords[0] || null;
+        }
+      } catch (err: any) {
+        diagnosticLogs.push(`A lookup: ${err.code || err.message}`);
+      }
     }
 
     // 4. Check TXT record on domain and on _chatify-challenge.{domain}
@@ -230,11 +284,17 @@ export async function verifyWorkspaceDomainAction(
         data: {
           verified: false,
           status: 'pending',
-          details:
-            `DNS looks correct, but ${domain} is not serving your help centre yet. ` +
-            `Add ${domain} as a domain on the hosting project (Vercel → Project → ` +
-            `Settings → Domains), then verify again. New certificates can also take ` +
-            `a few minutes. Diagnostics: ${diagnosticLogs.join(' | ')}`,
+          details: !hosting.configured
+            ? `DNS looks correct, but ${domain} is not serving your help centre yet. ` +
+              `This platform has no hosting credentials configured, so the domain ` +
+              `must be added to the hosting project by hand (Vercel → Project → ` +
+              `Settings → Domains). Diagnostics: ${diagnosticLogs.join(' | ')}`
+            : hosting.ok
+            ? `DNS and hosting are both set up — the certificate for ${domain} is ` +
+              `still being issued. This usually takes a minute or two; verify again ` +
+              `shortly. Diagnostics: ${diagnosticLogs.join(' | ')}`
+            : `DNS looks correct, but registering ${domain} with the hosting ` +
+              `project failed: ${hosting.error}. Diagnostics: ${diagnosticLogs.join(' | ')}`,
         },
       };
     } else {
@@ -250,7 +310,21 @@ export async function verifyWorkspaceDomainAction(
         data: {
           verified: false,
           status: 'failed',
-          details: `DNS records not detected yet. Diagnostics: ${diagnosticLogs.join(' | ')}`,
+          // Naming the wrong target beats "not detected yet". Every workspace
+          // set up before the CNAME target was corrected is pointing at the
+          // old value, and without this they have no way to know that.
+          details: (() => {
+            const { isApex } = splitDomain(domain);
+            const record = isApex
+              ? `an A record pointing to ${APEX_A_RECORD}`
+              : `a CNAME pointing to "${CNAME_TARGET}"`;
+            const diag = `Diagnostics: ${diagnosticLogs.join(' | ')}`;
+            return foundCname
+              ? `${domain} currently points at "${foundCname}", which is not this ` +
+                `platform. Replace it with ${record} and verify again. ${diag}`
+              : `No DNS records found for ${domain} yet. Add ${record}. Changes ` +
+                `can take a few minutes to propagate. ${diag}`;
+          })(),
         },
       };
     }
@@ -269,16 +343,31 @@ export async function removeWorkspaceDomainAction(
   try {
     const supabase = await createClient();
 
+    // Read it before clearing, so the hostname can be released upstream too.
+    const { data: ws } = await supabase
+      .from('workspaces')
+      .select('custom_domain')
+      .eq('id', workspaceId)
+      .maybeSingle();
+
     const { error } = await supabase
       .from('workspaces')
       .update({
         custom_domain: null,
         custom_domain_status: null,
         custom_domain_verified_at: null,
+        custom_domain_verification_token: null,
       })
       .eq('id', workspaceId);
 
     if (error) throw new Error(error.message);
+
+    // Leaving it attached would block the same domain from being added to
+    // another workspace later.
+    if (ws?.custom_domain) {
+      await removeDomainFromProject(ws.custom_domain);
+    }
+
     return { success: true };
   } catch (err: any) {
     return { success: false, error: err.message || 'Failed to remove domain' };

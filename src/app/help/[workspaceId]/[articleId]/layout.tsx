@@ -1,5 +1,7 @@
 import type { Metadata } from 'next';
+import { headers } from 'next/headers';
 import { createClient } from '@supabase/supabase-js';
+import { getWorkspaceHelpCenterUrl } from '@/lib/domain';
 
 const SUPABASE_URL =
   process.env.NEXT_PUBLIC_SUPABASE_URL ||
@@ -22,12 +24,12 @@ export async function generateMetadata({
   const { data: ws } = isUuid(workspaceId)
     ? await supabase
         .from('workspaces')
-        .select('id, name')
+        .select('id, name, slug, custom_domain, custom_domain_status')
         .eq('id', workspaceId)
         .maybeSingle()
     : await supabase
         .from('workspaces')
-        .select('id, name')
+        .select('id, name, slug, custom_domain, custom_domain_status')
         .or(`slug.eq.${workspaceId},custom_domain.eq.${workspaceId}`)
         .maybeSingle();
 
@@ -36,12 +38,12 @@ export async function generateMetadata({
   const { data: article } = isUuid(articleId)
     ? await supabase
         .from('articles')
-        .select('title, summary')
+        .select('id, slug, title, summary')
         .eq('id', articleId)
         .maybeSingle()
     : await supabase
         .from('articles')
-        .select('title, summary')
+        .select('id, slug, title, summary')
         .eq('workspace_id', ws.id)
         .eq('slug', articleId)
         .maybeSingle();
@@ -52,10 +54,17 @@ export async function generateMetadata({
   const description =
     article.summary || `Help article from the ${ws.name} team.`;
 
+  // See the parent layout: one article, two reachable URLs, one canonical.
+  const h = await headers();
+  const canonical = getWorkspaceHelpCenterUrl(ws as any, article, {
+    host: h.get('x-forwarded-host') || h.get('host'),
+  });
+
   return {
     title,
     description,
-    openGraph: { title, description, siteName: ws.name, type: 'article' },
+    alternates: { canonical },
+    openGraph: { title, description, siteName: ws.name, type: 'article', url: canonical },
     twitter: { card: 'summary', title, description },
   };
 }

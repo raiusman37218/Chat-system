@@ -65,13 +65,34 @@ export default function OnboardingPage() {
       if (!session) return;
 
       // Generate slug and default help subdomain
-      const cleanWeb = cleanDomain(websiteUrl);
       const baseSlug = (businessName || 'workspace')
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, '-')
         .replace(/(^-|-$)/g, '') || 'workspace';
       const slug = `${baseSlug}-${Math.random().toString(36).substring(2, 6)}`;
-      const customDomain = cleanWeb ? `help.${cleanWeb}` : null;
+      // Claim a help subdomain from the website the owner just gave us, so the
+      // help centre is already pointed at their own brand. Three things this
+      // must not do: double-prefix a URL that is already "help."/"support.",
+      // claim a local development host, or claim a domain another workspace
+      // has already connected — the last one would leave two workspaces
+      // fighting over the same hostname, and host routing resolves to one row.
+      const suggested = getDefaultSubdomain(websiteUrl);
+      let customDomain =
+        suggested && !suggested.includes('localhost') && !suggested.endsWith('.test')
+          ? suggested
+          : null;
+
+      if (customDomain) {
+        const { data: taken } = await supabase
+          .from('workspaces')
+          .select('id')
+          .ilike('custom_domain', customDomain)
+          .maybeSingle();
+        // Left unset on a clash; the owner can connect a different one in
+        // Settings, where the conflict is reported properly.
+        if (taken) customDomain = null;
+      }
+
       const verificationToken = `chatify_tok_${Math.random().toString(36).substring(2, 10)}`;
 
       // 1. Create Workspace

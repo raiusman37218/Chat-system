@@ -462,7 +462,10 @@ export function AdminSettingsPanel({
   // ──────────────────────────────────────────────────────────────────────────
   // SECTION 6: INSTALL SNIPPET
   // ──────────────────────────────────────────────────────────────────────────
-  const origin = typeof window !== 'undefined' ? window.location.origin : 'https://chatify.dev';
+  const origin =
+    typeof window !== 'undefined'
+      ? window.location.origin
+      : process.env.NEXT_PUBLIC_APP_ORIGIN || '';
   const installSnippetCode = `<!-- Chatify Live Chat Tracker & Widget -->
 <script
   src="${origin}/tracker.js"
@@ -2112,17 +2115,17 @@ export function AdminSettingsPanel({
                       return (
                         <>
                           <div className="grid grid-cols-12 px-4 py-3 border-b border-line/60 items-center">
-                            <div className="col-span-2 font-mono font-bold text-accent">CNAME</div>
-                            <div className="col-span-3 font-mono text-ink truncate">{records.cname.name}</div>
-                            <div className="col-span-5 font-mono text-ink truncate">{records.cname.value}</div>
+                            <div className="col-span-2 font-mono font-bold text-accent">{records.primary.type}</div>
+                            <div className="col-span-3 font-mono text-ink truncate">{records.primary.name}</div>
+                            <div className="col-span-5 font-mono text-ink truncate">{records.primary.value}</div>
                             <div className="col-span-2 text-right">
                               <button
                                 type="button"
                                 onClick={() => {
-                                  navigator.clipboard.writeText(records.cname.value);
+                                  navigator.clipboard.writeText(records.primary.value);
                                   setCopiedCname(true);
                                   setTimeout(() => setCopiedCname(false), 2000);
-                                  showStatus('CNAME target copied!');
+                                  showStatus(`${records.primary.type} target copied!`);
                                 }}
                                 className="btn btn-xs btn-secondary"
                               >

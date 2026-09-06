@@ -20,7 +20,7 @@ import { Article, Workspace } from '@/types/database';
 import { createClient } from '@/lib/supabase/client';
 import { Avatar } from '@/components/ui/Avatar';
 import { MarkdownArticleContent } from '@/components/dashboard/MarkdownArticleContent';
-import { getWorkspaceHelpCenterUrl } from '@/lib/domain';
+import { getWorkspaceHelpCenterUrl, isPlatformHost } from '@/lib/domain';
 
 export default function ArticleDetailPage() {
   const params = useParams();
@@ -154,12 +154,7 @@ export default function ArticleDetailPage() {
   const navigateToRoot = () => {
     if (typeof window !== 'undefined') {
       const host = window.location.host.toLowerCase().split(':')[0];
-      const isPlatform =
-        host === 'localhost' ||
-        host === '127.0.0.1' ||
-        host.endsWith('.vercel.app') ||
-        host.endsWith('chatify.dev') ||
-        host.endsWith('chatify.site');
+      const isPlatform = isPlatformHost(host);
 
       if (!isPlatform) {
         router.push('/');
@@ -172,12 +167,7 @@ export default function ArticleDetailPage() {
   const navigateToArticle = (rel: Article) => {
     if (typeof window !== 'undefined') {
       const host = window.location.host.toLowerCase().split(':')[0];
-      const isPlatform =
-        host === 'localhost' ||
-        host === '127.0.0.1' ||
-        host.endsWith('.vercel.app') ||
-        host.endsWith('chatify.dev') ||
-        host.endsWith('chatify.site');
+      const isPlatform = isPlatformHost(host);
 
       if (!isPlatform) {
         router.push(`/${rel.slug || rel.id}`);

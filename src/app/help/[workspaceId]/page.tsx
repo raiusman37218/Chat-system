@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 import { Article, HelpSection, Workspace } from '@/types/database';
 import { createClient } from '@/lib/supabase/client';
-import { getWorkspaceHelpCenterUrl } from '@/lib/domain';
+import { getWorkspaceHelpCenterUrl, isPlatformHost } from '@/lib/domain';
 
 export default function PublicHelpCenterPage() {
   const params = useParams();
@@ -132,12 +132,7 @@ export default function PublicHelpCenterPage() {
   const navigateToArticle = (art: Article) => {
     if (typeof window !== 'undefined') {
       const host = window.location.host.toLowerCase().split(':')[0];
-      const isPlatform =
-        host === 'localhost' ||
-        host === '127.0.0.1' ||
-        host.endsWith('.vercel.app') ||
-        host.endsWith('chatify.dev') ||
-        host.endsWith('chatify.site');
+      const isPlatform = isPlatformHost(host);
 
       if (!isPlatform) {
         router.push(`/${art.slug || art.id}`);
