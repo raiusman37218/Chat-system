@@ -295,7 +295,7 @@ export default function ChatWidget({
         table: 'messages',
         filter: `conversation_id=eq.${conversationId}`,
       },
-      (payload) => {
+      (payload: any) => {
         const newMsg = payload.new as Message;
         if (newMsg.is_internal) return; // Drop internal team notes
 
@@ -331,7 +331,7 @@ export default function ChatWidget({
         table: 'messages',
         filter: `conversation_id=eq.${conversationId}`,
       },
-      (payload) => {
+      (payload: any) => {
         const updatedMsg = payload.new as Message;
         if (updatedMsg.is_internal) return;
         setMessages((prev) =>

@@ -51,7 +51,7 @@ export default function OnboardingPage() {
 
   // Check auth session
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(({ data: { session } }: any) => {
       if (!session) {
         router.replace('/login');
       }

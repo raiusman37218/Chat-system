@@ -127,7 +127,7 @@ export function VisitorDetailsSidebar({
           table: 'visitors',
           filter: `id=eq.${visitor.id}`,
         },
-        (payload) => {
+        (payload: any) => {
           setLiveVisitor((prev) => ({
             ...(prev || ({} as Visitor)),
             ...(payload.new as Visitor),
@@ -153,7 +153,7 @@ export function VisitorDetailsSidebar({
       .eq('visitor_id', vid)
       .neq('id', conversation.id)
       .order('created_at', { ascending: false })
-      .then(({ data }) => {
+      .then(({ data }: any) => {
         if (data) setPastConversations(data as Conversation[]);
       });
   }, [visitor?.id, conversation.id, conversation.visitor_id]);

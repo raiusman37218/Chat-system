@@ -33,7 +33,7 @@ export function subscribeToConversations(
       table: 'conversations',
       ...(filter ? { filter } : {}),
     },
-    (payload) => {
+    (payload: any) => {
       switch (payload.eventType) {
         case 'INSERT':
           callbacks.onInsert?.(payload.new as Conversation);
@@ -48,7 +48,7 @@ export function subscribeToConversations(
     }
   );
 
-  channel.subscribe((status, err) => {
+  channel.subscribe((status: any, err: any) => {
     if (err) {
       console.error('[Supabase Realtime] Conversations subscription error:', err);
     }
@@ -82,7 +82,7 @@ export function subscribeToMessages(
       table: 'messages',
       filter: `conversation_id=eq.${conversationId}`,
     },
-    (payload) => {
+    (payload: any) => {
       callbacks.onInsert?.(payload.new as Message);
     }
   );
@@ -95,12 +95,12 @@ export function subscribeToMessages(
       table: 'messages',
       filter: `conversation_id=eq.${conversationId}`,
     },
-    (payload) => {
+    (payload: any) => {
       callbacks.onUpdate?.(payload.new as Message, payload.old as Partial<Message>);
     }
   );
 
-  channel.subscribe((status, err) => {
+  channel.subscribe((status: any, err: any) => {
     if (err) {
       console.error(`[Supabase Realtime] Messages subscription error for ${conversationId}:`, err);
     }
@@ -133,7 +133,7 @@ export function subscribeToInternalNotes(
       table: 'internal_notes',
       filter: `conversation_id=eq.${conversationId}`,
     },
-    (payload) => {
+    (payload: any) => {
       callbacks.onInsert?.(payload.new as InternalNote);
     }
   );
