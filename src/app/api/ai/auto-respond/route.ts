@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { serviceClient } from '@/lib/supabase/service';
 import {
   generateAutoFirstResponse,
   generateHelpDeskResponseWithHandover,
@@ -57,7 +57,9 @@ export async function POST(req: NextRequest) {
     inFlightConversations.add(conversation_id);
     lockAcquired = true;
 
-    const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+    // Privileged: this route has no user session, and row level security
+    // otherwise hides the workspace's own settings from it.
+    const supabase = serviceClient();
 
     // 1. Fetch workspace AI settings
     const { data: workspace } = await supabase

@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js';
+import { serviceClient } from '@/lib/supabase/service';
 import type { ProviderConfig, ProviderId } from './provider';
 import {
   buildIndex,
@@ -22,14 +22,6 @@ import {
  * evidence is thin, and quotes the passage that actually addresses the
  * question. Everything it says is text the workspace owner wrote.
  */
-
-const SUPABASE_URL =
-  process.env.NEXT_PUBLIC_SUPABASE_URL ||
-  'https://vfjsaynnubxywdbevxtx.supabase.co';
-const SUPABASE_KEY =
-  process.env.SUPABASE_SERVICE_ROLE_KEY ||
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
-  '';
 
 /** Where a piece of knowledge came from. */
 export type KnowledgeSource = 'article' | 'note';
@@ -60,7 +52,7 @@ async function loadIndex(workspaceId: string): Promise<HelpIndex> {
   const cached = indexCache.get(workspaceId);
   if (cached && Date.now() - cached.builtAt < INDEX_TTL_MS) return cached.index;
 
-  const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+  const supabase = serviceClient();
   const [{ data: sections }, { data: articles }, { data: notes }] = await Promise.all([
     supabase
       .from('help_sections')
@@ -143,7 +135,7 @@ export async function recordUnanswered(
   conversationId?: string | null
 ): Promise<void> {
   try {
-    const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+    const supabase = serviceClient();
     await supabase.rpc('fn_record_unanswered_question', {
       p_workspace_id: workspaceId,
       p_question: question.slice(0, 1000),

@@ -1,5 +1,9 @@
 import { createClient } from '@supabase/supabase-js';
-import { providerConfigFrom } from '@/lib/ai/help-answer';
+import {
+  providerConfigFrom,
+  buildModelContext,
+  recordUnanswered,
+} from '@/lib/ai/help-answer';
 import { dispatchOutboundMessage } from '@/lib/channels/dispatcher';
 import {
   generateAutoFirstResponse,
@@ -86,6 +90,19 @@ export async function triggerLangGraphAgent(params: LangGraphTriggerParams) {
         timestamp: m.created_at,
       }));
 
+      // Retrieve first, then hand the agent what it needs to be grounded.
+      // Same ranker the built-in assistant uses, so both paths answer from the
+      // same knowledge and an agent cannot invent a policy the docs contradict.
+      const priorVisitorTurns = (historyMessages || [])
+        .filter((m) => m.sender_type === 'visitor')
+        .map((m) => m.content as string)
+        .reverse()
+        .slice(0, 4);
+
+      const retrieved = await buildModelContext(workspaceId, incomingMessage, {
+        history: priorVisitorTurns,
+      });
+
       const payload = {
         conversation_id: conversationId,
         workspace_id: workspaceId,
@@ -99,7 +116,20 @@ export async function triggerLangGraphAgent(params: LangGraphTriggerParams) {
         history,
         system_prompt:
           integration.langgraph_system_prompt ||
-          'You are Chatify AI Support Assistant. Be polite, concise, and helpful. Escalate to a human agent when needed.',
+          'You are a customer support assistant. Answer from the supplied documentation only, ' +
+            'and say so plainly when it does not cover the question.',
+        /**
+         * Retrieved documentation for this specific question. `context` is the
+         * ready-to-use block; `sources` lets the agent cite or log what it used.
+         * An agent that ignores these fields behaves exactly as before.
+         */
+        context: retrieved.text,
+        sources: retrieved.used,
+        knowledge: {
+          has_context: Boolean(retrieved.text),
+          article_count: retrieved.used.filter((u) => u.source === 'article').length,
+          note_count: retrieved.used.filter((u) => u.source === 'note').length,
+        },
       };
 
       const headers: Record<string, string> = {
@@ -110,6 +140,12 @@ export async function triggerLangGraphAgent(params: LangGraphTriggerParams) {
       }
 
       console.log(`[AI Bridge] Calling external agent endpoint at: ${integration.langgraph_webhook_url}`);
+
+      // An external agent is one more thing that can be down, misconfigured or
+      // slow. When it is, the customer should still get the help centre answer
+      // rather than nothing at all — so every failure below falls through to
+      // the built-in assistant instead of aborting the request.
+      try {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 25000);
 
@@ -139,6 +175,14 @@ export async function triggerLangGraphAgent(params: LangGraphTriggerParams) {
       }
 
       if (data.action === 'escalate') {
+        // Worth recording for the same reason the built-in assistant records
+        // its own: it is a question the documentation did not settle.
+        void recordUnanswered(
+          workspaceId,
+          incomingMessage,
+          'External agent escalated to a human',
+          conversationId
+        );
         await supabase
           .from('conversations')
           .update({
@@ -159,7 +203,13 @@ export async function triggerLangGraphAgent(params: LangGraphTriggerParams) {
         return { success: true, action: 'reply', response: replyText };
       }
 
-      return { success: true, action: 'none' };
+      // Reached the agent, got nothing usable back. Fall through.
+      console.warn('[AI Bridge] External agent returned an empty reply; using the built-in assistant.');
+      } catch (agentErr: any) {
+        console.warn(
+          `[AI Bridge] External agent unavailable (${agentErr?.name === 'AbortError' ? 'timed out' : agentErr?.message}); using the built-in assistant.`
+        );
+      }
     }
 
     // 3. ZERO-CONFIG BUILT-IN HELP DESK KNOWLEDGE AGENT (No URL required!)

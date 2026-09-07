@@ -554,6 +554,7 @@ export function AdminSettingsPanel({
     ok: boolean;
     model?: string;
     error?: string;
+    warning?: string;
   } | null>(null);
 
   const handleTestAiProvider = async () => {
@@ -2394,11 +2395,14 @@ export function AdminSettingsPanel({
                         <option value="anthropic">Anthropic (Claude)</option>
                         <option value="openai">OpenAI</option>
                         <option value="google">Google (Gemini)</option>
+                        <option value="deepseek">DeepSeek</option>
                         <option value="compatible">Other — OpenAI-compatible URL</option>
                       </select>
                       <p className="text-[11px] text-ink-3">
                         {aiSettings.provider === 'compatible'
-                          ? 'OpenRouter, Groq, Together, DeepSeek, a local Ollama — anything that serves /chat/completions.'
+                          ? 'OpenRouter, Groq, Together, a local Ollama — anything that serves /chat/completions.'
+                          : aiSettings.provider === 'deepseek'
+                          ? 'Uses api.deepseek.com. Models: deepseek-chat, or deepseek-reasoner for harder questions.'
                           : 'Switch provider any time; your help centre answers stay the same either way.'}
                       </p>
                     </div>
@@ -2414,6 +2418,8 @@ export function AdminSettingsPanel({
                             ? 'gpt-5'
                             : aiSettings.provider === 'google'
                             ? 'gemini-2.5-pro'
+                            : aiSettings.provider === 'deepseek'
+                            ? 'deepseek-chat'
                             : aiSettings.provider === 'compatible'
                             ? 'provider/model-name'
                             : 'claude-opus-5'
@@ -2464,27 +2470,37 @@ export function AdminSettingsPanel({
                     </p>
                   </div>
 
-                  <div className="flex items-center gap-3 pt-1">
-                    <button
-                      type="button"
-                      onClick={handleTestAiProvider}
-                      disabled={testingProvider}
-                      className="btn btn-sm btn-secondary gap-1.5"
-                    >
-                      <Sparkles className="w-3.5 h-3.5" />
-                      {testingProvider ? 'Testing…' : 'Test connection'}
-                    </button>
-                    {providerTest && (
-                      <span
-                        className={cn(
-                          'text-[12px] font-medium',
-                          providerTest.ok ? 'text-success' : 'text-danger'
-                        )}
+                  <div className="space-y-2 pt-1">
+                    <div className="flex items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={handleTestAiProvider}
+                        disabled={testingProvider}
+                        className="btn btn-sm btn-secondary gap-1.5"
                       >
-                        {providerTest.ok
-                          ? `Connected — ${providerTest.model} replied.`
-                          : providerTest.error}
-                      </span>
+                        <Sparkles className="w-3.5 h-3.5" />
+                        {testingProvider ? 'Testing…' : 'Test connection'}
+                      </button>
+                      {providerTest && (
+                        <span
+                          className={cn(
+                            'text-[12px] font-medium',
+                            providerTest.ok ? 'text-success' : 'text-danger'
+                          )}
+                        >
+                          {providerTest.ok
+                            ? `Connected — ${providerTest.model} replied.`
+                            : providerTest.error}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* A server-side prerequisite the owner cannot see any
+                        other way, and which silently disables everything. */}
+                    {providerTest?.warning && (
+                      <p className="text-[12px] text-warn bg-warn-soft border border-warn-line rounded-lg px-3 py-2">
+                        {providerTest.warning}
+                      </p>
                     )}
                   </div>
                 </div>

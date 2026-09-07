@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { invalidateHelpIndex } from '@/lib/ai/help-answer';
 import { testProvider, type ProviderConfig } from '@/lib/ai/provider';
+import { hasServiceRole } from '@/lib/supabase/service';
 
 /**
  * Internal team knowledge, and the questions the help centre could not answer.
@@ -239,7 +240,7 @@ export async function saveAiProviderAction(
 export async function testAiProviderAction(
   workspaceId: string,
   override?: Partial<ProviderConfig>
-): Promise<{ ok: boolean; model?: string; error?: string }> {
+): Promise<{ ok: boolean; model?: string; error?: string; warning?: string }> {
   const { supabase } = await assertAgent(workspaceId);
 
   const { data } = await supabase
@@ -257,5 +258,22 @@ export async function testAiProviderAction(
     baseUrl: override?.baseUrl ?? stored.base_url ?? null,
   };
 
-  return testProvider(config);
+  const result = await testProvider(config);
+
+  // A working key is not enough on its own. The background responder runs
+  // without a user session, so it needs the service role key to read this
+  // workspace's settings at all — without it the model is configured
+  // correctly and still never called. Better to say so here than to let it
+  // be discovered by a customer waiting for a reply.
+  if (!hasServiceRole()) {
+    return {
+      ...result,
+      warning:
+        'SUPABASE_SERVICE_ROLE_KEY is not set on the server, so automatic ' +
+        'replies cannot read this workspace’s settings and no model will be ' +
+        'called. Add it from Supabase → Project Settings → API.',
+    };
+  }
+
+  return result;
 }

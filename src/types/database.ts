@@ -219,7 +219,7 @@ export interface AISettingsConfig {
   summary_enabled: boolean;
   sentiment_enabled: boolean;
   /** Which model vendor answers. Absent on workspaces saved before the picker. */
-  provider?: 'anthropic' | 'openai' | 'google' | 'compatible';
+  provider?: 'anthropic' | 'openai' | 'google' | 'deepseek' | 'compatible';
   /** Model name as that provider spells it; empty means the provider default. */
   model?: string;
   /** Key for whichever provider is selected. */

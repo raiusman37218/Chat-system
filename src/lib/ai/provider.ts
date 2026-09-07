@@ -12,7 +12,12 @@
 
 import Anthropic from '@anthropic-ai/sdk';
 
-export type ProviderId = 'anthropic' | 'openai' | 'google' | 'compatible';
+export type ProviderId =
+  | 'anthropic'
+  | 'openai'
+  | 'google'
+  | 'deepseek'
+  | 'compatible';
 
 export interface ProviderConfig {
   provider: ProviderId;
@@ -67,13 +72,22 @@ export const DEFAULT_MODELS: Record<ProviderId, string> = {
   anthropic: 'claude-opus-5',
   openai: 'gpt-5',
   google: 'gemini-2.5-pro',
+  // deepseek-chat is the general model; deepseek-reasoner is the thinking one.
+  deepseek: 'deepseek-chat',
   compatible: '',
+};
+
+/** Fixed endpoints for the providers that speak OpenAI's shape. */
+const OPENAI_SHAPED_BASE_URLS: Partial<Record<ProviderId, string>> = {
+  openai: 'https://api.openai.com/v1',
+  deepseek: 'https://api.deepseek.com/v1',
 };
 
 export const PROVIDER_LABELS: Record<ProviderId, string> = {
   anthropic: 'Anthropic (Claude)',
   openai: 'OpenAI',
   google: 'Google (Gemini)',
+  deepseek: 'DeepSeek',
   compatible: 'Other (OpenAI-compatible URL)',
 };
 
@@ -86,6 +100,8 @@ function envKeyFor(provider: ProviderId): string | undefined {
       return process.env.OPENAI_API_KEY;
     case 'google':
       return process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY;
+    case 'deepseek':
+      return process.env.DEEPSEEK_API_KEY;
     case 'compatible':
       return process.env.AI_API_KEY;
   }
@@ -124,7 +140,17 @@ export async function chat(
     case 'google':
       return googleChat(apiKey, model, req, timeoutMs);
     case 'openai':
-      return openAiChat(apiKey, model, 'https://api.openai.com/v1', req, timeoutMs, 'openai');
+    case 'deepseek':
+      return openAiChat(
+        apiKey,
+        model,
+        // The provider's own endpoint; a workspace may still override it, which
+        // is how a proxy or a regional endpoint gets used.
+        (config.baseUrl || OPENAI_SHAPED_BASE_URLS[config.provider])!.replace(/\/+$/, ''),
+        req,
+        timeoutMs,
+        config.provider
+      );
     case 'compatible': {
       if (!config.baseUrl) {
         throw new ProviderError('No base URL configured', 'compatible', undefined, false);
@@ -218,7 +244,12 @@ async function openAiChat(
       },
       body: JSON.stringify({
         model,
-        max_completion_tokens: req.maxTokens ?? 4096,
+        // OpenAI's newer models require max_completion_tokens and reject
+        // max_tokens; DeepSeek and most compatible servers only know
+        // max_tokens. Sending the wrong one is a 400, so pick by provider.
+        ...(provider === 'openai'
+          ? { max_completion_tokens: req.maxTokens ?? 4096 }
+          : { max_tokens: req.maxTokens ?? 4096 }),
         messages: [
           { role: 'system', content: req.system },
           ...req.messages,
