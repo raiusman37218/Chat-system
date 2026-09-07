@@ -438,15 +438,14 @@ export default function ChatWidget({
   };
 
   // Pre-chat Form Submission: immediately sends auto welcome message before user sends their message
-  const handlePreChatSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const cleanName = visitorName.trim();
-    const cleanEmail = visitorEmail.trim();
-    if (!cleanName || !cleanEmail) return;
+  const handlePreChatSubmit = async (e?: React.FormEvent, isSkip: boolean = false) => {
+    if (e) e.preventDefault();
+    const cleanName = isSkip ? '' : visitorName.trim();
+    const cleanEmail = isSkip ? '' : visitorEmail.trim();
 
     try {
-      localStorage.setItem('chatify_visitor_name', cleanName);
-      localStorage.setItem('chatify_visitor_email', cleanEmail);
+      if (cleanName) localStorage.setItem('chatify_visitor_name', cleanName);
+      if (cleanEmail) localStorage.setItem('chatify_visitor_email', cleanEmail);
     } catch (err) {}
 
     setIsIdentified(true);
@@ -455,8 +454,8 @@ export default function ChatWidget({
       // 1. Sync visitor info to database
       await supabase.from('visitors').upsert({
         id: visitorId,
-        name: cleanName,
-        email: cleanEmail,
+        name: cleanName || null,
+        email: cleanEmail || null,
         last_seen_at: new Date().toISOString(),
         is_online: true,
         workspace_id: config.workspaceId || null,
@@ -1046,12 +1045,11 @@ export default function ChatWidget({
               <form onSubmit={handlePreChatSubmit} className="space-y-3">
                 <div>
                   <label className="block text-xs font-medium text-slate-600 dark:text-slate-300 mb-1">
-                    Your Name
+                    Your Name <span className="text-[11px] font-normal text-slate-400 dark:text-slate-500">(Optional)</span>
                   </label>
                   <input
                     type="text"
-                    required
-                    placeholder="Jane Doe"
+                    placeholder="e.g. Sarah Connor"
                     value={visitorName}
                     onChange={(e) => setVisitorName(e.target.value)}
                     className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -1060,12 +1058,11 @@ export default function ChatWidget({
 
                 <div>
                   <label className="block text-xs font-medium text-slate-600 dark:text-slate-300 mb-1">
-                    Email Address
+                    Email Address <span className="text-[11px] font-normal text-slate-400 dark:text-slate-500">(Optional)</span>
                   </label>
                   <input
                     type="email"
-                    required
-                    placeholder="jane@example.com"
+                    placeholder="sarah@example.com"
                     value={visitorEmail}
                     onChange={(e) => setVisitorEmail(e.target.value)}
                     className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -1075,9 +1072,18 @@ export default function ChatWidget({
                 <button
                   type="submit"
                   style={{ backgroundColor: brandColor }}
-                  className="w-full py-2.5 px-4 text-white text-sm font-semibold rounded-lg shadow-sm hover:opacity-95 transition-opacity mt-2"
+                  className="w-full py-2.5 px-4 text-white text-sm font-semibold rounded-lg shadow-sm hover:opacity-95 transition-opacity mt-2 cursor-pointer"
                 >
                   Start Live Conversation
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handlePreChatSubmit(undefined, true)}
+                  className="w-full py-2 px-4 text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 text-xs font-medium rounded-lg border border-slate-200 dark:border-slate-800 hover:border-blue-500/40 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <span>Skip &amp; start as Guest</span>
+                  <ChevronRight className="w-3.5 h-3.5" />
                 </button>
               </form>
             </div>

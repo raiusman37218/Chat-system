@@ -1185,14 +1185,20 @@ class ChatifyWidget {
               <h4>👋 Welcome to Live Support</h4>
               <p>Please introduce yourself so our support team can best assist you.</p>
               <div class="chatify-form-group">
-                <label>Your Name</label>
+                <label>Your Name <span class="chatify-optional-tag">(Optional)</span></label>
                 <input type="text" id="chatifyInputName" class="chatify-input" placeholder="e.g. Sarah Connor" />
               </div>
               <div class="chatify-form-group">
-                <label>Email Address</label>
+                <label>Email Address <span class="chatify-optional-tag">(Optional)</span></label>
                 <input type="email" id="chatifyInputEmail" class="chatify-input" placeholder="sarah@example.com" />
               </div>
               <button class="chatify-start-btn" id="chatifyStartBtn">Start Live Conversation</button>
+              <button type="button" class="chatify-skip-btn" id="chatifySkipBtn">
+                <span>Skip &amp; start as Guest</span>
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="9 18 15 12 9 6"></polyline>
+                </svg>
+              </button>
             </div>
           `
               : ''
@@ -1311,7 +1317,12 @@ class ChatifyWidget {
 
     const startBtn = this.shadow.getElementById('chatifyStartBtn');
     if (startBtn) {
-      startBtn.addEventListener('click', () => this.handleStartPreChat());
+      startBtn.addEventListener('click', () => this.handleStartPreChat(false));
+    }
+
+    const skipBtn = this.shadow.getElementById('chatifySkipBtn');
+    if (skipBtn) {
+      skipBtn.addEventListener('click', () => this.handleStartPreChat(true));
     }
 
     const sendBtn = this.shadow.getElementById('chatifySendBtn');
@@ -2179,6 +2190,37 @@ class ChatifyWidget {
       .chatify-start-btn:hover { filter: brightness(1.08); }
       .chatify-start-btn:active { transform: scale(.985); }
 
+      .chatify-optional-tag {
+        font-size: 11px;
+        font-weight: 400;
+        color: var(--w-ink-3);
+        margin-left: 4px;
+      }
+
+      .chatify-skip-btn {
+        width: 100%;
+        height: 38px;
+        margin-top: 8px;
+        background: transparent;
+        border: 1px solid var(--w-line-2);
+        border-radius: var(--w-r-sm);
+        color: var(--w-ink-2);
+        font-size: 13px;
+        font-weight: 500;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        transition: background .16s var(--w-ease), color .16s var(--w-ease), border-color .16s var(--w-ease);
+      }
+
+      .chatify-skip-btn:hover {
+        background: var(--w-surface-2);
+        color: var(--w-brand);
+        border-color: var(--w-brand);
+      }
+
       .chatify-message-row {
         display: flex;
         animation: w-bubble-in .3s var(--w-ease-out) both;
@@ -2769,16 +2811,20 @@ class ChatifyWidget {
   }
 
   // 11. Handlers
-  private async handleStartPreChat() {
+  private async handleStartPreChat(isSkip: boolean = false) {
     const nameInput = this.shadow?.getElementById('chatifyInputName') as HTMLInputElement | null;
     const emailInput = this.shadow?.getElementById('chatifyInputEmail') as HTMLInputElement | null;
 
-    this.visitorName = nameInput?.value.trim() || '';
-    this.visitorEmail = emailInput?.value.trim() || '';
+    this.visitorName = isSkip ? '' : (nameInput?.value.trim() || '');
+    this.visitorEmail = isSkip ? '' : (emailInput?.value.trim() || '');
 
     const suffix = this.config.workspaceId ? `_${this.config.workspaceId.slice(0, 8)}` : '';
-    localStorage.setItem(`chatify_visitor_name${suffix}`, this.visitorName);
-    localStorage.setItem(`chatify_visitor_email${suffix}`, this.visitorEmail);
+    if (this.visitorName) {
+      localStorage.setItem(`chatify_visitor_name${suffix}`, this.visitorName);
+    }
+    if (this.visitorEmail) {
+      localStorage.setItem(`chatify_visitor_email${suffix}`, this.visitorEmail);
+    }
 
     await this.supabase.rpc('fn_upsert_visitor', {
       p_id: this.visitorId,
