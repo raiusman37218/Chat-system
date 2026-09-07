@@ -15,6 +15,9 @@ import {
   Grid3X3,
   Columns4,
   Rows3,
+  Calendar,
+  Clock,
+  Sparkles,
 } from 'lucide-react';
 import { Article, HelpSection, Workspace } from '@/types/database';
 import { createClient } from '@/lib/supabase/client';
@@ -34,11 +37,11 @@ const UNSORTED = '__unsorted__';
 
 /** Columns the index needs. Article bodies are fetched separately — see below. */
 const LIST_COLUMNS =
-  'id, title, slug, summary, section_id, created_at, updated_at, views_count';
+  'id, title, slug, summary, section_id, created_at, updated_at, views_count, order_index';
 
 type ListArticle = Pick<
   Article,
-  'id' | 'title' | 'slug' | 'summary' | 'section_id' | 'created_at' | 'updated_at'
+  'id' | 'title' | 'slug' | 'summary' | 'section_id' | 'created_at' | 'updated_at' | 'views_count' | 'order_index'
 >;
 
 const UUID_RE =
@@ -144,7 +147,8 @@ export default function PublicHelpCenterPage() {
             .select(LIST_COLUMNS)
             .eq('workspace_id', ws.id)
             .eq('status', 'published')
-            .order('created_at', { ascending: false }),
+            .order('order_index', { ascending: true })
+            .order('created_at', { ascending: true }),
         ]);
 
         if (cancelled) return;
@@ -183,6 +187,15 @@ export default function PublicHelpCenterPage() {
     for (const a of articles) {
       const key = a.section_id || UNSORTED;
       (map[key] ||= []).push(a);
+    }
+    // Sort articles within each collection by order_index asc, then created_at asc
+    for (const key of Object.keys(map)) {
+      map[key].sort((a, b) => {
+        const ao = a.order_index ?? 0;
+        const bo = b.order_index ?? 0;
+        if (ao !== bo) return ao - bo;
+        return new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime();
+      });
     }
     return map;
   }, [articles]);
@@ -351,6 +364,13 @@ export default function PublicHelpCenterPage() {
   const title = helpTitleOf(workspace);
   const totalPublished = articles.length;
 
+  const popularArticles = useMemo(() => {
+    if (articles.length === 0) return [];
+    return [...articles]
+      .sort((a, b) => (b.views_count || 0) - (a.views_count || 0))
+      .slice(0, 3);
+  }, [articles]);
+
   return (
     <div
       className="min-h-screen bg-canvas text-ink flex flex-col"
@@ -363,7 +383,7 @@ export default function PublicHelpCenterPage() {
         <div className="mx-auto max-w-3xl space-y-5">
           <div className="space-y-1.5">
             <h1 className="text-[26px] sm:text-[32px] font-semibold tracking-tight text-white">
-              How can we help?
+              {workspace.help_center_title ? `Welcome to ${workspace.help_center_title}` : 'How can we help?'}
             </h1>
             <p className="text-[14px] text-white/50">
               {totalPublished > 0
@@ -379,7 +399,7 @@ export default function PublicHelpCenterPage() {
               type="search"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search for an answer…"
+              placeholder="Search for articles..."
               aria-label="Search help articles"
               className="w-full h-13 pl-11 pr-24 rounded-xl bg-white/[0.06] border border-white/12 text-[15px] text-white placeholder:text-white/35 outline-none transition-all focus:bg-white/[0.09] focus:border-white/25 [&::-webkit-search-cancel-button]:hidden"
             />
@@ -430,32 +450,66 @@ export default function PublicHelpCenterPage() {
             href={articleHref}
           />
         ) : (
-          <CollectionGrid
-            collections={collections}
-            layout={layout}
-            onSetLayout={handleSetLayout}
-            onOpen={(slug) => setOpenCollection(slug)}
-            onSelect={goToArticle}
-            href={articleHref}
-          />
+          <div className="space-y-8">
+            {/* AquaFunded-style "Most Viewed Articles" Top Block */}
+            {popularArticles.length > 0 && (
+              <section className="rounded-2xl border border-line bg-surface p-4 sm:p-5 shadow-2xs">
+                <div className="flex items-center justify-between mb-3 px-1">
+                  <header className="text-[16px] font-bold text-ink">
+                    Most Viewed Articles
+                  </header>
+                  <span className="text-[12px] text-ink-3">Popular</span>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  {popularArticles.map((art) => (
+                    <a
+                      key={art.id}
+                      href={articleHref(art)}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        goToArticle(art);
+                      }}
+                      className="group flex items-center justify-between gap-3 p-3.5 rounded-xl border border-line/70 bg-surface-2/40 hover:bg-accent-soft/30 hover:border-accent/40 transition-all no-underline"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <h4 className="text-[13.5px] font-medium text-ink group-hover:text-accent transition-colors truncate">
+                          {art.title}
+                        </h4>
+                      </div>
+                      <ChevronRight className="w-4 h-4 text-ink-3 shrink-0 group-hover:text-accent group-hover:translate-x-0.5 transition-transform" />
+                    </a>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            <CollectionGrid
+              collections={collections}
+              layout={layout}
+              onSetLayout={handleSetLayout}
+              onOpen={(slug) => setOpenCollection(slug)}
+              onSelect={goToArticle}
+              href={articleHref}
+            />
+          </div>
         )}
 
         {!query.trim() && (
-          <section className="mt-10 rounded-2xl border border-line bg-surface p-6 sm:p-7 text-center">
-            <h2 className="text-[16px] font-semibold text-ink">
-              Can&apos;t find what you need?
+          <section className="mt-14 rounded-2xl border border-line bg-surface p-8 sm:p-10 text-center shadow-2xs">
+            <h2 className="text-[22px] sm:text-[25px] font-bold text-ink tracking-tight">
+              More Questions?
             </h2>
-            <p className="mt-1 text-[13.5px] text-ink-3 max-w-md mx-auto">
-              Start a conversation and someone from the {title} team will pick it up.
+            <p className="mt-2 text-[14px] text-ink-3 max-w-md mx-auto leading-relaxed">
+              If you have any unanswered questions simply get in touch with us and we&apos;ll aim to reply promptly.
             </p>
             <button
               type="button"
               onClick={openChat}
-              className="mt-4 h-10 px-5 rounded-xl text-white text-[13.5px] font-semibold inline-flex items-center gap-2 transition-opacity hover:opacity-90"
+              className="mt-5 h-11 px-6 rounded-xl text-white text-[14px] font-semibold inline-flex items-center gap-2 shadow-sm transition-all hover:opacity-90 active:scale-[0.98] cursor-pointer"
               style={{ backgroundColor: brand }}
             >
               <MessageCircle className="w-4 h-4" />
-              Message us
+              <span>Contact {title} Support</span>
             </button>
           </section>
         )}
@@ -898,34 +952,50 @@ function CollectionView({
   href: (a: ListArticle) => string;
 }) {
   return (
-    <div className="space-y-4 animate-in fade-in">
-      {/* Clean Top Bar: Back button, Section number & title, and count badge */}
-      <div className="flex items-center justify-between pb-1 flex-wrap gap-2">
-        <div className="flex items-center gap-2.5">
-          <button
-            type="button"
-            onClick={onBack}
-            className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-accent hover:underline cursor-pointer group"
-          >
-            <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
-            <span>All collections</span>
-          </button>
-          <span className="text-ink-3 text-xs">/</span>
-          <span className="font-mono text-[11px] font-bold px-1.5 py-0.5 rounded-md bg-surface-2 border border-line text-ink-3">
-            #{collection.formattedNumber}
-          </span>
-          <h2 className="text-[14px] font-bold text-ink truncate">{collection.name}</h2>
+    <div className="space-y-6 animate-in fade-in">
+      {/* Breadcrumbs Navigation */}
+      <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-[13px] text-ink-3">
+        <button
+          type="button"
+          onClick={onBack}
+          className="inline-flex items-center gap-1.5 font-medium text-accent hover:underline cursor-pointer group"
+        >
+          <ArrowLeft className="w-3.5 h-3.5 group-hover:-translate-x-1 transition-transform" />
+          <span>All collections</span>
+        </button>
+        <span className="text-ink-3/60">/</span>
+        <span className="text-ink font-semibold truncate">{collection.name}</span>
+      </nav>
+
+      {/* AquaFunded-style Collection Hero Card */}
+      <div className="rounded-2xl border border-line bg-surface p-6 sm:p-7 flex flex-col sm:flex-row items-start sm:items-center gap-5 shadow-2xs">
+        <CollectionIcon
+          icon={collection.icon}
+          className="w-16 h-16 rounded-2xl text-[32px] shrink-0"
+          imgClassName="w-9 h-9"
+        />
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2 mb-1">
+            <span className="font-mono text-[11px] font-bold px-1.5 py-0.5 rounded-md bg-surface-2 border border-line text-ink-3">
+              #{collection.formattedNumber}
+            </span>
+            <span className="text-[12px] font-medium text-ink-3">
+              {collection.articles.length} {collection.articles.length === 1 ? 'article' : 'articles'}
+            </span>
+          </div>
+          <h1 className="text-[22px] sm:text-[26px] font-bold text-ink tracking-tight">
+            {collection.name}
+          </h1>
+          {collection.description && (
+            <p className="mt-1.5 text-[14px] text-ink-2 leading-relaxed max-w-2xl">
+              {collection.description}
+            </p>
+          )}
         </div>
-        {collection.articles.length > 0 && (
-          <span className="text-[12.5px] text-ink-3 font-medium">
-            {collection.articles.length}{' '}
-            {collection.articles.length === 1 ? 'article' : 'articles'}
-          </span>
-        )}
       </div>
 
       {/* Articles inside collection */}
-      <ul className="rounded-2xl border border-line bg-surface divide-y divide-line/70 overflow-hidden">
+      <ul className="rounded-2xl border border-line bg-surface divide-y divide-line/70 overflow-hidden shadow-2xs">
         {collection.articles.map((a) => (
           <li key={a.id}>
             <a
@@ -934,10 +1004,10 @@ function CollectionView({
                 e.preventDefault();
                 onSelect(a);
               }}
-              className="group flex items-center justify-between gap-4 p-4 sm:p-5 hover:bg-surface-2/60 transition-colors"
+              className="group flex items-center justify-between gap-4 p-4 sm:p-5 hover:bg-accent-soft/20 transition-all"
             >
               <div className="min-w-0 flex-1">
-                <h3 className="text-[15px] sm:text-[15.5px] font-medium text-ink group-hover:text-accent transition-colors">
+                <h3 className="text-[15px] sm:text-[16px] font-semibold text-ink group-hover:text-accent transition-colors">
                   {a.title}
                 </h3>
                 {a.summary && (
@@ -945,6 +1015,12 @@ function CollectionView({
                     {a.summary}
                   </p>
                 )}
+                <div className="mt-2 flex items-center gap-3 text-[11.5px] text-ink-3">
+                  <span className="inline-flex items-center gap-1">
+                    <Calendar className="w-3 h-3 opacity-70" />
+                    Updated {formatDate(a.updated_at || a.created_at)}
+                  </span>
+                </div>
               </div>
               <ChevronRight className="w-4 h-4 text-ink-3 shrink-0 group-hover:text-accent group-hover:translate-x-0.5 transition-all" />
             </a>

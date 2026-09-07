@@ -58,10 +58,11 @@ export async function GET(request: NextRequest) {
     // 4. Fetch Published Articles
     let query = supabase
       .from('articles')
-      .select('id, workspace_id, section_id, title, slug, category, summary, content, views_count, helpful_count, not_helpful_count, created_at, updated_at, author:agents(id, name, avatar_url), section:help_sections(id, name, icon)')
+      .select('id, workspace_id, section_id, title, slug, category, summary, content, views_count, helpful_count, not_helpful_count, order_index, created_at, updated_at, author:agents(id, name, avatar_url), section:help_sections(id, name, icon)')
       .eq('workspace_id', workspaceId)
       .eq('status', 'published')
-      .order('created_at', { ascending: false });
+      .order('order_index', { ascending: true })
+      .order('created_at', { ascending: true });
 
     if (sectionId) {
       query = query.eq('section_id', sectionId);

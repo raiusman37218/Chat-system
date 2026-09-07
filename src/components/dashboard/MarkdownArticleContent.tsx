@@ -9,6 +9,10 @@ import {
   Info,
   CheckCircle2,
   XCircle,
+  ExternalLink,
+  Sparkles,
+  ShieldAlert,
+  ArrowRight,
 } from 'lucide-react';
 
 interface MarkdownArticleContentProps {
@@ -72,17 +76,122 @@ export function extractHeadings(content: string): ArticleHeading[] {
 }
 
 /**
- * Parses inline formatting like **bold**, *italic*, `code`, ~~strike~~, [links](url)
+ * Parses inline formatting:
+ * - Highlights: ==highlight==, <mark>highlight</mark>, [hl:yellow]...[/hl], [hl:green]...[/hl], [hl:blue]...[/hl]
+ * - Badges: [badge:green:Active], [badge:90% Profit Split]
+ * - Buttons: [button:Get Funded](https://...), [btn:Learn More](url)
+ * - Standard Markdown: **bold**, *italic*, `code`, ~~strike~~, [links](url)
  */
 export function formatInlineText(text: string): React.ReactNode[] {
-  // Tokenize regex for **bold**, *italic*, `code`, ~~strike~~, [link](url)
-  const regex = /(\*\*.*?\*\*|\*.*?\*|`.*?`|~~.*?~~|\[.*?\]\(.*?\))/g;
+  // Master inline tokenizer
+  const regex =
+    /(==.*?==|<mark>.*?<\/mark>|\[hl:[a-zA-Z]+\][\s\S]*?\[\/hl\]|\[badge:(?:[a-zA-Z]+:)?[^\]]+\]|\[(?:button|btn):[^\]]+\]\([^)]+\)|\*\*.*?\*\*|\*.*?\*|`.*?`|~~.*?~~|\[.*?\]\(.*?\))/g;
   const parts = text.split(regex);
 
   return parts.map((part, index) => {
     if (!part) return null;
 
-    // Bold
+    // 1. Highlight Syntax: ==text==
+    if (part.startsWith('==') && part.endsWith('==') && part.length >= 4) {
+      const inner = part.slice(2, -2);
+      return (
+        <mark
+          key={index}
+          className="bg-amber-300/35 dark:bg-amber-400/25 text-amber-950 dark:text-amber-100 font-semibold px-1.5 py-0.5 rounded-md border-b-2 border-amber-400/70"
+        >
+          {inner}
+        </mark>
+      );
+    }
+
+    // 2. <mark>text</mark>
+    if (part.startsWith('<mark>') && part.endsWith('</mark>')) {
+      const inner = part.replace(/^<mark>/, '').replace(/<\/mark>$/, '');
+      return (
+        <mark
+          key={index}
+          className="bg-amber-300/35 dark:bg-amber-400/25 text-amber-950 dark:text-amber-100 font-semibold px-1.5 py-0.5 rounded-md border-b-2 border-amber-400/70"
+        >
+          {inner}
+        </mark>
+      );
+    }
+
+    // 3. Color-coded Highlights: [hl:green]text[/hl]
+    const hlMatch = part.match(/^\[hl:([a-zA-Z]+)\]([\s\S]*?)\[\/hl\]$/);
+    if (hlMatch) {
+      const [, color, inner] = hlMatch;
+      const colorMap: Record<string, string> = {
+        yellow:
+          'bg-amber-300/35 dark:bg-amber-400/25 text-amber-950 dark:text-amber-100 border-amber-400/70',
+        green:
+          'bg-emerald-300/35 dark:bg-emerald-400/25 text-emerald-950 dark:text-emerald-100 border-emerald-400/70',
+        blue:
+          'bg-sky-300/35 dark:bg-sky-400/25 text-sky-950 dark:text-sky-100 border-sky-400/70',
+        purple:
+          'bg-purple-300/35 dark:bg-purple-400/25 text-purple-950 dark:text-purple-100 border-purple-400/70',
+        rose:
+          'bg-rose-300/35 dark:bg-rose-400/25 text-rose-950 dark:text-rose-100 border-rose-400/70',
+        red:
+          'bg-rose-300/35 dark:bg-rose-400/25 text-rose-950 dark:text-rose-100 border-rose-400/70',
+      };
+      const style = colorMap[color.toLowerCase()] || colorMap.yellow;
+      return (
+        <mark
+          key={index}
+          className={`font-semibold px-1.5 py-0.5 rounded-md border-b-2 ${style}`}
+        >
+          {inner}
+        </mark>
+      );
+    }
+
+    // 4. Badges / Status Pills: [badge:Active] or [badge:green:Active]
+    const badgeMatch = part.match(/^\[badge:(?:([a-zA-Z]+):)?([^\]]+)\]$/);
+    if (badgeMatch) {
+      const [, color = 'blue', label] = badgeMatch;
+      const badgeStyles: Record<string, string> = {
+        blue: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20',
+        green: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20',
+        emerald: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20',
+        amber: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20',
+        yellow: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20',
+        rose: 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20',
+        red: 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20',
+        purple: 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20',
+        gray: 'bg-slate-500/10 text-slate-600 dark:text-slate-400 border-slate-500/20',
+      };
+      const badgeClass = badgeStyles[color.toLowerCase()] || badgeStyles.blue;
+      return (
+        <span
+          key={index}
+          className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11.5px] font-semibold border mx-1 align-baseline select-none ${badgeClass}`}
+        >
+          {label.trim()}
+        </span>
+      );
+    }
+
+    // 5. Embedded CTA Buttons: [button:Get Funded](https://...) or [btn:Get Funded](url)
+    const btnMatch = part.match(/^\[(?:button|btn):([^\]]+)\]\(([^)]+)\)$/);
+    if (btnMatch) {
+      const [, label, url] = btnMatch;
+      return (
+        <a
+          key={index}
+          href={url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center justify-center gap-1.5 px-4 py-2 my-1 rounded-xl text-white font-semibold text-[13px] shadow-sm transition-all hover:opacity-95 hover:shadow-md active:scale-[0.98] cursor-pointer no-underline"
+          style={{ backgroundColor: 'var(--brand, #007aff)' }}
+        >
+          <span>{label}</span>
+          <ArrowRight className="w-3.5 h-3.5" />
+        </a>
+      );
+    }
+
+    // 6. Bold
     if (part.startsWith('**') && part.endsWith('**') && part.length >= 4) {
       return (
         <strong key={index} className="font-bold text-ink">
@@ -91,7 +200,7 @@ export function formatInlineText(text: string): React.ReactNode[] {
       );
     }
 
-    // Italic
+    // 7. Italic
     if (part.startsWith('*') && part.endsWith('*') && part.length >= 2) {
       return (
         <em key={index} className="italic text-ink-2">
@@ -100,7 +209,7 @@ export function formatInlineText(text: string): React.ReactNode[] {
       );
     }
 
-    // Inline code
+    // 8. Inline code
     if (part.startsWith('`') && part.endsWith('`') && part.length >= 2) {
       return (
         <code
@@ -112,7 +221,7 @@ export function formatInlineText(text: string): React.ReactNode[] {
       );
     }
 
-    // Strikethrough
+    // 9. Strikethrough
     if (part.startsWith('~~') && part.endsWith('~~') && part.length >= 4) {
       return (
         <del key={index} className="line-through text-ink-3">
@@ -121,7 +230,7 @@ export function formatInlineText(text: string): React.ReactNode[] {
       );
     }
 
-    // Link [title](url)
+    // 10. Standard Link [title](url)
     const linkMatch = part.match(/^\[(.*?)\]\((.*?)\)$/);
     if (linkMatch) {
       const [, label, url] = linkMatch;
@@ -296,18 +405,24 @@ export function MarkdownArticleContent({
       }
     }
 
-    // 4. Callout Alerts (> [!NOTE], > [!TIP], > [!WARNING], > [!CAUTION])
+    // 4. Callout Alerts (> [!NOTE], > [!TIP], > [!SUCCESS], > [!WARNING], > [!CAUTION], > [!DANGER], > [!CTA], > [!FEATURED])
     if (
       trimmed.startsWith('> [!NOTE]') ||
       trimmed.startsWith('> [!INFO]') ||
       trimmed.startsWith('> [!TIP]') ||
+      trimmed.startsWith('> [!SUCCESS]') ||
       trimmed.startsWith('> [!WARNING]') ||
-      trimmed.startsWith('> [!CAUTION]')
+      trimmed.startsWith('> [!CAUTION]') ||
+      trimmed.startsWith('> [!DANGER]') ||
+      trimmed.startsWith('> [!CTA]') ||
+      trimmed.startsWith('> [!FEATURED]')
     ) {
-      let calloutType: 'note' | 'tip' | 'warning' | 'caution' = 'note';
+      let calloutType: 'note' | 'tip' | 'success' | 'warning' | 'caution' | 'cta' = 'note';
       if (trimmed.includes('[!TIP]')) calloutType = 'tip';
+      if (trimmed.includes('[!SUCCESS]')) calloutType = 'success';
       if (trimmed.includes('[!WARNING]')) calloutType = 'warning';
-      if (trimmed.includes('[!CAUTION]')) calloutType = 'caution';
+      if (trimmed.includes('[!CAUTION]') || trimmed.includes('[!DANGER]')) calloutType = 'caution';
+      if (trimmed.includes('[!CTA]') || trimmed.includes('[!FEATURED]')) calloutType = 'cta';
 
       index++;
       const calloutLines: string[] = [];
@@ -322,40 +437,64 @@ export function MarkdownArticleContent({
 
       const styles = {
         note: {
-          bg: 'bg-blue-500/10 border-blue-500/30 text-blue-900 dark:text-blue-200',
-          icon: <Lightbulb className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" />,
+          bg: 'bg-blue-50/70 dark:bg-blue-950/25 border-blue-200/80 dark:border-blue-800/50 text-blue-950 dark:text-blue-100',
+          icon: <Lightbulb className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />,
           title: 'Note',
+          isCentered: false,
         },
         tip: {
-          bg: 'bg-emerald-500/10 border-emerald-500/30 text-emerald-900 dark:text-emerald-200',
-          icon: <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />,
+          bg: 'bg-[#d7efdc]/60 dark:bg-emerald-950/30 border-[#1bb157]/30 text-emerald-950 dark:text-emerald-100',
+          icon: <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />,
           title: 'Pro Tip',
+          isCentered: false,
+        },
+        success: {
+          bg: 'bg-[#d7efdc]/70 dark:bg-emerald-950/35 border-[#1bb157]/35 text-emerald-950 dark:text-emerald-100 shadow-2xs',
+          icon: <Sparkles className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />,
+          title: 'Bonus / Upgrade',
+          isCentered: false,
         },
         warning: {
-          bg: 'bg-amber-500/10 border-amber-500/30 text-amber-900 dark:text-amber-200',
-          icon: <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />,
-          title: 'Warning',
+          bg: 'bg-[#fff3cd]/70 dark:bg-amber-950/30 border-[#d97706]/30 text-amber-950 dark:text-amber-100',
+          icon: <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />,
+          title: 'Important Rule',
+          isCentered: false,
         },
         caution: {
-          bg: 'bg-rose-500/10 border-rose-500/30 text-rose-900 dark:text-rose-200',
-          icon: <XCircle className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />,
-          title: 'Caution',
+          bg: 'bg-[#ffebe9]/80 dark:bg-rose-950/30 border-[#df2020]/30 text-rose-950 dark:text-rose-100',
+          icon: <XCircle className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0 mt-0.5" />,
+          title: 'Violation / Caution',
+          isCentered: false,
+        },
+        cta: {
+          bg: 'bg-[#e3e7fa]/80 dark:bg-blue-950/40 border-[#334bfa]/30 text-blue-950 dark:text-blue-100 text-center shadow-xs',
+          icon: null,
+          title: '',
+          isCentered: true,
         },
       }[calloutType];
+
+      const isCentered = styles.isCentered || calloutLines.some((l) => l.includes('[button:') || l.includes('[btn:'));
 
       elements.push(
         <div
           key={`callout-${index}`}
-          className={`p-4 my-3.5 rounded-xl border flex items-start gap-3 text-[13px] leading-relaxed ${styles.bg}`}
+          className={`p-4 sm:p-5 my-4 rounded-2xl border transition-all ${styles.bg} ${
+            isCentered ? 'flex flex-col items-center justify-center text-center gap-2.5' : 'flex items-start gap-3.5'
+          } text-[13.5px] leading-relaxed`}
         >
-          {styles.icon}
-          <div className="flex-1 space-y-1">
-            <span className="font-bold uppercase tracking-wider text-[11px] block">
-              {styles.title}
-            </span>
-            <div className="space-y-1">
+          {!isCentered && styles.icon}
+          <div className={`space-y-1.5 ${isCentered ? 'w-full max-w-lg mx-auto text-center' : 'flex-1'}`}>
+            {styles.title && (
+              <span className="font-bold uppercase tracking-wider text-[11px] block opacity-85">
+                {styles.title}
+              </span>
+            )}
+            <div className={`space-y-2 ${isCentered ? 'flex flex-col items-center justify-center' : ''}`}>
               {calloutLines.map((cLine, cIdx) => (
-                <p key={cIdx}>{formatInlineText(cLine)}</p>
+                <div key={cIdx} className={isCentered ? 'text-center w-full' : ''}>
+                  {formatInlineText(cLine)}
+                </div>
               ))}
             </div>
           </div>
@@ -542,7 +681,29 @@ export function MarkdownArticleContent({
       continue;
     }
 
-    // 12. Normal Paragraph
+    // 12. Standalone CTA Button ([button:Title](url))
+    const btnBlockMatch = trimmed.match(/^\[(?:button|btn):([^\]]+)\]\(([^)]+)\)$/);
+    if (btnBlockMatch) {
+      const [, label, url] = btnBlockMatch;
+      elements.push(
+        <div key={`btn-block-${index}`} className="my-5 flex justify-center">
+          <a
+            href={url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl text-white font-semibold text-[14px] shadow-sm transition-all hover:opacity-95 hover:shadow-md active:scale-[0.98] cursor-pointer no-underline"
+            style={{ backgroundColor: 'var(--brand, #007aff)' }}
+          >
+            <span>{label}</span>
+            <ArrowRight className="w-4 h-4" />
+          </a>
+        </div>
+      );
+      index++;
+      continue;
+    }
+
+    // 13. Normal Paragraph
     elements.push(
       <p key={`p-${index}`} className="text-[14px] text-ink leading-relaxed">
         {formatInlineText(trimmed)}

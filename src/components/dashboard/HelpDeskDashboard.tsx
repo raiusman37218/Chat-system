@@ -55,6 +55,13 @@ import {
   Keyboard,
   Upload,
   MoreHorizontal,
+  Highlighter,
+  BadgeCheck,
+  ShieldAlert,
+  ArrowRight,
+  ArrowUp,
+  ArrowDown,
+  GripVertical,
 } from 'lucide-react';
 import { Agent, Article, HelpSection, Workspace } from '@/types/database';
 import { EmojiPickerPopover } from '@/components/dashboard/EmojiPickerPopover';
@@ -68,6 +75,7 @@ import {
   createArticleAction,
   updateArticleAction,
   deleteArticleAction,
+  reorderArticlesAction,
   toggleArticleStatusAction,
   updateHelpTabSettingsAction,
   searchArticleBodiesAction,
@@ -85,6 +93,58 @@ interface HelpDeskDashboardProps {
 }
 
 const COMMON_EMOJIS = ['🚀', '💳', '⚙️', '📦', '🔒', '💡', '❓', '📖', '🛠️', '🎯', '📱', '🔔'];
+
+export function SectionIconPreview({
+  icon,
+  className = 'w-9 h-9 rounded-xl',
+  imgClassName = 'w-6 h-6',
+}: {
+  icon?: string | null;
+  className?: string;
+  imgClassName?: string;
+}) {
+  const isImg =
+    icon &&
+    (icon.startsWith('http://') ||
+      icon.startsWith('https://') ||
+      icon.startsWith('/') ||
+      icon.startsWith('data:image/'));
+
+  return (
+    <span
+      className={`grid place-items-center bg-surface-2 border border-line overflow-hidden shrink-0 select-none ${className}`}
+    >
+      {isImg ? (
+        <img
+          src={icon}
+          alt=""
+          className={`object-contain ${imgClassName}`}
+        />
+      ) : (
+        <span className="text-[18px] leading-none">{icon?.trim() || '📚'}</span>
+      )}
+    </span>
+  );
+}
+
+export const SECTION_ICON_GROUPS = [
+  {
+    name: 'Trading & Finance',
+    icons: ['📈', '💳', '💵', '📊', '🪙', '📉', '🏦', '💹'],
+  },
+  {
+    name: 'Security & Rules',
+    icons: ['🛡️', '🔒', '⚖️', '🔑', '📜', '🔏', '🪪', '⚠️'],
+  },
+  {
+    name: 'Tech & Platform',
+    icons: ['🚀', '⚡', '⚙️', '💡', '📱', '🌐', '💻', '🔧'],
+  },
+  {
+    name: 'General & Support',
+    icons: ['📚', '📄', '📁', '💬', '❓', '🎯', '👤', '🎧'],
+  },
+];
 
 export function HelpDeskDashboard({
   workspace,
@@ -107,6 +167,10 @@ export function HelpDeskDashboard({
   const [editingArticle, setEditingArticle] = useState<Article | null>(null);
   const [isSectionModalOpen, setIsSectionModalOpen] = useState(false);
   const [editingSection, setEditingSection] = useState<HelpSection | null>(null);
+  const [sectionToRename, setSectionToRename] = useState<HelpSection | null>(null);
+  const [sectionToDelete, setSectionToDelete] = useState<HelpSection | null>(null);
+  const [isDeletingSection, setIsDeletingSection] = useState(false);
+  const [isReorderModalOpen, setIsReorderModalOpen] = useState(false);
   const [isTabSettingsModalOpen, setIsTabSettingsModalOpen] = useState(false);
   const [workspaceState, setWorkspaceState] = useState<Workspace | null>(workspace);
 
@@ -211,9 +275,118 @@ export function HelpDeskDashboard({
     return counts;
   }, [articles]);
 
+  const activeSection = useMemo(() => {
+    if (selectedSectionId === 'all') return null;
+    return sections.find((s) => s.id === selectedSectionId) || null;
+  }, [sections, selectedSectionId]);
+
+  const handleStartRenameSection = (sec: HelpSection) => {
+    setSectionToRename(sec);
+  };
+
+  const handleStartDeleteSection = (sec: HelpSection) => {
+    setSectionToDelete(sec);
+  };
+
+  const handleConfirmDeleteSection = async () => {
+    if (!workspace?.id || !sectionToDelete) return;
+    setIsDeletingSection(true);
+    try {
+      await deleteHelpSectionAction(workspace.id, sectionToDelete.id);
+
+      setSections((prev) => prev.filter((s) => s.id !== sectionToDelete.id));
+      setArticles((prev) =>
+        prev.map((art) =>
+          art.section_id === sectionToDelete.id
+            ? { ...art, section_id: null, section: null }
+            : art
+        )
+      );
+
+      if (selectedSectionId === sectionToDelete.id) {
+        setSelectedSectionId('all');
+      }
+
+      showToast(`Section "${sectionToDelete.name}" deleted successfully!`);
+      setSectionToDelete(null);
+    } catch (err: any) {
+      showToast(err.message || 'Failed to delete section', 'error');
+    } finally {
+      setIsDeletingSection(false);
+    }
+  };
+
+  const handleSectionUpdated = (updatedSec: HelpSection) => {
+    setSections((prev) =>
+      prev.map((s) => (s.id === updatedSec.id ? updatedSec : s))
+    );
+    setArticles((prev) =>
+      prev.map((art) =>
+        art.section_id === updatedSec.id
+          ? {
+              ...art,
+              category: updatedSec.name,
+              section: updatedSec,
+            }
+          : art
+      )
+    );
+    showToast(`Section "${updatedSec.name}" updated successfully!`);
+    setSectionToRename(null);
+  };
+
+  // Articles in the currently selected section, sorted by order_index asc, created_at asc
+  const activeSectionArticles = useMemo(() => {
+    if (!activeSection) return [];
+    return articles
+      .filter((a) => a.section_id === activeSection.id)
+      .sort((a, b) => {
+        const ao = a.order_index ?? 0;
+        const bo = b.order_index ?? 0;
+        if (ao !== bo) return ao - bo;
+        return new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime();
+      });
+  }, [articles, activeSection]);
+
+  const handleQuickMoveArticle = async (article: Article, direction: 'up' | 'down') => {
+    if (!workspace?.id || !activeSection) return;
+    const list = [...activeSectionArticles];
+    const idx = list.findIndex((a) => a.id === article.id);
+    if (idx === -1) return;
+    const targetIdx = direction === 'up' ? idx - 1 : idx + 1;
+    if (targetIdx < 0 || targetIdx >= list.length) return;
+
+    // Swap adjacent items
+    const temp = list[idx];
+    list[idx] = list[targetIdx];
+    list[targetIdx] = temp;
+
+    // Assign sequential 1..N order_index
+    const updates = list.map((item, index) => ({
+      id: item.id,
+      order_index: index + 1,
+    }));
+
+    // Optimistically update local articles state
+    setArticles((prev) =>
+      prev.map((art) => {
+        const up = updates.find((u) => u.id === art.id);
+        return up ? { ...art, order_index: up.order_index } : art;
+      })
+    );
+
+    try {
+      await reorderArticlesAction(workspace.id, updates);
+      showToast(`Article moved ${direction}!`);
+    } catch (err: any) {
+      showToast(err.message || 'Failed to reorder article', 'error');
+      loadHelpDeskData();
+    }
+  };
+
   // Filtered Articles
   const filteredArticles = useMemo(() => {
-    return articles.filter((art) => {
+    const list = articles.filter((art) => {
       if (selectedSectionId !== 'all' && art.section_id !== selectedSectionId) {
         return false;
       }
@@ -226,13 +399,23 @@ export function HelpDeskDashboard({
           art.title.toLowerCase().includes(q) ||
           art.summary?.toLowerCase().includes(q) ||
           art.category?.toLowerCase().includes(q) ||
-          // Body matches come back from the server; the browser no longer
-          // holds a copy of every article just to search it.
           bodyMatchIds.has(art.id)
         );
       }
       return true;
     });
+
+    if (selectedSectionId !== 'all') {
+      // Sort in the exact sequence as it appears on the public Help Center
+      list.sort((a, b) => {
+        const ao = a.order_index ?? 0;
+        const bo = b.order_index ?? 0;
+        if (ao !== bo) return ao - bo;
+        return new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime();
+      });
+    }
+
+    return list;
   }, [articles, selectedSectionId, selectedStatus, searchQuery, bodyMatchIds]);
 
   const handleToggleStatus = async (article: Article) => {
@@ -526,38 +709,180 @@ export function HelpDeskDashboard({
                 <span className="text-[11px] opacity-80">({articles.length})</span>
               </button>
 
-              {sections.map((sec, idx) => (
-                <button
-                  key={sec.id}
-                  onClick={() => setSelectedSectionId(sec.id)}
-                  className={cn(
-                    'h-8 px-3 rounded-lg text-[12.5px] font-medium transition-all whitespace-nowrap flex items-center gap-1.5 border border-transparent',
-                    selectedSectionId === sec.id
-                      ? 'bg-accent text-accent-ink shadow-xs'
-                      : 'bg-surface-2 text-ink-2 hover:bg-surface-3 hover:text-ink'
-                  )}
-                >
-                  <span className="font-mono text-[10px] font-bold opacity-75">
-                    #{String(sec.order_index && sec.order_index > 0 ? sec.order_index : idx + 1).padStart(2, '0')}
-                  </span>
-                  <span>{sec.icon || '📚'}</span>
-                  <span>{sec.name}</span>
-                  <span className="text-[11px] opacity-75">({sectionCounts[sec.id] || 0})</span>
-                </button>
-              ))}
+              {sections.map((sec, idx) => {
+                const isSelected = selectedSectionId === sec.id;
+                return (
+                  <div
+                    key={sec.id}
+                    className={cn(
+                      'group relative inline-flex items-center h-8 rounded-lg text-[12.5px] font-medium transition-all whitespace-nowrap border',
+                      isSelected
+                        ? 'bg-accent text-accent-ink border-transparent shadow-xs'
+                        : 'bg-surface-2 text-ink-2 hover:bg-surface-3 hover:text-ink border-transparent'
+                    )}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => setSelectedSectionId(sec.id)}
+                      className="h-full pl-3 pr-2 flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <span className="font-mono text-[10px] font-bold opacity-75">
+                        #{String(sec.order_index && sec.order_index > 0 ? sec.order_index : idx + 1).padStart(2, '0')}
+                      </span>
+                      <span>{sec.icon || '📚'}</span>
+                      <span className="max-w-[130px] truncate">{sec.name}</span>
+                      <span className="text-[11px] opacity-75">({sectionCounts[sec.id] || 0})</span>
+                    </button>
 
-              <button
-                onClick={() => {
-                  setEditingSection(null);
-                  setIsSectionModalOpen(true);
-                }}
-                className="h-8 px-2.5 rounded-lg border border-dashed border-line text-[12px] text-ink-3 hover:text-accent hover:border-accent flex items-center gap-1 transition-all whitespace-nowrap"
-              >
-                <Plus className="w-3 h-3" />
-                <span>Add Section</span>
-              </button>
+                    {/* Quick rename & delete actions on pill hover */}
+                    <div className="flex items-center pr-1.5 gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleStartRenameSection(sec);
+                        }}
+                        className={cn(
+                          'w-5 h-5 rounded flex items-center justify-center transition-colors cursor-pointer',
+                          isSelected
+                            ? 'hover:bg-white/20 text-accent-ink'
+                            : 'hover:bg-surface text-ink-3 hover:text-ink'
+                        )}
+                        title={`Rename section "${sec.name}"`}
+                      >
+                        <Edit2 className="w-3 h-3" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleStartDeleteSection(sec);
+                        }}
+                        className={cn(
+                          'w-5 h-5 rounded flex items-center justify-center transition-colors cursor-pointer',
+                          isSelected
+                            ? 'hover:bg-rose-500 text-accent-ink hover:text-white'
+                            : 'hover:bg-rose-500/20 text-ink-3 hover:text-rose-500'
+                        )}
+                        title={`Delete section "${sec.name}"`}
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+
+              <div className="flex items-center gap-1.5 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingSection(null);
+                    setIsSectionModalOpen(true);
+                  }}
+                  className="h-8 px-2.5 rounded-lg border border-dashed border-line text-[12px] text-ink-3 hover:text-accent hover:border-accent flex items-center gap-1 transition-all whitespace-nowrap cursor-pointer"
+                >
+                  <Plus className="w-3 h-3" />
+                  <span>Add Section</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingSection(null);
+                    setIsSectionModalOpen(true);
+                  }}
+                  className="h-8 px-2.5 rounded-lg bg-surface-2 hover:bg-surface-3 text-[12px] text-ink-2 hover:text-ink flex items-center gap-1.5 transition-all whitespace-nowrap cursor-pointer border border-line/60"
+                  title="Manage all sections (reorder, rename, delete, custom icons)"
+                >
+                  <Settings className="w-3 h-3 text-ink-3" />
+                  <span>Manage Sections</span>
+                </button>
+              </div>
             </div>
           </div>
+
+          {/* Active Section Banner with direct Rename and Delete controls */}
+          {activeSection && (
+            <div className="p-3.5 sm:p-4 rounded-xl border border-accent/30 bg-accent/5 backdrop-blur-xs flex flex-col md:flex-row md:items-center justify-between gap-3.5 animate-in fade-in">
+              <div className="flex items-center gap-3 min-w-0">
+                <SectionIconPreview
+                  icon={activeSection.icon}
+                  className="w-10 h-10 rounded-xl bg-surface border border-line shadow-xs text-[20px] shrink-0"
+                  imgClassName="w-6 h-6 object-contain"
+                />
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-mono text-[10.5px] font-bold px-1.5 py-0.5 rounded-md bg-surface border border-line text-ink-3">
+                      Section #{String(activeSection.order_index && activeSection.order_index > 0 ? activeSection.order_index : 1).padStart(2, '0')}
+                    </span>
+                    <h2 className="text-[15px] font-bold text-ink truncate">{activeSection.name}</h2>
+                    <span className="text-[11.5px] font-medium px-2 py-0.5 rounded-full bg-accent/10 text-accent border border-accent/20">
+                      {sectionCounts[activeSection.id] || 0} articles
+                    </span>
+                  </div>
+                  {activeSection.description ? (
+                    <p className="text-[12px] text-ink-3 mt-0.5 line-clamp-1">{activeSection.description}</p>
+                  ) : (
+                    <p className="text-[11.5px] text-ink-3 italic mt-0.5">No description set for this section.</p>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 shrink-0 self-start md:self-auto flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => handleStartRenameSection(activeSection)}
+                  className="h-8 px-3 rounded-lg border border-line bg-surface hover:bg-surface-2 text-ink text-[12px] font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+                  title="Rename or update this section"
+                >
+                  <Edit2 className="w-3.5 h-3.5 text-accent" />
+                  <span>Rename Section</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleStartDeleteSection(activeSection)}
+                  className="h-8 px-3 rounded-lg border border-rose-500/20 bg-rose-500/5 hover:bg-rose-500/15 text-rose-600 dark:text-rose-400 text-[12px] font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+                  title="Delete this section"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Delete Section</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setIsReorderModalOpen(true)}
+                  className="h-8 px-3 rounded-lg border border-line bg-surface hover:bg-surface-2 text-ink text-[12px] font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+                  title="Change the display order of articles in this section"
+                >
+                  <ArrowUpDown className="w-3.5 h-3.5 text-accent" />
+                  <span>Reorder Articles</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingArticle({ section_id: activeSection.id } as Article);
+                    setIsArticleModalOpen(true);
+                  }}
+                  className="h-8 px-3 rounded-lg bg-accent text-accent-ink hover:opacity-95 text-[12px] font-semibold flex items-center gap-1.5 transition-all shadow-xs cursor-pointer"
+                  title="Create a new article directly in this section"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>New Article</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setSelectedSectionId('all')}
+                  className="h-8 w-8 rounded-lg border border-line bg-surface hover:bg-surface-2 text-ink-3 hover:text-ink flex items-center justify-center transition-colors cursor-pointer"
+                  title="View all sections"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Search and Status Filters */}
           <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-1">
@@ -652,6 +977,45 @@ export function HelpDeskDashboard({
                           />
                           {isPublished ? 'Published' : 'Draft'}
                         </span>
+
+                        {/* Article Order within Section */}
+                        {selectedSectionId !== 'all' ? (
+                          <div
+                            className="flex items-center gap-1 bg-surface-2/90 border border-line rounded-md px-2 py-0.5"
+                            title="Display position on help.business.com"
+                          >
+                            <span className="font-mono text-[11px] font-bold text-accent">
+                              #{String(article.order_index && article.order_index > 0 ? article.order_index : filteredArticles.indexOf(article) + 1).padStart(2, '0')}
+                            </span>
+                            <div className="flex items-center gap-0.5 border-l border-line/80 pl-1 ml-0.5">
+                              <button
+                                type="button"
+                                disabled={filteredArticles.indexOf(article) === 0}
+                                onClick={() => handleQuickMoveArticle(article, 'up')}
+                                className="w-4.5 h-4.5 rounded hover:bg-surface flex items-center justify-center text-ink-3 hover:text-ink disabled:opacity-25 transition-colors cursor-pointer"
+                                title="Move article up in order"
+                              >
+                                <ArrowUp className="w-3 h-3" />
+                              </button>
+                              <button
+                                type="button"
+                                disabled={filteredArticles.indexOf(article) === filteredArticles.length - 1}
+                                onClick={() => handleQuickMoveArticle(article, 'down')}
+                                className="w-4.5 h-4.5 rounded hover:bg-surface flex items-center justify-center text-ink-3 hover:text-ink disabled:opacity-25 transition-colors cursor-pointer"
+                                title="Move article down in order"
+                              >
+                                <ArrowDown className="w-3 h-3" />
+                              </button>
+                            </div>
+                          </div>
+                        ) : article.order_index && article.order_index > 0 ? (
+                          <span
+                            className="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded bg-surface-2 border border-line text-ink-3"
+                            title="Display order position"
+                          >
+                            #{String(article.order_index).padStart(2, '0')}
+                          </span>
+                        ) : null}
 
                         {article.section ? (
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium bg-surface-2 text-ink-2 border border-line/60">
@@ -790,9 +1154,58 @@ export function HelpDeskDashboard({
         <SectionsManagerModal
           workspaceId={workspace?.id || ''}
           sections={sections}
-          onClose={() => setIsSectionModalOpen(false)}
+          initialEditingSection={editingSection}
+          onClose={() => {
+            setIsSectionModalOpen(false);
+            setEditingSection(null);
+          }}
           onSectionsChanged={() => {
             loadHelpDeskData();
+          }}
+        />
+      )}
+
+      {/* QUICK RENAME SECTION MODAL */}
+      {sectionToRename && (
+        <QuickRenameSectionModal
+          workspaceId={workspace?.id || ''}
+          section={sectionToRename}
+          onClose={() => setSectionToRename(null)}
+          onUpdated={handleSectionUpdated}
+          onDeleteRequest={(sec) => {
+            setSectionToRename(null);
+            handleStartDeleteSection(sec);
+          }}
+        />
+      )}
+
+      {/* DELETE SECTION CONFIRM MODAL */}
+      {sectionToDelete && (
+        <DeleteSectionConfirmModal
+          section={sectionToDelete}
+          articleCount={sectionCounts[sectionToDelete.id] || 0}
+          isDeleting={isDeletingSection}
+          onClose={() => setSectionToDelete(null)}
+          onConfirm={handleConfirmDeleteSection}
+        />
+      )}
+
+      {/* REORDER ARTICLES MODAL */}
+      {isReorderModalOpen && activeSection && (
+        <ReorderArticlesModal
+          workspaceId={workspace?.id || ''}
+          section={activeSection}
+          articles={activeSectionArticles}
+          onClose={() => setIsReorderModalOpen(false)}
+          onSaved={(updatedSectionArticles: Article[]) => {
+            setIsReorderModalOpen(false);
+            setArticles((prev) =>
+              prev.map((art) => {
+                const up = updatedSectionArticles.find((u: Article) => u.id === art.id);
+                return up ? { ...art, order_index: up.order_index } : art;
+              })
+            );
+            showToast(`Article order for "${activeSection.name}" updated successfully!`);
           }}
         />
       )}
@@ -828,6 +1241,101 @@ interface ArticleEditorModalProps {
 // ARTICLE BLUEPRINTS (Quick Start Professional Templates)
 // ============================================================================
 const ARTICLE_BLUEPRINTS = [
+  {
+    id: 'aquafunded-split',
+    label: '🏆 Profit Split & Payouts',
+    name: 'Profit Split Policy (AquaFunded Style)',
+    desc: '90% standard split, 100% upgrade notice, reward calculations & CTA',
+    content: `# 🏆 What is the Profit Split?
+
+Traders receive a ==90% profit split== as standard on all evaluation and funded accounts.
+
+### Example Calculation
+If a trader earns a profit of **$5,000** and requests a payout reward, they will receive **$4,500** as their total reward directly to their preferred method.
+
+> [!SUCCESS]
+> **100% PROFIT SPLIT UPGRADE**
+> Upon checkout, you have the option to upgrade with an add-on to:
+> - [badge:emerald:100% PROFIT SPLIT]
+> Keep every single dollar you generate through your trading strategy!
+
+## Supported Payout Methods
+We process reward payouts within **24 hours** through the following gateways:
+
+| Method | Min Amount | Processing Time | Fee |
+|:---|:---|:---|:---|
+| Crypto (USDT / BTC) | $50 | Instant - 2 Hours | $0 |
+| Bank Wire (Direct) | $200 | 1 - 2 Business Days | $0 |
+| Deel / Rise | $100 | Same Day | $0 |
+
+> [!CTA]
+> **Trade with our capital and keep 100% of the profit**
+> *Take advantage of our limited time evaluation sale live now.*
+> [button:Get Funded](https://www.aquafunded.com/#Evaluations)`,
+  },
+  {
+    id: 'aquafunded-risk',
+    label: '⚡ Floating Loss & Risk',
+    name: 'Maximum Loss Per Trade Policy',
+    desc: '-2% risk limits, violation consequences, and account scaling tiers',
+    content: `# ⚡ Maximum Loss Per Trade Policy
+
+For all Instant Funding Models & AquaMan Models, if your floating PnL (profit and loss) drops below ==-2% of the account starting balance==, the account will be closed immediately.
+
+This ensures strict adherence to risk management protocols and safeguards the integrity of our funding process.
+
+### Floating Loss Example
+For a **$50,000** account balance, if your combined open PnL across all active positions reaches a loss of ==$1,000 (-2%)==, the account will be permanently breached.
+
+> [!WARNING]
+> **Important Note for $300,000 & $400,000 Accounts**
+> For $300k and $400k accounts, a stricter floating risk limit of ==-1%== applies to manage market exposure.
+
+## Consequences for Exceeding the Risk Limit:
+- [ ] Immediate and permanent closure of the breached account.
+- [ ] No further trading activity permitted on the account.
+- [ ] Remaining balance is settled according to evaluation terms.
+
+> [!DANGER]
+> **Zero Tolerance Violations**
+> Hedging between different accounts, latency arbitrage, or account sharing will result in permanent ban from the platform.
+
+---
+
+> [!CTA]
+> **Need help configuring risk on your platform?**
+> *Our 24/7 team is available to assist you with lot size calculators.*
+> [button:Contact Support](https://trading.aquafunded.com)`,
+  },
+  {
+    id: 'aquafunded-faq',
+    label: '❓ Trading Rules FAQ',
+    name: 'Trading Rules & Conditions FAQ',
+    desc: 'EAs, copy trading, holding trades overnight and weekend rules',
+    content: `# ❓ General Trading Rules & FAQ
+
+Find answers to common operational and strategy questions below.
+
+### Q: Are EAs & Trade Copiers allowed?
+==Yes.== Expert Advisors (EAs), algorithms, and trade copiers between your own personal accounts are fully permitted.
+
+### Q: Can I hold trades overnight and over the weekend?
+==Yes.== You are free to hold positions overnight and across the weekend on all swing and evaluation models without restriction.
+
+### Q: Is there a maximum lot limit?
+No, there is no arbitrary max lot limit. You can trade any position size that fits within your margin and max drawdown boundaries.
+
+> [!NOTE]
+> **News Trading Guidelines**
+> You are permitted to trade high-impact news releases without restrictions on standard evaluation phases.
+
+### Q: Do you allow hedging and martingale?
+==Hedging is allowed== within the same trading account. Martingale strategies are permitted as long as you do not exceed max drawdown.
+
+> [!CTA]
+> **Ready to test your trading skills?**
+> [button:Start Evaluation Challenge](https://www.aquafunded.com/#Evaluations)`,
+  },
   {
     id: 'step-guide',
     label: '📋 Step Guide',
@@ -960,6 +1468,7 @@ function ArticleEditorModal({
   const [slug, setSlug] = useState(article?.slug || '');
   const [isSlugCustom, setIsSlugCustom] = useState(Boolean(article?.slug));
   const [sectionId, setSectionId] = useState<string>(article?.section_id || sections[0]?.id || '');
+  const [orderIndex, setOrderIndex] = useState<number>(article?.order_index ?? 0);
   const [summary, setSummary] = useState(article?.summary || '');
   const [content, setContent] = useState(article?.content || '');
   // The list hands over an article without its body, so an existing article
@@ -1259,6 +1768,11 @@ function ArticleEditorModal({
       insertMarkdown('[', '](https://)');
       return;
     }
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'h') {
+      e.preventDefault();
+      insertMarkdown('==', '==');
+      return;
+    }
     if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
       e.preventDefault();
       handleSave();
@@ -1459,6 +1973,7 @@ function ArticleEditorModal({
           summary,
           content,
           status,
+          order_index: orderIndex,
         });
         if (res.article) onSaved(res.article);
       } else {
@@ -1469,6 +1984,7 @@ function ArticleEditorModal({
           summary,
           content,
           status,
+          order_index: orderIndex > 0 ? orderIndex : undefined,
         });
         if (res.article) onSaved(res.article);
       }
@@ -1652,20 +2168,36 @@ function ArticleEditorModal({
               />
             </div>
 
-            <div className="space-y-1">
-              <label className="text-[12px] font-semibold text-ink">Section / Collection</label>
-              <select
-                value={sectionId}
-                onChange={(e) => setSectionId(e.target.value)}
-                className="w-full h-10 px-3 rounded-xl border border-line bg-surface text-[13px] text-ink focus:outline-none focus:border-accent font-medium shadow-2xs"
-              >
-                <option value="">(No Section - General)</option>
-                {sections.map((sec, idx) => (
-                  <option key={sec.id} value={sec.id}>
-                    #{String(sec.order_index && sec.order_index > 0 ? sec.order_index : idx + 1).padStart(2, '0')} {sec.icon} {sec.name}
-                  </option>
-                ))}
-              </select>
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+              <div className="sm:col-span-3 space-y-1">
+                <label className="text-[12px] font-semibold text-ink">Section / Collection</label>
+                <select
+                  value={sectionId}
+                  onChange={(e) => setSectionId(e.target.value)}
+                  className="w-full h-10 px-3 rounded-xl border border-line bg-surface text-[13px] text-ink focus:outline-none focus:border-accent font-medium shadow-2xs"
+                >
+                  <option value="">(No Section - General)</option>
+                  {sections.map((sec, idx) => (
+                    <option key={sec.id} value={sec.id}>
+                      #{String(sec.order_index && sec.order_index > 0 ? sec.order_index : idx + 1).padStart(2, '0')} {sec.icon} {sec.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="sm:col-span-1 space-y-1">
+                <label className="text-[12px] font-semibold text-ink" title="Order position on help.business.com (lower numbers appear first)">
+                  Order # in Section
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  value={orderIndex > 0 ? orderIndex : ''}
+                  onChange={(e) => setOrderIndex(Math.max(0, parseInt(e.target.value, 10) || 0))}
+                  placeholder="Auto"
+                  className="w-full h-10 px-3 rounded-xl border border-line bg-surface text-[13px] font-mono text-ink focus:outline-none focus:border-accent font-medium shadow-2xs"
+                />
+              </div>
             </div>
           </div>
 
@@ -1877,6 +2409,23 @@ function ArticleEditorModal({
                 </button>
                 <button
                   type="button"
+                  onClick={() => insertMarkdown('==', '==')}
+                  className="h-7 w-7 rounded hover:bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center font-bold transition-colors"
+                  title="Highlight Text (==text==) [Ctrl+H]"
+                >
+                  <Highlighter className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => insertMarkdown('[badge:green:', ']')}
+                  className="h-7 px-1.5 rounded hover:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center gap-1 text-[11px] font-semibold transition-colors"
+                  title="Insert Status Badge"
+                >
+                  <BadgeCheck className="w-3.5 h-3.5" />
+                  <span>Badge</span>
+                </button>
+                <button
+                  type="button"
                   onClick={() => insertMarkdown('~~', '~~')}
                   className="h-7 w-7 rounded hover:bg-surface-2 flex items-center justify-center text-ink hover:text-accent"
                   title="Strikethrough"
@@ -1924,7 +2473,7 @@ function ArticleEditorModal({
                 </button>
               </div>
 
-              {/* Intercom / GitHub Callouts */}
+              {/* Intercom / AquaFunded Callouts */}
               <div className="flex items-center gap-0.5 bg-surface rounded-lg p-0.5 border border-line/60">
                 <button
                   type="button"
@@ -1937,21 +2486,55 @@ function ArticleEditorModal({
                 </button>
                 <button
                   type="button"
-                  onClick={() => insertText('\n> [!TIP]\n> Pro-tip: Recommended best practice...\n\n')}
+                  onClick={() =>
+                    insertText(
+                      '\n> [!SUCCESS]\n> **100% PROFIT SPLIT UPGRADE**\n> - Traders receive a **90% profit** split as standard.\n> - Upgrade add-on available at checkout for **100% PROFIT SPLIT**.\n\n'
+                    )
+                  }
                   className="h-7 px-2 rounded hover:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[11px] font-semibold flex items-center gap-1"
-                  title="Pro Tip Box"
+                  title="Bonus / Upgrade Callout (Green)"
                 >
                   <Sparkles className="w-3.5 h-3.5" />
-                  <span>Tip</span>
+                  <span>Upgrade</span>
                 </button>
                 <button
                   type="button"
-                  onClick={() => insertText('\n> [!WARNING]\n> Caution: Do not skip this requirement...\n\n')}
+                  onClick={() =>
+                    insertText(
+                      '\n> [!CTA]\n> **Trade with our capital and keep 100% of the profit**\n> *Take advantage of our limited time evaluation sale live now.*\n> [button:Get Funded](https://www.aquafunded.com/#Evaluations)\n\n'
+                    )
+                  }
+                  className="h-7 px-2 rounded hover:bg-blue-500/10 text-blue-600 dark:text-blue-400 text-[11px] font-semibold flex items-center gap-1"
+                  title="Featured CTA Banner (Blue with Button)"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  <span>CTA Card</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    insertText(
+                      '\n> [!WARNING]\n> **Important Risk Limit**\n> Floating loss exceeding -2% will result in automatic rule breach.\n\n'
+                    )
+                  }
                   className="h-7 px-2 rounded hover:bg-amber-500/10 text-amber-600 dark:text-amber-400 text-[11px] font-semibold flex items-center gap-1"
                   title="Warning Box"
                 >
                   <AlertTriangle className="w-3.5 h-3.5" />
                   <span>Warn</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    insertText(
+                      '\n> [!DANGER]\n> **Violation / Breach Notice**\n> Prohibited trading strategies will result in immediate account closure.\n\n'
+                    )
+                  }
+                  className="h-7 px-2 rounded hover:bg-rose-500/10 text-rose-600 dark:text-rose-400 text-[11px] font-semibold flex items-center gap-1"
+                  title="Violation / Danger Box (Red)"
+                >
+                  <ShieldAlert className="w-3.5 h-3.5" />
+                  <span>Breach</span>
                 </button>
               </div>
 
@@ -1964,6 +2547,15 @@ function ArticleEditorModal({
                   title="Insert Image"
                 >
                   <ImageIcon className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => insertMarkdown('[button:Get Funded](', 'https://)')}
+                  className="h-7 px-2 rounded hover:bg-accent-soft text-accent text-[11px] font-semibold flex items-center gap-1"
+                  title="Insert CTA Action Button"
+                >
+                  <ArrowRight className="w-3.5 h-3.5" />
+                  <span>Button</span>
                 </button>
                 <button
                   type="button"
@@ -2241,6 +2833,10 @@ Tip:
                   <kbd className="px-1.5 py-0.5 rounded bg-surface border border-line text-[11px] font-mono text-ink-2">Ctrl+I</kbd>
                 </div>
                 <div className="p-2.5 rounded-lg bg-surface-2/60 border border-line/60 flex items-center justify-between">
+                  <span>Highlight text</span>
+                  <kbd className="px-1.5 py-0.5 rounded bg-surface border border-line text-[11px] font-mono text-ink-2">Ctrl+H</kbd>
+                </div>
+                <div className="p-2.5 rounded-lg bg-surface-2/60 border border-line/60 flex items-center justify-between">
                   <span>Insert Link</span>
                   <kbd className="px-1.5 py-0.5 rounded bg-surface border border-line text-[11px] font-mono text-ink-2">Ctrl+K</kbd>
                 </div>
@@ -2252,19 +2848,15 @@ Tip:
                   <span>Indent List</span>
                   <kbd className="px-1.5 py-0.5 rounded bg-surface border border-line text-[11px] font-mono text-ink-2">Tab</kbd>
                 </div>
-                <div className="p-2.5 rounded-lg bg-surface-2/60 border border-line/60 flex items-center justify-between">
-                  <span>Outdent List</span>
-                  <kbd className="px-1.5 py-0.5 rounded bg-surface border border-line text-[11px] font-mono text-ink-2">Shift+Tab</kbd>
-                </div>
               </div>
 
               <div className="space-y-1.5 pt-2 border-t border-line/60">
-                <h4 className="font-semibold text-ink text-[13px]">Smart List Behavior (Notion-grade):</h4>
+                <h4 className="font-semibold text-ink text-[13px]">AquaFunded-Grade Article Features:</h4>
                 <ul className="list-disc pl-5 space-y-1 text-ink-2 text-[12px]">
-                  <li>Press <strong className="text-ink">Enter</strong> on any list line to auto-continue bullets, sequential numbers, or checklist tasks.</li>
-                  <li>Press <strong className="text-ink">Enter</strong> on an empty bullet to instantly exit the list and write standard paragraphs.</li>
-                  <li>Press <strong className="text-ink">Backspace</strong> at the beginning of a list line to convert it back to normal text.</li>
-                  <li>Highlight multiple lines and click <strong className="text-ink">Bullet</strong> or <strong className="text-ink">1. 2. 3.</strong> to format the entire block sequentially.</li>
+                  <li><strong className="text-ink">Highlighter:</strong> Wrap text with <code className="px-1 py-0.5 rounded bg-surface border border-line font-mono text-[11px]">==important figure==</code> or press <strong className="text-ink">Ctrl+H</strong>.</li>
+                  <li><strong className="text-ink">Status Badges:</strong> Use <code className="px-1 py-0.5 rounded bg-surface border border-line font-mono text-[11px]">[badge:green:Active]</code> or <code className="px-1 py-0.5 rounded bg-surface border border-line font-mono text-[11px]">[badge:blue:90% Split]</code>.</li>
+                  <li><strong className="text-ink">CTA Buttons:</strong> Use <code className="px-1 py-0.5 rounded bg-surface border border-line font-mono text-[11px]">[button:Get Funded](https://...)</code> to embed primary buttons.</li>
+                  <li><strong className="text-ink">Callout Cards:</strong> Use <code className="px-1 py-0.5 rounded bg-surface border border-line font-mono text-[11px]">&gt; [!SUCCESS]</code> (green), <code className="px-1 py-0.5 rounded bg-surface border border-line font-mono text-[11px]">&gt; [!CTA]</code> (blue banner), <code className="px-1 py-0.5 rounded bg-surface border border-line font-mono text-[11px]">&gt; [!WARNING]</code> (amber), or <code className="px-1 py-0.5 rounded bg-surface border border-line font-mono text-[11px]">&gt; [!DANGER]</code> (red).</li>
                 </ul>
               </div>
             </div>
@@ -2286,70 +2878,697 @@ Tip:
 }
 
 // ============================================================================
+// REORDER ARTICLES MODAL COMPONENT
+// ============================================================================
+interface ReorderArticlesModalProps {
+  workspaceId: string;
+  section: HelpSection;
+  articles: Article[];
+  onClose: () => void;
+  onSaved: (updatedSectionArticles: Article[]) => void;
+}
+
+function ReorderArticlesModal({
+  workspaceId,
+  section,
+  articles,
+  onClose,
+  onSaved,
+}: ReorderArticlesModalProps) {
+  // Sort initially by order_index ascending, then created_at
+  const [list, setList] = useState<Article[]>(() => {
+    return [...articles].sort((a, b) => {
+      const ao = a.order_index ?? 0;
+      const bo = b.order_index ?? 0;
+      if (ao !== bo) return ao - bo;
+      return new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime();
+    });
+  });
+
+  const [saving, setSaving] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // Check if current order differs from initial
+  const hasChanges = useMemo(() => {
+    if (list.length !== articles.length) return true;
+    return list.some((item, index) => item.id !== articles[index]?.id);
+  }, [list, articles]);
+
+  const handleMove = (index: number, direction: 'up' | 'down') => {
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= list.length) return;
+
+    const copy = [...list];
+    const temp = copy[index];
+    copy[index] = copy[targetIndex];
+    copy[targetIndex] = temp;
+    setList(copy);
+  };
+
+  const handleMoveToTop = (index: number) => {
+    if (index === 0) return;
+    const copy = [...list];
+    const [item] = copy.splice(index, 1);
+    copy.unshift(item);
+    setList(copy);
+  };
+
+  const handleMoveToBottom = (index: number) => {
+    if (index === list.length - 1) return;
+    const copy = [...list];
+    const [item] = copy.splice(index, 1);
+    copy.push(item);
+    setList(copy);
+  };
+
+  const handleReset = () => {
+    setList(
+      [...articles].sort((a, b) => {
+        const ao = a.order_index ?? 0;
+        const bo = b.order_index ?? 0;
+        if (ao !== bo) return ao - bo;
+        return new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime();
+      })
+    );
+    setErrorMsg(null);
+  };
+
+  const handleSave = async () => {
+    if (!workspaceId || list.length === 0) {
+      onClose();
+      return;
+    }
+
+    setSaving(true);
+    setErrorMsg(null);
+
+    const updates = list.map((item, index) => ({
+      id: item.id,
+      order_index: index + 1,
+    }));
+
+    try {
+      await reorderArticlesAction(workspaceId, updates);
+      const updatedArticles = list.map((item, index) => ({
+        ...item,
+        order_index: index + 1,
+      }));
+      onSaved(updatedArticles);
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Failed to save article order');
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-in fade-in">
+      <div className="bg-surface border border-line rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] flex flex-col overflow-hidden animate-in zoom-in-95">
+        {/* Header */}
+        <div className="px-5 py-4 border-b border-line flex items-center justify-between bg-surface-2/60 shrink-0">
+          <div className="flex items-center gap-3">
+            <SectionIconPreview
+              icon={section.icon}
+              className="w-10 h-10 rounded-xl bg-surface border border-line shadow-xs text-[20px]"
+              imgClassName="w-6 h-6 object-contain"
+            />
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-[16px] font-bold text-ink">Reorder Articles</h3>
+                <span className="font-mono text-[11px] font-bold px-1.5 py-0.5 rounded-md bg-accent/10 text-accent border border-accent/20">
+                  {section.name}
+                </span>
+              </div>
+              <p className="text-[12px] text-ink-3">
+                Change the sequence in which articles are displayed on help.business.com
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="w-8 h-8 rounded-lg hover:bg-surface-3 flex items-center justify-center text-ink-3 hover:text-ink transition-colors cursor-pointer"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="p-5 overflow-y-auto flex-1 space-y-4">
+          {errorMsg && (
+            <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400 text-[12.5px] flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              <span>{errorMsg}</span>
+            </div>
+          )}
+
+          <div className="p-3.5 rounded-xl bg-accent-soft/30 border border-accent/20 flex items-start gap-2.5 text-[12.5px] text-ink-2">
+            <Info className="w-4 h-4 text-accent shrink-0 mt-0.5" />
+            <span>
+              Articles at the top appear first on your public Help Center and inside the widget. Use the <strong className="text-ink">Up</strong> and <strong className="text-ink">Down</strong> buttons to reorder.
+            </span>
+          </div>
+
+          {list.length === 0 ? (
+            <div className="py-12 text-center text-ink-3 text-[13px]">
+              No articles found in this section.
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {list.map((item, index) => {
+                const isFirst = index === 0;
+                const isLast = index === list.length - 1;
+                const displayNum = String(index + 1).padStart(2, '0');
+
+                return (
+                  <div
+                    key={item.id}
+                    className="p-3 rounded-xl border border-line bg-surface hover:bg-surface-2/60 transition-all flex items-center justify-between gap-3 shadow-2xs group"
+                  >
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <GripVertical className="w-4 h-4 text-ink-3/40 group-hover:text-ink-3 transition-colors" />
+                        <span className="font-mono text-[12px] font-bold px-2 py-0.5 rounded-md bg-surface-2 border border-line text-accent">
+                          #{displayNum}
+                        </span>
+                      </div>
+
+                      <div className="min-w-0 flex-1">
+                        <h4 className="text-[13.5px] font-semibold text-ink truncate">
+                          {item.title}
+                        </h4>
+                        <div className="flex items-center gap-2 mt-0.5 text-[11px] text-ink-3">
+                          <span
+                            className={cn(
+                              'px-1.5 py-0.2 rounded font-medium',
+                              item.status === 'published'
+                                ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                                : 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
+                            )}
+                          >
+                            {item.status === 'published' ? 'Published' : 'Draft'}
+                          </span>
+                          {item.summary && (
+                            <span className="truncate max-w-xs opacity-75">
+                              • {item.summary}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Order Controls */}
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        type="button"
+                        disabled={isFirst}
+                        onClick={() => handleMove(index, 'up')}
+                        className="h-7.5 px-2 rounded-lg border border-line bg-surface hover:bg-surface-2 text-ink text-[12px] font-medium flex items-center gap-1 transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed shadow-2xs"
+                        title="Move Up"
+                      >
+                        <ArrowUp className="w-3.5 h-3.5 text-accent" />
+                        <span className="hidden sm:inline">Up</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        disabled={isLast}
+                        onClick={() => handleMove(index, 'down')}
+                        className="h-7.5 px-2 rounded-lg border border-line bg-surface hover:bg-surface-2 text-ink text-[12px] font-medium flex items-center gap-1 transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed shadow-2xs"
+                        title="Move Down"
+                      >
+                        <ArrowDown className="w-3.5 h-3.5 text-accent" />
+                        <span className="hidden sm:inline">Down</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        disabled={isFirst}
+                        onClick={() => handleMoveToTop(index)}
+                        className="h-7.5 w-7.5 rounded-lg border border-line bg-surface hover:bg-surface-2 text-ink-3 hover:text-ink flex items-center justify-center transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+                        title="Move to Top"
+                      >
+                        <span className="text-[11px] font-bold font-mono">⇈</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        disabled={isLast}
+                        onClick={() => handleMoveToBottom(index)}
+                        className="h-7.5 w-7.5 rounded-lg border border-line bg-surface hover:bg-surface-2 text-ink-3 hover:text-ink flex items-center justify-center transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+                        title="Move to Bottom"
+                      >
+                        <span className="text-[11px] font-bold font-mono">⇊</span>
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="px-5 py-3.5 border-t border-line flex items-center justify-between bg-surface-2/40 shrink-0">
+          <button
+            type="button"
+            onClick={handleReset}
+            disabled={saving || !hasChanges}
+            className="text-[12px] text-ink-3 hover:text-ink flex items-center gap-1 cursor-pointer font-medium disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+            <span>Reset Order</span>
+          </button>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="h-8.5 px-3.5 rounded-lg border border-line bg-surface text-ink text-[12.5px] font-medium hover:bg-surface-2 transition-colors cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              disabled={saving}
+              onClick={handleSave}
+              className="h-8.5 px-4 rounded-lg bg-accent text-accent-ink text-[12.5px] font-semibold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+            >
+              <Check className="w-4 h-4" />
+              <span>{saving ? 'Saving...' : 'Save & Apply Order'}</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================================
+// QUICK RENAME / EDIT SECTION MODAL
+// ============================================================================
+interface QuickRenameSectionModalProps {
+  workspaceId: string;
+  section: HelpSection;
+  onClose: () => void;
+  onUpdated: (updatedSection: HelpSection) => void;
+  onDeleteRequest: (section: HelpSection) => void;
+}
+
+function QuickRenameSectionModal({
+  workspaceId,
+  section,
+  onClose,
+  onUpdated,
+  onDeleteRequest,
+}: QuickRenameSectionModalProps) {
+  const [name, setName] = useState(section.name);
+  const [description, setDescription] = useState(section.description || '');
+  const [icon, setIcon] = useState(section.icon || '📚');
+  const [orderIndex, setOrderIndex] = useState(section.order_index ?? 1);
+  const [iconTab, setIconTab] = useState<'presets' | 'custom'>(
+    section.icon && (section.icon.startsWith('http') || section.icon.startsWith('/'))
+      ? 'custom'
+      : 'presets'
+  );
+  const [uploadingIcon, setUploadingIcon] = useState(false);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingIcon(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await fetch('/api/upload', { method: 'POST', body: formData });
+      const data = await res.json();
+      if (data.url) setIcon(data.url);
+    } catch {
+      setErrorMsg('Failed to upload icon image');
+    } finally {
+      setUploadingIcon(false);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name.trim()) {
+      setErrorMsg('Section name is required');
+      return;
+    }
+    setSaving(true);
+    setErrorMsg(null);
+    try {
+      const res = await updateHelpSectionAction(workspaceId, section.id, {
+        name: name.trim(),
+        description: description.trim(),
+        icon: icon.trim() || '📚',
+        order_index: orderIndex,
+      });
+      if (res.section) {
+        onUpdated(res.section);
+      }
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Failed to rename section');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in">
+      <div className="bg-surface border border-line rounded-2xl shadow-2xl max-w-lg w-full flex flex-col overflow-hidden">
+        {/* Header */}
+        <div className="px-6 py-4 border-b border-line flex items-center justify-between bg-surface-2/50">
+          <div>
+            <h2 className="text-[16px] font-bold text-ink">Rename Section</h2>
+            <p className="text-[11.5px] text-ink-3">
+              Change section name, display order, or custom logo.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="w-8 h-8 rounded-lg hover:bg-surface-3 flex items-center justify-center text-ink-3 hover:text-ink transition-colors cursor-pointer"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Form */}
+        <form onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto max-h-[75vh]">
+          {errorMsg && (
+            <div className="p-3 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-500 text-[12px] font-medium">
+              {errorMsg}
+            </div>
+          )}
+
+          {/* Live Preview */}
+          <div className="p-3 rounded-xl border border-line bg-surface-2/60 flex items-center gap-3">
+            <SectionIconPreview
+              icon={icon}
+              className="w-11 h-11 rounded-xl text-[20px]"
+              imgClassName="w-7 h-7"
+            />
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2">
+                <span className="font-mono text-[11px] font-bold px-1.5 py-0.5 rounded bg-surface border border-line text-ink-3 shrink-0">
+                  #{String(orderIndex > 0 ? orderIndex : 1).padStart(2, '0')}
+                </span>
+                <span className="text-[14px] font-bold text-ink truncate">
+                  {name.trim() || 'Section Name'}
+                </span>
+              </div>
+              <p className="text-[11.5px] text-ink-3 truncate mt-0.5">
+                {description.trim() || 'Section description will appear here'}
+              </p>
+            </div>
+            <span className="text-[10.5px] font-medium px-2 py-0.5 rounded bg-surface border border-line text-ink-3 shrink-0">
+              Live Preview
+            </span>
+          </div>
+
+          {/* Name & Order */}
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+            <div className="sm:col-span-3">
+              <label className="text-[11.5px] font-semibold text-ink-2 block mb-1">
+                Section Name <span className="text-rose-500">*</span>
+              </label>
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="e.g. Account Management, Rules, Payouts"
+                required
+                className="w-full h-9 px-3 rounded-lg border border-line bg-surface text-[13px] text-ink focus:outline-none focus:border-accent"
+                autoFocus
+              />
+            </div>
+            <div className="sm:col-span-1">
+              <label className="text-[11.5px] font-semibold text-ink-2 block mb-1" title="Order Index">
+                Section #
+              </label>
+              <input
+                type="number"
+                min={1}
+                value={orderIndex || ''}
+                onChange={(e) => setOrderIndex(Math.max(1, parseInt(e.target.value, 10) || 1))}
+                placeholder="1, 2, 3..."
+                className="w-full h-9 px-3 rounded-lg border border-line bg-surface text-[13px] font-mono text-ink focus:outline-none focus:border-accent"
+              />
+            </div>
+          </div>
+
+          {/* Description */}
+          <div>
+            <label className="text-[11.5px] font-semibold text-ink-2 block mb-1">
+              Short Description (Optional)
+            </label>
+            <input
+              type="text"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="e.g. Understand guidelines, payout split, and account types"
+              className="w-full h-9 px-3 rounded-lg border border-line bg-surface text-[13px] text-ink focus:outline-none focus:border-accent"
+            />
+          </div>
+
+          {/* Icon Tabs */}
+          <div className="space-y-2 pt-1">
+            <div className="flex items-center justify-between">
+              <label className="text-[11.5px] font-semibold text-ink-2">Section Icon / Logo</label>
+              <div className="flex items-center gap-1 p-0.5 rounded-lg bg-surface-2 border border-line text-[11px]">
+                <button
+                  type="button"
+                  onClick={() => setIconTab('presets')}
+                  className={`px-2 py-0.5 rounded font-medium transition-all ${
+                    iconTab === 'presets'
+                      ? 'bg-accent text-white shadow-xs'
+                      : 'text-ink-3 hover:text-ink'
+                  }`}
+                >
+                  Icon Presets
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIconTab('custom')}
+                  className={`px-2 py-0.5 rounded font-medium transition-all ${
+                    iconTab === 'custom'
+                      ? 'bg-accent text-white shadow-xs'
+                      : 'text-ink-3 hover:text-ink'
+                  }`}
+                >
+                  Custom Logo / URL
+                </button>
+              </div>
+            </div>
+
+            {iconTab === 'presets' ? (
+              <div className="p-3 rounded-xl border border-line bg-surface-2/40 space-y-2">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={icon}
+                    onChange={(e) => setIcon(e.target.value)}
+                    className="w-14 h-8 px-2 text-center text-[18px] rounded-lg border border-line bg-surface focus:outline-none focus:border-accent"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowEmojiPicker((prev) => !prev)}
+                    className="h-8 px-2.5 rounded-lg border border-line bg-surface hover:bg-surface-2 text-ink text-[11.5px] shrink-0 font-medium inline-flex items-center gap-1 cursor-pointer"
+                  >
+                    <span>😊</span>
+                    <span>More Emojis</span>
+                  </button>
+                  {showEmojiPicker && (
+                    <div className="absolute z-50 mt-10">
+                      <EmojiPickerPopover
+                        onSelect={(em) => {
+                          setIcon(em);
+                          setShowEmojiPicker(false);
+                        }}
+                        onClose={() => setShowEmojiPicker(false)}
+                      />
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-1.5 pt-1">
+                  {SECTION_ICON_GROUPS.map((grp) => (
+                    <div key={grp.name} className="flex items-center gap-1.5 flex-wrap">
+                      <span className="text-[10px] text-ink-3 w-28 shrink-0 font-medium">
+                        {grp.name}:
+                      </span>
+                      {grp.icons.map((em) => (
+                        <button
+                          key={em}
+                          type="button"
+                          onClick={() => setIcon(em)}
+                          className={`w-6 h-6 rounded flex items-center justify-center text-[13px] transition-all cursor-pointer ${
+                            icon === em ? 'bg-accent text-white scale-110' : 'hover:bg-surface'
+                          }`}
+                        >
+                          {em}
+                        </button>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="p-3 rounded-xl border border-line bg-surface-2/40 space-y-2.5">
+                <div className="flex items-center gap-2">
+                  <label className="h-8 px-3 rounded-lg border border-line bg-surface hover:bg-surface-2 text-ink text-[11.5px] font-medium inline-flex items-center gap-1.5 cursor-pointer shrink-0">
+                    <Upload className="w-3.5 h-3.5" />
+                    <span>{uploadingIcon ? 'Uploading…' : 'Upload Logo'}</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      disabled={uploadingIcon}
+                      onChange={handleUpload}
+                      className="hidden"
+                    />
+                  </label>
+                  <span className="text-[11px] text-ink-3">or paste image link:</span>
+                </div>
+
+                <input
+                  type="url"
+                  value={icon.startsWith('http') || icon.startsWith('/') ? icon : ''}
+                  onChange={(e) => setIcon(e.target.value)}
+                  placeholder="https://example.com/icon.svg"
+                  className="w-full h-8 px-3 rounded-lg border border-line bg-surface text-[11.5px] text-ink focus:outline-none focus:border-accent"
+                />
+              </div>
+            )}
+          </div>
+
+          {/* Footer Actions */}
+          <div className="pt-3 border-t border-line flex items-center justify-between">
+            <button
+              type="button"
+              onClick={() => onDeleteRequest(section)}
+              className="text-[12px] text-rose-500 hover:text-rose-600 hover:underline flex items-center gap-1 cursor-pointer font-medium"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>Delete this section</span>
+            </button>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={onClose}
+                className="h-8 px-3 rounded-lg border border-line bg-surface text-ink text-[12px] font-medium hover:bg-surface-2 transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={saving || uploadingIcon}
+                className="h-8 px-4 rounded-lg bg-accent text-accent-ink text-[12px] font-semibold transition-all shadow-xs disabled:opacity-50 cursor-pointer"
+              >
+                {saving ? 'Saving...' : 'Save Changes'}
+              </button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================================
+// DELETE SECTION CONFIRM MODAL
+// ============================================================================
+interface DeleteSectionConfirmModalProps {
+  section: HelpSection;
+  articleCount: number;
+  isDeleting: boolean;
+  onClose: () => void;
+  onConfirm: () => Promise<void>;
+}
+
+function DeleteSectionConfirmModal({
+  section,
+  articleCount,
+  isDeleting,
+  onClose,
+  onConfirm,
+}: DeleteSectionConfirmModalProps) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in">
+      <div className="bg-surface border border-line rounded-2xl shadow-2xl max-w-md w-full overflow-hidden animate-in zoom-in-95">
+        <div className="p-6 space-y-4">
+          <div className="flex items-start gap-3.5">
+            <div className="w-10 h-10 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400 flex items-center justify-center shrink-0">
+              <Trash2 className="w-5 h-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <h3 className="text-[16px] font-bold text-ink">Delete Section?</h3>
+              <p className="text-[12.5px] text-ink-3 mt-1">
+                Are you sure you want to delete <strong className="text-ink">"{section.name}"</strong>?
+              </p>
+            </div>
+          </div>
+
+          <div className="p-3 rounded-xl border border-line bg-surface-2/60 space-y-2">
+            <div className="flex items-center justify-between text-[12px]">
+              <span className="text-ink-3">Articles in this section:</span>
+              <span className="font-bold text-ink">{articleCount}</span>
+            </div>
+            <p className="text-[11.5px] text-ink-3 leading-relaxed">
+              {articleCount > 0 ? (
+                <span>
+                  Articles will <strong className="text-ink">NOT</strong> be deleted. Their section assignment will be cleared and they will remain accessible in your Help Center as general articles.
+                </span>
+              ) : (
+                <span>This section has no articles and will be safely removed.</span>
+              )}
+            </p>
+          </div>
+
+          <div className="flex items-center justify-end gap-2.5 pt-2">
+            <button
+              type="button"
+              disabled={isDeleting}
+              onClick={onClose}
+              className="h-8 px-3.5 rounded-lg border border-line bg-surface text-ink text-[12.5px] font-medium hover:bg-surface-2 transition-colors cursor-pointer disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              disabled={isDeleting}
+              onClick={onConfirm}
+              className="h-8 px-4 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-[12.5px] font-semibold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>{isDeleting ? 'Deleting...' : 'Delete Section'}</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================================
 // SECTIONS MANAGER MODAL COMPONENT
 // ============================================================================
 interface SectionsManagerModalProps {
   workspaceId: string;
   sections: HelpSection[];
+  initialEditingSection?: HelpSection | null;
   onClose: () => void;
   onSectionsChanged: () => void;
 }
 
-function SectionIconPreview({
-  icon,
-  className = 'w-9 h-9 rounded-xl',
-  imgClassName = 'w-6 h-6',
-}: {
-  icon?: string | null;
-  className?: string;
-  imgClassName?: string;
-}) {
-  const isImg =
-    icon &&
-    (icon.startsWith('http://') ||
-      icon.startsWith('https://') ||
-      icon.startsWith('/') ||
-      icon.startsWith('data:image/'));
-
-  return (
-    <span
-      className={`grid place-items-center bg-surface-2 border border-line overflow-hidden shrink-0 select-none ${className}`}
-    >
-      {isImg ? (
-        <img
-          src={icon}
-          alt=""
-          className={`object-contain ${imgClassName}`}
-        />
-      ) : (
-        <span className="text-[18px] leading-none">{icon?.trim() || '📚'}</span>
-      )}
-    </span>
-  );
-}
-
-const SECTION_ICON_GROUPS = [
-  {
-    name: 'Trading & Finance',
-    icons: ['📈', '💳', '💵', '📊', '🪙', '📉', '🏦', '💹'],
-  },
-  {
-    name: 'Security & Rules',
-    icons: ['🛡️', '🔒', '⚖️', '🔑', '📜', '🔏', '🪪', '⚠️'],
-  },
-  {
-    name: 'Tech & Platform',
-    icons: ['🚀', '⚡', '⚙️', '💡', '📱', '🌐', '💻', '🔧'],
-  },
-  {
-    name: 'General & Support',
-    icons: ['📚', '📄', '📁', '💬', '❓', '🎯', '👤', '🎧'],
-  },
-];
-
 function SectionsManagerModal({
   workspaceId,
   sections,
+  initialEditingSection,
   onClose,
   onSectionsChanged,
 }: SectionsManagerModalProps) {
@@ -2359,6 +3578,12 @@ function SectionsManagerModal({
   useEffect(() => {
     setSectionList(sections);
   }, [sections]);
+
+  useEffect(() => {
+    if (initialEditingSection) {
+      handleStartEdit(initialEditingSection);
+    }
+  }, [initialEditingSection]);
 
   const sortedSectionList = useMemo(() => {
     return [...sectionList].sort((a, b) => {
@@ -2748,19 +3973,23 @@ function SectionsManagerModal({
 
                       <div className="flex items-center gap-1.5 shrink-0">
                         <button
+                          type="button"
                           onClick={() => handleStartEdit(sec)}
-                          className="h-7 w-7 rounded hover:bg-surface-2 flex items-center justify-center text-ink-2 hover:text-ink transition-colors cursor-pointer"
-                          title="Edit section"
+                          className="h-7 px-2.5 rounded-lg border border-line bg-surface hover:bg-surface-2 text-ink text-[11.5px] font-medium flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+                          title="Rename or edit section"
                         >
-                          <Edit2 className="w-3 h-3" />
+                          <Edit2 className="w-3 h-3 text-accent" />
+                          <span>Rename</span>
                         </button>
 
                         <button
+                          type="button"
                           onClick={() => handleDeleteSection(sec.id, sec.name)}
-                          className="h-7 w-7 rounded hover:bg-rose-500/10 flex items-center justify-center text-ink-3 hover:text-rose-500 transition-colors cursor-pointer"
+                          className="h-7 px-2.5 rounded-lg border border-rose-500/20 bg-rose-500/5 hover:bg-rose-500/15 text-rose-600 dark:text-rose-400 text-[11.5px] font-medium flex items-center gap-1.5 transition-colors cursor-pointer"
                           title="Delete section"
                         >
                           <Trash2 className="w-3 h-3" />
+                          <span>Delete</span>
                         </button>
                       </div>
                     </div>

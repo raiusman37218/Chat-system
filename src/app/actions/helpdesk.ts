@@ -79,12 +79,13 @@ export async function getHelpDeskDataAction(workspaceId: string) {
       // every article's full text made opening the Help Desk proportional to
       // how much the customer had written, which is exactly backwards.
       .select(
-        'id, workspace_id, section_id, title, slug, category, summary, status, ' +
+        'id, workspace_id, section_id, title, slug, category, summary, status, order_index, ' +
           'author_id, views_count, helpful_count, not_helpful_count, created_at, updated_at, ' +
           'author:agents(id, name, avatar_url), section:help_sections(id, name, slug, icon)'
       )
       .eq('workspace_id', workspaceId)
-      .order('created_at', { ascending: false }),
+      .order('order_index', { ascending: true })
+      .order('created_at', { ascending: true }),
   ]);
 
   if (sectionsRes.error) {
@@ -262,6 +263,16 @@ export async function updateHelpSectionAction(
     .single();
 
   if (error) throw new Error(error.message);
+
+  if (data.name !== undefined) {
+    // Keep legacy category column in sync for existing articles in this section
+    await supabase
+      .from('articles')
+      .update({ category: data.name.trim() })
+      .eq('section_id', sectionId)
+      .eq('workspace_id', workspaceId);
+  }
+
   return { success: true, section: updated as HelpSection };
 }
 
@@ -299,6 +310,7 @@ export async function createArticleAction(
     content: string;
     status?: 'published' | 'draft';
     slug?: string;
+    order_index?: number;
   }
 ) {
   const { agent } = await assertAgent(workspaceId);
@@ -317,6 +329,19 @@ export async function createArticleAction(
     if (sec?.name) category = sec.name;
   }
 
+  let orderIndex = data.order_index ?? 0;
+  if (data.order_index === undefined && data.section_id) {
+    const { data: lastArt } = await supabase
+      .from('articles')
+      .select('order_index')
+      .eq('workspace_id', workspaceId)
+      .eq('section_id', data.section_id)
+      .order('order_index', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    orderIndex = (lastArt?.order_index ?? 0) + 1;
+  }
+
   const { data: inserted, error } = await supabase
     .from('articles')
     .insert({
@@ -328,6 +353,7 @@ export async function createArticleAction(
       summary: data.summary?.trim() || null,
       content: data.content.trim(),
       status: data.status || 'published',
+      order_index: orderIndex,
       author_id: agent.id,
       views_count: 0,
       helpful_count: 0,
@@ -351,6 +377,7 @@ export async function updateArticleAction(
     content?: string;
     status?: 'published' | 'draft';
     slug?: string;
+    order_index?: number;
   }
 ) {
   await assertAgent(workspaceId);
@@ -369,6 +396,7 @@ export async function updateArticleAction(
   if (data.summary !== undefined) updatePayload.summary = data.summary?.trim() || null;
   if (data.content !== undefined) updatePayload.content = data.content.trim();
   if (data.status !== undefined) updatePayload.status = data.status;
+  if (data.order_index !== undefined) updatePayload.order_index = data.order_index;
 
   if (data.section_id) {
     const { data: sec } = await supabase
@@ -391,6 +419,30 @@ export async function updateArticleAction(
 
   if (error) throw new Error(error.message);
   return { success: true, article: updated as Article };
+}
+
+export async function reorderArticlesAction(
+  workspaceId: string,
+  updates: { id: string; order_index: number }[]
+) {
+  await assertAgent(workspaceId);
+  const supabase = await createClient();
+
+  const promises = updates.map(({ id, order_index }) =>
+    supabase
+      .from('articles')
+      .update({ order_index, updated_at: new Date().toISOString() })
+      .eq('id', id)
+      .eq('workspace_id', workspaceId)
+  );
+
+  const results = await Promise.all(promises);
+  const failed = results.find((r) => r.error);
+  if (failed?.error) {
+    throw new Error(failed.error.message);
+  }
+
+  return { success: true };
 }
 
 export async function deleteArticleAction(workspaceId: string, articleId: string) {

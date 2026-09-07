@@ -150,7 +150,8 @@ export default function ArticleDetailPage() {
             .eq('workspace_id', ws.id)
             .eq('section_id', art.section_id)
             .eq('status', 'published')
-            .order('created_at', { ascending: false });
+            .order('order_index', { ascending: true })
+            .order('created_at', { ascending: true });
 
           if (!cancelled && sib) setSiblings(sib as SiblingArticle[]);
         }
@@ -384,17 +385,17 @@ export default function ArticleDetailPage() {
             <button
               type="button"
               onClick={goHome}
-              className="hover:text-ink transition-colors cursor-pointer"
+              className="hover:text-ink transition-colors cursor-pointer font-medium"
             >
-              Help Center
+              All collections
             </button>
             {article.section && (
               <>
-                <span aria-hidden>/</span>
+                <span aria-hidden className="text-ink-3/60">/</span>
                 <button
                   type="button"
                   onClick={goToCollection}
-                  className="hover:text-ink transition-colors cursor-pointer inline-flex items-center gap-1.5"
+                  className="hover:text-ink transition-colors cursor-pointer inline-flex items-center gap-1.5 font-medium"
                 >
                   {article.section.order_index ? (
                     <span className="font-mono text-[10.5px] font-bold px-1.5 py-0.2 rounded bg-surface-2 border border-line text-ink-3">
@@ -405,6 +406,8 @@ export default function ArticleDetailPage() {
                 </button>
               </>
             )}
+            <span aria-hidden className="text-ink-3/60">/</span>
+            <span className="text-ink font-semibold truncate max-w-[260px]">{article.title}</span>
           </nav>
 
           <header className="mt-4 pb-6 border-b border-line space-y-3">

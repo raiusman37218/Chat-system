@@ -123,7 +123,8 @@ export default function ChatWidget({
             .select('id, title, summary, content, category, section:help_sections(name, icon)')
             .eq('workspace_id', config.workspaceId)
             .eq('status', 'published')
-            .order('created_at', { ascending: false }),
+            .order('order_index', { ascending: true })
+            .order('created_at', { ascending: true }),
         ]);
 
         if (wsData) {

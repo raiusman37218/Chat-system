@@ -259,6 +259,7 @@ export interface Article {
   views_count?: number;
   helpful_count?: number;
   not_helpful_count?: number;
+  order_index?: number;
   created_at: string;
   updated_at?: string;
 
