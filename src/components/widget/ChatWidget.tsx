@@ -16,6 +16,7 @@ import {
   BookOpen,
   Search,
   ChevronLeft,
+  ChevronRight,
   ThumbsUp,
   ThumbsDown,
   ExternalLink,
@@ -93,6 +94,8 @@ export default function ChatWidget({
   // Help Desk state
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [helpArticles, setHelpArticles] = useState<any[]>([]);
+  const [helpSections, setHelpSections] = useState<any[]>([]);
+  const [selectedSectionId, setSelectedSectionId] = useState<string | null>(null);
   const [helpSearch, setHelpSearch] = useState('');
   const [selectedArticle, setSelectedArticle] = useState<any | null>(null);
   const [articleVoted, setArticleVoted] = useState<Record<string, boolean>>({});
@@ -112,15 +115,21 @@ export default function ChatWidget({
     if (!config.workspaceId) return;
     async function loadWorkspaceAndArticles() {
       try {
-        const [{ data: wsData }, { data: articlesData }] = await Promise.all([
+        const [{ data: wsData }, { data: sectionsData }, { data: articlesData }] = await Promise.all([
           supabase
             .from('public_workspaces')
             .select('id, name, slug, custom_domain, custom_domain_status, website_url, help_center_tab_label, show_help_tab, widget_position')
             .eq('id', config.workspaceId)
             .maybeSingle(),
           supabase
+            .from('help_sections')
+            .select('id, name, description, icon, order_index, slug')
+            .eq('workspace_id', config.workspaceId)
+            .order('order_index', { ascending: true })
+            .order('created_at', { ascending: true }),
+          supabase
             .from('articles')
-            .select('id, title, summary, content, category, section:help_sections(name, icon)')
+            .select('id, title, summary, content, category, section_id, order_index, section:help_sections(id, name, icon)')
             .eq('workspace_id', config.workspaceId)
             .eq('status', 'published')
             .order('order_index', { ascending: true })
@@ -137,6 +146,7 @@ export default function ChatWidget({
           const resolvedUrl = getWorkspaceHelpCenterUrl(wsData as any);
           setHelpCenterPortalUrl(resolvedUrl);
         }
+        if (sectionsData) setHelpSections(sectionsData);
         if (articlesData) setHelpArticles(articlesData);
       } catch (err) {
         console.warn('Failed to load help tab config in widget:', err);
@@ -797,53 +807,195 @@ export default function ChatWidget({
                 </div>
 
                 <div className="flex-1 overflow-y-auto p-3 space-y-2">
-                  {helpArticles.length === 0 ? (
+                  {helpArticles.length === 0 && helpSections.length === 0 ? (
                     <div className="p-8 text-center text-xs text-slate-400 space-y-2">
                       <BookOpen className="w-8 h-8 text-slate-300 mx-auto" />
                       <p>No articles available yet.</p>
                     </div>
-                  ) : (() => {
-                    const filtered = helpArticles.filter((a) => {
-                      if (!helpSearch.trim()) return true;
+                  ) : helpSearch.trim() ? (
+                    (() => {
                       const q = helpSearch.toLowerCase().trim();
-                      return (
-                        a.title?.toLowerCase().includes(q) ||
-                        a.summary?.toLowerCase().includes(q) ||
-                        a.content?.toLowerCase().includes(q) ||
-                        a.category?.toLowerCase().includes(q) ||
-                        a.section?.name?.toLowerCase().includes(q)
-                      );
-                    });
+                      const filtered = helpArticles.filter((a) => {
+                        return (
+                          a.title?.toLowerCase().includes(q) ||
+                          a.summary?.toLowerCase().includes(q) ||
+                          a.content?.toLowerCase().includes(q) ||
+                          a.category?.toLowerCase().includes(q) ||
+                          a.section?.name?.toLowerCase().includes(q)
+                        );
+                      });
 
-                    if (filtered.length === 0) {
+                      if (filtered.length === 0) {
+                        return (
+                          <div className="p-8 text-center text-xs text-slate-400 space-y-2">
+                            <BookOpen className="w-8 h-8 text-slate-300 mx-auto" />
+                            <p>No articles match &ldquo;{helpSearch}&rdquo;</p>
+                          </div>
+                        );
+                      }
+
                       return (
-                        <div className="p-8 text-center text-xs text-slate-400 space-y-2">
-                          <BookOpen className="w-8 h-8 text-slate-300 mx-auto" />
-                          <p>No articles match &ldquo;{helpSearch}&rdquo;</p>
+                        <div className="space-y-2">
+                          <div className="text-[11px] font-semibold text-slate-400 dark:text-slate-500 px-1">
+                            {filtered.length} article{filtered.length === 1 ? '' : 's'} found
+                          </div>
+                          {filtered.map((art) => (
+                            <div
+                              key={art.id}
+                              onClick={() => setSelectedArticle(art)}
+                              className="p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-slate-400 dark:hover:border-slate-600 transition-all cursor-pointer space-y-1 shadow-2xs"
+                            >
+                              <span className="text-[10.5px] font-semibold text-blue-600 dark:text-blue-400">
+                                {art.section?.icon || '📚'} {art.section?.name || art.category || 'General'}
+                              </span>
+                              <h4 className="text-xs font-bold text-slate-800 dark:text-slate-100 leading-snug">
+                                {art.title}
+                              </h4>
+                              {art.summary && (
+                                <p className="text-[11.5px] text-slate-500 dark:text-slate-400 line-clamp-1">
+                                  {art.summary}
+                                </p>
+                              )}
+                            </div>
+                          ))}
                         </div>
                       );
-                    }
+                    })()
+                  ) : !selectedSectionId ? (
+                    // LEVEL 1: SECTIONS LIST VIEW (order_index wise)
+                    helpSections.length === 0 ? (
+                      // Fallback if no sections configured
+                      helpArticles.map((art) => (
+                        <div
+                          key={art.id}
+                          onClick={() => setSelectedArticle(art)}
+                          className="p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-slate-400 dark:hover:border-slate-600 transition-all cursor-pointer space-y-1 shadow-2xs"
+                        >
+                          <span className="text-[10.5px] font-semibold text-blue-600 dark:text-blue-400">
+                            {art.section?.icon || '📚'} {art.section?.name || art.category}
+                          </span>
+                          <h4 className="text-xs font-bold text-slate-800 dark:text-slate-100 leading-snug">
+                            {art.title}
+                          </h4>
+                          {art.summary && (
+                            <p className="text-[11.5px] text-slate-500 dark:text-slate-400 line-clamp-1">
+                              {art.summary}
+                            </p>
+                          )}
+                        </div>
+                      ))
+                    ) : (
+                      (() => {
+                        const countMap: Record<string, number> = {};
+                        let unsortedCount = 0;
+                        helpArticles.forEach((a) => {
+                          if (a.section_id) {
+                            countMap[a.section_id] = (countMap[a.section_id] || 0) + 1;
+                          } else {
+                            unsortedCount++;
+                          }
+                        });
 
-                    return filtered.map((art) => (
-                      <div
-                        key={art.id}
-                        onClick={() => setSelectedArticle(art)}
-                        className="p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-slate-400 dark:hover:border-slate-600 transition-all cursor-pointer space-y-1 shadow-2xs"
-                      >
-                        <span className="text-[10.5px] font-semibold text-blue-600 dark:text-blue-400">
-                          {art.section?.icon || '📚'} {art.section?.name || art.category}
-                        </span>
-                        <h4 className="text-xs font-bold text-slate-800 dark:text-slate-100 leading-snug">
-                          {art.title}
-                        </h4>
-                        {art.summary && (
-                          <p className="text-[11.5px] text-slate-500 dark:text-slate-400 line-clamp-1">
-                            {art.summary}
-                          </p>
-                        )}
-                      </div>
-                    ));
-                  })()}
+                        const sectionsList = [...helpSections];
+                        if (unsortedCount > 0) {
+                          sectionsList.push({
+                            id: '__other__',
+                            name: 'General',
+                            icon: '📚',
+                            description: null,
+                          });
+                        }
+
+                        return (
+                          <div className="space-y-2">
+                            {sectionsList.map((sec) => {
+                              const count = sec.id === '__other__' ? unsortedCount : (countMap[sec.id] || 0);
+                              return (
+                                <div
+                                  key={sec.id}
+                                  onClick={() => setSelectedSectionId(sec.id)}
+                                  className="p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-slate-400 dark:hover:border-slate-600 transition-all cursor-pointer flex items-center gap-3 shadow-2xs group"
+                                >
+                                  <div className="w-9 h-9 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-lg shrink-0">
+                                    {sec.icon || '📚'}
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <h4 className="text-xs font-bold text-slate-800 dark:text-slate-100 leading-snug group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                                      {sec.name}
+                                    </h4>
+                                    <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate mt-0.5">
+                                      {sec.description || `${count} article${count === 1 ? '' : 's'}`}
+                                    </p>
+                                  </div>
+                                  <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors shrink-0" />
+                                </div>
+                              );
+                            })}
+                          </div>
+                        );
+                      })()
+                    )
+                  ) : (
+                    // LEVEL 2: SECTION ARTICLES VIEW
+                    (() => {
+                      const currentSec = helpSections.find((s) => s.id === selectedSectionId) || {
+                        id: selectedSectionId,
+                        name: 'General',
+                        icon: '📚',
+                        description: null,
+                      };
+                      const sectionArticles = helpArticles.filter((a) =>
+                        selectedSectionId === '__other__' ? !a.section_id : a.section_id === selectedSectionId
+                      );
+
+                      return (
+                        <div className="space-y-2">
+                          <button
+                            onClick={() => setSelectedSectionId(null)}
+                            className="text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 mb-2"
+                          >
+                            <ChevronLeft className="w-3.5 h-3.5" />
+                            <span>All Collections</span>
+                          </button>
+
+                          <div className="flex items-center gap-2.5 pb-2.5 mb-2 border-b border-slate-200 dark:border-slate-800">
+                            <span className="text-xl">{currentSec.icon || '📚'}</span>
+                            <div className="flex-1 min-w-0">
+                              <h3 className="text-xs font-bold text-slate-900 dark:text-white leading-snug">
+                                {currentSec.name}
+                              </h3>
+                              <p className="text-[10.5px] text-slate-500 dark:text-slate-400">
+                                {sectionArticles.length} article{sectionArticles.length === 1 ? '' : 's'}
+                              </p>
+                            </div>
+                          </div>
+
+                          {sectionArticles.length === 0 ? (
+                            <div className="p-6 text-center text-xs text-slate-400">
+                              No articles in this section yet.
+                            </div>
+                          ) : (
+                            sectionArticles.map((art) => (
+                              <div
+                                key={art.id}
+                                onClick={() => setSelectedArticle(art)}
+                                className="p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-slate-400 dark:hover:border-slate-600 transition-all cursor-pointer space-y-1 shadow-2xs"
+                              >
+                                <h4 className="text-xs font-bold text-slate-800 dark:text-slate-100 leading-snug">
+                                  {art.title}
+                                </h4>
+                                {art.summary && (
+                                  <p className="text-[11.5px] text-slate-500 dark:text-slate-400 line-clamp-1">
+                                    {art.summary}
+                                  </p>
+                                )}
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      );
+                    })()
+                  )}
                 </div>
 
                 {config.workspaceId && (
