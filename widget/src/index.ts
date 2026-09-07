@@ -801,6 +801,20 @@ class ChatifyWidget {
     this.messages.push(tempMsg);
     this.renderMessages();
 
+    if (this.conversationStatus !== 'open') {
+      this.conversationStatus = 'open';
+      this.supabase
+        .from('conversations')
+        .update({
+          status: 'open',
+          closed_at: null,
+          snoozed_until: null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', convId)
+        .then(() => {});
+    }
+
     const { data } = await this.supabase.from('messages').insert({
       conversation_id: convId,
       sender_type: 'visitor',

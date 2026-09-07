@@ -383,11 +383,42 @@ export default function DashboardPage() {
           // Immediately move conversation to top of list with latest message preview
           setConversations((prev) => {
             const index = prev.findIndex((c) => c.id === newMsg.conversation_id);
-            if (index === -1) return prev;
+            if (index === -1) {
+              // The conversation wasn't in the current in-memory list (e.g. brand new or previously closed).
+              // Fetch it immediately so it appears at the top of the Open inbox right away!
+              supabase
+                .from('conversations')
+                .select('*, visitor:visitors(*), agent:agents(*)')
+                .eq('id', newMsg.conversation_id)
+                .single()
+                .then(({ data: fetchedConv }) => {
+                  if (fetchedConv) {
+                    const isSelected = fetchedConv.id === selectedConversationIdRef.current;
+                    const newConvItem: Conversation = {
+                      ...fetchedConv,
+                      status: newMsg.sender_type === 'visitor' ? 'open' : fetchedConv.status,
+                      closed_at: newMsg.sender_type === 'visitor' ? null : fetchedConv.closed_at,
+                      snoozed_until: newMsg.sender_type === 'visitor' ? null : fetchedConv.snoozed_until,
+                      updated_at: newMsg.created_at,
+                      last_message: newMsg,
+                      unread_count: isSelected ? 0 : (newMsg.sender_type === 'visitor' ? 1 : 0),
+                    };
+                    setConversations((current) => {
+                      const others = current.filter((c) => c.id !== newConvItem.id);
+                      return [newConvItem, ...others];
+                    });
+                  }
+                });
+              return prev;
+            }
+
             const target = prev[index];
             const isSelected = target.id === selectedConversationIdRef.current;
-            const updated = {
+            const updated: Conversation = {
               ...target,
+              status: newMsg.sender_type === 'visitor' ? 'open' : target.status,
+              closed_at: newMsg.sender_type === 'visitor' ? null : target.closed_at,
+              snoozed_until: newMsg.sender_type === 'visitor' ? null : target.snoozed_until,
               updated_at: newMsg.created_at,
               last_message: newMsg,
               unread_count: isSelected
@@ -464,6 +495,11 @@ export default function DashboardPage() {
                 }).catch((err) => console.warn('[AI Auto-Respond]:', err));
               }, delay * 1000);
             }
+          } else if (payload.eventType === 'UPDATE') {
+            const updated = payload.new as Conversation;
+            setConversations((prev) =>
+              prev.map((c) => (c.id === updated.id ? { ...c, ...updated } : c))
+            );
           }
 
           refreshConversations();
