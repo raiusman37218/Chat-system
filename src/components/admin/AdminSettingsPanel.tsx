@@ -529,25 +529,21 @@ export function AdminSettingsPanel({
   // ──────────────────────────────────────────────────────────────────────────
   // SECTION 7: CLAUDE AI SETTINGS
   // ──────────────────────────────────────────────────────────────────────────
-  const [aiSettings, setAiSettings] = useState<AISettingsConfig>(
-    workspace.ai_settings || {
-      enabled: true,
-      auto_response_enabled: true,
-      auto_response_delay_seconds: 20,
-      suggested_replies_enabled: true,
-      auto_tagging_enabled: true,
-      summary_enabled: true,
-      sentiment_enabled: true,
-      // Any provider, not just one. `api_key` supersedes the old
-      // `anthropic_api_key`, which is still read for workspaces saved before
-      // the picker existed.
-      provider: 'anthropic',
-      api_key: '',
-      base_url: '',
-      anthropic_api_key: '',
-      model: 'claude-3-5-sonnet-20241022',
-    }
-  );
+  const [aiSettings, setAiSettings] = useState<AISettingsConfig>({
+    enabled: true,
+    auto_response_enabled: true,
+    auto_response_delay_seconds: 20,
+    suggested_replies_enabled: true,
+    auto_tagging_enabled: true,
+    summary_enabled: true,
+    sentiment_enabled: true,
+    provider: 'anthropic',
+    api_key: '',
+    base_url: '',
+    anthropic_api_key: '',
+    model: 'claude-3-5-sonnet-20241022',
+    ...(workspace.ai_settings || {}),
+  });
 
   const [testingProvider, setTestingProvider] = useState(false);
   const [providerTest, setProviderTest] = useState<{
@@ -2471,7 +2467,7 @@ export function AdminSettingsPanel({
                   </div>
 
                   <div className="space-y-2 pt-1">
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center flex-wrap gap-3">
                       <button
                         type="button"
                         onClick={handleTestAiProvider}
@@ -2480,6 +2476,15 @@ export function AdminSettingsPanel({
                       >
                         <Sparkles className="w-3.5 h-3.5" />
                         {testingProvider ? 'Testing…' : 'Test connection'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleSaveAISettings}
+                        disabled={saving}
+                        className="btn btn-sm btn-primary gap-1.5 shadow-xs"
+                      >
+                        <Sparkles className="w-3.5 h-3.5" />
+                        <span>{saving ? 'Saving…' : 'Save AI Settings'}</span>
                       </button>
                       {providerTest && (
                         <span

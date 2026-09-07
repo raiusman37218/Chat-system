@@ -342,10 +342,27 @@ export async function updateAISettingsAction(
   await assertAdminUser(workspaceId);
   const supabase = await createClient();
 
+  const { data: existing } = await supabase
+    .from('workspaces')
+    .select('ai_settings')
+    .eq('id', workspaceId)
+    .single();
+
+  const prevAi = existing?.ai_settings || {};
+  const cleanedApiKey = settings.api_key && settings.api_key.trim() ? settings.api_key.trim() : null;
+  const finalApiKey = cleanedApiKey !== null ? cleanedApiKey : (prevAi.api_key ?? prevAi.anthropic_api_key ?? null);
+
+  const finalSettings: AISettingsConfig = {
+    ...prevAi,
+    ...settings,
+    api_key: finalApiKey,
+    anthropic_api_key: null,
+  };
+
   const { data: updated, error } = await supabase
     .from('workspaces')
     .update({
-      ai_settings: settings,
+      ai_settings: finalSettings,
     })
     .eq('id', workspaceId)
     .select()

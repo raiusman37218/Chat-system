@@ -326,14 +326,28 @@ async function fetchJson(
     );
   }
 
-  if (!res.ok) {
+    if (!res.ok) {
     const body = await res.text().catch(() => '');
     let detail = body.slice(0, 300);
     try {
-      detail = JSON.parse(body)?.error?.message ?? detail;
+      const parsed = JSON.parse(body);
+      detail = parsed?.error?.message || parsed?.message || detail;
     } catch {
       /* not JSON; the raw body is the best detail available */
     }
+
+    if (provider === 'deepseek') {
+      if (res.status === 401 || detail.includes('Authentication Fails')) {
+        detail = 'Invalid DeepSeek API key. Please check your key at platform.deepseek.com.';
+      } else if (res.status === 402 || detail.toLowerCase().includes('balance')) {
+        detail = 'Insufficient DeepSeek account balance. Please recharge credits in your DeepSeek account (platform.deepseek.com).';
+      }
+    } else if (provider === 'openai') {
+      if (res.status === 401) {
+        detail = 'Invalid OpenAI API key. Please check your API key at platform.openai.com.';
+      }
+    }
+
     throw new ProviderError(
       detail || `HTTP ${res.status}`,
       provider,

@@ -1,14 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { providerConfigFrom } from '@/lib/ai/help-answer';
-import { createClient } from '@supabase/supabase-js';
+import { serviceClient } from '@/lib/supabase/service';
 import {
   analyzeVisitorSentiment,
   generateAutoTags,
   generateConversationSummary,
 } from '@/lib/ai/anthropic';
-
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://vfjsaynnubxywdbevxtx.supabase.co';
-const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZmanNheW5udWJ4eXdkYmV2eHR4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgyNTA5MDEsImV4cCI6MjEwMzgyNjkwMX0.YyBCXMqwrOk5BRhQafYLFw8tiM5PC8lc8Yocodw9wf0';
 
 export async function POST(req: NextRequest) {
   try {
@@ -18,7 +15,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Missing conversation_id or workspace_id' }, { status: 400 });
     }
 
-    const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+    const supabase = serviceClient();
 
     // 1. Fetch workspace AI settings
     const { data: workspace } = await supabase
