@@ -4,29 +4,29 @@ import React from 'react';
 
 export function ConversationCardSkeleton() {
   return (
-    <div className="p-3.5 px-4 border-b border-line animate-pulse flex items-start gap-3">
+    <div className="p-2.5 rounded-xl border border-line/60 bg-surface/80 animate-pulse flex items-start gap-2.5 shadow-xs">
       {/* Avatar skeleton */}
-      <div className="w-10 h-10 rounded-full bg-surface-2 shrink-0" />
+      <div className="w-9 h-9 rounded-full bg-surface-3 shrink-0 mt-0.5" />
 
       {/* Content skeleton */}
       <div className="flex-1 min-w-0 space-y-2 py-0.5">
-        <div className="flex items-center justify-between">
-          <div className="h-3.5 w-28 bg-surface-2 rounded-md" />
-          <div className="h-3 w-10 bg-surface-2/60 rounded" />
+        <div className="flex items-center justify-between gap-2">
+          <div className="h-3.5 w-24 bg-surface-3 rounded-md" />
+          <div className="h-2.5 w-8 bg-surface-2 rounded" />
         </div>
-        <div className="h-3 w-4/5 bg-surface-2/70 rounded" />
-        <div className="flex items-center gap-1.5 pt-0.5">
-          <div className="h-4 w-12 bg-surface-2/50 rounded-full" />
-          <div className="h-4 w-14 bg-surface-2/50 rounded-full" />
+        <div className="h-3 w-4/5 bg-surface-2 rounded" />
+        <div className="flex items-center gap-1.5 pt-1">
+          <div className="h-3.5 w-14 bg-surface-2 rounded-md" />
+          <div className="h-3.5 w-10 bg-surface-2/70 rounded-md" />
         </div>
       </div>
     </div>
   );
 }
 
-export function ConversationListSkeleton({ count = 6 }: { count?: number }) {
+export function ConversationListSkeleton({ count = 7 }: { count?: number }) {
   return (
-    <div className="divide-y divide-line">
+    <div className="space-y-1 p-0.5">
       {Array.from({ length: count }).map((_, i) => (
         <ConversationCardSkeleton key={i} />
       ))}

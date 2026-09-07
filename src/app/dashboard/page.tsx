@@ -40,6 +40,10 @@ export default function DashboardPage() {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [lastSynced, setLastSynced] = useState<Date>(new Date());
+  const [isMessagesLoading, setIsMessagesLoading] = useState(false);
+  const messagesCacheRef = useRef<Record<string, Message[]>>({});
 
   // Visitors
   const [visitors, setVisitors] = useState<Visitor[]>([]);
@@ -68,7 +72,7 @@ export default function DashboardPage() {
     updateFaviconBadge(unreadTotal);
   }, [conversations]);
 
-  // Global Keyboard Shortcuts Listener (? for cheatsheet, Esc to deselect)
+  // Global Keyboard Shortcuts Listener (? for cheatsheet, Esc to deselect, R to refresh)
   useEffect(() => {
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
       const activeTag = document.activeElement?.tagName.toLowerCase();
@@ -80,6 +84,13 @@ export default function DashboardPage() {
       if (e.key === '?' && !isInputActive && !e.metaKey && !e.ctrlKey) {
         e.preventDefault();
         setShowShortcutsModal((prev) => !prev);
+        return;
+      }
+
+      // 'r' or 'R' to refresh when not typing
+      if ((e.key === 'r' || e.key === 'R') && !isInputActive && !e.metaKey && !e.ctrlKey) {
+        e.preventDefault();
+        refreshConversations();
         return;
       }
 
@@ -98,6 +109,7 @@ export default function DashboardPage() {
     window.addEventListener('keydown', handleGlobalKeyDown);
     return () => window.removeEventListener('keydown', handleGlobalKeyDown);
   }, [showShortcutsModal, selectedConversationId]);
+
 
   // 1. Initial Load & Auth Verification
   const initializeDashboard = useCallback(async () => {
@@ -205,62 +217,92 @@ export default function DashboardPage() {
     initializeDashboard();
   }, [initializeDashboard]);
 
-  // 2. Refresh Conversations
-  const refreshConversations = async (wsId?: string) => {
+  // 2. Refresh Conversations (Optimized 2-Batch Query, zero N+1 congestion)
+  const refreshConversations = useCallback(async (wsId?: string) => {
     const targetWsId = wsId || currentWorkspaceIdRef.current;
-    let query = supabase
-      .from('conversations')
-      .select(`
-        *,
-        visitor:visitors(*),
-        agent:agents(*)
-      `)
-      .order('updated_at', { ascending: false });
+    setIsRefreshing(true);
+    try {
+      let query = supabase
+        .from('conversations')
+        .select(`
+          *,
+          visitor:visitors(*),
+          agent:agents(*)
+        `)
+        .order('updated_at', { ascending: false });
 
-    if (targetWsId) {
-      query = query.eq('workspace_id', targetWsId);
-    }
+      if (targetWsId) {
+        query = query.eq('workspace_id', targetWsId);
+      }
 
-    const { data: convData, error } = await query;
-    if (error) {
-      console.error('Failed to fetch conversations:', error);
-      return;
-    }
+      const { data: convData, error } = await query;
+      if (error) {
+        console.error('Failed to fetch conversations:', error);
+        return;
+      }
 
-    const enrichedConversations: Conversation[] = await Promise.all(
-      (convData || []).map(async (c: any) => {
-        const [{ data: msgData }, { count: unreadCount }] = await Promise.all([
-          supabase
-            .from('messages')
-            .select('*')
-            .eq('conversation_id', c.id)
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .maybeSingle(),
-          supabase
-            .from('messages')
-            .select('*', { count: 'exact', head: true })
-            .eq('conversation_id', c.id)
-            .eq('sender_type', 'visitor')
-            .is('read_at', null),
-        ]);
+      if (!convData || convData.length === 0) {
+        setConversations([]);
+        setLastSynced(new Date());
+        return;
+      }
 
+      const convIds = convData.map((c: any) => c.id);
+
+      // In parallel: Batch fetch unread visitor messages and latest messages in just 2 queries
+      const [unreadRes, recentMsgsRes] = await Promise.all([
+        supabase
+          .from('messages')
+          .select('conversation_id')
+          .in('conversation_id', convIds)
+          .eq('sender_type', 'visitor')
+          .is('read_at', null),
+        supabase
+          .from('messages')
+          .select('*')
+          .in('conversation_id', convIds)
+          .order('created_at', { ascending: false }),
+      ]);
+
+      // Calculate unread counts per conversation in O(1) memory
+      const unreadCountMap: Record<string, number> = {};
+      if (unreadRes.data) {
+        for (const row of unreadRes.data) {
+          unreadCountMap[row.conversation_id] = (unreadCountMap[row.conversation_id] || 0) + 1;
+        }
+      }
+
+      // Map latest message per conversation
+      const latestMessageMap: Record<string, Message> = {};
+      if (recentMsgsRes.data) {
+        for (const msg of recentMsgsRes.data) {
+          if (!latestMessageMap[msg.conversation_id]) {
+            latestMessageMap[msg.conversation_id] = msg as Message;
+          }
+        }
+      }
+
+      const enrichedConversations: Conversation[] = convData.map((c: any) => {
         const isCurrentlySelected = selectedConversationIdRef.current === c.id;
-
         return {
           ...c,
-          last_message: msgData || null,
-          unread_count: isCurrentlySelected ? 0 : (unreadCount || 0),
+          last_message: latestMessageMap[c.id] || null,
+          unread_count: isCurrentlySelected ? 0 : (unreadCountMap[c.id] || 0),
         };
-      })
-    );
+      });
 
-    setConversations(enrichedConversations);
+      setConversations(enrichedConversations);
+      setLastSynced(new Date());
 
-    if (!selectedConversationIdRef.current && enrichedConversations.length > 0) {
-      setSelectedConversationId(enrichedConversations[0].id);
+      if (!selectedConversationIdRef.current && enrichedConversations.length > 0) {
+        setSelectedConversationId(enrichedConversations[0].id);
+      }
+    } catch (err) {
+      console.error('Failed to refresh conversations:', err);
+    } finally {
+      setIsRefreshing(false);
     }
-  };
+  }, [supabase]);
 
   // 3. Refresh Visitors
   const refreshVisitors = async (wsId?: string) => {
@@ -282,8 +324,17 @@ export default function DashboardPage() {
     setVisitors((vData as Visitor[]) || []);
   };
 
-  // 4. Fetch Messages for Active Conversation
+  // 4. Fetch Messages for Active Conversation with Instant In-Memory Cache
   const loadMessages = useCallback(async (conversationId: string) => {
+    // 1. Instant Cache Hit: Show messages immediately (0ms perceived lag)
+    if (messagesCacheRef.current[conversationId]) {
+      setMessages(messagesCacheRef.current[conversationId]);
+      setIsMessagesLoading(false);
+    } else {
+      setIsMessagesLoading(true);
+    }
+
+    // 2. Fetch fresh messages in the background
     const { data, error } = await supabase
       .from('messages')
       .select('*, agent:agents(*)')
@@ -292,13 +343,20 @@ export default function DashboardPage() {
 
     if (error) {
       console.error('Failed to load messages:', error);
+      setIsMessagesLoading(false);
       return;
     }
-    setMessages((data as Message[]) || []);
 
-    // Opening the thread is the agent reading it. The RPC also backfills
-    // delivered_at, so "read" never appears without a delivery behind it.
-    // Fails quietly on projects that have not run the receipts migration.
+    const fetchedMessages = (data as Message[]) || [];
+    messagesCacheRef.current[conversationId] = fetchedMessages;
+
+    // Only update active state if the agent is still viewing this conversation
+    if (selectedConversationIdRef.current === conversationId) {
+      setMessages(fetchedMessages);
+      setIsMessagesLoading(false);
+    }
+
+    // Opening the thread is the agent reading it.
     try {
       await supabase.rpc('fn_mark_messages_read', {
         p_conversation_id: conversationId,
@@ -330,7 +388,7 @@ export default function DashboardPage() {
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'messages' },
-        (payload) => {
+        (payload: any) => {
           const newMsg = payload.new as Message;
 
           if (newMsg.conversation_id === selectedConversationIdRef.current) {
@@ -391,7 +449,7 @@ export default function DashboardPage() {
                 .select('*, visitor:visitors(*), agent:agents(*)')
                 .eq('id', newMsg.conversation_id)
                 .single()
-                .then(({ data: fetchedConv }) => {
+                .then(({ data: fetchedConv }: any) => {
                   if (fetchedConv) {
                     const isSelected = fetchedConv.id === selectedConversationIdRef.current;
                     const newConvItem: Conversation = {
@@ -431,14 +489,25 @@ export default function DashboardPage() {
             return [updated, ...others];
           });
 
-          refreshConversations();
+          // Sync into messages cache for instant rendering
+          if (messagesCacheRef.current[newMsg.conversation_id]) {
+            const cached = messagesCacheRef.current[newMsg.conversation_id];
+            if (!cached.some((m) => m.id === newMsg.id)) {
+              messagesCacheRef.current[newMsg.conversation_id] = [...cached, newMsg];
+            }
+          }
         }
       )
       .on(
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'messages' },
-        (payload) => {
+        (payload: any) => {
           const updatedMsg = payload.new as Message;
+          if (messagesCacheRef.current[updatedMsg.conversation_id]) {
+            messagesCacheRef.current[updatedMsg.conversation_id] = messagesCacheRef.current[
+              updatedMsg.conversation_id
+            ].map((m) => (m.id === updatedMsg.id ? { ...m, ...updatedMsg } : m));
+          }
           if (updatedMsg.conversation_id === selectedConversationIdRef.current) {
             setMessages((prev) =>
               prev.map((m) => (m.id === updatedMsg.id ? { ...m, ...updatedMsg } : m))
@@ -453,7 +522,7 @@ export default function DashboardPage() {
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'conversations' },
-        (payload) => {
+        (payload: any) => {
           if (payload.eventType === 'INSERT') {
             sound.playNewConversation();
             const newConv = payload.new as Conversation;
@@ -467,6 +536,21 @@ export default function DashboardPage() {
                 },
               }
             );
+
+            // Fetch enriched conversation details (visitor, agent) and prepend smoothly
+            supabase
+              .from('conversations')
+              .select('*, visitor:visitors(*), agent:agents(*)')
+              .eq('id', newConv.id)
+              .single()
+              .then(({ data }: any) => {
+                if (data) {
+                  setConversations((prev) => {
+                    if (prev.some((c) => c.id === data.id)) return prev;
+                    return [data as Conversation, ...prev];
+                  });
+                }
+              });
 
             // Dispatch Slack notification
             fetch('/api/notifications/dispatch', {
@@ -501,8 +585,6 @@ export default function DashboardPage() {
               prev.map((c) => (c.id === updated.id ? { ...c, ...updated } : c))
             );
           }
-
-          refreshConversations();
         }
       )
       .subscribe();
@@ -512,7 +594,7 @@ export default function DashboardPage() {
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'visitors' },
-        (payload) => {
+        (payload: any) => {
           const updatedVisitor = payload.new as Visitor;
           // Only process if belongs to this workspace
           if (
@@ -548,7 +630,7 @@ export default function DashboardPage() {
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'internal_notes' },
-        (payload) => {
+        (payload: any) => {
           const note = payload.new as any;
           const agentId = currentAgentRef.current?.id;
           if (
@@ -830,8 +912,8 @@ export default function DashboardPage() {
             className={cn(
               'h-full shrink-0',
               selectedConversationId
-                ? 'hidden md:flex md:w-[310px]'
-                : 'flex w-full md:w-[310px] pb-14 md:pb-0'
+                ? 'hidden md:flex md:w-[340px] xl:w-[360px]'
+                : 'flex w-full md:w-[340px] xl:w-[360px] pb-14 md:pb-0'
             )}
           >
             <ConversationList
@@ -840,6 +922,9 @@ export default function DashboardPage() {
               onSelectConversation={setSelectedConversationId}
               currentAgent={currentAgent}
               loading={loading}
+              isRefreshing={isRefreshing}
+              onRefresh={() => refreshConversations()}
+              lastSynced={lastSynced}
             />
           </div>
 
@@ -854,6 +939,7 @@ export default function DashboardPage() {
               <ChatThread
                 conversation={activeConversation}
                 messages={messages}
+                loading={isMessagesLoading}
                 currentAgent={currentAgent}
                 agentsList={allAgents}
                 onSendMessage={handleSendMessage}

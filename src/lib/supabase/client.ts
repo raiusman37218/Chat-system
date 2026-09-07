@@ -4,11 +4,22 @@ import { Database } from '@/types/database';
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://vfjsaynnubxywdbevxtx.supabase.co';
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZmanNheW5udWJ4eXdkYmV2eHR4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgyNTA5MDEsImV4cCI6MjEwMzgyNjkwMX0.YyBCXMqwrOk5BRhQafYLFw8tiM5PC8lc8Yocodw9wf0';
 
+let clientInstance: any = null;
+
 /**
- * Creates a browser-side Supabase client for React client components.
+ * Creates or reuses a browser-side Supabase client for React client components.
+ * Reusing a singleton instance prevents multiple duplicate WebSocket connections
+ * and realtime channel thrashing across components.
  */
 export function createClient<T = any>() {
-  return createBrowserClient<T>(SUPABASE_URL, SUPABASE_KEY);
+  if (typeof window === 'undefined') {
+    return createBrowserClient<T>(SUPABASE_URL, SUPABASE_KEY);
+  }
+  if (!clientInstance) {
+    clientInstance = createBrowserClient<T>(SUPABASE_URL, SUPABASE_KEY);
+  }
+  return clientInstance;
 }
 
 export type { Database };
+

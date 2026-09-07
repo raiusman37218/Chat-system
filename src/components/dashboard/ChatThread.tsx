@@ -210,7 +210,7 @@ export function ChatThread({
 
         setCollisionAgents(others);
       })
-      .subscribe(async (status) => {
+      .subscribe(async (status: any) => {
         if (status === 'SUBSCRIBED') {
           await presenceChannel.track({
             agent_id: currentAgent.id,
@@ -232,7 +232,7 @@ export function ChatThread({
     supabase
       .from('canned_responses')
       .select('*')
-      .then(({ data }) => {
+      .then(({ data }: any) => {
         if (data && data.length > 0) {
           setDbMacros(
             data.map((d: any) => ({
