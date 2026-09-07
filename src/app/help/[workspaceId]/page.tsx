@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback, Suspense } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import {
   Search,
@@ -47,7 +47,7 @@ type ListArticle = Pick<
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-export default function PublicHelpCenterPage() {
+function PublicHelpCenterContent() {
   const params = useParams();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -326,26 +326,15 @@ export default function PublicHelpCenterPage() {
     return () => window.removeEventListener('keydown', onKey);
   }, [query, results, activeIndex, goToArticle]);
 
+  const popularArticles = useMemo(() => {
+    if (articles.length === 0) return [];
+    return [...articles]
+      .sort((a, b) => (b.views_count || 0) - (a.views_count || 0))
+      .slice(0, 3);
+  }, [articles]);
+
   if (loading) {
-    return (
-      <div className="min-h-screen bg-canvas">
-        <div className="h-16 bg-[#0b0b0f]" />
-        <div className="bg-[#0b0b0f] px-4 sm:px-6 pb-14 pt-10">
-          <div className="mx-auto max-w-3xl space-y-5">
-            <div className="h-8 w-2/3 rounded-lg bg-white/10 animate-pulse" />
-            <div className="h-13 w-full rounded-xl bg-white/5 animate-pulse" />
-          </div>
-        </div>
-        <div className="mx-auto max-w-3xl px-4 sm:px-6 py-10 space-y-3">
-          {[0, 1, 2].map((i) => (
-            <div
-              key={i}
-              className="h-24 rounded-2xl border border-line bg-surface-2/50 animate-pulse"
-            />
-          ))}
-        </div>
-      </div>
-    );
+    return <HelpCenterLoadingSkeleton />;
   }
 
   if (!workspace) {
@@ -363,13 +352,6 @@ export default function PublicHelpCenterPage() {
   const brand = brandOf(workspace);
   const title = helpTitleOf(workspace);
   const totalPublished = articles.length;
-
-  const popularArticles = useMemo(() => {
-    if (articles.length === 0) return [];
-    return [...articles]
-      .sort((a, b) => (b.views_count || 0) - (a.views_count || 0))
-      .slice(0, 3);
-  }, [articles]);
 
   return (
     <div
@@ -518,6 +500,36 @@ export default function PublicHelpCenterPage() {
       <HelpFooter workspace={workspace} />
       <HelpWidget workspace={workspace} />
     </div>
+  );
+}
+
+function HelpCenterLoadingSkeleton() {
+  return (
+    <div className="min-h-screen bg-canvas">
+      <div className="h-16 bg-[#0b0b0f]" />
+      <div className="bg-[#0b0b0f] px-4 sm:px-6 pb-14 pt-10">
+        <div className="mx-auto max-w-3xl space-y-5">
+          <div className="h-8 w-2/3 rounded-lg bg-white/10 animate-pulse" />
+          <div className="h-13 w-full rounded-xl bg-white/5 animate-pulse" />
+        </div>
+      </div>
+      <div className="mx-auto max-w-3xl px-4 sm:px-6 py-10 space-y-3">
+        {[0, 1, 2].map((i) => (
+          <div
+            key={i}
+            className="h-24 rounded-2xl border border-line bg-surface-2/50 animate-pulse"
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+export default function PublicHelpCenterPage() {
+  return (
+    <Suspense fallback={<HelpCenterLoadingSkeleton />}>
+      <PublicHelpCenterContent />
+    </Suspense>
   );
 }
 
