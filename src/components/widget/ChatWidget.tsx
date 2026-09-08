@@ -107,6 +107,13 @@ export default function ChatWidget({
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const [pendingAttachment, setPendingAttachment] = useState<{
+    file: File;
+    isImage: boolean;
+    previewUrl: string;
+  } | null>(null);
+  const [previewImageModalUrl, setPreviewImageModalUrl] = useState<string | null>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const supabase = useMemo(() => createClient(), []);
 
@@ -499,13 +506,88 @@ export default function ChatWidget({
     }
   };
 
-  // Send Message
-  const handleSendMessage = async (attachmentUrl?: string) => {
-    const text = inputContent.trim();
-    if (!text && !attachmentUrl) return;
+  // Helper to detect if an attachment is an image (Cloudinary or common extensions)
+  const isImageAttachment = (url: string | null | undefined): boolean => {
+    if (!url) return false;
+    if (url.includes('cloudinary.com') && (url.includes('/image/upload/') || !url.includes('/raw/upload/'))) {
+      return true;
+    }
+    return Boolean(url.match(/\.(jpeg|jpg|png|webp|gif|svg|avif|bmp)(\?.*)?$/i));
+  };
 
+  // Handle selecting or dropping a file / photo
+  const handleSelectFile = (file: File) => {
+    if (file.size > 15 * 1024 * 1024) {
+      alert('File size exceeds maximum 15MB limit.');
+      return;
+    }
+    if (pendingAttachment?.previewUrl) {
+      URL.revokeObjectURL(pendingAttachment.previewUrl);
+    }
+    const isImg = file.type.startsWith('image/');
+    const previewUrl = isImg ? URL.createObjectURL(file) : '';
+    setPendingAttachment({ file, isImage: isImg, previewUrl });
+  };
+
+  // Handle clipboard paste (e.g. screenshot pasting)
+  const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].type.startsWith('image/')) {
+        const file = items[i].getAsFile();
+        if (file) {
+          e.preventDefault();
+          handleSelectFile(file);
+          break;
+        }
+      }
+    }
+  };
+
+  // Send Message with optional Cloudinary attachment
+  const handleSendMessage = async (attachmentUrlOverride?: string) => {
+    let finalAttachmentUrl = attachmentUrlOverride || null;
+
+    // If there is a pending local attachment, upload it to Cloudinary first
+    if (!finalAttachmentUrl && pendingAttachment) {
+      setIsUploading(true);
+      try {
+        const formData = new FormData();
+        formData.append('file', pendingAttachment.file);
+        const res = await fetch('/api/upload', {
+          method: 'POST',
+          body: formData,
+        });
+
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.error || 'Failed to upload image to Cloudinary');
+        }
+
+        const data = await res.json();
+        finalAttachmentUrl = data.url;
+      } catch (err: any) {
+        alert(`Upload error: ${err.message}`);
+        setIsUploading(false);
+        return;
+      } finally {
+        setIsUploading(false);
+      }
+    }
+
+    const text = inputContent.trim();
+    if (!text && !finalAttachmentUrl) return;
+
+    // Cleanup local preview
+    if (pendingAttachment?.previewUrl) {
+      URL.revokeObjectURL(pendingAttachment.previewUrl);
+    }
+    setPendingAttachment(null);
     setInputContent('');
     setShowEmojiPicker(false);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+    if (imageInputRef.current) imageInputRef.current.value = '';
 
     try {
       const activeConvId = await ensureConversation();
@@ -518,21 +600,21 @@ export default function ChatWidget({
         sender_type: 'visitor',
         sender_id: null,
         content: text,
-        attachment_url: attachmentUrl || null,
+        attachment_url: finalAttachmentUrl,
         created_at: new Date().toISOString(),
         read_at: null,
       };
 
       setMessages((prev) => [...prev, optimisticMsg]);
 
-      // Insert to Supabase
+      // Insert message to Supabase (only storing Cloudinary CDN URL, not the file itself)
       const { data: savedMsg, error } = await supabase
         .from('messages')
         .insert({
           conversation_id: activeConvId,
           sender_type: 'visitor',
-          content: text || 'Sent an attachment',
-          attachment_url: attachmentUrl || null,
+          content: text || (finalAttachmentUrl ? 'Sent a picture' : ''),
+          attachment_url: finalAttachmentUrl,
         })
         .select()
         .single();
@@ -549,34 +631,11 @@ export default function ChatWidget({
     }
   };
 
-  // File Upload Handler
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  // File Upload Input Change Handler
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
-    setIsUploading(true);
-    const formData = new FormData();
-    formData.append('file', file);
-
-    try {
-      const res = await fetch('/api/upload', {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || 'Upload failed');
-      }
-
-      const data = await res.json();
-      await handleSendMessage(data.url);
-    } catch (err: any) {
-      alert(`Upload error: ${err.message}`);
-    } finally {
-      setIsUploading(false);
-      if (fileInputRef.current) fileInputRef.current.value = '';
-    }
+    handleSelectFile(file);
   };
 
   // Offline Form Submission
@@ -1115,12 +1174,12 @@ export default function ChatWidget({
                       {/* Attachment Rendering */}
                       {msg.attachment_url && (
                         <div className="mb-2">
-                          {msg.attachment_url.match(/\.(jpeg|jpg|png|webp|gif)$/i) ? (
+                          {isImageAttachment(msg.attachment_url) ? (
                             <img
                               src={msg.attachment_url}
                               alt="Attachment"
-                              className="rounded-xl max-h-48 w-auto object-cover cursor-pointer hover:opacity-90"
-                              onClick={() => window.open(msg.attachment_url!, '_blank')}
+                              className="rounded-xl max-h-56 w-auto max-w-full object-cover cursor-pointer hover:opacity-90 transition-opacity border border-black/10 dark:border-white/10 shadow-xs"
+                              onClick={() => setPreviewImageModalUrl(msg.attachment_url)}
                             />
                           ) : (
                             <a
@@ -1218,79 +1277,145 @@ export default function ChatWidget({
                 ✓ Message received! We'll reply to your email shortly.
               </div>
             ) : (
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  if (isAgentOnline === false) {
-                    handleOfflineSubmit(e);
-                  } else {
-                    handleSendMessage();
-                  }
-                }}
-                className="flex items-end gap-2"
-              >
-                {/* File Attachment Hidden Input */}
-                <input
-                  type="file"
-                  ref={fileInputRef}
-                  onChange={handleFileUpload}
-                  className="hidden"
-                  accept="image/*,.pdf,.txt"
-                />
+              <>
+                {/* Pending Attachment Preview Banner */}
+                {pendingAttachment && (
+                  <div className="mb-2 p-2 rounded-xl bg-slate-100 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700 flex items-center gap-2.5">
+                    {pendingAttachment.isImage && pendingAttachment.previewUrl ? (
+                      <img
+                        src={pendingAttachment.previewUrl}
+                        alt="Preview"
+                        className="w-12 h-12 rounded-lg object-cover border border-slate-300 dark:border-slate-600 shrink-0"
+                      />
+                    ) : (
+                      <div className="w-12 h-12 rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
+                        <FileText className="w-5 h-5" />
+                      </div>
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-semibold text-slate-800 dark:text-slate-100 truncate">
+                        {pendingAttachment.file.name}
+                      </p>
+                      <p className="text-[10px] text-slate-500">
+                        {(pendingAttachment.file.size / 1024).toFixed(0)} KB · Ready to send
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (pendingAttachment.previewUrl) URL.revokeObjectURL(pendingAttachment.previewUrl);
+                        setPendingAttachment(null);
+                        if (fileInputRef.current) fileInputRef.current.value = '';
+                        if (imageInputRef.current) imageInputRef.current.value = '';
+                      }}
+                      className="p-1 rounded-md text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+                      title="Remove attachment"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                )}
 
-                <div className="flex items-center gap-0.5 mb-1 text-slate-500">
-                  <button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={isUploading}
-                    className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-300 transition-colors"
-                    title="Attach file or image"
-                  >
-                    <Paperclip className={`w-4 h-4 ${isUploading ? 'animate-spin' : ''}`} />
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-                    className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-300 transition-colors"
-                    title="Insert emoji"
-                  >
-                    <Smile className="w-4 h-4" />
-                  </button>
-                </div>
-
-                <textarea
-                  rows={1}
-                  value={inputContent}
-                  onChange={handleInputChange}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                      e.preventDefault();
-                      if (isAgentOnline === false) {
-                        handleOfflineSubmit(e);
-                      } else {
-                        handleSendMessage();
-                      }
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    if (isAgentOnline === false) {
+                      handleOfflineSubmit(e);
+                    } else {
+                      handleSendMessage();
                     }
                   }}
-                  placeholder={
-                    isAgentOnline === false
-                      ? 'Leave your message...'
-                      : 'Write a message...'
-                  }
-                  className="flex-1 max-h-24 px-3 py-2 text-sm rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-                />
-
-                <button
-                  type="submit"
-                  disabled={!inputContent.trim() && !isUploading}
-                  style={{ backgroundColor: brandColor }}
-                  className="p-2 rounded-xl text-white shadow-sm hover:opacity-90 disabled:opacity-40 transition-opacity mb-0.5"
-                  title="Send message"
+                  className="flex items-end gap-2"
                 >
-                  <Send className="w-4 h-4" />
-                </button>
-              </form>
+                  {/* Image Attachment Hidden Input */}
+                  <input
+                    type="file"
+                    ref={imageInputRef}
+                    onChange={handleFileUpload}
+                    className="hidden"
+                    accept="image/*"
+                  />
+
+                  {/* Document/File Attachment Hidden Input */}
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    onChange={handleFileUpload}
+                    className="hidden"
+                    accept="image/*,.pdf,.txt"
+                  />
+
+                  <div className="flex items-center gap-0.5 mb-1 text-slate-500">
+                    <button
+                      type="button"
+                      onClick={() => imageInputRef.current?.click()}
+                      disabled={isUploading}
+                      className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                      title="Send photo or image"
+                    >
+                      <ImageIcon className="w-4 h-4" />
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={isUploading}
+                      className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-300 transition-colors"
+                      title="Attach document or file"
+                    >
+                      <Paperclip className={`w-4 h-4 ${isUploading ? 'animate-spin' : ''}`} />
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                      className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-300 transition-colors"
+                      title="Insert emoji"
+                    >
+                      <Smile className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  <textarea
+                    rows={1}
+                    value={inputContent}
+                    onChange={handleInputChange}
+                    onPaste={handlePaste}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        if (isAgentOnline === false) {
+                          handleOfflineSubmit(e);
+                        } else {
+                          handleSendMessage();
+                        }
+                      }
+                    }}
+                    placeholder={
+                      isAgentOnline === false
+                        ? 'Leave your message...'
+                        : pendingAttachment
+                        ? 'Add a caption (optional)...'
+                        : 'Write a message...'
+                    }
+                    className="flex-1 max-h-24 px-3 py-2 text-sm rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                  />
+
+                  <button
+                    type="submit"
+                    disabled={(!inputContent.trim() && !pendingAttachment) || isUploading}
+                    style={{ backgroundColor: brandColor }}
+                    className="p-2 rounded-xl text-white shadow-sm hover:opacity-90 disabled:opacity-40 transition-opacity mb-0.5 flex items-center justify-center shrink-0"
+                    title="Send message"
+                  >
+                    {isUploading ? (
+                      <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    ) : (
+                      <Send className="w-4 h-4" />
+                    )}
+                  </button>
+                </form>
+              </>
             )}
           </div>
         )}
@@ -1329,6 +1454,44 @@ export default function ChatWidget({
               </span>
             )}
           </button>
+        </div>
+      )}
+
+      {/* ---------------------------------------------------------------------- */}
+      {/* FULL IMAGE LIGHTBOX MODAL                                               */}
+      {/* ---------------------------------------------------------------------- */}
+      {previewImageModalUrl && (
+        <div
+          className="fixed inset-0 z-50 bg-black/85 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150"
+          onClick={() => setPreviewImageModalUrl(null)}
+        >
+          <div className="relative max-w-3xl max-h-[90vh] flex flex-col items-center">
+            <button
+              onClick={() => setPreviewImageModalUrl(null)}
+              className="absolute -top-10 right-0 text-white hover:text-slate-300 p-1.5 rounded-full bg-white/10 hover:bg-white/20 transition-colors cursor-pointer"
+              title="Close image"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <img
+              src={previewImageModalUrl}
+              alt="Enlarged view"
+              className="max-h-[80vh] w-auto max-w-full rounded-2xl object-contain shadow-2xl border border-white/10"
+              onClick={(e) => e.stopPropagation()}
+            />
+            <div className="mt-3 text-center">
+              <a
+                href={previewImageModalUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                className="text-xs text-blue-300 hover:text-blue-200 hover:underline inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/10 transition-colors"
+              >
+                <span>Open high-res in new tab</span>
+                <ExternalLink className="w-3.5 h-3.5" />
+              </a>
+            </div>
+          </div>
         </div>
       )}
     </div>

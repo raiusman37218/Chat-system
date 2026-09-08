@@ -688,7 +688,8 @@ export default function DashboardPage() {
     content: string,
     isInternal: boolean = false,
     conversationId?: string,
-    replyToId?: string | null
+    replyToId?: string | null,
+    attachmentUrl?: string | null
   ) => {
     const targetId = conversationId || selectedConversationIdRef.current;
     if (!targetId) {
@@ -702,8 +703,9 @@ export default function DashboardPage() {
       conversation_id: targetId,
       sender_type: 'agent',
       sender_id: currentAgent.id,
-      content,
+      content: content || (attachmentUrl ? 'Sent an attachment' : ''),
       is_internal: isInternal,
+      ...(attachmentUrl ? { attachment_url: attachmentUrl } : {}),
       // Omitted rather than set to null when there is no quote, so the insert
       // still works against a database that has not run the migration yet.
       ...(replyToId ? { reply_to_message_id: replyToId } : {}),

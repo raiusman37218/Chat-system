@@ -12,6 +12,7 @@
     "@anthropic-ai/sdk": "^0.123.0",
     "@supabase/ssr": "^0.12.5",
     "@supabase/supabase-js": "^2.112.4",
+    "cloudinary": "^2.11.0",
     "clsx": "^2.1.1",
     "jpeg-js": "^0.4.4",
     "lucide-react": "^1.38.0",

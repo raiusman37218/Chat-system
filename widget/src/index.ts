@@ -30,12 +30,14 @@ interface WidgetConfig {
   businessName?: string;
   customDomain?: string;
   navbarTriggerConfig?: NavbarTriggerConfig;
+  apiUrl?: string;
 }
 
 interface MessageItem {
   id: string;
   sender_type: 'visitor' | 'agent' | 'ai';
   content: string;
+  attachment_url?: string | null;
   created_at: string;
   is_internal?: boolean;
   /** Set once the agent's client acknowledged receipt. */
@@ -114,8 +116,17 @@ class ChatifyWidget {
   private faqSearchQuery: string = '';
   private isPreChatCompleted: boolean = false;
   private csatRated: boolean = false;
+  private pendingAttachment: { file: File; previewUrl: string } | null = null;
 
   private audioCtx: AudioContext | null = null;
+
+  private isImageAttachment(url: string | null | undefined): boolean {
+    if (!url) return false;
+    if (url.includes('cloudinary.com') && (url.includes('/image/upload/') || !url.includes('/raw/upload/'))) {
+      return true;
+    }
+    return Boolean(url.match(/\.(jpeg|jpg|png|webp|gif|svg|avif|bmp)(\?.*)?$/i));
+  }
 
   constructor() {
     this.config = this.parseConfig();
@@ -154,6 +165,17 @@ class ChatifyWidget {
     const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
     const urlWs = urlParams?.get('workspaceId') || urlParams?.get('ws') || urlParams?.get('chatify_workspace');
 
+    let apiUrl = script?.getAttribute('data-api-url') || '';
+    if (!apiUrl && script?.src) {
+      try {
+        const parsed = new URL(script.src);
+        apiUrl = parsed.origin;
+      } catch (e) {}
+    }
+    if (!apiUrl && typeof window !== 'undefined') {
+      apiUrl = window.location.origin;
+    }
+
     return {
       supabaseUrl: script?.getAttribute('data-supabase-url') || DEFAULT_SUPABASE_URL,
       supabaseKey: script?.getAttribute('data-supabase-key') || DEFAULT_SUPABASE_KEY,
@@ -167,6 +189,7 @@ class ChatifyWidget {
       helpTabIcon: script?.getAttribute('data-help-icon') || '📖',
       businessName: script?.getAttribute('data-business-name') || script?.getAttribute('data-company-name') || undefined,
       customDomain: script?.getAttribute('data-custom-domain') || undefined,
+      apiUrl,
     };
   }
 
@@ -1000,15 +1023,16 @@ class ChatifyWidget {
     return data.id;
   }
 
-  public async sendMessage(content: string) {
-    if (!content.trim()) return;
+  public async sendMessage(content: string, attachmentUrl?: string) {
+    if (!content.trim() && !attachmentUrl) return;
 
     const convId = await this.ensureConversation();
 
     const tempMsg: MessageItem = {
       id: 'temp-' + Date.now(),
       sender_type: 'visitor',
-      content: content.trim(),
+      content: content.trim() || (attachmentUrl ? 'Sent a picture' : ''),
+      attachment_url: attachmentUrl || null,
       created_at: new Date().toISOString(),
       pending: true,
     };
@@ -1032,7 +1056,8 @@ class ChatifyWidget {
     const { data } = await this.supabase.from('messages').insert({
       conversation_id: convId,
       sender_type: 'visitor',
-      content: content.trim(),
+      content: content.trim() || (attachmentUrl ? 'Sent a picture' : ''),
+      attachment_url: attachmentUrl || null,
       is_internal: false,
     }).select().single();
 
@@ -1205,7 +1230,42 @@ class ChatifyWidget {
           }
         </div>
 
+        <!-- Attachment preview container -->
+        <div id="chatifyAttachmentPreview" class="chatify-attachment-preview" style="display:none;">
+          <img id="chatifyPreviewImg" class="chatify-preview-thumb" src="" alt="Preview" />
+          <div class="chatify-preview-info">
+            <span id="chatifyPreviewName" class="chatify-preview-name">image.png</span>
+            <span id="chatifyPreviewSize" class="chatify-preview-size">0 KB</span>
+          </div>
+          <button type="button" id="chatifyPreviewRemove" class="chatify-preview-remove" title="Remove picture">✕</button>
+        </div>
+
+        <!-- Emoji Picker Popover -->
+        <div id="chatifyEmojiPicker" class="chatify-emoji-popover" style="display:none;">
+          <div class="chatify-emoji-grid" id="chatifyEmojiGrid"></div>
+        </div>
+
+        <!-- Hidden input for picture upload -->
+        <input type="file" id="chatifyImageInput" accept="image/*" style="display:none;" />
+
         <div class="chatify-footer" id="chatifyFooter" style="${!this.isPreChatCompleted ? 'display:none;' : 'display:flex;'}">
+          <div class="chatify-footer-actions">
+            <button type="button" id="chatifyImageBtn" class="chatify-action-btn" title="Send picture">
+              <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                <polyline points="21 15 16 10 5 21"></polyline>
+              </svg>
+            </button>
+            <button type="button" id="chatifyEmojiBtn" class="chatify-action-btn" title="Insert emoji">
+              <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"></circle>
+                <path d="M8 14s1.5 2 4 2 4-2 4-2"></path>
+                <line x1="9" y1="9" x2="9.01" y2="9"></line>
+                <line x1="15" y1="9" x2="15.01" y2="9"></line>
+              </svg>
+            </button>
+          </div>
           <textarea id="chatifyTextarea" class="chatify-textarea" rows="1" placeholder="Type a message..."></textarea>
           <button id="chatifySendBtn" class="chatify-send-btn" title="Send message">
             <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
@@ -1273,6 +1333,13 @@ class ChatifyWidget {
           <span>Help</span>
         </button>
       </nav>
+
+      <!-- Image Lightbox Modal -->
+      <div id="chatifyImageLightbox" class="chatify-lightbox" style="display:none;">
+        <button type="button" id="chatifyLightboxClose" class="chatify-lightbox-close" title="Close">✕</button>
+        <img id="chatifyLightboxImg" class="chatify-lightbox-img" src="" alt="Enlarged" />
+        <a id="chatifyLightboxLink" class="chatify-lightbox-link" href="#" target="_blank" rel="noopener noreferrer">Open original in new tab</a>
+      </div>
     `;
 
     this.shadow.appendChild(chatWindow);
@@ -1327,6 +1394,61 @@ class ChatifyWidget {
 
     const sendBtn = this.shadow.getElementById('chatifySendBtn');
     const textarea = this.shadow.getElementById('chatifyTextarea') as HTMLTextAreaElement | null;
+    const imageBtn = this.shadow.getElementById('chatifyImageBtn');
+    const imageInput = this.shadow.getElementById('chatifyImageInput') as HTMLInputElement | null;
+    const emojiBtn = this.shadow.getElementById('chatifyEmojiBtn');
+    const previewRemoveBtn = this.shadow.getElementById('chatifyPreviewRemove');
+    const lightboxCloseBtn = this.shadow.getElementById('chatifyLightboxClose');
+    const lightbox = this.shadow.getElementById('chatifyImageLightbox');
+
+    imageBtn?.addEventListener('click', () => {
+      imageInput?.click();
+    });
+
+    imageInput?.addEventListener('change', (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (file) this.handleSelectImage(file);
+    });
+
+    previewRemoveBtn?.addEventListener('click', () => {
+      this.clearPendingAttachment();
+    });
+
+    emojiBtn?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.toggleEmojiPicker();
+    });
+
+    this.renderEmojiGrid();
+
+    this.shadow.addEventListener('click', (e) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest('#chatifyEmojiPicker') && !target.closest('#chatifyEmojiBtn')) {
+        this.closeEmojiPicker();
+      }
+    });
+
+    textarea?.addEventListener('paste', (e) => {
+      const items = e.clipboardData?.items;
+      if (!items) return;
+      for (let i = 0; i < items.length; i++) {
+        if (items[i].type.startsWith('image/')) {
+          const file = items[i].getAsFile();
+          if (file) {
+            e.preventDefault();
+            this.handleSelectImage(file);
+            break;
+          }
+        }
+      }
+    });
+
+    lightboxCloseBtn?.addEventListener('click', () => this.closeLightbox());
+    lightbox?.addEventListener('click', (e) => {
+      if ((e.target as HTMLElement).id === 'chatifyImageLightbox') {
+        this.closeLightbox();
+      }
+    });
 
     sendBtn?.addEventListener('click', () => this.handleSendMessage());
     textarea?.addEventListener('keydown', (e) => {
@@ -1335,6 +1457,110 @@ class ChatifyWidget {
         this.handleSendMessage();
       }
     });
+  }
+
+  private handleSelectImage(file: File) {
+    if (file.size > 15 * 1024 * 1024) {
+      alert('File size exceeds maximum 15MB limit.');
+      return;
+    }
+    if (!file.type.startsWith('image/')) {
+      alert('Please select an image file (JPEG, PNG, WEBP, GIF, etc.).');
+      return;
+    }
+    if (this.pendingAttachment?.previewUrl) {
+      URL.revokeObjectURL(this.pendingAttachment.previewUrl);
+    }
+    const previewUrl = URL.createObjectURL(file);
+    this.pendingAttachment = { file, previewUrl };
+
+    const previewContainer = this.shadow?.getElementById('chatifyAttachmentPreview');
+    const previewImg = this.shadow?.getElementById('chatifyPreviewImg') as HTMLImageElement | null;
+    const previewName = this.shadow?.getElementById('chatifyPreviewName');
+    const previewSize = this.shadow?.getElementById('chatifyPreviewSize');
+
+    if (previewContainer && previewImg) {
+      previewImg.src = previewUrl;
+      if (previewName) previewName.textContent = file.name;
+      if (previewSize) previewSize.textContent = `${(file.size / 1024).toFixed(0)} KB · Ready to send`;
+      previewContainer.style.display = 'flex';
+    }
+  }
+
+  private clearPendingAttachment() {
+    if (this.pendingAttachment?.previewUrl) {
+      URL.revokeObjectURL(this.pendingAttachment.previewUrl);
+    }
+    this.pendingAttachment = null;
+    const previewContainer = this.shadow?.getElementById('chatifyAttachmentPreview');
+    if (previewContainer) previewContainer.style.display = 'none';
+    const input = this.shadow?.getElementById('chatifyImageInput') as HTMLInputElement | null;
+    if (input) input.value = '';
+  }
+
+  private toggleEmojiPicker() {
+    const picker = this.shadow?.getElementById('chatifyEmojiPicker');
+    if (!picker) return;
+    const isVisible = picker.style.display === 'block';
+    picker.style.display = isVisible ? 'none' : 'block';
+  }
+
+  private closeEmojiPicker() {
+    const picker = this.shadow?.getElementById('chatifyEmojiPicker');
+    if (picker) picker.style.display = 'none';
+  }
+
+  private renderEmojiGrid() {
+    const grid = this.shadow?.getElementById('chatifyEmojiGrid');
+    if (!grid) return;
+    grid.innerHTML = '';
+    const emojis = [
+      '👋', '😊', '👍', '❤️', '🔥', '🎉',
+      '🚀', '🙌', '💡', '✨', '🙏', '💯',
+      '🤔', '👀', '😎', '🤝', '😍', '⭐',
+      '⚡', '💻', '📞', '📩', '✅', '❌'
+    ];
+    emojis.forEach((em) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'chatify-emoji-btn';
+      btn.textContent = em;
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.insertEmoji(em);
+      });
+      grid.appendChild(btn);
+    });
+  }
+
+  private insertEmoji(emoji: string) {
+    const textarea = this.shadow?.getElementById('chatifyTextarea') as HTMLTextAreaElement | null;
+    if (!textarea) return;
+    const start = textarea.selectionStart || textarea.value.length;
+    const end = textarea.selectionEnd || textarea.value.length;
+    const val = textarea.value;
+    textarea.value = val.substring(0, start) + emoji + val.substring(end);
+    textarea.selectionStart = textarea.selectionEnd = start + emoji.length;
+    textarea.focus();
+    this.closeEmojiPicker();
+  }
+
+  private openLightbox(url: string) {
+    const lightbox = this.shadow?.getElementById('chatifyImageLightbox');
+    const img = this.shadow?.getElementById('chatifyLightboxImg') as HTMLImageElement | null;
+    const link = this.shadow?.getElementById('chatifyLightboxLink') as HTMLAnchorElement | null;
+    if (lightbox && img) {
+      img.src = url;
+      if (link) link.href = url;
+      lightbox.style.display = 'flex';
+    }
+  }
+
+  private closeLightbox() {
+    const lightbox = this.shadow?.getElementById('chatifyImageLightbox');
+    if (lightbox) {
+      lightbox.style.display = 'none';
+    }
   }
 
   public switchTab(tab: 'home' | 'messages' | 'help') {
@@ -2425,6 +2651,224 @@ class ChatifyWidget {
 
       .chatify-send-btn svg { width: 19px; height: 19px; fill: currentColor; }
 
+      .chatify-footer-actions {
+        display: flex;
+        align-items: center;
+        gap: 3px;
+        padding-bottom: 5px;
+      }
+
+      .chatify-action-btn {
+        width: 34px;
+        height: 34px;
+        border: none;
+        border-radius: var(--w-r-sm);
+        background: transparent;
+        color: var(--w-ink-2);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: background .15s var(--w-ease), color .15s var(--w-ease), transform .12s var(--w-ease);
+      }
+
+      .chatify-action-btn:hover {
+        background: var(--w-surface-2);
+        color: var(--w-brand);
+        transform: scale(1.08);
+      }
+
+      .chatify-action-btn svg {
+        width: 19px;
+        height: 19px;
+      }
+
+      .chatify-attachment-preview {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 8px 14px;
+        background: var(--w-surface-2);
+        border-top: 1px solid var(--w-line);
+        flex-shrink: 0;
+        animation: chatifyFadeIn .15s var(--w-ease);
+      }
+
+      .chatify-preview-thumb {
+        width: 38px;
+        height: 38px;
+        border-radius: 8px;
+        object-fit: cover;
+        border: 1px solid var(--w-line);
+      }
+
+      .chatify-preview-info {
+        flex: 1;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .chatify-preview-name {
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--w-ink);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .chatify-preview-size {
+        font-size: 10.5px;
+        color: var(--w-ink-3);
+      }
+
+      .chatify-preview-remove {
+        width: 22px;
+        height: 22px;
+        border-radius: 50%;
+        border: none;
+        background: var(--w-line);
+        color: var(--w-ink-2);
+        font-size: 12px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: background .15s;
+      }
+
+      .chatify-preview-remove:hover {
+        background: var(--w-line-2);
+        color: var(--w-ink);
+      }
+
+      .chatify-emoji-popover {
+        position: absolute;
+        bottom: 66px;
+        left: 14px;
+        z-index: 25;
+        background: var(--w-surface);
+        border: 1px solid var(--w-line);
+        border-radius: 12px;
+        padding: 8px;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.14);
+        max-width: 260px;
+        animation: chatifyFadeIn .15s var(--w-ease);
+      }
+
+      .chatify-emoji-grid {
+        display: grid;
+        grid-template-columns: repeat(6, 1fr);
+        gap: 3px;
+      }
+
+      .chatify-emoji-btn {
+        font-size: 18px;
+        padding: 6px 4px;
+        border: none;
+        background: transparent;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: transform .12s, background .15s;
+        line-height: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .chatify-emoji-btn:hover {
+        background: var(--w-surface-2);
+        transform: scale(1.22);
+      }
+
+      .chatify-msg-attachment {
+        margin-bottom: 6px;
+      }
+
+      .chatify-msg-img {
+        max-width: 100%;
+        max-height: 190px;
+        border-radius: 10px;
+        object-fit: cover;
+        cursor: pointer;
+        display: block;
+        border: 1px solid rgba(0,0,0,.08);
+        transition: opacity .15s, transform .15s;
+      }
+
+      .chatify-msg-img:hover {
+        opacity: .94;
+        transform: scale(1.01);
+      }
+
+      .chatify-msg-doc {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 10px;
+        background: rgba(0,0,0,0.06);
+        border-radius: 8px;
+        font-size: 12px;
+        text-decoration: underline;
+        color: inherit;
+      }
+
+      .chatify-lightbox {
+        position: absolute;
+        inset: 0;
+        z-index: 9999;
+        background: rgba(0, 0, 0, 0.88);
+        backdrop-filter: blur(4px);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 18px;
+        animation: chatifyFadeIn .15s var(--w-ease);
+      }
+
+      .chatify-lightbox-img {
+        max-width: 90%;
+        max-height: 80%;
+        border-radius: 12px;
+        object-fit: contain;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+      }
+
+      .chatify-lightbox-close {
+        position: absolute;
+        top: 14px;
+        right: 14px;
+        background: rgba(255,255,255,0.18);
+        border: none;
+        color: #fff;
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        cursor: pointer;
+        font-size: 16px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: background .15s;
+      }
+
+      .chatify-lightbox-close:hover {
+        background: rgba(255,255,255,0.35);
+      }
+
+      .chatify-lightbox-link {
+        margin-top: 12px;
+        color: #93c5fd;
+        font-size: 12px;
+        text-decoration: underline;
+      }
+
+      @keyframes chatifySpin {
+        to { transform: rotate(360deg); }
+      }
+
       /* ── Help tab ─────────────────────────────────────────────────── */
 
       .chatify-help-body {
@@ -2879,12 +3323,55 @@ class ChatifyWidget {
 
   private async handleSendMessage() {
     const textarea = this.shadow?.getElementById('chatifyTextarea') as HTMLTextAreaElement | null;
+    const sendBtn = this.shadow?.getElementById('chatifySendBtn') as HTMLButtonElement | null;
     if (!textarea) return;
     const text = textarea.value.trim();
-    if (!text) return;
-    textarea.value = '';
+    if (!text && !this.pendingAttachment) return;
 
-    await this.sendMessage(text);
+    let attachmentUrl: string | null = null;
+
+    if (this.pendingAttachment) {
+      if (sendBtn) {
+        sendBtn.disabled = true;
+        sendBtn.innerHTML = `<span style="width:16px;height:16px;border:2px solid rgba(255,255,255,0.3);border-top-color:#fff;border-radius:50%;display:inline-block;animation:chatifySpin 0.8s linear infinite;"></span>`;
+      }
+
+      try {
+        const formData = new FormData();
+        formData.append('file', this.pendingAttachment.file);
+
+        const apiUrl = this.config.apiUrl || '';
+        const res = await fetch(`${apiUrl}/api/upload`, {
+          method: 'POST',
+          body: formData,
+        });
+
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.error || 'Failed to upload image to Cloudinary');
+        }
+
+        const data = await res.json();
+        attachmentUrl = data.url;
+      } catch (err: any) {
+        alert(`Image upload error: ${err.message}`);
+        if (sendBtn) {
+          sendBtn.disabled = false;
+          sendBtn.innerHTML = `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>`;
+        }
+        return;
+      } finally {
+        if (sendBtn) {
+          sendBtn.disabled = false;
+          sendBtn.innerHTML = `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>`;
+        }
+      }
+    }
+
+    textarea.value = '';
+    this.clearPendingAttachment();
+
+    await this.sendMessage(text, attachmentUrl || undefined);
   }
 
   private renderMessages() {
@@ -2936,10 +3423,31 @@ class ChatifyWidget {
           )}</span></div>`
         : '';
 
+      let attachmentHtml = '';
+      if (msg.attachment_url) {
+        if (this.isImageAttachment(msg.attachment_url)) {
+          attachmentHtml = `<div class="chatify-msg-attachment"><img src="${this.escapeHTML(
+            msg.attachment_url
+          )}" alt="Attachment" class="chatify-msg-img" /></div>`;
+        } else {
+          attachmentHtml = `<div class="chatify-msg-attachment"><a href="${this.escapeHTML(
+            msg.attachment_url
+          )}" target="_blank" rel="noopener noreferrer" class="chatify-msg-doc">📄 <span>View Document</span></a></div>`;
+        }
+      }
+
       bubble.innerHTML =
         quoteHtml +
-        `<div class="chatify-msg-text">${this.escapeHTML(msg.content)}</div>` +
+        attachmentHtml +
+        (msg.content ? `<div class="chatify-msg-text">${this.escapeHTML(msg.content)}</div>` : '') +
         `<div class="chatify-msg-time">${timeStr}${ticks}</div>`;
+
+      const imgEl = bubble.querySelector('.chatify-msg-img') as HTMLImageElement | null;
+      if (imgEl && msg.attachment_url) {
+        imgEl.addEventListener('click', () => {
+          this.openLightbox(msg.attachment_url!);
+        });
+      }
 
       row.appendChild(bubble);
       body.appendChild(row);

@@ -28,6 +28,8 @@ import {
   Smile,
   Frown,
   CornerUpLeft,
+  Image as ImageIcon,
+  Paperclip,
 } from 'lucide-react';
 import {
   Agent,
@@ -58,7 +60,8 @@ interface ChatThreadProps {
     content: string,
     isInternal?: boolean,
     conversationId?: string,
-    replyToId?: string | null
+    replyToId?: string | null,
+    attachmentUrl?: string | null
   ) => Promise<void>;
   onUpdateStatus: (status: ConversationStatus) => Promise<void>;
   onAssignAgent: (agentId: string | null) => Promise<void>;
@@ -171,6 +174,50 @@ export function ChatThread({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const tagPickerRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const [pendingAttachment, setPendingAttachment] = useState<{
+    file: File;
+    isImage: boolean;
+    previewUrl: string;
+  } | null>(null);
+  const [previewImageModalUrl, setPreviewImageModalUrl] = useState<string | null>(null);
+
+  const isImageAttachment = (url: string | null | undefined): boolean => {
+    if (!url) return false;
+    if (url.includes('cloudinary.com') && (url.includes('/image/upload/') || !url.includes('/raw/upload/'))) {
+      return true;
+    }
+    return Boolean(url.match(/\.(jpeg|jpg|png|webp|gif|svg|avif|bmp)(\?.*)?$/i));
+  };
+
+  const handleSelectFile = (file: File) => {
+    if (file.size > 15 * 1024 * 1024) {
+      alert('File size exceeds maximum 15MB limit.');
+      return;
+    }
+    if (pendingAttachment?.previewUrl) {
+      URL.revokeObjectURL(pendingAttachment.previewUrl);
+    }
+    const isImg = file.type.startsWith('image/');
+    const previewUrl = isImg ? URL.createObjectURL(file) : '';
+    setPendingAttachment({ file, isImage: isImg, previewUrl });
+  };
+
+  const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].type.startsWith('image/')) {
+        const file = items[i].getAsFile();
+        if (file) {
+          e.preventDefault();
+          handleSelectFile(file);
+          break;
+        }
+      }
+    }
+  };
 
   // 1. Realtime Agent Collision Detection (Supabase Presence)
   useEffect(() => {
@@ -420,13 +467,42 @@ export function ChatThread({
   };
 
   const handleSend = async () => {
-    if (!inputText.trim() || isSending) return;
+    if ((!inputText.trim() && !pendingAttachment) || isSending) return;
     const text = inputText.trim();
     const isInternal = composerMode === 'internal';
 
-    setInputText('');
     setIsSending(true);
     setSendError(null);
+
+    let attachmentUrl: string | null = null;
+    if (pendingAttachment) {
+      try {
+        const formData = new FormData();
+        formData.append('file', pendingAttachment.file);
+        const res = await fetch('/api/upload', {
+          method: 'POST',
+          body: formData,
+        });
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.error || 'Failed to upload image to Cloudinary');
+        }
+        const data = await res.json();
+        attachmentUrl = data.url;
+      } catch (err: any) {
+        setSendError(err.message || 'Image upload failed');
+        setIsSending(false);
+        return;
+      }
+    }
+
+    if (pendingAttachment?.previewUrl) {
+      URL.revokeObjectURL(pendingAttachment.previewUrl);
+    }
+    setPendingAttachment(null);
+    setInputText('');
+    if (fileInputRef.current) fileInputRef.current.value = '';
+    if (imageInputRef.current) imageInputRef.current.value = '';
 
     try {
       sound.playSentMessage();
@@ -436,7 +512,7 @@ export function ChatThread({
         await supabase.from('internal_notes').insert({
           conversation_id: conversation.id,
           agent_id: currentAgent?.id || null,
-          content: text,
+          content: text || (attachmentUrl ? 'Attached an image' : ''),
           mentioned_agent_ids: mentionedAgentIds,
         });
         setMentionedAgentIds([]);
@@ -444,7 +520,7 @@ export function ChatThread({
 
       // An internal note is not a chat message, so it cannot quote one.
       const quotedId = isInternal ? null : replyTo?.id ?? null;
-      await onSendMessage(text, isInternal, conversation.id, quotedId);
+      await onSendMessage(text, isInternal, conversation.id, quotedId, attachmentUrl);
       setReplyTo(null);
 
       // If customer is on WhatsApp, Instagram, Messenger, or LinkedIn, dispatch outbound
@@ -455,7 +531,7 @@ export function ChatThread({
           body: JSON.stringify({
             conversationId: conversation.id,
             workspaceId: conversation.workspace_id,
-            content: text,
+            content: text || (attachmentUrl ? '[Image Attachment]' : ''),
             channel: conversation.channel,
           }),
         }).catch((err) => console.error('[Outbound Dispatch Error]:', err));
@@ -787,12 +863,12 @@ export function ChatThread({
             )}
             {msg.attachment_url && (
               <div className="mb-2">
-                {msg.attachment_url.match(/\.(jpeg|jpg|png|webp|gif)$/i) ? (
+                {isImageAttachment(msg.attachment_url) ? (
                   <img
                     src={msg.attachment_url}
                     alt="Attachment"
-                    className="rounded-xl max-h-48 w-auto object-cover cursor-pointer hover:opacity-90 transition-opacity"
-                    onClick={() => window.open(msg.attachment_url!, '_blank')}
+                    className="rounded-xl max-h-56 w-auto max-w-full object-cover cursor-pointer hover:opacity-90 transition-opacity border border-black/10 dark:border-white/10 shadow-xs"
+                    onClick={() => setPreviewImageModalUrl(msg.attachment_url)}
                   />
                 ) : (
                   <a
@@ -1487,6 +1563,66 @@ export function ChatThread({
             </div>
           </div>
 
+          {/* Hidden File Inputs for Attachments */}
+          <input
+            type="file"
+            ref={imageInputRef}
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) handleSelectFile(file);
+            }}
+            className="hidden"
+            accept="image/*"
+          />
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) handleSelectFile(file);
+            }}
+            className="hidden"
+            accept="image/*,.pdf,.txt"
+          />
+
+          {/* Pending Attachment Preview Banner */}
+          {pendingAttachment && (
+            <div className="flex items-center gap-2.5 px-3 py-2 border-b border-line/60 bg-surface-2/60 animate-rise">
+              {pendingAttachment.isImage && pendingAttachment.previewUrl ? (
+                <img
+                  src={pendingAttachment.previewUrl}
+                  alt="Preview"
+                  className="w-10 h-10 rounded-lg object-cover border border-line shrink-0"
+                />
+              ) : (
+                <div className="w-10 h-10 rounded-lg bg-accent/10 text-accent flex items-center justify-center shrink-0">
+                  <FileText className="w-5 h-5" />
+                </div>
+              )}
+              <div className="min-w-0 flex-1">
+                <p className="text-[12px] font-semibold text-ink truncate">
+                  {pendingAttachment.file.name}
+                </p>
+                <p className="text-[10.5px] text-ink-3">
+                  {(pendingAttachment.file.size / 1024).toFixed(0)} KB · Ready to send via Cloudinary
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  if (pendingAttachment.previewUrl) URL.revokeObjectURL(pendingAttachment.previewUrl);
+                  setPendingAttachment(null);
+                  if (fileInputRef.current) fileInputRef.current.value = '';
+                  if (imageInputRef.current) imageInputRef.current.value = '';
+                }}
+                className="p-1 rounded-md text-ink-3 hover:text-ink hover:bg-surface-3 transition-colors cursor-pointer"
+                title="Remove attachment"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
+
           {/* Textarea */}
           <div className="p-3">
             <textarea
@@ -1495,9 +1631,12 @@ export function ChatThread({
               value={inputText}
               onChange={handleInputChange}
               onKeyDown={handleKeyDown}
+              onPaste={handlePaste}
               placeholder={
                 isInternalMode
                   ? 'Write an internal note for your team (visitor will not see this)…'
+                  : pendingAttachment
+                  ? 'Add a caption for this picture (optional)…'
                   : `Reply to ${displayName}…`
               }
               className="w-full bg-transparent text-[13px] leading-relaxed text-ink resize-none focus:outline-none placeholder:text-ink-3 min-h-[48px] max-h-40"
@@ -1532,7 +1671,7 @@ export function ChatThread({
 
           {/* Composer Footer Action Bar */}
           <div className="px-3 py-2 bg-surface-2/40 border-t border-line/40 flex items-center justify-between text-[11px] text-ink-3">
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1.5 flex-wrap">
               <span>Press</span>
               <span className="kbd text-[9.5px]">Ctrl ↵</span>
               <span>to send</span>
@@ -1547,27 +1686,51 @@ export function ChatThread({
                   </span>
                 </>
               )}
+
+              <div className="flex items-center gap-1 ml-1.5 border-l border-line/50 pl-2">
+                <button
+                  type="button"
+                  onClick={() => imageInputRef.current?.click()}
+                  disabled={isSending}
+                  className="h-6 px-2 rounded-md text-[11px] font-medium text-ink-3 hover:text-accent hover:bg-accent/10 transition-colors inline-flex items-center gap-1 cursor-pointer"
+                  title="Attach photo/image (Cloudinary)"
+                >
+                  <ImageIcon className="w-3.5 h-3.5 text-accent" />
+                  <span>Photo</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isSending}
+                  className="h-6 px-1.5 rounded-md text-[11px] font-medium text-ink-3 hover:text-ink hover:bg-surface-3 transition-colors inline-flex items-center gap-1 cursor-pointer"
+                  title="Attach document/file"
+                >
+                  <Paperclip className="w-3.5 h-3.5" />
+                </button>
+              </div>
             </div>
 
             <button
               onClick={handleSend}
-              disabled={!inputText.trim() || isSending}
+              disabled={(!inputText.trim() && !pendingAttachment) || isSending}
               title={isInternalMode ? 'Post internal note (Ctrl+Enter)' : 'Send reply (Ctrl+Enter)'}
               className={cn(
                 'h-7 px-3 rounded-lg flex items-center gap-1.5 text-[11.5px] font-bold transition-all shadow-xs cursor-pointer',
-                !inputText.trim() || isSending
+                (!inputText.trim() && !pendingAttachment) || isSending
                   ? 'bg-surface-3 text-ink-3 cursor-not-allowed opacity-50'
                   : isInternalMode
                   ? 'bg-amber-600 hover:bg-amber-700 text-white shadow-sm hover:scale-102'
                   : 'bg-accent hover:bg-accent-hover text-accent-ink shadow-sm hover:scale-102'
               )}
             >
-              <span>{isInternalMode ? 'Add Note' : 'Send'}</span>
-              {isInternalMode ? (
+              {isSending ? (
+                <span className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
+              ) : isInternalMode ? (
                 <Lock className="w-3 h-3" />
               ) : (
                 <Send className="w-3 h-3" />
               )}
+              <span>{isSending ? 'Sending…' : isInternalMode ? 'Add Note' : 'Send'}</span>
             </button>
           </div>
         </div>
@@ -1741,6 +1904,42 @@ export function ChatThread({
                   Merge
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Image Lightbox Modal ── */}
+      {previewImageModalUrl && (
+        <div
+          className="fixed inset-0 z-50 bg-black/85 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150"
+          onClick={() => setPreviewImageModalUrl(null)}
+        >
+          <div className="relative max-w-3xl max-h-[90vh] flex flex-col items-center">
+            <button
+              onClick={() => setPreviewImageModalUrl(null)}
+              className="absolute -top-10 right-0 text-white hover:text-slate-300 p-1.5 rounded-full bg-white/10 hover:bg-white/20 transition-colors cursor-pointer"
+              title="Close image"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <img
+              src={previewImageModalUrl}
+              alt="Enlarged attachment"
+              className="max-h-[80vh] w-auto max-w-full rounded-2xl object-contain shadow-2xl border border-white/10"
+              onClick={(e) => e.stopPropagation()}
+            />
+            <div className="mt-3 text-center">
+              <a
+                href={previewImageModalUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                className="text-xs text-blue-300 hover:text-blue-200 hover:underline inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/10 transition-colors"
+              >
+                <span>Open original in new tab</span>
+                <ExternalLink className="w-3.5 h-3.5" />
+              </a>
             </div>
           </div>
         </div>
