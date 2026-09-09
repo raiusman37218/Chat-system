@@ -54,6 +54,7 @@ import {
 import { CountryFlag } from '@/components/ui/BrandIcon';
 import { parseLocation } from '@/lib/visitor-meta';
 import { createClient } from '@/lib/supabase/client';
+import { EMOJI_CATEGORIES, ALL_EMOJIS } from '@/lib/emojis';
 
 interface ChatThreadProps {
   conversation: Conversation;
@@ -179,6 +180,27 @@ export function ChatThread({
   const [mentionFilter, setMentionFilter] = useState('');
   const [mentionedAgentIds, setMentionedAgentIds] = useState<string[]>([]);
   const [suggestedReplies, setSuggestedReplies] = useState<Array<{ title: string; text: string }>>([]);
+
+  // Emoji Picker State
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [activeEmojiCategory, setActiveEmojiCategory] = useState('smileys');
+  const [emojiSearchQuery, setEmojiSearchQuery] = useState('');
+
+  const handleInsertEmoji = (emoji: string) => {
+    if (!textareaRef.current) {
+      setInputText((prev) => prev + emoji);
+      return;
+    }
+    const el = textareaRef.current;
+    const start = el.selectionStart || inputText.length;
+    const end = el.selectionEnd || inputText.length;
+    const newText = inputText.substring(0, start) + emoji + inputText.substring(end);
+    setInputText(newText);
+    setTimeout(() => {
+      el.focus();
+      el.selectionStart = el.selectionEnd = start + emoji.length;
+    }, 10);
+  };
 
   // Message Edit & Delete State
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
@@ -589,6 +611,7 @@ export function ChatThread({
     }
     setPendingAttachment(null);
     setInputText('');
+    setShowEmojiPicker(false);
     if (fileInputRef.current) fileInputRef.current.value = '';
     if (imageInputRef.current) imageInputRef.current.value = '';
 
@@ -1943,6 +1966,58 @@ export function ChatThread({
             </div>
           )}
 
+          {/* WhatsApp Style Emoji Picker Popover */}
+          {showEmojiPicker && (
+            <div className="p-2.5 bg-surface border-t border-line flex flex-col gap-2 shadow-lg max-h-64 animate-in fade-in duration-150">
+              {/* Search */}
+              <input
+                type="text"
+                value={emojiSearchQuery}
+                onChange={(e) => setEmojiSearchQuery(e.target.value)}
+                placeholder="Search emojis..."
+                className="w-full px-2.5 py-1 text-[12px] rounded-lg border border-line bg-surface-2 focus:outline-none focus:ring-1 focus:ring-accent"
+              />
+              {/* Category tabs */}
+              <div className="flex items-center gap-1 overflow-x-auto pb-1 border-b border-line">
+                {EMOJI_CATEGORIES.map((cat) => (
+                  <button
+                    key={cat.id}
+                    type="button"
+                    onClick={() => {
+                      setActiveEmojiCategory(cat.id);
+                      setEmojiSearchQuery('');
+                    }}
+                    title={cat.name}
+                    className={cn(
+                      'p-1 text-sm rounded-md transition-colors cursor-pointer',
+                      activeEmojiCategory === cat.id && !emojiSearchQuery
+                        ? 'bg-surface-3'
+                        : 'hover:bg-surface-2'
+                    )}
+                  >
+                    {cat.icon}
+                  </button>
+                ))}
+              </div>
+              {/* Emojis Grid */}
+              <div className="grid grid-cols-10 sm:grid-cols-12 gap-1 max-h-36 overflow-y-auto pr-1">
+                {(emojiSearchQuery
+                  ? ALL_EMOJIS
+                  : EMOJI_CATEGORIES.find((c) => c.id === activeEmojiCategory)?.emojis || EMOJI_CATEGORIES[0].emojis
+                ).map((emoji, idx) => (
+                  <button
+                    key={`${emoji}-${idx}`}
+                    type="button"
+                    onClick={() => handleInsertEmoji(emoji)}
+                    className="text-lg hover:scale-125 transition-transform p-1 rounded hover:bg-surface-2 flex items-center justify-center leading-none cursor-pointer"
+                  >
+                    {emoji}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Composer Footer Action Bar */}
           <div className="px-3 py-2 bg-surface-2/40 border-t border-line/40 flex items-center justify-between text-[11px] text-ink-3">
             <div className="flex items-center gap-1.5 flex-wrap">
@@ -1962,6 +2037,21 @@ export function ChatThread({
               )}
 
               <div className="flex items-center gap-1 ml-1.5 border-l border-line/50 pl-2">
+                <button
+                  type="button"
+                  onClick={() => setShowEmojiPicker((prev) => !prev)}
+                  disabled={isSending}
+                  className={cn(
+                    'h-6 px-2 rounded-md text-[11px] font-medium transition-colors inline-flex items-center gap-1 cursor-pointer',
+                    showEmojiPicker
+                      ? 'text-accent bg-accent/15'
+                      : 'text-ink-3 hover:text-accent hover:bg-accent/10'
+                  )}
+                  title="Insert emoji (WhatsApp style)"
+                >
+                  <Smile className="w-3.5 h-3.5" />
+                  <span>Emoji</span>
+                </button>
                 <button
                   type="button"
                   onClick={() => imageInputRef.current?.click()}

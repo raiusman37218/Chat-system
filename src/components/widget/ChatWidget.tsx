@@ -24,6 +24,7 @@ import {
 import { createClient } from '@/lib/supabase/client';
 import { Message } from '@/types/database';
 import { getWorkspaceHelpCenterUrl } from '@/lib/domain';
+import { EMOJI_CATEGORIES, ALL_EMOJIS } from '@/lib/emojis';
 
 export interface WidgetConfig {
   brandColor?: string;
@@ -86,6 +87,8 @@ export default function ChatWidget({
   const [unreadCount, setUnreadCount] = useState(0);
   const [hasNewMessagePulse, setHasNewMessagePulse] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [activeEmojiCategory, setActiveEmojiCategory] = useState('smileys');
+  const [emojiSearchQuery, setEmojiSearchQuery] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   const [isOfflineSubmitted, setIsOfflineSubmitted] = useState(false);
   const [conversationId, setConversationId] = useState<string | null>(null);
@@ -1309,22 +1312,57 @@ export default function ChatWidget({
           )}
         </div>
 
-        {/* EMOJI PICKER POPOVER */}
+        {/* EMOJI PICKER POPOVER (WhatsApp Style) */}
         {showEmojiPicker && (
-          <div className="p-3 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 grid grid-cols-8 gap-2 max-h-36 overflow-y-auto">
-            {POPULAR_EMOJIS.map((emoji) => (
-              <button
-                key={emoji}
-                type="button"
-                onClick={() => {
-                  setInputContent((prev) => prev + emoji);
-                  setShowEmojiPicker(false);
-                }}
-                className="text-lg hover:scale-125 transition-transform p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800"
-              >
-                {emoji}
-              </button>
-            ))}
+          <div className="p-2.5 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 flex flex-col gap-2 shadow-lg max-h-60">
+            {/* Search */}
+            <input
+              type="text"
+              value={emojiSearchQuery}
+              onChange={(e) => setEmojiSearchQuery(e.target.value)}
+              placeholder="Search emojis..."
+              className="w-full px-2.5 py-1 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            />
+            {/* Category tabs */}
+            <div className="flex items-center gap-1 overflow-x-auto pb-1 border-b border-slate-200 dark:border-slate-800">
+              {EMOJI_CATEGORIES.map((cat) => (
+                <button
+                  key={cat.id}
+                  type="button"
+                  onClick={() => {
+                    setActiveEmojiCategory(cat.id);
+                    setEmojiSearchQuery('');
+                  }}
+                  title={cat.name}
+                  className={`p-1 text-sm rounded-md transition-colors ${
+                    activeEmojiCategory === cat.id && !emojiSearchQuery
+                      ? 'bg-slate-200 dark:bg-slate-700'
+                      : 'hover:bg-slate-100 dark:hover:bg-slate-800'
+                  }`}
+                >
+                  {cat.icon}
+                </button>
+              ))}
+            </div>
+            {/* Emojis Grid */}
+            <div className="grid grid-cols-8 gap-1.5 max-h-36 overflow-y-auto pr-1">
+              {(emojiSearchQuery
+                ? ALL_EMOJIS
+                : EMOJI_CATEGORIES.find((c) => c.id === activeEmojiCategory)?.emojis || EMOJI_CATEGORIES[0].emojis
+              ).map((emoji, idx) => (
+                <button
+                  key={`${emoji}-${idx}`}
+                  type="button"
+                  onClick={() => {
+                    setInputContent((prev) => prev + emoji);
+                    setShowEmojiPicker(false);
+                  }}
+                  className="text-lg hover:scale-125 transition-transform p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center justify-center leading-none"
+                >
+                  {emoji}
+                </button>
+              ))}
+            </div>
           </div>
         )}
 
@@ -1378,11 +1416,7 @@ export default function ChatWidget({
                 <form
                   onSubmit={(e) => {
                     e.preventDefault();
-                    if (isAgentOnline === false) {
-                      handleOfflineSubmit(e);
-                    } else {
-                      handleSendMessage();
-                    }
+                    handleSendMessage();
                   }}
                   className="flex items-end gap-2"
                 >
@@ -1443,17 +1477,11 @@ export default function ChatWidget({
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' && !e.shiftKey) {
                         e.preventDefault();
-                        if (isAgentOnline === false) {
-                          handleOfflineSubmit(e);
-                        } else {
-                          handleSendMessage();
-                        }
+                        handleSendMessage();
                       }
                     }}
                     placeholder={
-                      isAgentOnline === false
-                        ? 'Leave your message...'
-                        : pendingAttachment
+                      pendingAttachment
                         ? 'Add a caption (optional)...'
                         : 'Write a message...'
                     }

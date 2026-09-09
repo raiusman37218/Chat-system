@@ -1,5 +1,6 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { CHATIFY_ICON_DATA_URI } from './icon';
+import { EMOJI_CATEGORIES, ALL_EMOJIS } from '../../src/lib/emojis';
 
 const DEFAULT_SUPABASE_URL = 'https://vfjsaynnubxywdbevxtx.supabase.co';
 const DEFAULT_SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZmanNheW5udWJ4eXdkYmV2eHR4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgyNTA5MDEsImV4cCI6MjEwMzgyNjkwMX0.YyBCXMqwrOk5BRhQafYLFw8tiM5PC8lc8Yocodw9wf0';
@@ -117,6 +118,8 @@ class ChatifyWidget {
   private isPreChatCompleted: boolean = false;
   private csatRated: boolean = false;
   private pendingAttachment: { file: File; previewUrl: string } | null = null;
+  private activeEmojiCategory: string = 'smileys';
+  private emojiSearchQuery: string = '';
 
   private audioCtx: AudioContext | null = null;
 
@@ -959,6 +962,20 @@ class ChatifyWidget {
 
           if (this.messages.some((m) => m.id === newMsg.id)) return;
 
+          // Replace pending message if content or attachment matches
+          const tempIdx = this.messages.findIndex(
+            (m) =>
+              (m.id.startsWith('temp-') || m.pending) &&
+              m.sender_type === newMsg.sender_type &&
+              (m.content === newMsg.content || m.attachment_url === newMsg.attachment_url)
+          );
+
+          if (tempIdx !== -1) {
+            this.messages[tempIdx] = newMsg;
+            this.renderMessages();
+            return;
+          }
+
           this.messages.push(newMsg);
           this.renderMessages();
 
@@ -1166,13 +1183,20 @@ class ChatifyWidget {
         .then(() => {});
     }
 
-    const { data } = await this.supabase.from('messages').insert({
+    const { data, error } = await this.supabase.from('messages').insert({
       conversation_id: convId,
       sender_type: 'visitor',
       content: content.trim() || (attachmentUrl ? 'Sent a picture' : ''),
       attachment_url: attachmentUrl || null,
       is_internal: false,
     }).select().single();
+
+    if (error) {
+      console.error('[Chatify] Error sending message:', error);
+      tempMsg.pending = false;
+      this.renderMessages();
+      return;
+    }
 
     if (data) {
       const idx = this.messages.findIndex((m) => m.id === tempMsg.id);
@@ -1389,8 +1413,12 @@ class ChatifyWidget {
           <button type="button" id="chatifyPreviewRemove" class="chatify-preview-remove" title="Remove picture">✕</button>
         </div>
 
-        <!-- Emoji Picker Popover -->
+        <!-- Emoji Picker Popover (WhatsApp Style) -->
         <div id="chatifyEmojiPicker" class="chatify-emoji-popover" style="display:none;">
+          <div class="chatify-emoji-header">
+            <input type="text" id="chatifyEmojiSearch" class="chatify-emoji-search" placeholder="Search emojis..." />
+          </div>
+          <div class="chatify-emoji-categories" id="chatifyEmojiCategories"></div>
           <div class="chatify-emoji-grid" id="chatifyEmojiGrid"></div>
         </div>
 
@@ -1686,15 +1714,48 @@ class ChatifyWidget {
 
   private renderEmojiGrid() {
     const grid = this.shadow?.getElementById('chatifyEmojiGrid');
+    const categoriesContainer = this.shadow?.getElementById('chatifyEmojiCategories');
     if (!grid) return;
+
+    if (categoriesContainer && categoriesContainer.children.length === 0) {
+      categoriesContainer.innerHTML = '';
+      EMOJI_CATEGORIES.forEach((cat) => {
+        const catBtn = document.createElement('button');
+        catBtn.type = 'button';
+        catBtn.className = `chatify-emoji-cat-btn ${cat.id === this.activeEmojiCategory ? 'active' : ''}`;
+        catBtn.textContent = cat.icon;
+        catBtn.title = cat.name;
+        catBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          this.activeEmojiCategory = cat.id;
+          this.shadow?.querySelectorAll('.chatify-emoji-cat-btn').forEach((b) => b.classList.remove('active'));
+          catBtn.classList.add('active');
+          const searchInput = this.shadow?.getElementById('chatifyEmojiSearch') as HTMLInputElement | null;
+          if (searchInput) searchInput.value = '';
+          this.emojiSearchQuery = '';
+          this.renderEmojiGrid();
+        });
+        categoriesContainer.appendChild(catBtn);
+      });
+
+      const searchInput = this.shadow?.getElementById('chatifyEmojiSearch') as HTMLInputElement | null;
+      searchInput?.addEventListener('input', (e) => {
+        this.emojiSearchQuery = (e.target as HTMLInputElement).value.toLowerCase().trim();
+        this.renderEmojiGrid();
+      });
+    }
+
     grid.innerHTML = '';
-    const emojis = [
-      '👋', '😊', '👍', '❤️', '🔥', '🎉',
-      '🚀', '🙌', '💡', '✨', '🙏', '💯',
-      '🤔', '👀', '😎', '🤝', '😍', '⭐',
-      '⚡', '💻', '📞', '📩', '✅', '❌'
-    ];
-    emojis.forEach((em) => {
+
+    let listToRender: string[] = [];
+    if (this.emojiSearchQuery) {
+      listToRender = ALL_EMOJIS;
+    } else {
+      const currentCat = EMOJI_CATEGORIES.find((c) => c.id === this.activeEmojiCategory);
+      listToRender = currentCat ? currentCat.emojis : EMOJI_CATEGORIES[0].emojis;
+    }
+
+    listToRender.forEach((em) => {
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'chatify-emoji-btn';
@@ -3049,25 +3110,84 @@ class ChatifyWidget {
         position: absolute;
         bottom: 66px;
         left: 14px;
-        z-index: 25;
+        z-index: 35;
         background: var(--w-surface);
         border: 1px solid var(--w-line);
-        border-radius: 12px;
+        border-radius: 14px;
         padding: 8px;
-        box-shadow: 0 8px 24px rgba(0,0,0,0.14);
-        max-width: 260px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.18);
+        width: 295px;
+        box-sizing: border-box;
         animation: chatifyFadeIn .15s var(--w-ease);
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+
+      .chatify-emoji-header {
+        width: 100%;
+      }
+
+      .chatify-emoji-search {
+        width: 100%;
+        box-sizing: border-box;
+        padding: 6px 10px;
+        font-size: 12.5px;
+        border: 1px solid var(--w-line);
+        border-radius: 8px;
+        background: var(--w-surface-2);
+        color: var(--w-ink);
+        outline: none;
+      }
+
+      .chatify-emoji-search:focus {
+        border-color: var(--w-brand);
+      }
+
+      .chatify-emoji-categories {
+        display: flex;
+        align-items: center;
+        gap: 2px;
+        padding-bottom: 4px;
+        border-bottom: 1px solid var(--w-line);
+        overflow-x: auto;
+      }
+
+      .chatify-emoji-cat-btn {
+        background: transparent;
+        border: none;
+        border-radius: 6px;
+        padding: 4px 6px;
+        font-size: 15px;
+        cursor: pointer;
+        opacity: 0.65;
+        transition: opacity .15s, background .15s;
+        line-height: 1;
+      }
+
+      .chatify-emoji-cat-btn:hover {
+        opacity: 1;
+        background: var(--w-surface-2);
+      }
+
+      .chatify-emoji-cat-btn.active {
+        opacity: 1;
+        background: var(--w-surface-2);
+        box-shadow: inset 0 -2px 0 var(--w-brand);
       }
 
       .chatify-emoji-grid {
         display: grid;
-        grid-template-columns: repeat(6, 1fr);
-        gap: 3px;
+        grid-template-columns: repeat(7, 1fr);
+        gap: 2px;
+        max-height: 190px;
+        overflow-y: auto;
+        padding-right: 2px;
       }
 
       .chatify-emoji-btn {
-        font-size: 18px;
-        padding: 6px 4px;
+        font-size: 19px;
+        padding: 5px 2px;
         border: none;
         background: transparent;
         border-radius: 6px;

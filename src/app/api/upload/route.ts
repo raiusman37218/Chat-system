@@ -15,26 +15,42 @@ const ALLOWED_TYPES = new Set([
 
 const MAX_FILE_SIZE = 15 * 1024 * 1024; // 15MB
 
+const CORS_HEADERS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+};
+
+export async function OPTIONS() {
+  return new NextResponse(null, {
+    status: 204,
+    headers: CORS_HEADERS,
+  });
+}
+
 export async function POST(req: NextRequest) {
   try {
     const formData = await req.formData();
     const file = formData.get('file') as File | null;
 
     if (!file) {
-      return NextResponse.json({ error: 'No file uploaded' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'No file uploaded' },
+        { status: 400, headers: CORS_HEADERS }
+      );
     }
 
     if (file.size > MAX_FILE_SIZE) {
       return NextResponse.json(
         { error: 'File size exceeds maximum 15MB limit' },
-        { status: 400 }
+        { status: 400, headers: CORS_HEADERS }
       );
     }
 
     if (!ALLOWED_TYPES.has(file.type)) {
       return NextResponse.json(
         { error: `File type ${file.type} not permitted. Supported: images, PDF, and TXT.` },
-        { status: 400 }
+        { status: 400, headers: CORS_HEADERS }
       );
     }
 
@@ -44,7 +60,7 @@ export async function POST(req: NextRequest) {
           error:
             'Cloudinary credentials are not configured. Please set CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, and CLOUDINARY_API_SECRET (or CLOUDINARY_URL) in your .env.local file.',
         },
-        { status: 503 }
+        { status: 503, headers: CORS_HEADERS }
       );
     }
 
@@ -58,21 +74,24 @@ export async function POST(req: NextRequest) {
       resourceType: isImage ? 'image' : 'auto',
     });
 
-    return NextResponse.json({
-      url: result.secure_url,
-      publicId: result.public_id,
-      filename: file.name,
-      size: result.bytes || file.size,
-      mimeType: file.type,
-      isImage,
-      width: result.width,
-      height: result.height,
-    });
+    return NextResponse.json(
+      {
+        url: result.secure_url,
+        publicId: result.public_id,
+        filename: file.name,
+        size: result.bytes || file.size,
+        mimeType: file.type,
+        isImage,
+        width: result.width,
+        height: result.height,
+      },
+      { headers: CORS_HEADERS }
+    );
   } catch (error: any) {
     console.error('[Upload API Error]:', error);
     return NextResponse.json(
       { error: error.message || 'File upload failed' },
-      { status: 500 }
+      { status: 500, headers: CORS_HEADERS }
     );
   }
 }
