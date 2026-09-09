@@ -316,7 +316,7 @@ export function VisitorDetailsSidebar({
               below already tells the agent which region they are in. */}
           {(place.label || !localTime) && (
             <div className="px-3 py-2.5 flex items-center gap-2.5">
-              <CountryFlag flag={place.flag} />
+              <CountryFlag flag={place.flag} countryCode={place.countryCode} className="w-4 h-3 shrink-0" />
               <span className="text-[12.5px] font-medium text-ink truncate">
                 {place.label || 'Location unavailable'}
               </span>

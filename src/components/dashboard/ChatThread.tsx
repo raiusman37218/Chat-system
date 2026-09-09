@@ -30,6 +30,9 @@ import {
   CornerUpLeft,
   Image as ImageIcon,
   Paperclip,
+  Pencil,
+  Trash2,
+  Loader2,
 } from 'lucide-react';
 import {
   Agent,
@@ -48,6 +51,8 @@ import {
   MessageTicks,
   messageStatusOf,
 } from '@/components/ui/MessageTicks';
+import { CountryFlag } from '@/components/ui/BrandIcon';
+import { parseLocation } from '@/lib/visitor-meta';
 import { createClient } from '@/lib/supabase/client';
 
 interface ChatThreadProps {
@@ -63,6 +68,8 @@ interface ChatThreadProps {
     replyToId?: string | null,
     attachmentUrl?: string | null
   ) => Promise<void>;
+  onEditMessage?: (id: string, content: string) => Promise<void>;
+  onDeleteMessage?: (id: string) => Promise<void>;
   onUpdateStatus: (status: ConversationStatus) => Promise<void>;
   onAssignAgent: (agentId: string | null) => Promise<void>;
   onUpdatePriority?: (priority: ConversationPriority) => Promise<void>;
@@ -129,6 +136,8 @@ export function ChatThread({
   currentAgent,
   agentsList,
   onSendMessage,
+  onEditMessage,
+  onDeleteMessage,
   onUpdateStatus,
   onAssignAgent,
   onUpdatePriority,
@@ -171,7 +180,57 @@ export function ChatThread({
   const [mentionedAgentIds, setMentionedAgentIds] = useState<string[]>([]);
   const [suggestedReplies, setSuggestedReplies] = useState<Array<{ title: string; text: string }>>([]);
 
+  // Message Edit & Delete State
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
+  const [editingContent, setEditingContent] = useState('');
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
+  const [deleteConfirmMsg, setDeleteConfirmMsg] = useState<Message | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const startEditing = (msg: Message) => {
+    setEditingMessageId(msg.id);
+    setEditingContent(msg.content);
+  };
+
+  const cancelEditing = () => {
+    setEditingMessageId(null);
+    setEditingContent('');
+    setIsSavingEdit(false);
+  };
+
+  const handleSaveEdit = async (messageId: string) => {
+    if (!editingContent.trim() || isSavingEdit) return;
+    try {
+      setIsSavingEdit(true);
+      if (onEditMessage) {
+        await onEditMessage(messageId, editingContent.trim());
+      }
+      setEditingMessageId(null);
+      setEditingContent('');
+    } catch (err: any) {
+      console.error('Failed to save message edit:', err);
+    } finally {
+      setIsSavingEdit(false);
+    }
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deleteConfirmMsg || isDeleting) return;
+    try {
+      setIsDeleting(true);
+      if (onDeleteMessage) {
+        await onDeleteMessage(deleteConfirmMsg.id);
+      }
+      setDeleteConfirmMsg(null);
+    } catch (err: any) {
+      console.error('Failed to delete message:', err);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const tagPickerRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -292,9 +351,38 @@ export function ChatThread({
       });
   }, []);
 
+  const scrollToBottom = useCallback((smooth = false) => {
+    const scroll = () => {
+      if (messagesContainerRef.current) {
+        messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
+      }
+      messagesEndRef.current?.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto', block: 'end' });
+    };
+
+    scroll();
+    requestAnimationFrame(scroll);
+    setTimeout(scroll, 50);
+    setTimeout(scroll, 200);
+  }, []);
+
+  // Jump to bottom immediately on conversation open or switch (like WhatsApp)
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+    scrollToBottom(false);
+  }, [conversation?.id, scrollToBottom]);
+
+  // Jump to bottom when messages load or change
+  useEffect(() => {
+    if (messages.length > 0) {
+      scrollToBottom(false);
+    }
+  }, [messages, scrollToBottom]);
+
+  // Jump to bottom when loading finishes
+  useEffect(() => {
+    if (!loading) {
+      scrollToBottom(false);
+    }
+  }, [loading, scrollToBottom]);
 
   // Suggestions are fetched on demand from the AI Suggest button, not on every
   // open and every incoming message — that pushed a panel over the composer
@@ -670,6 +758,15 @@ export function ChatThread({
   );
 
   const currentPriority: ConversationPriority = conversation.priority || 'normal';
+  const visitorPlace = useMemo(
+    () =>
+      parseLocation(
+        visitor?.location,
+        visitor?.ip_location_city,
+        visitor?.ip_location_country
+      ),
+    [visitor?.location, visitor?.ip_location_city, visitor?.ip_location_country]
+  );
   const isInternalMode = composerMode === 'internal';
 
   const filteredMacros = useMemo(() => {
@@ -771,20 +868,95 @@ export function ChatThread({
       rendered.push(
         <div
           key={msg.id}
-          className="rounded-xl border border-warn-line bg-warn-soft px-4 py-3"
+          id={`msg-${msg.id}`}
+          className="rounded-xl border border-warn-line bg-warn-soft px-4 py-3 group/note relative"
         >
           <div className="flex items-center justify-between gap-3 mb-1.5">
             <span className="inline-flex items-center gap-1.5 text-[11.5px] font-semibold text-warn">
               <Lock className="w-3.5 h-3.5" />
               Internal note · {msg.agent?.name || 'Teammate'}
             </span>
-            <span className="text-[11px] text-warn/70 tabular-nums">
-              {formatTime(msg.created_at)}
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] text-warn/70 tabular-nums">
+                {formatTime(msg.created_at)}
+              </span>
+              {msg.metadata?.is_edited && (
+                <span className="text-[10px] text-warn/70 italic">(edited)</span>
+              )}
+              <button
+                type="button"
+                title="Edit note"
+                onClick={() => startEditing(msg)}
+                className="opacity-0 group-hover/note:opacity-100 text-warn/70 hover:text-warn transition-opacity p-0.5 cursor-pointer"
+              >
+                <Pencil className="w-3 h-3" />
+              </button>
+              <button
+                type="button"
+                title="Delete note"
+                onClick={() => setDeleteConfirmMsg(msg)}
+                className="opacity-0 group-hover/note:opacity-100 text-warn/70 hover:text-danger transition-opacity p-0.5 cursor-pointer"
+              >
+                <Trash2 className="w-3 h-3" />
+              </button>
+            </div>
           </div>
-          <p className="whitespace-pre-wrap text-[13.5px] leading-relaxed text-ink">
-            {msg.content}
-          </p>
+          {editingMessageId === msg.id ? (
+            <div className="w-full pt-1">
+              <textarea
+                value={editingContent}
+                onChange={(e) => setEditingContent(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSaveEdit(msg.id);
+                  } else if (e.key === 'Escape') {
+                    e.preventDefault();
+                    cancelEditing();
+                  }
+                }}
+                autoFocus
+                rows={3}
+                className="w-full rounded-lg bg-surface border border-warn-line p-2 text-[13.5px] text-ink focus:outline-none focus:ring-1 focus:ring-warn resize-none"
+                placeholder="Edit internal note..."
+              />
+              <div className="mt-1.5 flex items-center justify-between gap-2 text-[11px]">
+                <span className="text-warn/80 text-[10px]">Esc to cancel • Enter to save</span>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={cancelEditing}
+                    disabled={isSavingEdit}
+                    className="px-2 py-0.5 rounded border border-line bg-surface text-ink-2 hover:bg-surface-2 transition-colors cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleSaveEdit(msg.id)}
+                    disabled={isSavingEdit || !editingContent.trim()}
+                    className="px-2.5 py-0.5 rounded bg-warn text-white font-medium hover:bg-warn/90 transition-colors flex items-center gap-1 shadow-xs disabled:opacity-50 cursor-pointer"
+                  >
+                    {isSavingEdit ? (
+                      <>
+                        <RotateCcw className="w-3 h-3 animate-spin" />
+                        <span>Saving</span>
+                      </>
+                    ) : (
+                      <>
+                        <Check className="w-3 h-3" />
+                        <span>Save</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <p className="whitespace-pre-wrap text-[13.5px] leading-relaxed text-ink">
+              {msg.content}
+            </p>
+          )}
           <p className="mt-2 text-[11px] text-warn/80">
             Only visible to your team — never sent to the visitor.
           </p>
@@ -832,18 +1004,45 @@ export function ChatThread({
             />
           )}
 
-          <button
-            type="button"
-            title="Reply to this message"
-            aria-label="Reply to this message"
-            onClick={() => startReply(msg)}
+          {/* Message Action Toolbar (Reply, Edit, Delete) */}
+          <div
             className={cn(
-              'absolute top-0 z-10 w-7 h-7 grid place-items-center rounded-full border border-line bg-surface text-ink-3 shadow-xs opacity-0 transition-opacity hover:text-ink focus-visible:opacity-100 group-hover/msg:opacity-100',
-              isAgent ? '-left-9' : '-right-9'
+              'absolute top-0 z-10 flex items-center gap-0.5 rounded-full border border-line bg-surface p-0.5 shadow-sm opacity-0 transition-opacity focus-within:opacity-100 group-hover/msg:opacity-100 backdrop-blur-sm',
+              isAgent ? '-left-24' : '-right-9'
             )}
           >
-            <CornerUpLeft className="w-3.5 h-3.5" />
-          </button>
+            <button
+              type="button"
+              title="Reply to this message"
+              aria-label="Reply to this message"
+              onClick={() => startReply(msg)}
+              className="w-6 h-6 grid place-items-center rounded-full text-ink-3 hover:text-ink hover:bg-surface-2 transition-colors cursor-pointer"
+            >
+              <CornerUpLeft className="w-3.5 h-3.5" />
+            </button>
+            {isAgent && (
+              <>
+                <button
+                  type="button"
+                  title="Edit message"
+                  aria-label="Edit message"
+                  onClick={() => startEditing(msg)}
+                  className="w-6 h-6 grid place-items-center rounded-full text-ink-3 hover:text-accent hover:bg-surface-2 transition-colors cursor-pointer"
+                >
+                  <Pencil className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  type="button"
+                  title="Delete message"
+                  aria-label="Delete message"
+                  onClick={() => setDeleteConfirmMsg(msg)}
+                  className="w-6 h-6 grid place-items-center rounded-full text-ink-3 hover:text-danger hover:bg-surface-2 transition-colors cursor-pointer"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </>
+            )}
+          </div>
 
           <div
             className={cn(
@@ -867,6 +1066,7 @@ export function ChatThread({
                   <img
                     src={msg.attachment_url}
                     alt="Attachment"
+                    onLoad={() => scrollToBottom(false)}
                     className="rounded-xl max-h-56 w-auto max-w-full object-cover cursor-pointer hover:opacity-90 transition-opacity border border-black/10 dark:border-white/10 shadow-xs"
                     onClick={() => setPreviewImageModalUrl(msg.attachment_url)}
                   />
@@ -883,7 +1083,62 @@ export function ChatThread({
                 )}
               </div>
             )}
-            {msg.content}
+            {editingMessageId === msg.id ? (
+              <div className="w-full min-w-[240px] pt-1">
+                <textarea
+                  value={editingContent}
+                  onChange={(e) => setEditingContent(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      handleSaveEdit(msg.id);
+                    } else if (e.key === 'Escape') {
+                      e.preventDefault();
+                      cancelEditing();
+                    }
+                  }}
+                  autoFocus
+                  rows={Math.min(6, Math.max(2, editingContent.split('\n').length))}
+                  className="w-full rounded-lg bg-black/15 text-white placeholder-white/50 p-2 text-[13.5px] border border-white/20 focus:outline-none focus:ring-1 focus:ring-white/40 resize-none font-normal"
+                  placeholder="Edit message..."
+                />
+                <div className="mt-1.5 flex items-center justify-between gap-2 text-[11px]">
+                  <span className="text-white/70 text-[10px]">
+                    Esc to cancel • Enter to save
+                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={cancelEditing}
+                      disabled={isSavingEdit}
+                      className="px-2 py-0.5 rounded bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleSaveEdit(msg.id)}
+                      disabled={isSavingEdit || !editingContent.trim()}
+                      className="px-2.5 py-0.5 rounded bg-white text-accent-strong font-medium hover:bg-white/90 transition-colors flex items-center gap-1 shadow-xs disabled:opacity-50 cursor-pointer"
+                    >
+                      {isSavingEdit ? (
+                        <>
+                          <RotateCcw className="w-3 h-3 animate-spin" />
+                          <span>Saving</span>
+                        </>
+                      ) : (
+                        <>
+                          <Check className="w-3 h-3" />
+                          <span>Save</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              msg.content
+            )}
           </div>
 
           <div
@@ -893,6 +1148,9 @@ export function ChatThread({
             )}
           >
             <span className="tabular-nums">{formatTime(msg.created_at)}</span>
+            {msg.metadata?.is_edited && (
+              <span className="italic text-[10px] text-ink-3/70 ml-0.5">(edited)</span>
+            )}
             {(isAgent || isAI) && (
               <MessageTicks
                 status={messageStatusOf(msg)}
@@ -997,6 +1255,22 @@ export function ChatThread({
                   Active{' '}
                   {formatTimeAgo(visitor?.last_seen || conversation.updated_at)}
                 </span>
+              )}
+
+              {visitorPlace.label && (
+                <>
+                  <span aria-hidden className="shrink-0 text-ink-3">
+                    ·
+                  </span>
+                  <span className="inline-flex items-center gap-1.5 shrink-0 text-ink-2 font-medium" title={visitorPlace.label}>
+                    <CountryFlag
+                      flag={visitorPlace.flag}
+                      countryCode={visitorPlace.countryCode}
+                      className="w-4 h-3 shrink-0"
+                    />
+                    <span className="truncate max-w-[150px]">{visitorPlace.label}</span>
+                  </span>
+                </>
               )}
 
               {visitor?.email && (
@@ -1325,7 +1599,7 @@ export function ChatThread({
       )}
 
       {/* ── Messages ── */}
-      <div className="flex-1 overflow-y-auto px-5 py-5 space-y-3.5">
+      <div ref={messagesContainerRef} className="flex-1 overflow-y-auto px-5 py-5 space-y-3.5">
         <div className="flex justify-center">
           <span className="pill pill-neutral">
             Conversation opened {formatTimeAgo(conversation.created_at)}
@@ -1940,6 +2214,66 @@ export function ChatThread({
                 <span>Open original in new tab</span>
                 <ExternalLink className="w-3.5 h-3.5" />
               </a>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Delete Message Confirmation Modal ── */}
+      {deleteConfirmMsg && (
+        <div
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150"
+          onClick={() => !isDeleting && setDeleteConfirmMsg(null)}
+        >
+          <div
+            className="w-full max-w-md rounded-2xl border border-line bg-surface p-5 shadow-2xl animate-in zoom-in-95 duration-150"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-3 text-danger mb-3">
+              <div className="w-10 h-10 rounded-full bg-danger/10 grid place-items-center shrink-0">
+                <Trash2 className="w-5 h-5 text-danger" />
+              </div>
+              <div>
+                <h3 className="text-base font-semibold text-ink">Delete message?</h3>
+                <p className="text-xs text-ink-3 mt-0.5">This action cannot be undone.</p>
+              </div>
+            </div>
+
+            <p className="text-xs text-ink-2 mb-3">
+              Are you sure you want to delete this message? It will be removed for everyone in this conversation:
+            </p>
+
+            <div className="p-3 rounded-xl bg-surface-2 border border-line mb-5 text-xs text-ink-2 max-h-24 overflow-y-auto italic">
+              &ldquo;{deleteConfirmMsg.content || (deleteConfirmMsg.attachment_url ? 'Attachment file' : 'Message')}&rdquo;
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5">
+              <button
+                type="button"
+                onClick={() => setDeleteConfirmMsg(null)}
+                disabled={isDeleting}
+                className="px-3.5 py-1.5 rounded-xl border border-line bg-surface text-xs font-medium text-ink hover:bg-surface-2 transition-colors disabled:opacity-50 cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDelete}
+                disabled={isDeleting}
+                className="px-4 py-1.5 rounded-xl bg-danger text-white text-xs font-medium hover:bg-danger/90 transition-colors flex items-center gap-1.5 shadow-xs disabled:opacity-50 cursor-pointer"
+              >
+                {isDeleting ? (
+                  <>
+                    <RotateCcw className="w-3.5 h-3.5 animate-spin" />
+                    <span>Deleting...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Delete for everyone</span>
+                  </>
+                )}
+              </button>
             </div>
           </div>
         </div>

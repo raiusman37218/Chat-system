@@ -24,6 +24,8 @@ import {
 import { formatTimeAgo, cn } from '@/lib/utils';
 import { Avatar } from '@/components/ui/Avatar';
 import { ChannelBadge } from '@/components/ui/ChannelBadge';
+import { CountryFlag } from '@/components/ui/BrandIcon';
+import { parseLocation } from '@/lib/visitor-meta';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ConversationListSkeleton } from '@/components/ui/Skeleton';
 
@@ -117,6 +119,19 @@ const ConversationItem = memo(function ConversationItem({
   const isUrgent = conv.priority === 'urgent';
   const isHigh = conv.priority === 'high';
   const activityTime = getLastActivityTime(conv);
+  const place = useMemo(
+    () =>
+      parseLocation(
+        conv.visitor?.location,
+        conv.visitor?.ip_location_city,
+        conv.visitor?.ip_location_country
+      ),
+    [
+      conv.visitor?.location,
+      conv.visitor?.ip_location_city,
+      conv.visitor?.ip_location_country,
+    ]
+  );
 
   return (
     <button
@@ -148,7 +163,7 @@ const ConversationItem = memo(function ConversationItem({
 
       {/* Content */}
       <div className="flex-1 min-w-0">
-        {/* Top Line: Name + Channel + Time */}
+        {/* Top Line: Name + Country Flag + Channel + Time */}
         <div className="flex items-center justify-between gap-1.5">
           <div className="flex items-center gap-1.5 truncate">
             <span
@@ -163,6 +178,15 @@ const ConversationItem = memo(function ConversationItem({
             >
               {name}
             </span>
+            {place.countryCode && (
+              <span title={place.label || place.country || undefined} className="inline-flex shrink-0">
+                <CountryFlag
+                  flag={place.flag}
+                  countryCode={place.countryCode}
+                  className="w-3.5 h-2.5 shrink-0"
+                />
+              </span>
+            )}
             {conv.channel && conv.channel !== 'web' && (
               <ChannelBadge channel={conv.channel} />
             )}

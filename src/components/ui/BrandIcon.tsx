@@ -211,19 +211,49 @@ export function DeviceIcon({
 }
 
 /**
- * Flag emoji in a fixed box so rows stay aligned whether or not the platform
- * has a glyph for the country.
+ * High-definition country flag using crisp CDN badges with fallback
+ * to emoji and Globe icon. Works across Windows, Mac, iOS, Android.
  */
 export function CountryFlag({
   flag,
+  countryCode,
   className,
 }: {
-  flag: string | null;
+  flag?: string | null;
+  countryCode?: string | null;
   className?: string;
 }) {
+  const [imgError, setImgError] = React.useState(false);
+
+  let code = countryCode ? countryCode.toUpperCase() : null;
+  if (!code && flag && flag.length >= 2) {
+    try {
+      const codePoints = [...flag].map((c) => c.codePointAt(0) || 0);
+      if (codePoints.length === 2 && codePoints.every((cp) => cp >= 127462 && cp <= 127487)) {
+        code = String.fromCharCode(...codePoints.map((cp) => cp - 127397));
+      }
+    } catch {}
+  }
+
+  if (code && !imgError) {
+    return (
+      <img
+        src={`https://flagcdn.com/w40/${code.toLowerCase()}.png`}
+        srcSet={`https://flagcdn.com/w80/${code.toLowerCase()}.png 2x`}
+        alt={code}
+        onError={() => setImgError(true)}
+        className={cn(
+          'w-4 h-3 rounded-[2px] object-cover shrink-0 shadow-[0_0_0_1px_rgba(0,0,0,0.12)] select-none inline-block',
+          className
+        )}
+      />
+    );
+  }
+
   if (!flag) {
     return <Globe className={cn('w-4 h-4 text-ink-3 shrink-0', className)} />;
   }
+
   return (
     <span
       className={cn(

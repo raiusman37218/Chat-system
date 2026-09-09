@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import {
   MessageCircle,
   X,
@@ -106,6 +106,7 @@ export default function ChatWidget({
   );
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const [pendingAttachment, setPendingAttachment] = useState<{
@@ -347,6 +348,23 @@ export default function ChatWidget({
       }
     );
 
+    // Listen for message deletion
+    channel.on(
+      'postgres_changes',
+      {
+        event: 'DELETE',
+        schema: 'public',
+        table: 'messages',
+        filter: `conversation_id=eq.${conversationId}`,
+      },
+      (payload: any) => {
+        const deletedId = payload.old?.id;
+        if (deletedId) {
+          setMessages((prev) => prev.filter((m) => m.id !== deletedId));
+        }
+      }
+    );
+
     // Listen for agent typing broadcast
     (channel as any).on(
       'broadcast',
@@ -371,10 +389,33 @@ export default function ChatWidget({
     };
   }, [conversationId, isOpen, supabase, onUnreadChange]);
 
-  // Scroll to bottom on new messages
+  const scrollToBottom = useCallback((smooth = false) => {
+    const scroll = () => {
+      if (messagesContainerRef.current) {
+        messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
+      }
+      messagesEndRef.current?.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto', block: 'end' });
+    };
+
+    scroll();
+    requestAnimationFrame(scroll);
+    setTimeout(scroll, 50);
+    setTimeout(scroll, 200);
+  }, []);
+
+  // Jump to bottom immediately on open or reload
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, isAgentTyping]);
+    if (isOpen && !isHelpOpen) {
+      scrollToBottom(false);
+    }
+  }, [isOpen, isHelpOpen, scrollToBottom]);
+
+  // Scroll to bottom on messages update
+  useEffect(() => {
+    if (messages.length > 0) {
+      scrollToBottom(false);
+    }
+  }, [messages, isAgentTyping, scrollToBottom]);
 
   // Mark unread agent & AI messages as seen when widget is open
   useEffect(() => {
@@ -402,9 +443,11 @@ export default function ChatWidget({
     onOpenStateChange?.(nextState);
 
     if (nextState) {
-      setUnreadCount(0);
-      setHasNewMessagePulse(false);
-      onUnreadChange?.(0);
+      if (!isHelpOpen) {
+        setUnreadCount(0);
+        setHasNewMessagePulse(false);
+        onUnreadChange?.(0);
+      }
     }
   };
 
@@ -734,13 +777,26 @@ export default function ChatWidget({
             {showHelpTab && (
               <button
                 onClick={() => {
-                  setIsHelpOpen((prev) => !prev);
+                  setIsHelpOpen((prev) => {
+                    const next = !prev;
+                    if (!next) {
+                      setUnreadCount(0);
+                      setHasNewMessagePulse(false);
+                      onUnreadChange?.(0);
+                    }
+                    return next;
+                  });
                   setSelectedArticle(null);
                 }}
-                className="p-1.5 rounded-lg hover:bg-white/20 transition-colors text-white"
+                className="relative p-1.5 rounded-lg hover:bg-white/20 transition-colors text-white"
                 title={isHelpOpen ? 'Back to Chat' : `${helpTabLabel} & FAQs`}
               >
                 <BookOpen className="w-4.5 h-4.5" />
+                {unreadCount > 0 && isHelpOpen && (
+                  <span className="absolute -top-1 -right-1 bg-red-500 text-white font-bold text-[10px] min-w-4 h-4 px-1 rounded-full flex items-center justify-center shadow">
+                    {unreadCount > 9 ? '9+' : unreadCount}
+                  </span>
+                )}
               </button>
             )}
 
@@ -1075,7 +1131,7 @@ export default function ChatWidget({
         ) : (
           <>
             {/* BODY AREA */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-3.5 bg-slate-50/70 dark:bg-slate-950/60 relative">
+            <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-4 space-y-3.5 bg-slate-50/70 dark:bg-slate-950/60 relative">
           {/* OFFLINE BANNER */}
           {isAgentOnline === false && (
             <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-xs text-amber-800 dark:text-amber-300 flex items-start gap-2.5">
@@ -1208,6 +1264,9 @@ export default function ChatWidget({
                       }`}
                     >
                       <span className="tabular-nums">{timeString}</span>
+                      {msg.metadata?.is_edited && (
+                        <span className="italic text-[9.5px] opacity-75">(edited)</span>
+                      )}
                       {isVisitor && (
                         <span title={msg.read_at ? 'Seen by support' : isAgentOnline ? 'Delivered' : 'Sent'} className="flex items-center">
                           {msg.read_at ? (

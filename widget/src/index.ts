@@ -145,14 +145,44 @@ class ChatifyWidget {
     this.initDOM();
     this.bindGlobalTriggers();
     this.loadWorkspaceArticles();
-    this.fetchWorkspaceSettingsAndApply().then(() => {
+    this.fetchWorkspaceSettingsAndApply().then(async () => {
       this.initVisitorTracking();
       this.initSPANavigationTracking();
 
+      if (!this.conversationId && this.visitorId) {
+        try {
+          let query = this.supabase
+            .from('conversations')
+            .select('id, status')
+            .eq('visitor_id', this.visitorId)
+            .order('created_at', { ascending: false })
+            .limit(1);
+          if (this.config.workspaceId) {
+            query = query.eq('workspace_id', this.config.workspaceId);
+          }
+          const { data: existingConv } = await query.maybeSingle();
+          if (existingConv?.id) {
+            this.conversationId = existingConv.id;
+            this.conversationStatus = existingConv.status || 'open';
+            localStorage.setItem(`chatify_conversation_id${storageKeySuffix}`, existingConv.id);
+          }
+        } catch {}
+      }
+
       if (this.conversationId) {
-        this.loadMessageHistory();
+        await this.loadMessageHistory();
         this.subscribeToRealtime();
       }
+
+      // Restore widget state if visitor reloaded while widget was open
+      try {
+        const savedOpen = sessionStorage.getItem(`chatify_widget_open${storageKeySuffix}`);
+        const savedTab = sessionStorage.getItem(`chatify_widget_tab${storageKeySuffix}`) as 'home' | 'messages' | 'help' | null;
+        if (savedOpen === '1') {
+          this.open(savedTab || 'messages');
+          this.scrollToBottom(false);
+        }
+      } catch {}
     });
   }
 
@@ -755,16 +785,7 @@ class ChatifyWidget {
   private async initVisitorTracking() {
     let locationStr = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Unknown';
 
-    try {
-      const geoRes = await fetch('https://ipapi.co/json/', { signal: AbortSignal.timeout(3000) });
-      if (geoRes.ok) {
-        const geoData = await geoRes.json();
-        if (geoData.city && geoData.country_name) {
-          locationStr = `${geoData.city}, ${geoData.country_name}`;
-        }
-      }
-    } catch {}
-
+    // 1. Immediately upsert visitor (0ms block) so conversations/messages can send right away
     try {
       await this.supabase.rpc('fn_upsert_visitor', {
         p_id: this.visitorId,
@@ -777,9 +798,6 @@ class ChatifyWidget {
         p_workspace_id: this.config.workspaceId || null,
       });
 
-      // Sent separately because fn_upsert_visitor is overloaded and cannot take
-      // extra parameters. Fails quietly on projects that have not run the
-      // visitor timezone/language migration yet.
       try {
         await this.supabase.rpc('fn_update_visitor_meta', {
           p_id: this.visitorId,
@@ -790,6 +808,54 @@ class ChatifyWidget {
     } catch (e) {
       console.warn('[Chatify] Visitor tracking error:', e);
     }
+
+    // 2. Fetch accurate city & country in background with fallbacks and update
+    (async () => {
+      try {
+        let city = '';
+        let country = '';
+
+        // Provider 1: ipwho.is (fast, HTTPS enabled, generous free tier)
+        try {
+          const res = await fetch('https://ipwho.is/', { signal: AbortSignal.timeout(2500) });
+          if (res.ok) {
+            const d = await res.json();
+            if (d.success !== false && d.country) {
+              city = d.city || '';
+              country = d.country || '';
+            }
+          }
+        } catch {}
+
+        // Provider 2: ipapi.co fallback
+        if (!country) {
+          try {
+            const res = await fetch('https://ipapi.co/json/', { signal: AbortSignal.timeout(2500) });
+            if (res.ok) {
+              const d = await res.json();
+              if (d.country_name) {
+                city = d.city || '';
+                country = d.country_name || '';
+              }
+            }
+          } catch {}
+        }
+
+        if (country) {
+          const refinedLocation = city ? `${city}, ${country}` : country;
+          await this.supabase.rpc('fn_upsert_visitor', {
+            p_id: this.visitorId,
+            p_name: this.visitorName || null,
+            p_email: this.visitorEmail || null,
+            p_current_url: window.location.href,
+            p_user_agent: navigator.userAgent,
+            p_ip_address: null,
+            p_location: refinedLocation,
+            p_workspace_id: this.config.workspaceId || null,
+          });
+        }
+      } catch {}
+    })();
 
     setInterval(() => {
       this.sendHeartbeat();
@@ -931,6 +997,21 @@ class ChatifyWidget {
       .on(
         'postgres_changes',
         {
+          event: 'DELETE',
+          schema: 'public',
+          table: 'messages',
+          filter: `conversation_id=eq.${this.conversationId}`,
+        },
+        (payload) => {
+          const deletedId = (payload.old as { id?: string })?.id;
+          if (!deletedId) return;
+          this.messages = this.messages.filter((m) => m.id !== deletedId);
+          this.renderMessages();
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
           event: 'UPDATE',
           schema: 'public',
           table: 'conversations',
@@ -962,8 +1043,14 @@ class ChatifyWidget {
       this.messages = data as MessageItem[];
       this.renderMessages();
       if (this.isOpen && this.activeTab === 'messages') {
+        this.unreadCount = 0;
         this.markMessagesAsRead();
+      } else {
+        this.unreadCount = this.messages.filter(
+          (m) => m.sender_type !== 'visitor' && !m.read_at
+        ).length;
       }
+      this.updateUnreadBadge();
     }
   }
 
@@ -1007,13 +1094,39 @@ class ChatifyWidget {
     if (this.conversationId) return this.conversationId;
 
     const suffix = this.config.workspaceId ? `_${this.config.workspaceId.slice(0, 8)}` : '';
-    const { data, error } = await this.supabase.rpc('fn_get_or_create_conversation', {
+    let { data, error } = await this.supabase.rpc('fn_get_or_create_conversation', {
       p_visitor_id: this.visitorId,
       p_workspace_id: this.config.workspaceId || null,
     });
 
     if (error || !data) {
-      throw new Error('Failed to create conversation');
+      console.warn('[Chatify] fn_get_or_create_conversation fallback:', error);
+      try {
+        await this.supabase.from('visitors').upsert({
+          id: this.visitorId,
+          workspace_id: this.config.workspaceId || null,
+          last_seen: new Date().toISOString(),
+          is_online: true,
+        });
+
+        const { data: convData, error: convErr } = await this.supabase
+          .from('conversations')
+          .insert({
+            visitor_id: this.visitorId,
+            workspace_id: this.config.workspaceId || null,
+            status: 'open',
+          })
+          .select()
+          .single();
+
+        if (convData) {
+          data = convData;
+        } else {
+          throw convErr || new Error('Failed to create conversation');
+        }
+      } catch (fallbackErr) {
+        throw new Error('Failed to create conversation: ' + (error?.message || String(fallbackErr)));
+      }
     }
 
     this.conversationId = data.id;
@@ -1135,7 +1248,41 @@ class ChatifyWidget {
         </div>
 
         <div class="chatify-home-content">
-          <!-- Start Chat Card -->
+          <!-- Active Open Conversation Card (shown when opened conversation exists) -->
+          <div class="chatify-card chatify-card-action chatify-open-conv-card" id="cardOpenConv" style="display: none;">
+            <div class="chatify-card-head">
+              <span class="chatify-status-pill chatify-conv-status-pill" id="openConvStatusPill">
+                <span class="chatify-pulse-dot online"></span>
+                <span>Active conversation</span>
+              </span>
+              <span class="chatify-conv-time" id="openConvTime">Just now</span>
+            </div>
+            <div class="chatify-open-conv-preview">
+              <div class="chatify-open-conv-avatar-col">
+                <div class="chatify-mini-avatar" id="openConvAvatar" style="background:linear-gradient(135deg,var(--w-brand),#1e40af); width:34px; height:34px; font-size:13px; margin-left:0;">💬</div>
+              </div>
+              <div class="chatify-open-conv-text-col">
+                <div class="chatify-open-conv-sender-row">
+                  <span class="chatify-open-conv-sender" id="openConvSender">Support Team</span>
+                  <span class="chatify-home-unread-pill" id="openConvUnreadPill" style="display:none;">1 new</span>
+                </div>
+                <p class="chatify-open-conv-snippet" id="openConvSnippet">Click to view messages...</p>
+              </div>
+            </div>
+            <button class="chatify-primary-cta" id="btnContinueConversation">
+              <span id="btnContinueConvText">Continue conversation</span>
+              <span class="chatify-cta-badge" id="openConvCtaBadge" style="display:none;">1</span>
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+                <polyline points="12 5 19 12 12 19"></polyline>
+              </svg>
+            </button>
+            <button type="button" class="chatify-new-conv-link" id="btnStartNewChat">
+              <span>+ Send a new message</span>
+            </button>
+          </div>
+
+          <!-- Start Chat Card (shown when no conversation exists yet) -->
           <div class="chatify-card chatify-card-action" id="cardStartChat">
             <div class="chatify-card-head">
               <div class="chatify-avatars-stack" id="homeAvatarsStack">
@@ -1147,11 +1294,13 @@ class ChatifyWidget {
                 <span class="chatify-pulse-dot online"></span>
                 <span>Typically replies in 5m</span>
               </span>
+              <span class="chatify-home-unread-pill" id="homeCardUnreadPill" style="display:none;">1 new message</span>
             </div>
-            <h4 class="chatify-card-title">Send us a message</h4>
+            <h4 class="chatify-card-title" id="homeCardTitle">Chat with us</h4>
             <p class="chatify-card-sub" id="homeCardSub">Ask us anything, or share your feedback.</p>
             <button class="chatify-primary-cta" id="btnGoToMessages">
-              <span>Send us a message</span>
+              <span id="btnGoToMessagesText">Chat with us</span>
+              <span class="chatify-cta-badge" id="homeCardCtaBadge" style="display:none;">1</span>
               <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
                 <line x1="5" y1="12" x2="19" y2="12"></line>
                 <polyline points="12 5 19 12 12 19"></polyline>
@@ -1322,7 +1471,10 @@ class ChatifyWidget {
             </svg>
             <span class="chatify-nav-badge" id="navMsgBadge" style="display:none;">1</span>
           </div>
-          <span>Messages</span>
+          <span class="chatify-nav-label-wrap">
+            <span id="navMessagesText">Chat</span>
+            <span class="chatify-nav-inline-badge" id="navMsgInlineBadge" style="display:none;">1</span>
+          </span>
         </button>
         <button class="chatify-nav-item" data-tab="help" id="navHelp">
           <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -1359,6 +1511,28 @@ class ChatifyWidget {
 
     this.shadow.getElementById('btnGoToMessages')?.addEventListener('click', () => {
       this.switchTab('messages');
+    });
+
+    this.shadow.getElementById('cardStartChat')?.addEventListener('click', (e) => {
+      if ((e.target as HTMLElement)?.closest('#btnGoToMessages')) return;
+      this.switchTab('messages');
+    });
+
+    this.shadow.getElementById('btnContinueConversation')?.addEventListener('click', () => {
+      this.switchTab('messages');
+    });
+
+    this.shadow.getElementById('cardOpenConv')?.addEventListener('click', (e) => {
+      if ((e.target as HTMLElement)?.closest('#btnContinueConversation, #btnStartNewChat')) return;
+      this.switchTab('messages');
+    });
+
+    this.shadow.getElementById('btnStartNewChat')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.switchTab('messages');
+      setTimeout(() => {
+        (this.shadow?.getElementById('chatifyTextarea') as HTMLTextAreaElement | null)?.focus();
+      }, 120);
     });
 
     this.shadow.getElementById('btnBackToHome')?.addEventListener('click', () => {
@@ -1578,12 +1752,16 @@ class ChatifyWidget {
       nav.classList.toggle('active', nav.getAttribute('data-tab') === tab);
     });
 
+    const storageKeySuffix = this.config.workspaceId ? `_${this.config.workspaceId.slice(0, 8)}` : '';
+    try {
+      sessionStorage.setItem(`chatify_widget_tab${storageKeySuffix}`, tab);
+    } catch {}
+
     if (tab === 'messages') {
       this.unreadCount = 0;
       this.updateUnreadBadge();
       this.markMessagesAsRead();
-      const body = this.shadow?.getElementById('chatifyBody');
-      if (body) body.scrollTop = body.scrollHeight;
+      this.scrollToBottom(false);
       setTimeout(() => {
         (this.shadow?.getElementById('chatifyTextarea') as HTMLTextAreaElement | null)?.focus();
       }, 100);
@@ -1603,7 +1781,8 @@ class ChatifyWidget {
     const brandAvatar = this.shadow?.getElementById('homeBrandAvatar');
     if (brandAvatar) {
       const logoSrc = this.config.logoUrl || CHATIFY_ICON_DATA_URI;
-      brandAvatar.innerHTML = `<img src="${logoSrc}" alt="Logo" style="width:100%;height:100%;object-fit:contain;border-radius:inherit;" />`;
+      const fallback = CHATIFY_ICON_DATA_URI;
+      brandAvatar.innerHTML = `<img src="${logoSrc}" onerror="this.onerror=null;this.src='${fallback}'" alt="Logo" style="width:100%;height:100%;object-fit:contain;border-radius:inherit;" />`;
     }
 
     const homeGreeting = this.shadow?.getElementById('homeGreetingTitle');
@@ -2160,6 +2339,129 @@ class ChatifyWidget {
       .chatify-primary-cta:active {
         transform: translateY(0);
         filter: brightness(0.98);
+      }
+
+      .chatify-home-unread-pill {
+        display: none;
+        align-items: center;
+        gap: 5px;
+        height: 24px;
+        padding: 0 10px;
+        border-radius: 999px;
+        background: #ffe4e6;
+        color: #e11d48;
+        border: 1px solid #fecdd3;
+        font-size: 11px;
+        font-weight: 700;
+        white-space: nowrap;
+        animation: w-pop .28s var(--w-spring);
+      }
+
+      .chatify-cta-badge {
+        min-width: 19px;
+        height: 19px;
+        line-height: 19px;
+        padding: 0 6px;
+        border-radius: 999px;
+        background: #ffffff;
+        color: var(--w-brand);
+        font-size: 11.5px;
+        font-weight: 800;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        margin-left: 4px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+      }
+
+      .chatify-open-conv-card {
+        cursor: pointer;
+        transition: transform .2s var(--w-spring), box-shadow .2s var(--w-ease);
+      }
+
+      .chatify-open-conv-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+      }
+
+      .chatify-conv-status-pill {
+        background: #ecfdf5 !important;
+        border-color: #a7f3d0 !important;
+        color: #047857 !important;
+      }
+
+      .chatify-conv-time {
+        font-size: 11.5px;
+        color: var(--w-ink-3);
+        font-weight: 500;
+        margin-left: auto;
+      }
+
+      .chatify-open-conv-preview {
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+        padding: 10px 12px;
+        margin: 10px 0 14px;
+        background: var(--w-surface-2);
+        border: 1px solid var(--w-line);
+        border-radius: 12px;
+        text-align: left;
+      }
+
+      .chatify-open-conv-avatar-col {
+        flex-shrink: 0;
+      }
+
+      .chatify-open-conv-text-col {
+        flex: 1;
+        min-width: 0;
+      }
+
+      .chatify-open-conv-sender-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 6px;
+        margin-bottom: 3px;
+      }
+
+      .chatify-open-conv-sender {
+        font-size: 13px;
+        font-weight: 700;
+        color: var(--w-ink);
+      }
+
+      .chatify-open-conv-snippet {
+        font-size: 12.5px;
+        color: var(--w-ink-2);
+        line-height: 1.45;
+        margin: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+      }
+
+      .chatify-new-conv-link {
+        width: 100%;
+        background: transparent;
+        border: none;
+        padding: 8px 0 0;
+        margin-top: 6px;
+        font-size: 12.5px;
+        font-weight: 600;
+        color: var(--w-brand);
+        cursor: pointer;
+        text-align: center;
+        transition: opacity .15s;
+        display: block;
+      }
+
+      .chatify-new-conv-link:hover {
+        opacity: 0.8;
+        text-decoration: underline;
       }
 
       .chatify-chips-section {
@@ -3211,6 +3513,30 @@ class ChatifyWidget {
         border: 2px solid var(--w-surface);
       }
 
+      .chatify-nav-label-wrap {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 5px;
+      }
+
+      .chatify-nav-inline-badge {
+        min-width: 17px;
+        height: 17px;
+        line-height: 17px;
+        padding: 0 5px;
+        border-radius: 999px;
+        background: #e11d48;
+        color: #fff;
+        font-size: 10px;
+        font-weight: 700;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 1px 3px rgba(225, 29, 72, 0.35);
+        animation: w-pop .28s var(--w-spring);
+      }
+
       /* ── Motion ───────────────────────────────────────────────────── */
 
       @keyframes w-bubble-in {
@@ -3387,6 +3713,7 @@ class ChatifyWidget {
           <p style="color:var(--w-ink-2); font-size:13px; line-height:1.55;">Send a message below and someone from our team will pick it up.</p>
         </div>
       `;
+      this.renderRecentConversation();
       return;
     }
 
@@ -3436,11 +3763,16 @@ class ChatifyWidget {
         }
       }
 
+      const isEdited = Boolean((msg as any).metadata?.is_edited);
+      const editedTag = isEdited
+        ? `<span style="font-size:10px;font-style:italic;opacity:0.75;margin-left:4px;">(edited)</span>`
+        : '';
+
       bubble.innerHTML =
         quoteHtml +
         attachmentHtml +
         (msg.content ? `<div class="chatify-msg-text">${this.escapeHTML(msg.content)}</div>` : '') +
-        `<div class="chatify-msg-time">${timeStr}${ticks}</div>`;
+        `<div class="chatify-msg-time">${timeStr}${editedTag}${ticks}</div>`;
 
       const imgEl = bubble.querySelector('.chatify-msg-img') as HTMLImageElement | null;
       if (imgEl && msg.attachment_url) {
@@ -3483,6 +3815,7 @@ class ChatifyWidget {
     }
 
     body.scrollTop = body.scrollHeight;
+    this.renderRecentConversation();
   }
 
   /**
@@ -3540,6 +3873,11 @@ class ChatifyWidget {
 
   public toggleWindow() {
     this.isOpen = !this.isOpen;
+    const suffix = this.config.workspaceId ? `_${this.config.workspaceId.slice(0, 8)}` : '';
+    try {
+      sessionStorage.setItem(`chatify_widget_open${suffix}`, this.isOpen ? '1' : '0');
+    } catch {}
+
     const win = this.shadow?.getElementById('chatifyWindow');
     const openIcon = this.shadow?.getElementById('chatifyIconOpen');
     const closeIcon = this.shadow?.getElementById('chatifyIconClose');
@@ -3549,21 +3887,23 @@ class ChatifyWidget {
         win.style.display = 'flex';
         openIcon.style.display = 'none';
         closeIcon.style.display = 'block';
-        this.unreadCount = 0;
-        this.updateUnreadBadge();
 
         if (this.activeTab === 'messages') {
+          this.unreadCount = 0;
+          this.updateUnreadBadge();
           this.markMessagesAsRead();
-          const body = this.shadow?.getElementById('chatifyBody');
-          if (body) body.scrollTop = body.scrollHeight;
+          this.scrollToBottom(false);
           setTimeout(() => {
             (this.shadow?.getElementById('chatifyTextarea') as HTMLTextAreaElement | null)?.focus();
           }, 100);
+        } else {
+          this.updateUnreadBadge();
         }
       } else {
         win.style.display = 'none';
         openIcon.style.display = 'block';
         closeIcon.style.display = 'none';
+        this.updateUnreadBadge();
       }
     }
   }
@@ -3571,6 +3911,10 @@ class ChatifyWidget {
   private updateUnreadBadge() {
     const badge = this.shadow?.getElementById('chatifyBadge');
     const navBadge = this.shadow?.getElementById('navMsgBadge');
+    const navInlineBadge = this.shadow?.getElementById('navMsgInlineBadge');
+    const homePill = this.shadow?.getElementById('homeCardUnreadPill');
+    const homeCtaBadge = this.shadow?.getElementById('homeCardCtaBadge');
+    const homeTitle = this.shadow?.getElementById('homeCardTitle');
     const launcher = this.shadow?.getElementById('chatifyLauncherBtn');
 
     // The halo ring only runs while something is actually waiting.
@@ -3586,17 +3930,152 @@ class ChatifyWidget {
         navBadge.textContent = text;
         navBadge.style.display = 'flex';
       }
+      if (navInlineBadge) {
+        navInlineBadge.textContent = text;
+        navInlineBadge.style.display = 'inline-flex';
+      }
+      if (homePill) {
+        homePill.textContent = `${this.unreadCount} new ${this.unreadCount === 1 ? 'message' : 'messages'}`;
+        homePill.style.display = 'inline-flex';
+      }
+      if (homeCtaBadge) {
+        homeCtaBadge.textContent = text;
+        homeCtaBadge.style.display = 'inline-flex';
+      }
+      if (homeTitle) {
+        homeTitle.textContent = this.unreadCount === 1 ? 'You have 1 new reply' : `You have ${this.unreadCount} new replies`;
+      }
     } else {
       if (badge) badge.style.display = 'none';
       if (navBadge) navBadge.style.display = 'none';
+      if (navInlineBadge) navInlineBadge.style.display = 'none';
+      if (homePill) homePill.style.display = 'none';
+      if (homeCtaBadge) homeCtaBadge.style.display = 'none';
+      if (homeTitle) homeTitle.textContent = 'Chat with us';
+    }
+
+    this.renderRecentConversation();
+  }
+
+  private formatRelativeTime(date: Date): string {
+    const now = new Date();
+    const diffSec = Math.floor((now.getTime() - date.getTime()) / 1000);
+    if (diffSec < 60) return 'Just now';
+    const diffMin = Math.floor(diffSec / 60);
+    if (diffMin < 60) return `${diffMin}m ago`;
+    const diffHours = Math.floor(diffMin / 60);
+    if (diffHours < 24) return `${diffHours}h ago`;
+    const diffDays = Math.floor(diffHours / 24);
+    if (diffDays === 1) return 'Yesterday';
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+  }
+
+  public renderRecentConversation() {
+    const cardOpenConv = this.shadow?.getElementById('cardOpenConv');
+    const cardStartChat = this.shadow?.getElementById('cardStartChat');
+    const openConvSnippet = this.shadow?.getElementById('openConvSnippet');
+    const openConvSender = this.shadow?.getElementById('openConvSender');
+    const openConvTime = this.shadow?.getElementById('openConvTime');
+    const openConvUnreadPill = this.shadow?.getElementById('openConvUnreadPill');
+    const openConvCtaBadge = this.shadow?.getElementById('openConvCtaBadge');
+
+    const hasMessages = Boolean(this.messages && this.messages.length > 0);
+    if (!this.conversationId || !hasMessages) {
+      if (cardOpenConv) cardOpenConv.style.display = 'none';
+      if (cardStartChat) cardStartChat.style.display = 'block';
+      return;
+    }
+
+    // Opened conversation exists! Show it here on the Home screen
+    if (cardOpenConv) cardOpenConv.style.display = 'block';
+    if (cardStartChat) cardStartChat.style.display = 'none';
+
+    // Find the latest non-internal message
+    const lastMsg = [...this.messages].reverse().find((m) => !m.is_internal);
+
+    if (lastMsg) {
+      let snippet = (lastMsg.content || '').trim();
+      if (lastMsg.attachment_url) {
+        snippet = snippet ? `📷 ${snippet}` : '📷 Sent a picture';
+      }
+      if (openConvSnippet) {
+        openConvSnippet.textContent = snippet || 'Active conversation';
+      }
+
+      if (openConvSender) {
+        if (lastMsg.sender_type === 'visitor') {
+          openConvSender.textContent = 'You';
+        } else if (lastMsg.sender_type === 'ai') {
+          openConvSender.textContent = 'AI Assistant';
+        } else {
+          openConvSender.textContent = this.config.title || 'Support Team';
+        }
+      }
+
+      if (openConvTime && lastMsg.created_at) {
+        openConvTime.textContent = this.formatRelativeTime(new Date(lastMsg.created_at));
+      }
+    }
+
+    if (this.unreadCount > 0) {
+      if (openConvUnreadPill) {
+        openConvUnreadPill.textContent = `${this.unreadCount} new`;
+        openConvUnreadPill.style.display = 'inline-flex';
+      }
+      if (openConvCtaBadge) {
+        openConvCtaBadge.textContent = this.unreadCount > 9 ? '9+' : this.unreadCount.toString();
+        openConvCtaBadge.style.display = 'inline-flex';
+      }
+    } else {
+      if (openConvUnreadPill) openConvUnreadPill.style.display = 'none';
+      if (openConvCtaBadge) openConvCtaBadge.style.display = 'none';
     }
   }
+
+  public scrollToBottom(smooth: boolean = false) {
+    const body = this.shadow?.getElementById('chatifyBody');
+    if (!body) return;
+
+    const performScroll = () => {
+      body.scrollTop = body.scrollHeight;
+      const lastChild = body.lastElementChild as HTMLElement | null;
+      if (lastChild) {
+        lastChild.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto', block: 'end' });
+      }
+    };
+
+    // 1. Immediate scroll
+    performScroll();
+
+    // 2. Next animation frame (after browser layout reflow)
+    requestAnimationFrame(() => performScroll());
+
+    // 3. 50ms timeout for DOM paint
+    setTimeout(performScroll, 50);
+
+    // 4. 200ms timeout for layout stabilization
+    setTimeout(performScroll, 200);
+
+    // 5. If any images inside body are still loading, re-scroll when they load
+    const imgs = body.querySelectorAll('img');
+    imgs.forEach((img) => {
+      if (!img.complete) {
+        img.addEventListener('load', () => performScroll(), { once: true });
+        img.addEventListener('error', () => performScroll(), { once: true });
+      }
+    });
+  }
+
   public open(tab?: 'home' | 'messages' | 'help') {
     if (!this.isOpen) {
       this.toggleWindow();
     }
     if (tab) {
       this.switchTab(tab);
+    }
+    if (this.activeTab === 'messages') {
+      this.scrollToBottom(false);
     }
   }
 

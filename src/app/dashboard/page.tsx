@@ -438,64 +438,80 @@ export default function DashboardPage() {
             }).catch((err) => console.error('[Offline Email Dispatch]:', err));
           }
 
-          // Immediately move conversation to top of list with latest message preview
-          setConversations((prev) => {
-            const index = prev.findIndex((c) => c.id === newMsg.conversation_id);
-            if (index === -1) {
-              // The conversation wasn't in the current in-memory list (e.g. brand new or previously closed).
-              // Fetch it immediately so it appears at the top of the Open inbox right away!
-              supabase
-                .from('conversations')
-                .select('*, visitor:visitors(*), agent:agents(*)')
-                .eq('id', newMsg.conversation_id)
-                .single()
-                .then(({ data: fetchedConv }: any) => {
-                  if (fetchedConv) {
-                    const isSelected = fetchedConv.id === selectedConversationIdRef.current;
-                    const newConvItem: Conversation = {
-                      ...fetchedConv,
-                      status: newMsg.sender_type === 'visitor' ? 'open' : fetchedConv.status,
-                      closed_at: newMsg.sender_type === 'visitor' ? null : fetchedConv.closed_at,
-                      snoozed_until: newMsg.sender_type === 'visitor' ? null : fetchedConv.snoozed_until,
-                      updated_at: newMsg.created_at,
-                      last_message: newMsg,
-                      unread_count: isSelected ? 0 : (newMsg.sender_type === 'visitor' ? 1 : 0),
-                    };
-                    setConversations((current) => {
-                      const others = current.filter((c) => c.id !== newConvItem.id);
-                      return [newConvItem, ...others];
-                    });
-                  }
-                });
-              return prev;
-            }
-
-            const target = prev[index];
-            const isSelected = target.id === selectedConversationIdRef.current;
-            const updated: Conversation = {
-              ...target,
-              status: newMsg.sender_type === 'visitor' ? 'open' : target.status,
-              closed_at: newMsg.sender_type === 'visitor' ? null : target.closed_at,
-              snoozed_until: newMsg.sender_type === 'visitor' ? null : target.snoozed_until,
-              updated_at: newMsg.created_at,
-              last_message: newMsg,
-              unread_count: isSelected
-                ? 0
-                : newMsg.sender_type === 'visitor'
-                ? (target.unread_count || 0) + 1
-                : target.unread_count,
-            };
-            const others = prev.filter((c) => c.id !== newMsg.conversation_id);
-            return [updated, ...others];
-          });
-
-          // Sync into messages cache for instant rendering
+          // Update in-memory cache immediately
           if (messagesCacheRef.current[newMsg.conversation_id]) {
             const cached = messagesCacheRef.current[newMsg.conversation_id];
             if (!cached.some((m) => m.id === newMsg.id)) {
               messagesCacheRef.current[newMsg.conversation_id] = [...cached, newMsg];
             }
           }
+
+          // 1. If conversation already exists in memory, bump to top immediately
+          setConversations((prev) => {
+            const index = prev.findIndex((c) => c.id === newMsg.conversation_id);
+            if (index !== -1) {
+              const target = prev[index];
+              const isSelected = target.id === selectedConversationIdRef.current;
+              const updated: Conversation = {
+                ...target,
+                status: newMsg.sender_type === 'visitor' ? 'open' : target.status,
+                closed_at: newMsg.sender_type === 'visitor' ? null : target.closed_at,
+                snoozed_until: newMsg.sender_type === 'visitor' ? null : target.snoozed_until,
+                updated_at: newMsg.created_at,
+                last_message: newMsg,
+                unread_count: isSelected
+                  ? 0
+                  : newMsg.sender_type === 'visitor'
+                  ? (target.unread_count || 0) + 1
+                  : target.unread_count,
+              };
+              const others = prev.filter((c) => c.id !== newMsg.conversation_id);
+              return [updated, ...others];
+            }
+            return prev;
+          });
+
+          // 2. Fetch conversation details outside state updater to guarantee visitor details and instant appearance
+          supabase
+            .from('conversations')
+            .select('*, visitor:visitors(*), agent:agents(*)')
+            .eq('id', newMsg.conversation_id)
+            .single()
+            .then(({ data: fetchedConv }: any) => {
+              if (fetchedConv) {
+                if (
+                  currentWorkspaceIdRef.current &&
+                  fetchedConv.workspace_id &&
+                  fetchedConv.workspace_id !== currentWorkspaceIdRef.current
+                ) {
+                  return;
+                }
+
+                const isSelected = fetchedConv.id === selectedConversationIdRef.current;
+                const newConvItem: Conversation = {
+                  ...fetchedConv,
+                  status: newMsg.sender_type === 'visitor' ? 'open' : fetchedConv.status,
+                  closed_at: newMsg.sender_type === 'visitor' ? null : fetchedConv.closed_at,
+                  snoozed_until: newMsg.sender_type === 'visitor' ? null : fetchedConv.snoozed_until,
+                  updated_at: newMsg.created_at,
+                  last_message: newMsg,
+                  unread_count: isSelected ? 0 : (newMsg.sender_type === 'visitor' ? 1 : 0),
+                };
+
+                setConversations((current) => {
+                  const exists = current.some((c) => c.id === newConvItem.id);
+                  if (exists) {
+                    return current.map((c) => (c.id === newConvItem.id ? { ...c, ...newConvItem } : c));
+                  }
+                  return [newConvItem, ...current];
+                });
+
+                if (!selectedConversationIdRef.current) {
+                  setSelectedConversationId(newConvItem.id);
+                }
+              }
+            })
+            .catch(() => {});
         }
       )
       .on(
@@ -515,7 +531,26 @@ export default function DashboardPage() {
           }
         }
       )
-      .subscribe();
+      .on(
+        'postgres_changes',
+        { event: 'DELETE', schema: 'public', table: 'messages' },
+        (payload: any) => {
+          const deletedId = payload.old?.id;
+          if (!deletedId) return;
+          setMessages((prev) => prev.filter((m) => m.id !== deletedId));
+          for (const convId in messagesCacheRef.current) {
+            messagesCacheRef.current[convId] = messagesCacheRef.current[convId].filter(
+              (m) => m.id !== deletedId
+            );
+          }
+          refreshConversations();
+        }
+      )
+      .subscribe((status: any) => {
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          refreshConversations();
+        }
+      });
 
     const conversationsChannel = supabase
       .channel(`chatify-dashboard-conversations-${channelSuffix}`)
@@ -545,12 +580,23 @@ export default function DashboardPage() {
               .single()
               .then(({ data }: any) => {
                 if (data) {
+                  if (
+                    currentWorkspaceIdRef.current &&
+                    data.workspace_id &&
+                    data.workspace_id !== currentWorkspaceIdRef.current
+                  ) {
+                    return;
+                  }
                   setConversations((prev) => {
                     if (prev.some((c) => c.id === data.id)) return prev;
                     return [data as Conversation, ...prev];
                   });
+                  if (!selectedConversationIdRef.current) {
+                    setSelectedConversationId(data.id);
+                  }
                 }
-              });
+              })
+              .catch(() => {});
 
             // Dispatch Slack notification
             fetch('/api/notifications/dispatch', {
@@ -667,14 +713,38 @@ export default function DashboardPage() {
     checkSnoozed();
     const snoozeInterval = setInterval(checkSnoozed, 30000);
 
+    // Instant resync on tab focus or window visibilitychange
+    const handleVisibilityOrFocus = () => {
+      if (document.visibilityState === 'visible' || document.hasFocus()) {
+        refreshConversations();
+        if (selectedConversationIdRef.current) {
+          loadMessages(selectedConversationIdRef.current);
+        }
+      }
+    };
+
+    window.addEventListener('focus', handleVisibilityOrFocus);
+    document.addEventListener('visibilitychange', handleVisibilityOrFocus);
+
+    // Silent background heartbeat sync: ensures zero missed messages even on throttled background tabs
+    const heartbeatInterval = setInterval(() => {
+      refreshConversations();
+      if (selectedConversationIdRef.current && (document.visibilityState === 'visible' || document.hasFocus())) {
+        loadMessages(selectedConversationIdRef.current);
+      }
+    }, 6000);
+
     return () => {
       supabase.removeChannel(messagesChannel);
       supabase.removeChannel(conversationsChannel);
       supabase.removeChannel(visitorsChannel);
       supabase.removeChannel(internalNotesChannel);
       clearInterval(snoozeInterval);
+      clearInterval(heartbeatInterval);
+      window.removeEventListener('focus', handleVisibilityOrFocus);
+      document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
     };
-  }, [supabase]);
+  }, [supabase, refreshConversations, loadMessages]);
 
   // 6. Action Handlers
   /**
@@ -720,6 +790,109 @@ export default function DashboardPage() {
       .from('conversations')
       .update({ updated_at: new Date().toISOString() })
       .eq('id', targetId);
+  };
+
+  const handleEditMessage = async (messageId: string, newContent: string) => {
+    if (!currentAgent) {
+      throw new Error('Your session expired — reload and try again.');
+    }
+
+    const nowIso = new Date().toISOString();
+
+    // 1. Optimistic local state update
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.id === messageId
+          ? {
+              ...m,
+              content: newContent,
+              metadata: {
+                ...(m.metadata || {}),
+                is_edited: true,
+                edited_at: nowIso,
+              },
+            }
+          : m
+      )
+    );
+
+    if (selectedConversationId && messagesCacheRef.current[selectedConversationId]) {
+      messagesCacheRef.current[selectedConversationId] = messagesCacheRef.current[
+        selectedConversationId
+      ].map((m) =>
+        m.id === messageId
+          ? {
+              ...m,
+              content: newContent,
+              metadata: {
+                ...(m.metadata || {}),
+                is_edited: true,
+                edited_at: nowIso,
+              },
+            }
+          : m
+      );
+    }
+
+    // 2. Fetch current metadata
+    const { data: existing } = await supabase
+      .from('messages')
+      .select('metadata')
+      .eq('id', messageId)
+      .single();
+
+    const currentMeta = (existing?.metadata as Record<string, any>) || {};
+
+    // 3. Update message content in database
+    const { error } = await supabase
+      .from('messages')
+      .update({
+        content: newContent,
+        metadata: {
+          ...currentMeta,
+          is_edited: true,
+          edited_at: nowIso,
+        },
+      })
+      .eq('id', messageId);
+
+    if (error) {
+      console.error('Error editing message:', error);
+      if (selectedConversationId) {
+        loadMessages(selectedConversationId);
+      }
+      throw error;
+    }
+  };
+
+  const handleDeleteMessage = async (messageId: string) => {
+    if (!currentAgent) {
+      throw new Error('Your session expired — reload and try again.');
+    }
+
+    // 1. Optimistic local state removal
+    setMessages((prev) => prev.filter((m) => m.id !== messageId));
+    if (selectedConversationId && messagesCacheRef.current[selectedConversationId]) {
+      messagesCacheRef.current[selectedConversationId] = messagesCacheRef.current[
+        selectedConversationId
+      ].filter((m) => m.id !== messageId);
+    }
+
+    // 2. Delete row from database
+    const { error } = await supabase
+      .from('messages')
+      .delete()
+      .eq('id', messageId);
+
+    if (error) {
+      console.error('Error deleting message:', error);
+      if (selectedConversationId) {
+        loadMessages(selectedConversationId);
+      }
+      throw error;
+    }
+
+    refreshConversations();
   };
 
   const handleUpdatePriority = async (priority: ConversationPriority) => {
@@ -945,6 +1118,8 @@ export default function DashboardPage() {
                 currentAgent={currentAgent}
                 agentsList={allAgents}
                 onSendMessage={handleSendMessage}
+                onEditMessage={handleEditMessage}
+                onDeleteMessage={handleDeleteMessage}
                 onUpdateStatus={handleUpdateStatus}
                 onAssignAgent={handleAssignAgent}
                 onUpdatePriority={handleUpdatePriority}

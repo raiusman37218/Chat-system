@@ -259,7 +259,7 @@ export function LiveVisitorsRadar({
                     {/* 3. Location & Local Time */}
                     <div className="lg:col-span-2 min-w-0 text-[11.5px] text-ink-2">
                       <div className="flex items-center gap-1.5 truncate font-medium">
-                        <CountryFlag flag={place.flag} className="w-3.5 h-3.5 shrink-0" />
+                        <CountryFlag flag={place.flag} countryCode={place.countryCode} className="w-4 h-3 shrink-0" />
                         <span className="truncate">
                           {place.label || 'Location undetected'}
                         </span>
@@ -385,7 +385,7 @@ export function LiveVisitorsRadar({
                   {/* Device & location telemetry, same marks as the visitor panel */}
                   <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-[12px] text-ink-2 bg-surface-2/40 p-3 rounded-xl border border-line/40">
                     <span className="flex items-center gap-1.5 truncate">
-                      <CountryFlag flag={place.flag} className="w-3.5 h-3.5" />
+                      <CountryFlag flag={place.flag} countryCode={place.countryCode} className="w-4 h-3" />
                       <span className="truncate font-medium">
                         {place.label || 'Location undetected'}
                       </span>
