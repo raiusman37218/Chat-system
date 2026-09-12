@@ -217,7 +217,55 @@ export default function DashboardPage() {
     initializeDashboard();
   }, [initializeDashboard]);
 
-  // 2. Refresh Conversations (Optimized 2-Batch Query, zero N+1 congestion)
+  // 2. Fetch Messages for Active Conversation with Instant In-Memory Cache
+  const loadMessages = useCallback(async (conversationId: string) => {
+    // 1. Instant Cache Hit: Show messages immediately (0ms perceived lag)
+    if (messagesCacheRef.current[conversationId]) {
+      setMessages(messagesCacheRef.current[conversationId]);
+      setIsMessagesLoading(false);
+    } else {
+      setIsMessagesLoading(true);
+    }
+
+    // 2. Fetch fresh messages in the background
+    const { data, error } = await supabase
+      .from('messages')
+      .select('*, agent:agents(*)')
+      .eq('conversation_id', conversationId)
+      .order('created_at', { ascending: true });
+
+    if (error) {
+      console.error('Failed to load messages:', error);
+      setIsMessagesLoading(false);
+      return;
+    }
+
+    const fetchedMessages = (data as Message[]) || [];
+    messagesCacheRef.current[conversationId] = fetchedMessages;
+
+    // Only update active state if the agent is still viewing this conversation
+    if (selectedConversationIdRef.current === conversationId) {
+      setMessages(fetchedMessages);
+      setIsMessagesLoading(false);
+    }
+
+    // Opening the thread is the agent reading it.
+    try {
+      await supabase.rpc('fn_mark_messages_read', {
+        p_conversation_id: conversationId,
+        p_exclude_sender: 'agent',
+      });
+    } catch {
+      // ignored
+    }
+
+    // Immediately clear unread_count for the opened conversation in UI state
+    setConversations((prev) =>
+      prev.map((c) => (c.id === conversationId ? { ...c, unread_count: 0 } : c))
+    );
+  }, [supabase]);
+
+  // 3. Refresh Conversations (Manual refresh only, preserves active chat without resetting)
   const refreshConversations = useCallback(async (wsId?: string) => {
     const targetWsId = wsId || currentWorkspaceIdRef.current;
     setIsRefreshing(true);
@@ -242,7 +290,6 @@ export default function DashboardPage() {
       }
 
       if (!convData || convData.length === 0) {
-        setConversations([]);
         setLastSynced(new Date());
         return;
       }
@@ -291,20 +338,32 @@ export default function DashboardPage() {
         };
       });
 
-      setConversations(enrichedConversations);
+      // Preserve currently active conversation so chat never drops or backs out
+      setConversations((prev) => {
+        const currentSelectedId = selectedConversationIdRef.current;
+        if (currentSelectedId) {
+          const existingCurrent = prev.find((c) => c.id === currentSelectedId);
+          if (existingCurrent && !enrichedConversations.some((c) => c.id === currentSelectedId)) {
+            enrichedConversations.unshift(existingCurrent);
+          }
+        }
+        return enrichedConversations;
+      });
       setLastSynced(new Date());
 
       if (!selectedConversationIdRef.current && enrichedConversations.length > 0) {
         setSelectedConversationId(enrichedConversations[0].id);
+      } else if (selectedConversationIdRef.current) {
+        loadMessages(selectedConversationIdRef.current);
       }
     } catch (err) {
       console.error('Failed to refresh conversations:', err);
     } finally {
       setIsRefreshing(false);
     }
-  }, [supabase]);
+  }, [supabase, loadMessages]);
 
-  // 3. Refresh Visitors
+  // 4. Refresh Visitors
   const refreshVisitors = async (wsId?: string) => {
     const targetWsId = wsId || currentWorkspaceIdRef.current;
     let query = supabase
@@ -323,54 +382,6 @@ export default function DashboardPage() {
     }
     setVisitors((vData as Visitor[]) || []);
   };
-
-  // 4. Fetch Messages for Active Conversation with Instant In-Memory Cache
-  const loadMessages = useCallback(async (conversationId: string) => {
-    // 1. Instant Cache Hit: Show messages immediately (0ms perceived lag)
-    if (messagesCacheRef.current[conversationId]) {
-      setMessages(messagesCacheRef.current[conversationId]);
-      setIsMessagesLoading(false);
-    } else {
-      setIsMessagesLoading(true);
-    }
-
-    // 2. Fetch fresh messages in the background
-    const { data, error } = await supabase
-      .from('messages')
-      .select('*, agent:agents(*)')
-      .eq('conversation_id', conversationId)
-      .order('created_at', { ascending: true });
-
-    if (error) {
-      console.error('Failed to load messages:', error);
-      setIsMessagesLoading(false);
-      return;
-    }
-
-    const fetchedMessages = (data as Message[]) || [];
-    messagesCacheRef.current[conversationId] = fetchedMessages;
-
-    // Only update active state if the agent is still viewing this conversation
-    if (selectedConversationIdRef.current === conversationId) {
-      setMessages(fetchedMessages);
-      setIsMessagesLoading(false);
-    }
-
-    // Opening the thread is the agent reading it.
-    try {
-      await supabase.rpc('fn_mark_messages_read', {
-        p_conversation_id: conversationId,
-        p_exclude_sender: 'agent',
-      });
-    } catch {
-      // ignored
-    }
-
-    // Immediately clear unread_count for the opened conversation in UI state
-    setConversations((prev) =>
-      prev.map((c) => (c.id === conversationId ? { ...c, unread_count: 0 } : c))
-    );
-  }, [supabase]);
 
   useEffect(() => {
     if (selectedConversationId) {
@@ -694,57 +705,13 @@ export default function DashboardPage() {
       )
       .subscribe();
 
-    // Periodic check for overdue snoozed conversations
-    const checkSnoozed = () => {
-      fetch('/api/conversations/snooze')
-        .then((res) => res.json())
-        .then((data) => {
-          if (data && data.reopened > 0) {
-            refreshConversations();
-            sendBrowserNotification(
-              'Snooze expired',
-              `${data.reopened} snoozed conversation(s) have reopened.`
-            );
-          }
-        })
-        .catch(() => {});
-    };
-
-    checkSnoozed();
-    const snoozeInterval = setInterval(checkSnoozed, 30000);
-
-    // Instant resync on tab focus or window visibilitychange
-    const handleVisibilityOrFocus = () => {
-      if (document.visibilityState === 'visible' || document.hasFocus()) {
-        refreshConversations();
-        if (selectedConversationIdRef.current) {
-          loadMessages(selectedConversationIdRef.current);
-        }
-      }
-    };
-
-    window.addEventListener('focus', handleVisibilityOrFocus);
-    document.addEventListener('visibilitychange', handleVisibilityOrFocus);
-
-    // Silent background heartbeat sync: ensures zero missed messages even on throttled background tabs
-    const heartbeatInterval = setInterval(() => {
-      refreshConversations();
-      if (selectedConversationIdRef.current && (document.visibilityState === 'visible' || document.hasFocus())) {
-        loadMessages(selectedConversationIdRef.current);
-      }
-    }, 6000);
-
     return () => {
       supabase.removeChannel(messagesChannel);
       supabase.removeChannel(conversationsChannel);
       supabase.removeChannel(visitorsChannel);
       supabase.removeChannel(internalNotesChannel);
-      clearInterval(snoozeInterval);
-      clearInterval(heartbeatInterval);
-      window.removeEventListener('focus', handleVisibilityOrFocus);
-      document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
     };
-  }, [supabase, refreshConversations, loadMessages]);
+  }, [supabase]);
 
   // 6. Action Handlers
   /**
