@@ -41,6 +41,13 @@ export interface ChatRequest {
   temperature?: number;
   /** Abandon a slow provider rather than hold a conversation open. */
   timeoutMs?: number;
+  /**
+   * 'fast' asks models that think before answering to (nearly) skip it. A
+   * support reply grounded in retrieved articles gains little from thinking,
+   * and on Gemini the thoughts cost seconds and count against maxTokens — a
+   * 1024-token cap cut replies off mid-sentence. Ignored where unsupported.
+   */
+  reasoning?: 'fast' | 'default';
 }
 
 export interface ChatResult {
@@ -267,6 +274,20 @@ async function openAiChat(
 
 /* ── Google Gemini ────────────────────────────────────────────────────── */
 
+/**
+ * The thinking control differs by generation: Gemini 3 takes a level, 2.5 a
+ * token budget (Pro cannot go below 128). Older models have no thinking, and
+ * sending either field to them is rejected, so they get nothing.
+ */
+function googleFastThinking(model: string): Record<string, unknown> {
+  const m = model.toLowerCase();
+  if (/^gemini-[3-9]/.test(m)) return { thinkingConfig: { thinkingLevel: 'minimal' } };
+  if (m.startsWith('gemini-2.5')) {
+    return { thinkingConfig: { thinkingBudget: m.includes('pro') ? 128 : 0 } };
+  }
+  return {};
+}
+
 async function googleChat(
   apiKey: string,
   model: string,
@@ -291,6 +312,7 @@ async function googleChat(
         generationConfig: {
           maxOutputTokens: req.maxTokens ?? 4096,
           ...(req.temperature !== undefined ? { temperature: req.temperature } : {}),
+          ...(req.reasoning === 'fast' ? googleFastThinking(model) : {}),
         },
       }),
     },

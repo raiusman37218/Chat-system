@@ -40,7 +40,13 @@ const STOP_WORDS = new Set(
     'thing things stuff first second third next last new old good bad big small ' +
     'able possible actually really quite rather even ever never always often ' +
     'set put go going come coming happen happens happened use using used work ' +
-    'works working keep keeping mean means doing done seems looks'
+    'works working keep keeping mean means doing done seems looks bro plz pls ' +
+    // Uzbek (Latin) filler. Without these "qancha kerak" became query terms
+    // that matched nothing and diluted the ones that did.
+    'qancha qanday qanaqa nima necha nechta mumkin mumkinmi kerak kerakmi bormi ' +
+    'uchun bilan va yoki men mening menga meni siz sizning bu shu u da ga ni mi ' +
+    'qilsam qilish qila olamanmi bo bolsa boladi ladi ladimi ham salom rahmat iltimos ' +
+    'qachon qayerda qaysi nega ishlatsam ishlatish ishlatishim olsam'
   ).split(' ')
 );
 
@@ -127,6 +133,70 @@ const SYNONYM_GROUPS: string[][] = [
   ['verify', 'verification', 'kyc'],
   ['support', 'help', 'assistance'],
   ['year', 'yearly', 'annual', 'annually'],
+  // Trading shorthand. Help centres write "Expert Advisors (EAs)"; customers
+  // type "ea" or "bot", and neither matched the other.
+  ['bot', 'bots', 'ea', 'eas', 'robot', 'algo', 'automated', 'automation'],
+  ['account', 'acc', 'acct'],
+];
+
+/**
+ * Arabic and Uzbek (Latin) trading terms, rewritten to the English words the
+ * help centre uses.
+ *
+ * The tokeniser keeps only a–z and digits, so an Arabic question lost every
+ * word and matched nothing. The assistant normally translates a non-English
+ * question before searching; this is what still finds the article when that
+ * call is unavailable. Specific phrases come before the single words they
+ * contain ("سحب الأرباح" is a withdrawal, "الحد الأقصى للسحب" is a drawdown).
+ * Arabic has no \b in JS regex, so those patterns match on the phrase alone.
+ */
+const FOREIGN_TERMS: [RegExp, string][] = [
+  // Arabic
+  [/(?:الحد الأقصى |الحد الاقصى )?(?:للخسارة|الخسارة) اليومية|السحب اليومي|الحد اليومي|خسارة يومية/g, ' daily drawdown '],
+  [/الحد الأقصى للخسارة|الحد الاقصى للخسارة|الخسارة الإجمالية|الخسارة الاجمالية|أقصى خسارة|الحد الأقصى للسحب/g, ' maximum loss drawdown '],
+  [/تقسيم الأرباح|تقسيم الارباح|نسبة الأرباح|نسبة الارباح|حصة الأرباح/g, ' profit split '],
+  [/سحب الأرباح|سحب الارباح|السحب|سحب|المدفوعات|الدفعات/g, ' withdrawal '],
+  [/الرافعة المالية|الرافعة/g, ' leverage '],
+  [/حجم اللوت|اللوت/g, ' lot size '],
+  [/الأخبار|الاخبار|أخبار|اخبار/g, ' news '],
+  [/عطلة نهاية الأسبوع|نهاية الأسبوع|نهاية الاسبوع|الويكند/g, ' weekend holding '],
+  [/التداول الآلي|تداول آلي|روبوت|اكسبيرت|إكسبرت|نسخ الصفقات/g, ' bot '],
+  [/وقف الخسارة/g, ' stoploss '],
+  [/أيام الربح|ايام الربح|الأيام الرابحة/g, ' profitable day '],
+  [/أيام التداول|ايام التداول/g, ' trading day '],
+  [/عدة صفقات|صفقتين|نفس الوقت/g, ' concurrent layer trade '],
+  [/مدة الاحتفاظ|الاحتفاظ بالصفقة/g, ' minimum holding time '],
+  [/قاعدة الاتساق|الاتساق/g, ' consistency '],
+  [/التحقق|التوثيق|توثيق/g, ' verification '],
+  [/استرداد|استرجاع الرسوم/g, ' refund '],
+  [/الرسوم|رسوم/g, ' fee '],
+  [/المنصة|منصة|منصات/g, ' platform '],
+  [/إغلاق الحساب|اغلاق الحساب|فشل الحساب|خرق القواعد/g, ' fail account rule '],
+  [/الحساب|حساب|حسابي/g, ' account '],
+  [/الأرباح|الارباح|الربح|ربح/g, ' profit '],
+  [/الخسارة|خسارة/g, ' loss '],
+  [/قواعد|القواعد|قاعدة/g, ' rule '],
+  // Uzbek (Latin). ‘ ’ ʻ ' all appear as the o‘/g‘ apostrophe.
+  [/\bkunlik\s+(?:zarar|limit|yo[‘’ʻ']?qotish)\w*/g, ' daily drawdown '],
+  [/\b(?:maksimal|umumiy)\s+(?:zarar|yo[‘’ʻ']?qotish)\w*/g, ' maximum loss drawdown '],
+  [/\bfoyda\s+(?:taqsimoti|ulushi)\b/g, ' profit split '],
+  [/\bpul\s+yechish\b|\byechib\s+olish\b|\byechish\w*|\bto[‘’ʻ']?lov\w*/g, ' withdrawal '],
+  [/\bfoydali\s+kun\w*/g, ' profitable day '],
+  [/\bsavdo\s+kun\w*/g, ' trading day '],
+  [/\bbir\s+vaqtda\b|\bbir\s+nechta\s+savdo\w*/g, ' concurrent layer trade '],
+  [/\byangilik\w*/g, ' news '],
+  [/\bdam\s+olish\s+kun\w*|\bhafta\s+oxiri\w*/g, ' weekend holding '],
+  [/\bavtomatik\s+savdo\w*|\brobot\w*|\bekspert\w*/g, ' bot '],
+  [/\blot\s+hajmi\w*/g, ' lot size '],
+  [/\bleverij\w*|\bkredit\s+yelkasi\b/g, ' leverage '],
+  [/\bverifikatsiya\w*/g, ' verification '],
+  [/\bplatforma\w*/g, ' platform '],
+  [/\bqoidabuzarlik\w*|\bqoida\w*/g, ' rule '],
+  [/\byopildi\b|\byonib\s+ketdi\b/g, ' fail account '],
+  [/\bhisob\w*/g, ' account '],
+  [/\bfoyda\w*/g, ' profit '],
+  [/\bzarar\w*/g, ' loss '],
+  [/\bsavdo\w*/g, ' trade '],
 ];
 
 /**
@@ -145,6 +215,15 @@ const PHRASE_REWRITES: [RegExp, string][] = [
   [/\b(?:log|sign)\s+in\b/g, ' login '],
   [/\bstop[\s-]?loss\b/g, ' stoploss '],
   [/\bmoney\s+back\b/g, ' refund '],
+  [/\bmax(?:imum)?\s*dd\b|\bmdd\b/g, ' maximum drawdown '],
+  [/\bdd\b/g, ' drawdown '],
+  [/\bsl\b/g, ' stoploss '],
+  [/\bhft\b/g, ' high frequency bot '],
+  [/\bexpert\s+advisors?\b/g, ' bot '],
+  // "2 trades at the same time" is what trade layering rules describe as
+  // concurrent trades.
+  [/\bat\s+(?:the\s+)?same\s+time\b|\btogether\b|\bsimultaneous\w*|\bmultiple\s+trades?\b/g, ' concurrent layer trade '],
+  ...FOREIGN_TERMS,
 ];
 
 /** word → the term the whole group is indexed under. */

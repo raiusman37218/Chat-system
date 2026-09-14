@@ -2203,6 +2203,31 @@ export function AdminSettingsPanel({
                 </label>
               </div>
 
+              {/* System Prompt */}
+              <div className="p-5 rounded-2xl border border-line bg-surface space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <h4 className="text-[13.5px] font-semibold text-ink">System prompt</h4>
+                    <p className="text-[11.5px] text-ink-3">
+                      Who the assistant is and how it answers. Facts always come from your published help desk articles.
+                    </p>
+                  </div>
+                  <span className="text-[10.5px] text-ink-3 font-mono shrink-0">
+                    {(aiSettings.system_prompt || '').length.toLocaleString()} chars
+                  </span>
+                </div>
+                <textarea
+                  value={aiSettings.system_prompt || ''}
+                  onChange={(e) => setAiSettings({ ...aiSettings, system_prompt: e.target.value })}
+                  rows={14}
+                  placeholder="You are the support assistant for… Answer only from the knowledge base…"
+                  className="w-full px-3 py-2.5 rounded-xl border border-line bg-surface-2 text-[12.5px] leading-relaxed font-mono text-ink resize-y focus:outline-none focus:ring-1 focus:ring-accent"
+                />
+                <p className="text-[11px] text-ink-3">
+                  Leave empty to use the built-in default. Used for website chat, WhatsApp, Messenger, Instagram and LinkedIn.
+                </p>
+              </div>
+
               {/* Feature Grid */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 {/* 1. Auto First-Response (RAG) */}

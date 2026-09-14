@@ -55,6 +55,7 @@ import { CountryFlag } from '@/components/ui/BrandIcon';
 import { parseLocation } from '@/lib/visitor-meta';
 import { createClient } from '@/lib/supabase/client';
 import { EMOJI_CATEGORIES, ALL_EMOJIS } from '@/lib/emojis';
+import { ChatMarkdown } from '@/components/ui/ChatMarkdown';
 
 interface ChatThreadProps {
   conversation: Conversation;
@@ -76,6 +77,12 @@ interface ChatThreadProps {
   onUpdatePriority?: (priority: ConversationPriority) => Promise<void>;
   onUpdateTags?: (tags: string[]) => Promise<void>;
   onToggleAiMode?: (mode: 'autopilot' | 'disabled') => Promise<void>;
+  /**
+   * The AI assistant owns the replies on this thread. Agents can still leave
+   * internal notes, but a customer-facing reply needs them to take over first,
+   * so the visitor never gets answers from both.
+   */
+  aiAnswering?: boolean;
   loading?: boolean;
   onBack?: () => void;
   onToggleDetailsSidebar?: () => void;
@@ -144,6 +151,7 @@ export function ChatThread({
   onUpdatePriority,
   onUpdateTags,
   onToggleAiMode,
+  aiAnswering = false,
   loading = false,
   onBack,
   onToggleDetailsSidebar,
@@ -580,6 +588,7 @@ export function ChatThread({
     if ((!inputText.trim() && !pendingAttachment) || isSending) return;
     const text = inputText.trim();
     const isInternal = composerMode === 'internal';
+    if (!isInternal && aiAnswering) return;
 
     setIsSending(true);
     setSendError(null);
@@ -791,6 +800,7 @@ export function ChatThread({
     [visitor?.location, visitor?.ip_location_city, visitor?.ip_location_country]
   );
   const isInternalMode = composerMode === 'internal';
+  const replyLocked = aiAnswering && !isInternalMode;
 
   const filteredMacros = useMemo(() => {
     const combined = [...dbMacros];
@@ -1159,6 +1169,8 @@ export function ChatThread({
                   </div>
                 </div>
               </div>
+            ) : isAI ? (
+              <ChatMarkdown content={msg.content} />
             ) : (
               msg.content
             )}
@@ -1920,11 +1932,30 @@ export function ChatThread({
             </div>
           )}
 
+          {replyLocked && (
+            <div className="px-3 py-2 flex items-center gap-2 border-b border-line/40 bg-accent/10 text-[11.5px] text-ink">
+              <Bot className="w-3.5 h-3.5 text-accent shrink-0" />
+              <span className="flex-1 min-w-0">
+                AI assistant is replying to this conversation. Take over to reply yourself, or leave a note.
+              </span>
+              {onToggleAiMode && (
+                <button
+                  type="button"
+                  onClick={() => onToggleAiMode('disabled')}
+                  className="h-6 px-2.5 rounded-md text-[11px] font-bold bg-accent hover:bg-accent-hover text-accent-ink shrink-0 cursor-pointer"
+                >
+                  Take over
+                </button>
+              )}
+            </div>
+          )}
+
           {/* Textarea */}
           <div className="p-3">
             <textarea
               ref={textareaRef}
               rows={2}
+              disabled={replyLocked}
               value={inputText}
               onChange={handleInputChange}
               onKeyDown={handleKeyDown}
@@ -1932,6 +1963,8 @@ export function ChatThread({
               placeholder={
                 isInternalMode
                   ? 'Write an internal note for your team (visitor will not see this)…'
+                  : replyLocked
+                  ? 'AI autopilot is on — take over to reply'
                   : pendingAttachment
                   ? 'Add a caption for this picture (optional)…'
                   : `Reply to ${displayName}…`
@@ -2076,11 +2109,11 @@ export function ChatThread({
 
             <button
               onClick={handleSend}
-              disabled={(!inputText.trim() && !pendingAttachment) || isSending}
+              disabled={(!inputText.trim() && !pendingAttachment) || isSending || replyLocked}
               title={isInternalMode ? 'Post internal note (Ctrl+Enter)' : 'Send reply (Ctrl+Enter)'}
               className={cn(
                 'h-7 px-3 rounded-lg flex items-center gap-1.5 text-[11.5px] font-bold transition-all shadow-xs cursor-pointer',
-                (!inputText.trim() && !pendingAttachment) || isSending
+                (!inputText.trim() && !pendingAttachment) || isSending || replyLocked
                   ? 'bg-surface-3 text-ink-3 cursor-not-allowed opacity-50'
                   : isInternalMode
                   ? 'bg-amber-600 hover:bg-amber-700 text-white shadow-sm hover:scale-102'

@@ -218,6 +218,11 @@ export interface AISettingsConfig {
   auto_tagging_enabled: boolean;
   summary_enabled: boolean;
   sentiment_enabled: boolean;
+  /**
+   * Instructions the assistant follows on every reply — identity, tone, rules.
+   * Facts still come only from the retrieved help desk articles.
+   */
+  system_prompt?: string | null;
   /** Which model vendor answers. Absent on workspaces saved before the picker. */
   provider?: 'anthropic' | 'openai' | 'google' | 'deepseek' | 'compatible';
   /** Model name as that provider spells it; empty means the provider default. */
@@ -228,7 +233,6 @@ export interface AISettingsConfig {
   base_url?: string | null;
   /** Superseded by api_key; still read so older workspaces keep working. */
   anthropic_api_key?: string | null;
-  system_prompt?: string | null;
 }
 
 export interface HelpSection {

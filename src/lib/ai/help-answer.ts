@@ -40,18 +40,41 @@ export interface HelpAnswer {
   alternatives: { id: string; title: string; slug?: string | null }[];
 }
 
-/** Index cache. Help content changes rarely; questions arrive constantly. */
+/**
+ * Index cache. Help content changes rarely; questions arrive constantly.
+ *
+ * Building the index takes three queries and over a second, which blew the
+ * reply-time budget once a minute when the entry expired. An expired entry is
+ * now served as-is while a fresh one builds in the background, so only the very
+ * first question on a cold server waits for it.
+ */
 const indexCache = new Map<string, { index: HelpIndex; builtAt: number }>();
+const rebuilding = new Map<string, Promise<HelpIndex>>();
 const INDEX_TTL_MS = 60_000;
 
 export function invalidateHelpIndex(workspaceId: string) {
   indexCache.delete(workspaceId);
 }
 
-async function loadIndex(workspaceId: string): Promise<HelpIndex> {
-  const cached = indexCache.get(workspaceId);
-  if (cached && Date.now() - cached.builtAt < INDEX_TTL_MS) return cached.index;
+/** Starts loading the index early, so it is ready by the time it is needed. */
+export function warmHelpIndex(workspaceId: string): void {
+  loadIndex(workspaceId).catch(() => {});
+}
 
+function loadIndex(workspaceId: string): Promise<HelpIndex> {
+  const cached = indexCache.get(workspaceId);
+  if (cached && Date.now() - cached.builtAt < INDEX_TTL_MS) return Promise.resolve(cached.index);
+
+  let pending = rebuilding.get(workspaceId);
+  if (!pending) {
+    pending = buildWorkspaceIndex(workspaceId).finally(() => rebuilding.delete(workspaceId));
+    rebuilding.set(workspaceId, pending);
+    pending.catch(() => {});
+  }
+  return cached ? Promise.resolve(cached.index) : pending;
+}
+
+async function buildWorkspaceIndex(workspaceId: string): Promise<HelpIndex> {
   const supabase = serviceClient();
   const [{ data: sections }, { data: articles }, { data: notes }] = await Promise.all([
     supabase
@@ -102,10 +125,16 @@ async function loadIndex(workspaceId: string): Promise<HelpIndex> {
  * for.
  */
 const HUMAN_REQUEST =
-  /\b(human|real person|agent|representative|operator|someone else|live (?:support|agent|person)|talk to (?:someone|a person)|speak (?:to|with) (?:someone|a human|a person)|customer care|insan|banda)\b/i;
+  // A bare "agent" is not on the list: traders say "EA" and "trading agent",
+  // and each false match turns the assistant off for the whole conversation.
+  /\b(human|real person|(?:real|live|human) agent|representative|operator|live (?:support|person)|(?:talk|speak) (?:to|with) (?:someone|a human|a person|an agent|support)|customer care|jonli\s+(?:odam|operator|xodim)|odam\s+bilan\s+gaplash\w*|xodim\s+bilan\s+gaplash\w*)\b/i;
+
+/** Arabic has no \b in JS regex, so its phrases are matched on their own. */
+const HUMAN_REQUEST_AR =
+  /موظف|شخص حقيقي|إنسان حقيقي|انسان حقيقي|التحدث مع (?:شخص|موظف|إنسان|انسان|الدعم)|خدمة العملاء|وكيل بشري/;
 
 export function wantsHuman(message: string): boolean {
-  return HUMAN_REQUEST.test(message);
+  return HUMAN_REQUEST.test(message) || HUMAN_REQUEST_AR.test(message);
 }
 
 export interface AnswerRequest {
@@ -216,19 +245,31 @@ export async function answerFromHelpCenter(
 
   // A confident answer is stated plainly. A partial one says so, because a
   // hedge the customer can see beats a wrong answer they cannot.
+  // Chat replies render as Markdown: a heading naming the topic, the passage
+  // with its bullets as a real list, and a link to the full article.
+  const heading = isNote ? '' : `### ${article.title}\n\n`;
   const opening =
     verdict.confidence === 'high'
       ? ''
       : `I think this is what you're after — tell me if you meant something else.\n\n`;
+  const body = passage
+    .replace(/^\s*•\s+/gm, '- ')
+    // A chat bubble cannot show a table: separator rows go, and each data row
+    // becomes a bullet ("1st Withdrawal: 80% · 20%").
+    // [ \t] rather than \s: \s also eats the newline and joins rows together.
+    .replace(/^[ \t]*\|?[ \t]*:?-{2,}.*$/gm, '')
+    .replace(/^[ \t]*\|(.+)\|[ \t]*$/gm, (_row, cells: string) => {
+      const [first, ...rest] = cells.split('|').map((c) => c.trim());
+      return rest.length ? `- **${first}:** ${rest.join(' · ')}` : `- ${first}`;
+    })
+    .replace(/\n{3,}/g, '\n\n');
 
   const citation = link
-    ? `\n\nFull article: ${article.title} — ${link}`
-    : isNote
-    ? ''
-    : `\n\n(From "${article.title}" in our help centre.)`;
+    ? `\n\n[Read the full article](${link})`
+    : '';
 
   return {
-    text: `${opening}${passage}${citation}`,
+    text: `${heading}${opening}${body}${citation}`,
     source: isNote ? 'note' : 'article',
     confidence: verdict.confidence,
     article: { id: article.id, title: article.title, slug: article.slug },
@@ -251,6 +292,9 @@ export async function answerFromHelpCenter(
 
 
 /* ── Context for a language model ─────────────────────────────────────── */
+
+const MODEL_CONTEXT_TOP_CHARS = 3000;
+const MODEL_CONTEXT_OTHER_CHARS = 1000;
 
 export interface ModelContext {
   /** The documentation to put in front of the model. Empty when nothing fits. */
@@ -283,8 +327,13 @@ export async function buildModelContext(
   const relevant = hits.filter((h) => h.score >= 1);
   if (relevant.length === 0) return { text: '', used: [] };
 
+  // Every character in the prompt adds to how long the model takes to start
+  // answering. The best match keeps most of its article; the rest contribute
+  // only the part that matches the question.
+  const budgets = [MODEL_CONTEXT_TOP_CHARS, ...Array(relevant.length).fill(MODEL_CONTEXT_OTHER_CHARS)];
+
   const used: ModelContext['used'] = [];
-  const blocks = relevant.map((h) => {
+  const blocks = relevant.map((h, i) => {
     const a = h.article;
     const isNote = a.id.startsWith('note:');
     used.push({ id: a.id, title: a.title, source: isNote ? 'note' : 'article' });
@@ -295,9 +344,16 @@ export async function buildModelContext(
       ? `${a.title} — ${a.sectionName}`
       : a.title;
 
-    // The whole article, not an excerpt: the model is better than a heuristic
-    // at finding the relevant line, once the right article is in front of it.
-    return `## ${label}\n${a.summary ? `${a.summary}\n` : ''}${a.content}`;
+    // Short articles go in whole — the model is better than a heuristic at
+    // finding the relevant line. Long ones are cut to their matching passages.
+    const body =
+      a.content.length <= budgets[i]
+        ? a.content
+        : extractPassage(a.content, question, {
+            history: options.history,
+            maxChars: budgets[i],
+          });
+    return `## ${label}\n${a.summary ? `${a.summary}\n` : ''}${body}`;
   });
 
   return { text: blocks.join('\n\n---\n\n'), used };

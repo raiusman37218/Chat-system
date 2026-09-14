@@ -115,6 +115,7 @@ export async function triggerLangGraphAgent(params: LangGraphTriggerParams) {
         current_message: incomingMessage,
         history,
         system_prompt:
+          workspace?.ai_settings?.system_prompt ||
           integration.langgraph_system_prompt ||
           'You are a customer support assistant. Answer from the supplied documentation only, ' +
             'and say so plainly when it does not cover the question.',
@@ -214,13 +215,36 @@ export async function triggerLangGraphAgent(params: LangGraphTriggerParams) {
 
     // 3. ZERO-CONFIG BUILT-IN HELP DESK KNOWLEDGE AGENT (No URL required!)
     console.log(`[AI Bridge] Running Built-in Help Desk RAG for workspace ${workspaceId}`);
+
+    // The conversation so far, so a follow-up ("and on Instant?") is read in
+    // context. The incoming message is already stored, so it is dropped here.
+    const { data: recent } = await supabase
+      .from('messages')
+      .select('sender_type, content')
+      .eq('conversation_id', conversationId)
+      .eq('is_internal', false)
+      .in('sender_type', ['visitor', 'agent', 'ai'])
+      .order('created_at', { ascending: false })
+      .limit(11);
+    const prior = (recent || []).slice(1).reverse().filter((m) => m.content?.trim());
+
     const result = await generateHelpDeskResponseWithHandover({
       workspaceId,
       conversationId,
       incomingMessage,
       visitorName: sender.name || undefined,
       providerConfig: providerConfigFrom(workspace?.ai_settings),
-      systemPrompt: integration?.langgraph_system_prompt || null,
+      systemPrompt:
+        workspace?.ai_settings?.system_prompt || integration?.langgraph_system_prompt || null,
+      history: prior
+        .filter((m) => m.sender_type === 'visitor')
+        .map((m) => m.content as string)
+        .reverse()
+        .slice(0, 4),
+      turns: prior.map((m) => ({
+        role: (m.sender_type === 'visitor' ? 'user' : 'assistant') as 'user' | 'assistant',
+        content: m.content as string,
+      })),
     });
 
     if (result.replyText) {

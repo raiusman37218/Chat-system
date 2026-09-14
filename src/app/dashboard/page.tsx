@@ -19,6 +19,17 @@ import { sendBrowserNotification, cn } from '@/lib/utils';
 import { updateFaviconBadge } from '@/lib/favicon';
 import { BarChart2, BookOpen, Inbox, Radio, Settings } from 'lucide-react';
 
+/**
+ * Whether the AI assistant is the one replying on a thread. Mirrors the checks
+ * in /api/ai/auto-respond, so the composer is only locked when the assistant
+ * will actually answer.
+ */
+function isAiAnswering(conv: Conversation, ws: Workspace | null): boolean {
+  if (conv.ai_mode === 'disabled') return false;
+  const s = ws?.ai_settings;
+  return !s || (s.enabled && s.auto_response_enabled);
+}
+
 export default function DashboardPage() {
   const router = useRouter();
   const supabase = createClient();
@@ -735,6 +746,12 @@ export default function DashboardPage() {
     if (!currentAgent) {
       throw new Error('Your session expired — reload and try again.');
     }
+    if (!isInternal) {
+      const target = conversations.find((c) => c.id === targetId);
+      if (target && isAiAnswering(target, currentWorkspaceRef.current)) {
+        throw new Error('AI autopilot is replying to this conversation — take over to reply.');
+      }
+    }
 
     const { error } = await supabase.from('messages').insert({
       conversation_id: targetId,
@@ -1094,6 +1111,7 @@ export default function DashboardPage() {
                 onBack={() => setSelectedConversationId(null)}
                 isDetailsSidebarOpen={isDetailsSidebarOpen}
                 onToggleDetailsSidebar={() => setIsDetailsSidebarOpen((prev) => !prev)}
+                aiAnswering={isAiAnswering(activeConversation, currentWorkspace)}
                 onToggleAiMode={async (mode) => {
                   if (!selectedConversationId) return;
                   await supabase

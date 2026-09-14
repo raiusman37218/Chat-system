@@ -425,6 +425,85 @@ class ChatifyWidget {
     }
   }
 
+  /**
+   * Markdown for chat replies — what the AI assistant writes: headings, bold,
+   * bullet and numbered lists, links. Line based, so a "* " bullet is never
+   * mistaken for italics and an underscore in an email stays an underscore.
+   * Everything is escaped first; only the tags produced here reach the DOM.
+   */
+  private formatChatMarkdown(markdown: string): string {
+    const inline = (raw: string) => {
+      let s = this.escapeHTML(raw);
+      s = s.replace(/`([^`]+)`/g, '<code class="chatify-inline-code">$1</code>');
+      s = s.replace(
+        /\[([^\]]+)\]\((https?:\/\/[^\s)]+|mailto:[^\s)]+)\)/g,
+        '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>'
+      );
+      // Bare URLs and emails, skipping any already inside a link.
+      s = s.replace(
+        /(^|[\s(*])(https?:\/\/[^\s<)*]+)/g,
+        '$1<a href="$2" target="_blank" rel="noopener noreferrer">$2</a>'
+      );
+      s = s.replace(
+        /(^|[\s(*])([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,})/g,
+        '$1<a href="mailto:$2">$2</a>'
+      );
+      s = s.replace(/\*\*([^*]+?)\*\*/g, '<strong>$1</strong>');
+      s = s.replace(/(^|[^*\w])\*(?!\s)([^*]+?)\*(?!\w)/g, '$1<em>$2</em>');
+      return s;
+    };
+
+    const out: string[] = [];
+    let list: { tag: 'ul' | 'ol'; items: string[] } | null = null;
+    let para: string[] = [];
+
+    const flushPara = () => {
+      if (para.length) out.push(`<p>${para.map(inline).join('<br/>')}</p>`);
+      para = [];
+    };
+    const flushList = () => {
+      if (list) out.push(`<${list.tag}>${list.items.map((i) => `<li>${i}</li>`).join('')}</${list.tag}>`);
+      list = null;
+    };
+
+    for (const line of markdown.replace(/\r\n/g, '\n').split('\n')) {
+      const trimmed = line.trim();
+      const heading = trimmed.match(/^(#{1,4})\s+(.+)$/);
+      const bullet = trimmed.match(/^[-*•]\s+(.+)$/);
+      const numbered = trimmed.match(/^\d+[.)]\s+(.+)$/);
+
+      if (!trimmed) {
+        flushPara();
+        flushList();
+      } else if (heading) {
+        flushPara();
+        flushList();
+        // # and ## → h3, ### → h4, #### → h5: a bubble has no room for page-size titles.
+        const level = Math.min(Math.max(heading[1].length, 2) + 1, 5);
+        out.push(`<h${level}>${inline(heading[2].replace(/\*\*/g, ''))}</h${level}>`);
+      } else if (/^(-{3,}|\*{3,})$/.test(trimmed)) {
+        flushPara();
+        flushList();
+        out.push('<hr/>');
+      } else if (bullet || numbered) {
+        flushPara();
+        const tag = bullet ? 'ul' : 'ol';
+        if (list && list.tag !== tag) flushList();
+        if (!list) list = { tag, items: [] };
+        list.items.push(inline((bullet || numbered)![1]));
+      } else if (list && /^\s{2,}/.test(line)) {
+        // An indented line continues the previous list item.
+        list.items[list.items.length - 1] += `<br/>${inline(trimmed)}`;
+      } else {
+        flushList();
+        para.push(trimmed);
+      }
+    }
+    flushPara();
+    flushList();
+    return out.join('');
+  }
+
   private formatMarkdownToHtml(markdown: string): string {
     if (!markdown) return '';
 
@@ -1204,6 +1283,16 @@ class ChatifyWidget {
         this.messages[idx] = data as MessageItem;
         this.renderMessages();
       }
+    }
+
+    // Every visitor message gets a chance at an AI reply. The route decides
+    // whether the assistant is on for this conversation, and skips it when not.
+    if (this.config.workspaceId) {
+      fetch(`${this.config.apiUrl || ''}/api/ai/auto-respond`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ conversation_id: convId, workspace_id: this.config.workspaceId }),
+      }).catch(() => {});
     }
   }
 
@@ -2858,6 +2947,28 @@ class ChatifyWidget {
         overflow-wrap: anywhere;
       }
 
+      /* Formatted replies: structure comes from the markup, not whitespace. */
+      .chatify-msg-rich { white-space: normal; }
+      .chatify-msg-rich > :first-child { margin-top: 0; }
+      .chatify-msg-rich > :last-child { margin-bottom: 0; }
+      .chatify-msg-rich p { margin: 0 0 8px; }
+      .chatify-msg-rich h3, .chatify-msg-rich h4, .chatify-msg-rich h5, .chatify-msg-rich h6 {
+        margin: 12px 0 6px;
+        font-size: 14px;
+        line-height: 1.35;
+        font-weight: 700;
+        letter-spacing: -0.01em;
+        color: var(--w-ink);
+      }
+      .chatify-msg-rich h5, .chatify-msg-rich h6 { font-size: 13px; }
+      .chatify-msg-rich ul, .chatify-msg-rich ol { margin: 4px 0 8px; padding-left: 18px; }
+      .chatify-msg-rich li { margin: 0 0 4px; }
+      .chatify-msg-rich li::marker { color: var(--w-brand); }
+      .chatify-msg-rich strong { font-weight: 650; color: var(--w-ink); }
+      .chatify-msg-rich a { color: var(--w-brand); text-decoration: underline; text-underline-offset: 2px; word-break: break-all; }
+      .chatify-msg-rich hr { border: 0; border-top: 1px solid var(--w-line); margin: 10px 0; }
+      .chatify-msg-rich code { font-size: 12px; padding: 1px 4px; border-radius: 4px; background: var(--w-surface-2, rgba(15,23,42,.06)); }
+
       .chatify-msg-visitor {
         margin-left: auto;
         background: linear-gradient(145deg, var(--w-brand) 0%, var(--w-brand-deep) 130%);
@@ -3891,7 +4002,11 @@ class ChatifyWidget {
       bubble.innerHTML =
         quoteHtml +
         attachmentHtml +
-        (msg.content ? `<div class="chatify-msg-text">${this.escapeHTML(msg.content)}</div>` : '') +
+        (msg.content
+          ? isVisitor
+            ? `<div class="chatify-msg-text">${this.escapeHTML(msg.content)}</div>`
+            : `<div class="chatify-msg-text chatify-msg-rich">${this.formatChatMarkdown(msg.content)}</div>`
+          : '') +
         `<div class="chatify-msg-time">${timeStr}${editedTag}${ticks}</div>`;
 
       const imgEl = bubble.querySelector('.chatify-msg-img') as HTMLImageElement | null;
@@ -4115,7 +4230,13 @@ class ChatifyWidget {
     const lastMsg = [...this.messages].reverse().find((m) => !m.is_internal);
 
     if (lastMsg) {
-      let snippet = (lastMsg.content || '').trim();
+      // A one-line preview: the reply's markdown symbols are noise here.
+      let snippet = (lastMsg.content || '')
+        .replace(/^#{1,6}\s+/gm, '')
+        .replace(/^\s*[-*•]\s+/gm, '')
+        .replace(/\*\*|__|`/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
       if (lastMsg.attachment_url) {
         snippet = snippet ? `📷 ${snippet}` : '📷 Sent a picture';
       }

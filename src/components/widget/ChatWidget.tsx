@@ -25,6 +25,7 @@ import { createClient } from '@/lib/supabase/client';
 import { Message } from '@/types/database';
 import { getWorkspaceHelpCenterUrl } from '@/lib/domain';
 import { EMOJI_CATEGORIES, ALL_EMOJIS } from '@/lib/emojis';
+import { ChatMarkdown } from '@/components/ui/ChatMarkdown';
 
 export interface WidgetConfig {
   brandColor?: string;
@@ -671,6 +672,19 @@ export default function ChatWidget({
         setMessages((prev) =>
           prev.map((m) => (m.id === tempId ? savedMsg : m))
         );
+
+        // Every visitor message gets a chance at an AI reply. The route decides
+        // whether the assistant is on for this conversation.
+        if (config.workspaceId) {
+          fetch('/api/ai/auto-respond', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              conversation_id: activeConvId,
+              workspace_id: config.workspaceId,
+            }),
+          }).catch(() => {});
+        }
       }
     } catch (err) {
       console.error('[ChatWidget] Error dispatching message:', err);
@@ -1255,9 +1269,11 @@ export default function ChatWidget({
                       )}
 
                       {/* Content */}
-                      <p className="whitespace-pre-wrap leading-relaxed">
-                        {msg.content}
-                      </p>
+                      {isVisitor ? (
+                        <p className="whitespace-pre-wrap leading-relaxed">{msg.content}</p>
+                      ) : (
+                        <ChatMarkdown content={msg.content} className="leading-relaxed" />
+                      )}
                     </div>
 
                     {/* Timestamp & Delivery Info */}
