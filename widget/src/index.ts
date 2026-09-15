@@ -83,6 +83,8 @@ export interface ChatifyAPI {
   isOpen: () => boolean;
   resetSession: () => void;
   switchTab: (tab: 'home' | 'messages' | 'help') => void;
+  showPopup: (text?: string, senderTitle?: string) => void;
+  hidePopup: () => void;
   instance: ChatifyWidget;
 }
 
@@ -120,6 +122,8 @@ class ChatifyWidget {
   private pendingAttachment: { file: File; previewUrl: string } | null = null;
   private activeEmojiCategory: string = 'smileys';
   private emojiSearchQuery: string = '';
+  private currentPopupMsgId: string | null = null;
+  private popupCloseTimer: ReturnType<typeof setTimeout> | null = null;
 
   private audioCtx: AudioContext | null = null;
 
@@ -175,6 +179,8 @@ class ChatifyWidget {
       if (this.conversationId) {
         await this.loadMessageHistory();
         this.subscribeToRealtime();
+      } else if (this.visitorId) {
+        this.subscribeToVisitorConversations(storageKeySuffix);
       }
 
       // Restore widget state if visitor reloaded while widget was open
@@ -1066,6 +1072,9 @@ class ChatifyWidget {
               // It reached this browser, so it is delivered — but the visitor
               // has not looked at it, so it is not read.
               this.markMessagesAsDelivered();
+              if (!this.isOpen) {
+                this.showMessagePopup(newMsg);
+              }
             } else {
               this.markMessagesAsRead();
             }
@@ -1145,6 +1154,19 @@ class ChatifyWidget {
         this.unreadCount = this.messages.filter(
           (m) => m.sender_type !== 'visitor' && !m.read_at
         ).length;
+        if (!this.isOpen && this.unreadCount > 0) {
+          const lastAdminMsg = [...this.messages]
+            .reverse()
+            .find((m) => m.sender_type !== 'visitor' && !m.read_at);
+          if (lastAdminMsg) {
+            try {
+              const dismissed = sessionStorage.getItem(`chatify_popup_dismissed_${lastAdminMsg.id}`);
+              if (!dismissed) {
+                this.showMessagePopup(lastAdminMsg);
+              }
+            } catch {}
+          }
+        }
       }
       this.updateUnreadBadge();
     }
@@ -1336,6 +1358,42 @@ class ChatifyWidget {
     `;
     launcher.onclick = () => this.toggleWindow();
     this.shadow.appendChild(launcher);
+
+    // Incoming message popup preview (Intercom-style 2-card popup)
+    const popup = document.createElement('div');
+    popup.className = 'chatify-message-popup';
+    popup.id = 'chatifyMessagePopup';
+    popup.style.display = 'none';
+    popup.innerHTML = `
+      <div class="chatify-popup-card" id="chatifyPopupCard" title="Click to view conversation">
+        <div class="chatify-popup-avatar-wrap">
+          <div class="chatify-popup-avatar" id="chatifyPopupAvatar">TD</div>
+          <span class="chatify-popup-status-dot"></span>
+        </div>
+        <div class="chatify-popup-content">
+          <div class="chatify-popup-header">
+            <span class="chatify-popup-title" id="chatifyPopupTitle">Trader Care Desk</span>
+            <button type="button" class="chatify-popup-close" id="chatifyPopupCloseBtn" title="Dismiss" aria-label="Close message preview">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            </button>
+          </div>
+          <p class="chatify-popup-message" id="chatifyPopupMessageText">Hi, how can we help?</p>
+        </div>
+      </div>
+      <div class="chatify-popup-reply-bar" id="chatifyPopupReplyBar">
+        <input type="text" class="chatify-popup-input" id="chatifyPopupInput" placeholder="Write your message..." autocomplete="off" />
+        <button type="button" class="chatify-popup-send" id="chatifyPopupSendBtn" title="Send message" aria-label="Send message">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="22" y1="2" x2="11" y2="13"></line>
+            <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+          </svg>
+        </button>
+      </div>
+    `;
+    this.shadow.appendChild(popup);
 
     // Intercom Messenger 2.0 Multi-Tab Window
     const chatWindow = document.createElement('div');
@@ -1656,6 +1714,37 @@ class ChatifyWidget {
       this.switchTab('home');
     });
 
+    // Unread Message Popup event listeners
+    this.shadow.getElementById('chatifyPopupCloseBtn')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.dismissMessagePopup();
+    });
+
+    this.shadow.getElementById('chatifyPopupCard')?.addEventListener('click', (e) => {
+      if ((e.target as HTMLElement)?.closest('#chatifyPopupCloseBtn')) return;
+      this.hideMessagePopup(false);
+      this.open('messages');
+    });
+
+    const popupInput = this.shadow.getElementById('chatifyPopupInput') as HTMLInputElement | null;
+    const popupSendBtn = this.shadow.getElementById('chatifyPopupSendBtn');
+
+    popupInput?.addEventListener('input', () => {
+      popupSendBtn?.classList.toggle('active', Boolean(popupInput.value.trim()));
+    });
+
+    popupInput?.addEventListener('keydown', async (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        await this.sendPopupReply();
+      }
+    });
+
+    popupSendBtn?.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      await this.sendPopupReply();
+    });
+
     this.shadow.getElementById('homeSearchTrigger')?.addEventListener('click', () => {
       this.switchTab('help');
       setTimeout(() => {
@@ -1928,6 +2017,16 @@ class ChatifyWidget {
     const subEl = this.shadow?.getElementById('chatifyHeaderSubtitle');
     if (subEl) subEl.textContent = this.config.subtitle;
 
+    const popupTitleEl = this.shadow?.getElementById('chatifyPopupTitle');
+    if (popupTitleEl) {
+      const popupTitle = this.config.businessName || this.config.title || 'Trader Care Desk';
+      popupTitleEl.textContent = popupTitle;
+      const avatarEl = this.shadow?.getElementById('chatifyPopupAvatar');
+      if (avatarEl && !avatarEl.querySelector('img')) {
+        avatarEl.textContent = this.getSenderInitials(popupTitle);
+      }
+    }
+
     const brandAvatar = this.shadow?.getElementById('homeBrandAvatar');
     if (brandAvatar) {
       const logoSrc = this.config.logoUrl || CHATIFY_ICON_DATA_URI;
@@ -2194,6 +2293,224 @@ class ChatifyWidget {
         justify-content: center;
         border: 2px solid var(--w-surface);
         animation: w-pop .28s var(--w-spring);
+      }
+
+      /* ── Unread Message Popup (Intercom-style Preview) ─────────────── */
+
+      .chatify-message-popup {
+        position: fixed;
+        ${left ? 'left: 20px;' : 'right: 20px;'}
+        bottom: 86px;
+        width: 350px;
+        max-width: calc(100vw - 40px);
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        z-index: 2147482995;
+        pointer-events: auto;
+        animation: chatifyPopupSlideIn 0.32s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+      }
+
+      @keyframes chatifyPopupSlideIn {
+        0% {
+          opacity: 0;
+          transform: translateY(16px) scale(0.96);
+        }
+        100% {
+          opacity: 1;
+          transform: translateY(0) scale(1);
+        }
+      }
+
+      .chatify-message-popup.closing {
+        animation: chatifyPopupSlideOut 0.2s cubic-bezier(0.4, 0, 1, 1) forwards;
+      }
+
+      @keyframes chatifyPopupSlideOut {
+        0% {
+          opacity: 1;
+          transform: translateY(0) scale(1);
+        }
+        100% {
+          opacity: 0;
+          transform: translateY(12px) scale(0.96);
+        }
+      }
+
+      /* Card 1: Top Message Card */
+      .chatify-popup-card {
+        background: #ffffff;
+        border-radius: 18px;
+        padding: 14px 16px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.06);
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        cursor: pointer;
+        transition: transform 0.18s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+        border: 1px solid rgba(0, 0, 0, 0.05);
+        color: #111827;
+      }
+
+      .chatify-popup-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 14px 34px rgba(0, 0, 0, 0.16), 0 4px 12px rgba(0, 0, 0, 0.08);
+      }
+
+      .chatify-popup-avatar-wrap {
+        position: relative;
+        width: 44px;
+        height: 44px;
+        flex-shrink: 0;
+      }
+
+      .chatify-popup-avatar {
+        width: 44px;
+        height: 44px;
+        border-radius: 50%;
+        background: #5c5be5;
+        color: #ffffff;
+        font-weight: 700;
+        font-size: 15px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        letter-spacing: 0.5px;
+        box-shadow: 0 2px 8px rgba(92, 91, 229, 0.32);
+        overflow: hidden;
+      }
+
+      .chatify-popup-avatar img {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+      }
+
+      .chatify-popup-status-dot {
+        position: absolute;
+        bottom: 0px;
+        right: 0px;
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        background: #22c55e;
+        border: 2.5px solid #ffffff;
+      }
+
+      .chatify-popup-content {
+        flex: 1;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .chatify-popup-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 3px;
+      }
+
+      .chatify-popup-title {
+        font-size: 13.5px;
+        font-weight: 600;
+        color: #475569;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .chatify-popup-close {
+        background: transparent;
+        border: none;
+        color: #9ca3af;
+        cursor: pointer;
+        padding: 2px;
+        margin-right: -4px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 6px;
+        transition: color 0.15s, background-color 0.15s;
+      }
+
+      .chatify-popup-close:hover {
+        color: #374151;
+        background-color: #f1f5f9;
+      }
+
+      .chatify-popup-message {
+        font-size: 15px;
+        font-weight: 500;
+        color: #111827;
+        line-height: 1.38;
+        word-break: break-word;
+        display: -webkit-box;
+        -webkit-line-clamp: 3;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+      }
+
+      /* Card 2: Bottom Reply Bar */
+      .chatify-popup-reply-bar {
+        background: #ffffff;
+        border-radius: 9999px;
+        padding: 5px 6px 5px 18px;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.10), 0 2px 6px rgba(0, 0, 0, 0.05);
+        border: 1px solid rgba(0, 0, 0, 0.05);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        transition: box-shadow 0.2s, border-color 0.2s;
+      }
+
+      .chatify-popup-reply-bar:focus-within {
+        box-shadow: 0 10px 28px rgba(0, 0, 0, 0.14), 0 0 0 2px var(--w-brand, #5c5be5);
+        border-color: transparent;
+      }
+
+      .chatify-popup-input {
+        flex: 1;
+        border: none;
+        outline: none;
+        background: transparent;
+        font-size: 14px;
+        color: #111827;
+        min-width: 0;
+        padding: 7px 0;
+        font-family: inherit;
+      }
+
+      .chatify-popup-input::placeholder {
+        color: #9ca3af;
+      }
+
+      .chatify-popup-send {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        border: none;
+        background: #e2e8f0;
+        color: #64748b;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        flex-shrink: 0;
+        transition: background-color 0.2s, color 0.2s, transform 0.15s;
+      }
+
+      .chatify-popup-send.active {
+        background: var(--w-brand, #5c5be5);
+        color: #ffffff;
+      }
+
+      .chatify-popup-send:hover {
+        transform: scale(1.05);
+      }
+
+      .chatify-popup-send:active {
+        transform: scale(0.95);
       }
 
       /* ── Window ───────────────────────────────────────────────────── */
@@ -4119,6 +4436,7 @@ class ChatifyWidget {
 
     if (win && openIcon && closeIcon) {
       if (this.isOpen) {
+        this.hideMessagePopup(false);
         win.style.display = 'flex';
         openIcon.style.display = 'none';
         closeIcon.style.display = 'block';
@@ -4309,6 +4627,7 @@ class ChatifyWidget {
   }
 
   public open(tab?: 'home' | 'messages' | 'help') {
+    this.hideMessagePopup(false);
     if (!this.isOpen) {
       this.toggleWindow();
     }
@@ -4343,6 +4662,135 @@ class ChatifyWidget {
 
   public getIsOpen(): boolean {
     return this.isOpen;
+  }
+
+  // ── Unread Message Popup Helpers ─────────────────────────────────────
+  private getSenderInitials(name: string): string {
+    if (!name) return 'TD';
+    const parts = name.trim().split(/\s+/).filter(Boolean);
+    if (parts.length === 0) return 'TD';
+    if (parts.length === 1) {
+      return parts[0].slice(0, 2).toUpperCase();
+    }
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  }
+
+  public showMessagePopup(message: { id?: string; content?: string; attachment_url?: string | null }, senderName?: string) {
+    if (this.isOpen) return;
+    const popup = this.shadow?.getElementById('chatifyMessagePopup');
+    if (!popup) return;
+
+    if (this.popupCloseTimer) {
+      clearTimeout(this.popupCloseTimer);
+      this.popupCloseTimer = null;
+    }
+
+    this.currentPopupMsgId = message.id || null;
+
+    const title = senderName || this.config.businessName || this.config.title || 'Trader Care Desk';
+    const initials = this.getSenderInitials(title);
+
+    const titleEl = this.shadow?.getElementById('chatifyPopupTitle');
+    if (titleEl) titleEl.textContent = title;
+
+    const avatarEl = this.shadow?.getElementById('chatifyPopupAvatar');
+    if (avatarEl) {
+      if (this.config.logoUrl) {
+        avatarEl.innerHTML = `<img src="${this.config.logoUrl}" alt="Avatar" onerror="this.parentElement.textContent='${initials}'" />`;
+      } else {
+        avatarEl.textContent = initials;
+      }
+    }
+
+    const textEl = this.shadow?.getElementById('chatifyPopupMessageText');
+    if (textEl) {
+      textEl.textContent = message.content || (message.attachment_url ? 'Sent an attachment 📎' : 'New message');
+    }
+
+    popup.classList.remove('closing');
+    popup.style.display = 'flex';
+  }
+
+  public hideMessagePopup(animate: boolean = true) {
+    const popup = this.shadow?.getElementById('chatifyMessagePopup');
+    if (!popup || popup.style.display === 'none') return;
+
+    if (!animate) {
+      popup.style.display = 'none';
+      popup.classList.remove('closing');
+      return;
+    }
+
+    popup.classList.add('closing');
+    if (this.popupCloseTimer) clearTimeout(this.popupCloseTimer);
+    this.popupCloseTimer = setTimeout(() => {
+      popup.style.display = 'none';
+      popup.classList.remove('closing');
+      this.popupCloseTimer = null;
+    }, 200);
+  }
+
+  public dismissMessagePopup() {
+    if (this.currentPopupMsgId) {
+      try {
+        sessionStorage.setItem(`chatify_popup_dismissed_${this.currentPopupMsgId}`, '1');
+      } catch {}
+    }
+    this.hideMessagePopup(true);
+  }
+
+  private async sendPopupReply() {
+    const input = this.shadow?.getElementById('chatifyPopupInput') as HTMLInputElement | null;
+    const sendBtn = this.shadow?.getElementById('chatifyPopupSendBtn');
+    const text = input?.value.trim() || '';
+    if (!text) return;
+
+    if (input) input.value = '';
+    sendBtn?.classList.remove('active');
+
+    this.hideMessagePopup(false);
+    this.open('messages');
+    await this.sendMessage(text);
+  }
+
+  public showPopup(text?: string, senderTitle?: string) {
+    this.showMessagePopup(
+      {
+        id: 'test-' + Date.now(),
+        content: text || 'Hi, how can we help?',
+      },
+      senderTitle || 'Trader Care Desk'
+    );
+  }
+
+  public hidePopup() {
+    this.hideMessagePopup(true);
+  }
+
+  private subscribeToVisitorConversations(storageKeySuffix: string) {
+    if (!this.visitorId) return;
+    this.supabase
+      .channel(`chatify-visitor-convs-${this.visitorId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'conversations',
+          filter: `visitor_id=eq.${this.visitorId}`,
+        },
+        async (payload) => {
+          const conv = payload.new as { id?: string; status?: string; workspace_id?: string };
+          if (conv?.id && (!this.config.workspaceId || conv.workspace_id === this.config.workspaceId)) {
+            this.conversationId = conv.id;
+            this.conversationStatus = conv.status || 'open';
+            localStorage.setItem(`chatify_conversation_id${storageKeySuffix}`, conv.id);
+            await this.loadMessageHistory();
+            this.subscribeToRealtime();
+          }
+        }
+      )
+      .subscribe();
   }
 
   public search(query: string) {
@@ -4729,6 +5177,8 @@ if (typeof window !== 'undefined') {
       isOpen: () => widget.getIsOpen(),
       resetSession: () => widget.resetSession(),
       switchTab: (tab) => widget.switchTab(tab),
+      showPopup: (text, senderTitle) => widget.showPopup(text, senderTitle),
+      hidePopup: () => widget.hidePopup(),
       instance: widget,
     };
 
