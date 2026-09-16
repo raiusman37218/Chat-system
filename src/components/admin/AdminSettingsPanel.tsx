@@ -34,7 +34,9 @@ import {
   Grid3X3,
   Columns4,
   Rows3,
+  Mail,
 } from 'lucide-react';
+import { SMTPSettingsSection } from '@/components/admin/SMTPSettingsSection';
 import {
   Workspace,
   Agent,
@@ -92,6 +94,7 @@ export type AdminTab =
   | 'canned'
   | 'assignment'
   | 'ai'
+  | 'email'
   | 'snippet';
 
 const DEFAULT_SCHEDULE: BusinessHoursConfig = {
@@ -799,6 +802,7 @@ export function AdminSettingsPanel({
           { id: 'canned', label: 'Canned Replies', icon: MessageSquareText, badge: cannedResponses.length },
           { id: 'assignment', label: 'Auto-Assignment', icon: Sliders },
           { id: 'ai', label: 'AI assistant', icon: Sparkles },
+          { id: 'email', label: 'Email & Hostinger SMTP', icon: Mail },
           { id: 'snippet', label: 'Install Snippet', icon: Code },
         ].map((tab) => {
           const active = activeTab === tab.id;
@@ -2536,6 +2540,21 @@ export function AdminSettingsPanel({
                 </div>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* ─────────────────────────────────────────────────────────────────── */}
+        {/* TAB: EMAIL & HOSTINGER SMTP */}
+        {/* ─────────────────────────────────────────────────────────────────── */}
+        {activeTab === 'email' && (
+          <div className="space-y-6 animate-rise">
+            <SMTPSettingsSection
+              workspace={workspace}
+              onWorkspaceUpdated={(ws) => {
+                setWorkspace(ws);
+                onWorkspaceUpdated?.(ws);
+              }}
+            />
           </div>
         )}
 

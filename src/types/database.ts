@@ -121,6 +121,7 @@ export interface Message {
   agent?: Agent | null;
   is_internal?: boolean;
   metadata?: Record<string, any> | null;
+  email_notified_at?: string | null;
 }
 
 export type MessageInsert = Partial<Message>;
@@ -316,6 +317,18 @@ export interface PublicWorkspace {
   created_at: string;
 }
 
+export interface SMTPSettingsConfig {
+  enabled: boolean;
+  host: string;
+  port: number;
+  secure?: boolean;
+  user: string;
+  pass: string;
+  from_email: string;
+  from_name: string;
+  unread_threshold_minutes?: number;
+}
+
 export interface Workspace {
   id: string;
   name: string;
@@ -329,6 +342,7 @@ export interface Workspace {
   business_hours?: BusinessHoursConfig;
   auto_assignment?: AutoAssignmentConfig;
   ai_settings?: AISettingsConfig;
+  smtp_settings?: SMTPSettingsConfig | null;
   help_center_tab_label?: string | null;
   show_help_tab?: boolean | null;
   help_center_tab_icon?: string | null;

@@ -10,10 +10,12 @@ import {
   Share2,
   Users,
   Globe,
+  Mail,
 } from 'lucide-react';
 import { Agent, CannedResponse, Workspace } from '@/types/database';
 import { cn } from '@/lib/utils';
 import { InstallationGuide } from '@/components/dashboard/InstallationGuide';
+import { SMTPSettingsSection } from '@/components/admin/SMTPSettingsSection';
 import {
   IntegrationsSettings,
   type IntegrationTab,
@@ -40,7 +42,8 @@ type SectionId =
   | 'replies'
   | 'routing'
   | 'ai'
-  | 'channels';
+  | 'channels'
+  | 'email';
 
 interface Section {
   id: SectionId;
@@ -70,6 +73,13 @@ const SECTIONS: Section[] = [
     label: 'Custom Domains',
     description: 'Help Center URLs, custom domain and DNS verification',
     Icon: Globe,
+    adminOnly: true,
+  },
+  {
+    id: 'email',
+    label: 'Email & SMTP',
+    description: 'Hostinger email credentials and automated 5-minute unread email alerts',
+    Icon: Mail,
     adminOnly: true,
   },
   {
@@ -265,7 +275,16 @@ export function SettingsHub({
             </div>
           )}
 
-          {adminTabFor[active] && active !== 'ai' && active !== 'routing' && (
+          {active === 'email' && workspace && (
+            <div className="p-7 max-w-4xl">
+              <SMTPSettingsSection
+                workspace={workspace}
+                onWorkspaceUpdated={onWorkspaceUpdated}
+              />
+            </div>
+          )}
+
+          {adminTabFor[active] && active !== 'ai' && active !== 'routing' && active !== 'email' && (
             <div className="p-7 max-w-4xl">
               {renderAdmin(adminTabFor[active]!)}
             </div>

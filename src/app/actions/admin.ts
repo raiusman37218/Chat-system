@@ -9,6 +9,7 @@ import {
   AutoAssignmentConfig,
   AISettingsConfig,
   NavbarTriggerConfig,
+  SMTPSettingsConfig,
 } from '@/types/database';
 
 /**
@@ -442,5 +443,29 @@ export async function updateNavbarTriggerConfigAction(
   if (error) throw new Error(error.message);
   return { success: true, workspace: updated as Workspace };
 }
+
+/**
+ * SECTION 9: Hostinger / Custom SMTP Settings & 5-minute unread email alerts
+ */
+export async function updateSMTPSettingsAction(
+  workspaceId: string,
+  settings: SMTPSettingsConfig
+) {
+  await assertAdminUser(workspaceId);
+  const supabase = await createClient();
+
+  const { data: updated, error } = await supabase
+    .from('workspaces')
+    .update({
+      smtp_settings: settings,
+    })
+    .eq('id', workspaceId)
+    .select()
+    .single();
+
+  if (error) throw new Error(error.message);
+  return { success: true, workspace: updated as Workspace };
+}
+
 
 

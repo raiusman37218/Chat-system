@@ -145,7 +145,7 @@ class ChatifyWidget {
     this.conversationId = localStorage.getItem(`chatify_conversation_id${storageKeySuffix}`);
     this.visitorName = localStorage.getItem(`chatify_visitor_name${storageKeySuffix}`) || '';
     this.visitorEmail = localStorage.getItem(`chatify_visitor_email${storageKeySuffix}`) || '';
-    if (this.visitorName || this.conversationId) {
+    if (this.visitorEmail) {
       this.isPreChatCompleted = true;
     }
 
@@ -1534,16 +1534,11 @@ class ChatifyWidget {
                 <input type="text" id="chatifyInputName" class="chatify-input" placeholder="e.g. Sarah Connor" />
               </div>
               <div class="chatify-form-group">
-                <label>Email Address <span class="chatify-optional-tag">(Optional)</span></label>
-                <input type="email" id="chatifyInputEmail" class="chatify-input" placeholder="sarah@example.com" />
+                <label>Email Address <span class="chatify-required-tag" style="color:#ef4444; font-weight:700;">*</span></label>
+                <input type="email" id="chatifyInputEmail" class="chatify-input" placeholder="sarah@example.com" required />
+                <div id="chatifyEmailError" style="display:none; color:#ef4444; font-size:12px; margin-top:4px; font-weight:500;">Please enter a valid email address.</div>
               </div>
               <button class="chatify-start-btn" id="chatifyStartBtn">Start Live Conversation</button>
-              <button type="button" class="chatify-skip-btn" id="chatifySkipBtn">
-                <span>Skip &amp; start as Guest</span>
-                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                  <polyline points="9 18 15 12 9 6"></polyline>
-                </svg>
-              </button>
             </div>
           `
               : ''
@@ -1764,13 +1759,24 @@ class ChatifyWidget {
 
     const startBtn = this.shadow.getElementById('chatifyStartBtn');
     if (startBtn) {
-      startBtn.addEventListener('click', () => this.handleStartPreChat(false));
+      startBtn.addEventListener('click', () => this.handleStartPreChat());
     }
 
-    const skipBtn = this.shadow.getElementById('chatifySkipBtn');
-    if (skipBtn) {
-      skipBtn.addEventListener('click', () => this.handleStartPreChat(true));
-    }
+    const prechatEmail = this.shadow.getElementById('chatifyInputEmail') as HTMLInputElement | null;
+    const prechatName = this.shadow.getElementById('chatifyInputName') as HTMLInputElement | null;
+    const handlePrechatEnter = (e: KeyboardEvent) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        this.handleStartPreChat();
+      }
+    };
+    prechatEmail?.addEventListener('keydown', handlePrechatEnter);
+    prechatName?.addEventListener('keydown', handlePrechatEnter);
+    prechatEmail?.addEventListener('input', () => {
+      if (prechatEmail.style.borderColor) prechatEmail.style.borderColor = '';
+      const err = this.shadow?.getElementById('chatifyEmailError');
+      if (err) err.style.display = 'none';
+    });
 
     const sendBtn = this.shadow.getElementById('chatifySendBtn');
     const textarea = this.shadow.getElementById('chatifyTextarea') as HTMLTextAreaElement | null;
@@ -4129,20 +4135,35 @@ class ChatifyWidget {
   }
 
   // 11. Handlers
-  private async handleStartPreChat(isSkip: boolean = false) {
+  private async handleStartPreChat() {
     const nameInput = this.shadow?.getElementById('chatifyInputName') as HTMLInputElement | null;
     const emailInput = this.shadow?.getElementById('chatifyInputEmail') as HTMLInputElement | null;
+    const emailError = this.shadow?.getElementById('chatifyEmailError');
 
-    this.visitorName = isSkip ? '' : (nameInput?.value.trim() || '');
-    this.visitorEmail = isSkip ? '' : (emailInput?.value.trim() || '');
+    const email = (emailInput?.value || '').trim();
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!email || !emailRegex.test(email)) {
+      if (emailInput) {
+        emailInput.style.borderColor = '#ef4444';
+        emailInput.focus();
+      }
+      if (emailError) {
+        emailError.style.display = 'block';
+      }
+      return;
+    }
+
+    if (emailError) emailError.style.display = 'none';
+    if (emailInput) emailInput.style.borderColor = '';
+
+    this.visitorName = nameInput?.value.trim() || '';
+    this.visitorEmail = email;
 
     const suffix = this.config.workspaceId ? `_${this.config.workspaceId.slice(0, 8)}` : '';
     if (this.visitorName) {
       localStorage.setItem(`chatify_visitor_name${suffix}`, this.visitorName);
     }
-    if (this.visitorEmail) {
-      localStorage.setItem(`chatify_visitor_email${suffix}`, this.visitorEmail);
-    }
+    localStorage.setItem(`chatify_visitor_email${suffix}`, this.visitorEmail);
 
     await this.supabase.rpc('fn_upsert_visitor', {
       p_id: this.visitorId,

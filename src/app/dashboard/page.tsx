@@ -228,6 +228,21 @@ export default function DashboardPage() {
     initializeDashboard();
   }, [initializeDashboard]);
 
+  // Automated 5-minute unread query email alerts runner
+  useEffect(() => {
+    const runUnreadEmailAlertsCheck = () => {
+      fetch('/api/cron/unread-notifications', { method: 'POST' }).catch(() => {});
+    };
+
+    const timeout = setTimeout(runUnreadEmailAlertsCheck, 10000);
+    const interval = setInterval(runUnreadEmailAlertsCheck, 60000);
+
+    return () => {
+      clearTimeout(timeout);
+      clearInterval(interval);
+    };
+  }, []);
+
   // 2. Fetch Messages for Active Conversation with Instant In-Memory Cache
   const loadMessages = useCallback(async (conversationId: string) => {
     // 1. Instant Cache Hit: Show messages immediately (0ms perceived lag)
