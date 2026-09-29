@@ -338,6 +338,7 @@ export interface Workspace {
   greeting_message: string;
   owner_id: string;
   logo_url?: string | null;
+  show_launcher_logo?: boolean | null;
   widget_position?: 'right' | 'left';
   business_hours?: BusinessHoursConfig;
   auto_assignment?: AutoAssignmentConfig;

@@ -95,6 +95,7 @@ export async function updateWidgetSettingsAction(
   data: {
     brand_color?: string;
     logo_url?: string | null;
+    show_launcher_logo?: boolean;
     widget_position?: 'right' | 'left';
     greeting_title?: string;
     greeting_message?: string;
@@ -114,6 +115,9 @@ export async function updateWidgetSettingsAction(
     greeting_message: data.greeting_message,
   };
 
+  if (data.show_launcher_logo !== undefined) {
+    updatePayload.show_launcher_logo = data.show_launcher_logo;
+  }
   if (data.help_center_tab_label !== undefined) {
     updatePayload.help_center_tab_label = data.help_center_tab_label;
   }

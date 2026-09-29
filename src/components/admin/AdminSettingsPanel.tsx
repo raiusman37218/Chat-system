@@ -155,6 +155,9 @@ export function AdminSettingsPanel({
   // ──────────────────────────────────────────────────────────────────────────
   const [brandColor, setBrandColor] = useState(workspace.brand_color || '#2563eb');
   const [logoUrl, setLogoUrl] = useState(workspace.logo_url || '');
+  const [showLauncherLogo, setShowLauncherLogo] = useState(
+    workspace.show_launcher_logo !== false
+  );
   const [widgetPosition, setWidgetPosition] = useState<'right' | 'left'>(
     workspace.widget_position || 'right'
   );
@@ -172,6 +175,7 @@ export function AdminSettingsPanel({
       const res = await updateWidgetSettingsAction(workspace.id, {
         brand_color: brandColor,
         logo_url: logoUrl,
+        show_launcher_logo: showLauncherLogo,
         widget_position: widgetPosition,
         greeting_title: greetingTitle,
         greeting_message: greetingMessage,
@@ -924,8 +928,38 @@ export function AdminSettingsPanel({
                         onChange={(e) => setLogoUrl(e.target.value)}
                         className="input text-xs"
                       />
+                      <p className="text-[11px] text-ink-3">
+                        This logo is displayed in your chat header, greeting banner, and optionally on the floating launcher button.
+                      </p>
                     </div>
                   </div>
+                </div>
+
+                {/* Toggle: Show Logo on Floating Launcher Button */}
+                <div className="flex items-center justify-between p-3.5 rounded-xl border border-line bg-surface-2/60">
+                  <div className="space-y-0.5 pr-4">
+                    <div className="flex items-center gap-2">
+                      <label className="text-xs font-semibold text-ink cursor-pointer" htmlFor="toggle-launcher-logo">
+                        Show Logo on Chat Launcher Icon
+                      </label>
+                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${showLauncherLogo ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' : 'bg-ink-3/15 text-ink-3'}`}>
+                        {showLauncherLogo ? 'ON' : 'OFF'}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-ink-3">
+                      When ON, your uploaded logo will replace the chat icon on the floating website button. When OFF, the classic chat bubble icon will be used.
+                    </p>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                    <input
+                      id="toggle-launcher-logo"
+                      type="checkbox"
+                      checked={showLauncherLogo}
+                      onChange={(e) => setShowLauncherLogo(e.target.checked)}
+                      className="sr-only peer"
+                    />
+                    <div className="w-11 h-6 bg-line peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-accent"></div>
+                  </label>
                 </div>
 
                 {/* Widget Position */}
@@ -1141,9 +1175,15 @@ export function AdminSettingsPanel({
                     >
                       {previewOpen ? (
                         <X className="w-5 h-5 text-white" />
+                      ) : showLauncherLogo && logoUrl ? (
+                        <img
+                          src={logoUrl}
+                          alt="Chat"
+                          className="w-8 h-8 rounded-full object-cover bg-white p-0.5 shadow-sm"
+                        />
                       ) : (
                         <img
-                          src={logoUrl || '/chat-icon-white.png'}
+                          src="/chat-icon-white.png"
                           alt="Chat"
                           className="w-6 h-6 object-contain brightness-0 invert"
                         />

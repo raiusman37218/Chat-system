@@ -26,6 +26,7 @@ interface WidgetConfig {
   showHelpTab: boolean;
   helpTabIcon: string;
   logoUrl?: string;
+  showLauncherLogo?: boolean;
   greetingTitle?: string;
   welcomeText?: string;
   businessName?: string;
@@ -203,6 +204,8 @@ class ChatifyWidget {
     }
     const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
     const urlWs = urlParams?.get('workspaceId') || urlParams?.get('ws') || urlParams?.get('chatify_workspace');
+    const urlLogo = urlParams?.get('logo') || urlParams?.get('logoUrl') || urlParams?.get('logo_url');
+    const urlShowLauncherLogo = urlParams?.get('show_launcher_logo') ?? urlParams?.get('launcher_logo');
 
     let apiUrl = script?.getAttribute('data-api-url') || '';
     if (!apiUrl && script?.src) {
@@ -226,6 +229,8 @@ class ChatifyWidget {
       helpTabLabel: script?.getAttribute('data-help-label') || 'Help',
       showHelpTab: script?.getAttribute('data-show-help') !== 'false',
       helpTabIcon: script?.getAttribute('data-help-icon') || '📖',
+      logoUrl: urlLogo || script?.getAttribute('data-logo-url') || script?.getAttribute('data-logo') || undefined,
+      showLauncherLogo: urlShowLauncherLogo !== null ? urlShowLauncherLogo !== 'false' : (script?.getAttribute('data-show-launcher-logo') !== 'false'),
       businessName: script?.getAttribute('data-business-name') || script?.getAttribute('data-company-name') || undefined,
       customDomain: script?.getAttribute('data-custom-domain') || undefined,
       apiUrl,
@@ -263,6 +268,9 @@ class ChatifyWidget {
           this.config.helpTabLabel = data.help_center_tab_label;
         }
         if (data.logo_url) this.config.logoUrl = data.logo_url;
+        if (typeof data.show_launcher_logo === 'boolean') {
+          this.config.showLauncherLogo = data.show_launcher_logo;
+        }
         if (data.greeting_title) this.config.greetingTitle = data.greeting_title;
         if (typeof data.show_help_tab === 'boolean') {
           this.config.showHelpTab = data.show_help_tab;
@@ -1362,9 +1370,12 @@ class ChatifyWidget {
     const launcher = document.createElement('button');
     launcher.className = 'chatify-launcher';
     launcher.id = 'chatifyLauncherBtn';
+    const shouldShowLauncherLogo = this.config.showLauncherLogo !== false && Boolean(this.config.logoUrl);
+    const initialLogo = shouldShowLauncherLogo ? this.config.logoUrl! : CHATIFY_ICON_DATA_URI;
+    const isCustomLogo = shouldShowLauncherLogo;
     launcher.innerHTML = `
       <div class="chatify-badge" id="chatifyBadge">0</div>
-      <img id="chatifyIconOpen" src="${CHATIFY_ICON_DATA_URI}" alt="Chat" class="chatify-launcher-icon" />
+      <img id="chatifyIconOpen" src="${initialLogo}" alt="Chat" class="chatify-launcher-icon ${isCustomLogo ? 'chatify-custom-logo' : ''}" />
       <svg id="chatifyIconClose" style="display:none;" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
         <line x1="18" y1="6" x2="6" y2="18"></line>
         <line x1="6" y1="6" x2="18" y2="18"></line>
@@ -2042,16 +2053,48 @@ class ChatifyWidget {
       const popupTitle = this.config.businessName || this.config.title || 'Trader Care Desk';
       popupTitleEl.textContent = popupTitle;
       const avatarEl = this.shadow?.getElementById('chatifyPopupAvatar');
-      if (avatarEl && !avatarEl.querySelector('img')) {
-        avatarEl.textContent = this.getSenderInitials(popupTitle);
+      if (avatarEl) {
+        if (this.config.logoUrl) {
+          avatarEl.innerHTML = `<img src="${this.config.logoUrl}" alt="Logo" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" onerror="this.parentElement.textContent='${this.getSenderInitials(popupTitle)}'" />`;
+        } else if (!avatarEl.querySelector('img')) {
+          avatarEl.textContent = this.getSenderInitials(popupTitle);
+        }
       }
+    }
+
+    // Update Launcher Icon with custom logo if configured & enabled
+    const openIcon = this.shadow?.getElementById('chatifyIconOpen') as HTMLImageElement | null;
+    if (openIcon) {
+      const shouldShowLogo = this.config.showLauncherLogo !== false && Boolean(this.config.logoUrl);
+      if (shouldShowLogo) {
+        openIcon.src = this.config.logoUrl!;
+        openIcon.classList.add('chatify-custom-logo');
+        openIcon.onerror = () => {
+          openIcon.src = CHATIFY_ICON_DATA_URI;
+          openIcon.classList.remove('chatify-custom-logo');
+        };
+      } else {
+        openIcon.src = CHATIFY_ICON_DATA_URI;
+        openIcon.classList.remove('chatify-custom-logo');
+      }
+    }
+
+    // Update Header Avatar in Messages Tab
+    const headerAvatar = this.shadow?.getElementById('chatifyHeaderAvatar');
+    if (headerAvatar) {
+      const logoSrc = this.config.logoUrl || CHATIFY_ICON_DATA_URI;
+      const fallback = CHATIFY_ICON_DATA_URI;
+      headerAvatar.innerHTML = `
+        <img src="${logoSrc}" onerror="this.onerror=null;this.src='${fallback}'" alt="Logo" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;" />
+        <span class="chatify-online-dot"></span>
+      `;
     }
 
     const brandAvatar = this.shadow?.getElementById('homeBrandAvatar');
     if (brandAvatar) {
       const logoSrc = this.config.logoUrl || CHATIFY_ICON_DATA_URI;
       const fallback = CHATIFY_ICON_DATA_URI;
-      brandAvatar.innerHTML = `<img src="${logoSrc}" onerror="this.onerror=null;this.src='${fallback}'" alt="Logo" style="width:100%;height:100%;object-fit:contain;border-radius:inherit;" />`;
+      brandAvatar.innerHTML = `<img src="${logoSrc}" onerror="this.onerror=null;this.src='${fallback}'" alt="Logo" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;" />`;
     }
 
     const homeGreeting = this.shadow?.getElementById('homeGreetingTitle');
@@ -2283,6 +2326,16 @@ class ChatifyWidget {
         pointer-events: none;
         transition: transform .25s var(--w-ease), opacity .18s var(--w-ease);
         filter: drop-shadow(0 2px 4px rgba(0,0,0,0.22));
+      }
+
+      .chatify-launcher-icon.chatify-custom-logo {
+        width: 38px;
+        height: 38px;
+        border-radius: 50%;
+        object-fit: cover;
+        background: #ffffff;
+        padding: 2px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.22);
       }
 
       .chatify-launcher:hover .chatify-launcher-icon {

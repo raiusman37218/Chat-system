@@ -32,6 +32,7 @@ export interface WidgetConfig {
   brandColor?: string;
   position?: 'bottom-right' | 'bottom-left';
   logoUrl?: string;
+  showLauncherLogo?: boolean;
   companyName?: string;
   welcomeText?: string;
   autoGreetingDelaySeconds?: number;
@@ -1593,9 +1594,19 @@ export default function ChatWidget({
             {/* Launcher Icon Toggle */}
             {isOpen ? (
               <X className="w-6 h-6 text-white transition-transform duration-200 rotate-90 scale-100" />
+            ) : (config.showLauncherLogo !== false && config.logoUrl) ? (
+              <img
+                src={config.logoUrl}
+                alt="Chat"
+                className="w-9 h-9 rounded-full object-cover bg-white p-0.5 shadow-sm transition-transform duration-200 hover:scale-105"
+                onError={(e) => {
+                  (e.currentTarget as HTMLImageElement).src = '/chat-icon-white.png';
+                  (e.currentTarget as HTMLImageElement).className = 'w-7 h-7 object-contain brightness-0 invert drop-shadow-sm transition-transform duration-200 hover:scale-105';
+                }}
+              />
             ) : (
               <img
-                src={config.logoUrl || '/chat-icon-white.png'}
+                src="/chat-icon-white.png"
                 alt="Chat"
                 className="w-7 h-7 object-contain brightness-0 invert drop-shadow-sm transition-transform duration-200 hover:scale-105"
               />
