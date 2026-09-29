@@ -188,6 +188,8 @@ export function ChatThread({
   const [autoTranslateEnabled, setAutoTranslateEnabled] = useState<boolean>(true);
   const [isTranslating, setIsTranslating] = useState<boolean>(false);
   const [expandedTranslations, setExpandedTranslations] = useState<Record<string, boolean>>({});
+  const [showTranslateMenu, setShowTranslateMenu] = useState<boolean>(false);
+  const translateMenuRef = useRef<HTMLDivElement>(null);
 
   // Features State: Auto-Assign, Snooze, Merge, Mentions
   const [isAutoAssigning, setIsAutoAssigning] = useState(false);
@@ -599,32 +601,58 @@ export function ChatThread({
 
   // 6. Customer Language Auto-Detection & Sync
   const detectedVisitorLang = useMemo(() => {
-    // Check channel_metadata
-    const chanMeta = conversation.channel_metadata as Record<string, any> | undefined;
-    if (chanMeta?.visitor_language) {
-      return chanMeta.visitor_language;
+    // 1. Prioritize ACTUAL visitor messages in the thread (most recent first)
+    const visitorMessages = [...messages]
+      .reverse()
+      .filter((m) => m.sender_type === 'visitor' && m.content?.trim());
+
+    for (const msg of visitorMessages) {
+      const transLang =
+        msg.metadata?.translation?.detected_language ||
+        msg.metadata?.detected_language;
+      if (transLang && transLang !== 'en' && SUPPORTED_LANGUAGES[transLang.toLowerCase()]) {
+        return transLang.toLowerCase();
+      }
+      const det = detectLanguage(msg.content);
+      if (det.code && det.code !== 'en' && SUPPORTED_LANGUAGES[det.code]) {
+        return det.code;
+      }
     }
-    // Check visitor profile
+
+    // If visitor has sent messages and none were foreign, visitor communicates in English
+    if (visitorMessages.length > 0) {
+      return 'en';
+    }
+
+    // 2. Check channel_metadata if explicitly set
+    const chanMeta = conversation.channel_metadata as Record<string, any> | undefined;
+    if (chanMeta?.visitor_language && SUPPORTED_LANGUAGES[chanMeta.visitor_language.toLowerCase()]) {
+      return chanMeta.visitor_language.toLowerCase();
+    }
+
+    // 3. Fallback to visitor profile language only if no messages exist yet
     if (conversation.visitor?.language && conversation.visitor.language !== 'en') {
       const code = conversation.visitor.language.split('-')[0].toLowerCase();
       if (SUPPORTED_LANGUAGES[code]) return code;
     }
-    // Check latest visitor message in messages
-    const latestVisitor = [...messages]
-      .reverse()
-      .find((m) => m.sender_type === 'visitor' && m.content?.trim());
-    if (latestVisitor) {
-      if (latestVisitor.metadata?.translation?.detected_language) {
-        return latestVisitor.metadata.translation.detected_language;
-      }
-      if (latestVisitor.metadata?.detected_language) {
-        return latestVisitor.metadata.detected_language;
-      }
-      const det = detectLanguage(latestVisitor.content);
-      if (det.code !== 'en') return det.code;
-    }
+
     return 'en';
   }, [conversation, messages]);
+
+  // Close translation menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (translateMenuRef.current && !translateMenuRef.current.contains(event.target as Node)) {
+        setShowTranslateMenu(false);
+      }
+    };
+    if (showTranslateMenu) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showTranslateMenu]);
 
   // Sync target language when conversation or detected visitor language changes
   useEffect(() => {
@@ -2119,12 +2147,12 @@ export function ChatThread({
               </button>
             </div>
 
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1.5">
               <button
                 type="button"
                 onClick={handleGenerateAiSuggestion}
                 disabled={aiDrafting}
-                className="h-6 px-2 rounded-md text-[11px] font-semibold text-accent hover:bg-accent/10 transition-colors inline-flex items-center gap-1"
+                className="h-6 px-2 rounded-md text-[11px] font-semibold text-accent hover:bg-accent/10 transition-colors inline-flex items-center gap-1 cursor-pointer"
                 title="Ask AI Copilot to draft a reply"
               >
                 <Sparkles className={cn('w-3 h-3', aiDrafting && 'animate-spin')} />
@@ -2134,114 +2162,166 @@ export function ChatThread({
               <button
                 type="button"
                 onClick={() => setShowMacros((s) => !s)}
-                className="h-6 px-2 rounded-md text-[11px] font-medium text-ink-3 hover:text-ink hover:bg-surface-3 transition-colors inline-flex items-center gap-1"
+                className="h-6 px-2 rounded-md text-[11px] font-medium text-ink-3 hover:text-ink hover:bg-surface-3 transition-colors inline-flex items-center gap-1 cursor-pointer"
                 title="Saved replies (/)"
               >
                 <Zap className="w-3 h-3 text-amber-500" />
                 <span>Replies</span>
               </button>
 
+              {/* ── Translation Controls (Side Badge & Safe Popover) ── */}
+              {composerMode === 'reply' && (
+                <div className="relative" ref={translateMenuRef}>
+                  <button
+                    type="button"
+                    onClick={() => setShowTranslateMenu((prev) => !prev)}
+                    className={cn(
+                      'h-6 px-2 rounded-md text-[11px] font-medium transition-all inline-flex items-center gap-1.5 cursor-pointer shadow-2xs',
+                      autoTranslateEnabled && targetLanguage !== 'en'
+                        ? 'bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/30 hover:bg-blue-500/25 font-bold'
+                        : 'text-ink-3 hover:text-ink hover:bg-surface-3 border border-transparent'
+                    )}
+                    title={`Translation settings: Customer receives replies in ${getLanguageInfo(targetLanguage).name}. Click to view or change.`}
+                  >
+                    <Globe className={cn('w-3 h-3 shrink-0', autoTranslateEnabled && targetLanguage !== 'en' ? 'text-blue-500' : 'text-ink-3')} />
+                    <span className="truncate max-w-[120px]">
+                      {autoTranslateEnabled && targetLanguage !== 'en'
+                        ? `${getLanguageInfo(targetLanguage).flag || ''} ${getLanguageInfo(targetLanguage).name}`
+                        : 'Translate'}
+                    </span>
+                    <ChevronDown className="w-2.5 h-2.5 opacity-60 shrink-0" />
+                  </button>
+
+                  {/* Popover Dropdown Menu */}
+                  {showTranslateMenu && (
+                    <div className="absolute right-0 top-full mt-1.5 z-40 w-76 bg-surface rounded-xl border border-line shadow-2xl p-3 space-y-3 animate-pop">
+                      <div className="flex items-center justify-between border-b border-line/60 pb-2">
+                        <div className="flex items-center gap-1.5 text-[12px] font-bold text-ink">
+                          <Globe className="w-3.5 h-3.5 text-blue-500" />
+                          <span>Translation Settings</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setShowTranslateMenu(false)}
+                          className="text-ink-3 hover:text-ink p-1 rounded-md hover:bg-surface-2 transition-colors cursor-pointer"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+
+                      {/* Customer Native Language Status */}
+                      <div className="bg-surface-2/70 rounded-lg p-2.5 space-y-2 border border-line/40">
+                        <div className="flex items-center justify-between text-[11px]">
+                          <span className="text-ink-3 font-medium">Customer speaks:</span>
+                          <span className="font-bold text-ink flex items-center gap-1">
+                            <span>{getLanguageInfo(detectedVisitorLang).flag}</span>
+                            <span>{getLanguageInfo(detectedVisitorLang).name}</span>
+                            {getLanguageInfo(detectedVisitorLang).nativeName && (
+                              <span className="text-ink-3 font-normal">({getLanguageInfo(detectedVisitorLang).nativeName})</span>
+                            )}
+                          </span>
+                        </div>
+
+                        {/* Reset / Lock to Customer Language Button */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setTargetLanguage(detectedVisitorLang);
+                            setAutoTranslateEnabled(detectedVisitorLang !== 'en');
+                          }}
+                          className="w-full py-1.5 px-2.5 rounded-lg text-[11px] font-semibold bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/60 dark:hover:bg-blue-900/60 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800 transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
+                        >
+                          <RotateCcw className="w-3 h-3 shrink-0" />
+                          <span>Auto-lock to Customer ({getLanguageInfo(detectedVisitorLang).name})</span>
+                        </button>
+                      </div>
+
+                      {/* Manual Override Dropdown */}
+                      <div className="space-y-1.5">
+                        <div className="flex items-center justify-between text-[11px]">
+                          <label className="font-semibold text-ink">
+                            Customer Receives Replies In:
+                          </label>
+                          {targetLanguage !== detectedVisitorLang && (
+                            <span className="text-[10px] text-amber-600 dark:text-amber-400 font-bold bg-amber-500/10 px-1.5 py-0.5 rounded">
+                              Custom Override
+                            </span>
+                          )}
+                        </div>
+                        <select
+                          value={targetLanguage}
+                          onChange={(e) => {
+                            setTargetLanguage(e.target.value);
+                            if (e.target.value !== 'en') {
+                              setAutoTranslateEnabled(true);
+                            }
+                          }}
+                          aria-label="Select Customer Language"
+                          className="w-full text-[11.5px] font-semibold bg-surface border border-line-2 rounded-lg px-2.5 py-1.5 text-ink focus:outline-none focus:ring-2 focus:ring-accent cursor-pointer shadow-2xs"
+                        >
+                          <option value="en">🇬🇧 English (Original / No Translation)</option>
+                          <option value="ar">🇸🇦 Arabic (العربية)</option>
+                          <option value="hi">🇮🇳 Hindi (हिन्दी)</option>
+                          <option value="ur">🇵🇰 Urdu (اردو)</option>
+                          <option value="es">🇪🇸 Spanish (Español)</option>
+                          <option value="fr">🇫🇷 French (Français)</option>
+                          <option value="de">🇩🇪 German (Deutsch)</option>
+                          <option value="tr">🇹🇷 Turkish (Türkçe)</option>
+                          <option value="ru">🇷🇺 Russian (Русский)</option>
+                          <option value="zh">🇨🇳 Chinese (中文)</option>
+                          <option value="pt">🇵🇹 Portuguese (Português)</option>
+                          <option value="it">🇮🇹 Italian (Italiano)</option>
+                          <option value="id">🇮🇩 Indonesian (Bahasa Indonesia)</option>
+                          <option value="fa">🇮🇷 Persian (فارسی)</option>
+                          <option value="he">🇮🇱 Hebrew (עברית)</option>
+                          <option value="bn">🇧🇩 Bengali (বাংলা)</option>
+                          <option value="pa">🇮🇳 Punjabi (ਪੰਜਾਬੀ)</option>
+                          <option value="ta">🇮🇳 Tamil (தமிழ்)</option>
+                          <option value="te">🇮🇳 Telugu (తెలుగు)</option>
+                          <option value="th">🇹🇭 Thai (ไทย)</option>
+                          <option value="el">🇬🇷 Greek (Ελληνικά)</option>
+                          <option value="ja">🇯🇵 Japanese (日本語)</option>
+                          <option value="ko">🇰🇷 Korean (한국어)</option>
+                          <option value="vi">🇻🇳 Vietnamese (Tiếng Việt)</option>
+                          <option value="nl">🇳🇱 Dutch (Nederlands)</option>
+                          <option value="pl">🇵🇱 Polish (Polski)</option>
+                          <option value="sv">🇸🇪 Swedish (Svenska)</option>
+                        </select>
+                      </div>
+
+                      {/* On / Off Toggle */}
+                      <div className="pt-2 border-t border-line/60 flex items-center justify-between">
+                        <div className="space-y-0.5">
+                          <p className="text-[11px] font-bold text-ink">Auto-Translation</p>
+                          <p className="text-[10px] text-ink-3">Translate agent replies automatically</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setAutoTranslateEnabled(!autoTranslateEnabled)}
+                          className={cn(
+                            'text-[10.5px] px-2.5 py-1 rounded-md font-bold transition-all cursor-pointer shadow-2xs',
+                            autoTranslateEnabled && targetLanguage !== 'en'
+                              ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                              : 'bg-surface-2 hover:bg-surface-3 text-ink-2 border border-line'
+                          )}
+                        >
+                          {autoTranslateEnabled && targetLanguage !== 'en' ? 'Enabled (ON)' : 'Disabled (OFF)'}
+                        </button>
+                      </div>
+
+                      <div className="text-[10px] text-ink-3 bg-surface-2/40 p-2 rounded-lg border border-line/30 leading-snug">
+                        ✨ <strong>Workflow:</strong> Write in English or any language. The customer receives your reply in {getLanguageInfo(targetLanguage).name}. Customer replies will always appear in English for you.
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
               <span className="text-[10.5px] text-ink-3 hidden @3xl/thread:inline shrink-0 truncate max-w-[120px] ml-1">
                 as <strong className="text-ink font-medium">{currentAgent?.name || 'Agent'}</strong>
               </span>
             </div>
           </div>
-
-          {/* ── Auto-Translation Bar (High Visibility) ── */}
-          {composerMode === 'reply' && (
-            <div className="px-3.5 py-2 flex items-center justify-between gap-3 border-b-2 border-blue-500/25 bg-blue-500/10 dark:bg-blue-950/40 text-[12px] text-ink font-medium">
-              <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                <div
-                  className={cn(
-                    'w-6 h-6 rounded-lg flex items-center justify-center shrink-0 shadow-2xs transition-colors',
-                    autoTranslateEnabled && targetLanguage !== 'en'
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-surface-3 text-ink-2 border border-line-2'
-                  )}
-                >
-                  <Globe className="w-3.5 h-3.5" />
-                </div>
-                <div className="truncate">
-                  {autoTranslateEnabled && targetLanguage !== 'en' ? (
-                    <span>
-                      Customer speaks{' '}
-                      <strong className="text-blue-600 dark:text-blue-400 font-extrabold">
-                        {getLanguageInfo(targetLanguage).name}
-                        {getLanguageInfo(targetLanguage).nativeName
-                          ? ` (${getLanguageInfo(targetLanguage).nativeName})`
-                          : ''}
-                      </strong>
-                      . Type in ANY language — customer receives in {getLanguageInfo(targetLanguage).name} &amp; you see English.
-                    </span>
-                  ) : (
-                    <span className="text-ink-2 font-medium">
-                      Auto-translate: write in any language, customer receives in their native language &amp; you see English.
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2 shrink-0">
-                <select
-                  value={targetLanguage}
-                  onChange={(e) => {
-                    setTargetLanguage(e.target.value);
-                    if (e.target.value !== 'en') {
-                      setAutoTranslateEnabled(true);
-                    }
-                  }}
-                  aria-label="Select Customer Language"
-                  className="text-[11.5px] font-bold bg-surface border-2 border-line-2 rounded-lg px-2.5 py-1 text-ink focus:outline-none focus:ring-2 focus:ring-accent cursor-pointer shadow-2xs"
-                >
-                  <option value="en">English (Original)</option>
-                  <option value="ar">🇸🇦 Arabic (العربية)</option>
-                  <option value="hi">🇮🇳 Hindi (हिन्दी)</option>
-                  <option value="ur">🇵🇰 Urdu (اردو)</option>
-                  <option value="es">🇪🇸 Spanish (Español)</option>
-                  <option value="fr">🇫🇷 French (Français)</option>
-                  <option value="de">🇩🇪 German (Deutsch)</option>
-                  <option value="tr">🇹🇷 Turkish (Türkçe)</option>
-                  <option value="ru">🇷🇺 Russian (Русский)</option>
-                  <option value="zh">🇨🇳 Chinese (中文)</option>
-                  <option value="pt">🇵🇹 Portuguese (Português)</option>
-                  <option value="it">🇮🇹 Italian (Italiano)</option>
-                  <option value="id">🇮🇩 Indonesian (Bahasa Indonesia)</option>
-                  <option value="fa">🇮🇷 Persian (فارسی)</option>
-                  <option value="he">🇮🇱 Hebrew (עברית)</option>
-                  <option value="bn">🇧🇩 Bengali (বাংলা)</option>
-                  <option value="pa">🇮🇳 Punjabi (ਪੰਜਾਬੀ)</option>
-                  <option value="ta">🇮🇳 Tamil (தமிழ்)</option>
-                  <option value="te">🇮🇳 Telugu (తెలుగు)</option>
-                  <option value="th">🇹🇭 Thai (ไทย)</option>
-                  <option value="el">🇬🇷 Greek (Ελληνικά)</option>
-                  <option value="ja">🇯🇵 Japanese (日本語)</option>
-                  <option value="ko">🇰🇷 Korean (한국어)</option>
-                  <option value="vi">🇻🇳 Vietnamese (Tiếng Việt)</option>
-                  <option value="nl">🇳🇱 Dutch (Nederlands)</option>
-                  <option value="pl">🇵🇱 Polish (Polski)</option>
-                  <option value="sv">🇸🇪 Swedish (Svenska)</option>
-                </select>
-
-                <button
-                  type="button"
-                  onClick={() => setAutoTranslateEnabled(!autoTranslateEnabled)}
-                  className={cn(
-                    'text-[11.5px] px-3 py-1 rounded-lg font-extrabold transition-all cursor-pointer shadow-xs',
-                    autoTranslateEnabled && targetLanguage !== 'en'
-                      ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-xs'
-                      : 'bg-surface border-2 border-line-2 hover:bg-surface-2 text-ink-2'
-                  )}
-                  title={
-                    autoTranslateEnabled
-                      ? 'Disable translation and send raw text'
-                      : 'Enable automatic translation'
-                  }
-                >
-                  {autoTranslateEnabled && targetLanguage !== 'en' ? 'Translate: ON' : 'Translate: OFF'}
-                </button>
-              </div>
-            </div>
-          )}
 
           {/* Hidden File Inputs for Attachments */}
           <input
@@ -2478,54 +2558,68 @@ export function ChatThread({
               </div>
             </div>
 
-            <button
-              onClick={handleSend}
-              disabled={(!inputText.trim() && !pendingAttachment) || isSending || isTranslating || replyLocked}
-              title={
-                isInternalMode
-                  ? 'Post internal note (Ctrl+Enter)'
-                  : autoTranslateEnabled && targetLanguage !== 'en'
-                  ? `Translate into ${getLanguageInfo(targetLanguage).name} and send (Ctrl+Enter)`
-                  : 'Send reply (Ctrl+Enter)'
-              }
-              className={cn(
-                'h-7 px-3 rounded-lg flex items-center gap-1.5 text-[11.5px] font-bold transition-all shadow-xs cursor-pointer',
-                (!inputText.trim() && !pendingAttachment) || isSending || isTranslating || replyLocked
-                  ? 'bg-surface-3 text-ink-3 cursor-not-allowed opacity-50'
-                  : isInternalMode
-                  ? 'bg-amber-600 hover:bg-amber-700 text-white shadow-sm hover:scale-102'
-                  : autoTranslateEnabled && targetLanguage !== 'en'
-                  ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-sm hover:scale-102'
-                  : 'bg-accent hover:bg-accent-hover text-accent-ink shadow-sm hover:scale-102'
+            <div className="flex items-center gap-2">
+              {!isInternalMode && autoTranslateEnabled && targetLanguage !== 'en' && (
+                <button
+                  type="button"
+                  onClick={() => setShowTranslateMenu((prev) => !prev)}
+                  className="hidden sm:inline-flex items-center gap-1.5 text-[11px] font-semibold text-blue-600 dark:text-blue-400 bg-blue-500/10 hover:bg-blue-500/15 border border-blue-500/25 px-2 py-1 rounded-md cursor-pointer transition-colors shadow-2xs"
+                  title="Click to view or change translation settings"
+                >
+                  <Globe className="w-3 h-3 shrink-0" />
+                  <span>→ {getLanguageInfo(targetLanguage).flag || ''} {getLanguageInfo(targetLanguage).name}</span>
+                </button>
               )}
-            >
-              {isTranslating ? (
-                <>
-                  <span className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                  <span>Translating…</span>
-                </>
-              ) : isSending ? (
-                <>
-                  <span className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                  <span>Sending…</span>
-                </>
-              ) : isInternalMode ? (
-                <>
-                  <Lock className="w-3 h-3" />
-                  <span>Add Note</span>
-                </>
-              ) : autoTranslateEnabled && targetLanguage !== 'en' ? (
-                <>
-                  <Globe className="w-3 h-3" />
-                  <span>Translate &amp; Send</span>
-                </>
-              ) : (
-                <>
-                  <Send className="w-3 h-3" />
-                  <span>Send</span>
-                </>
-              )}
-            </button>
+
+              <button
+                onClick={handleSend}
+                disabled={(!inputText.trim() && !pendingAttachment) || isSending || isTranslating || replyLocked}
+                title={
+                  isInternalMode
+                    ? 'Post internal note (Ctrl+Enter)'
+                    : autoTranslateEnabled && targetLanguage !== 'en'
+                    ? `Translate into ${getLanguageInfo(targetLanguage).name} and send (Ctrl+Enter)`
+                    : 'Send reply (Ctrl+Enter)'
+                }
+                className={cn(
+                  'h-7 px-3 rounded-lg flex items-center gap-1.5 text-[11.5px] font-bold transition-all shadow-xs cursor-pointer',
+                  (!inputText.trim() && !pendingAttachment) || isSending || isTranslating || replyLocked
+                    ? 'bg-surface-3 text-ink-3 cursor-not-allowed opacity-50'
+                    : isInternalMode
+                    ? 'bg-amber-600 hover:bg-amber-700 text-white shadow-sm hover:scale-102'
+                    : autoTranslateEnabled && targetLanguage !== 'en'
+                    ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-sm hover:scale-102'
+                    : 'bg-accent hover:bg-accent-hover text-accent-ink shadow-sm hover:scale-102'
+                )}
+              >
+                {isTranslating ? (
+                  <>
+                    <span className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                    <span>Translating…</span>
+                  </>
+                ) : isSending ? (
+                  <>
+                    <span className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                    <span>Sending…</span>
+                  </>
+                ) : isInternalMode ? (
+                  <>
+                    <Lock className="w-3 h-3" />
+                    <span>Add Note</span>
+                  </>
+                ) : autoTranslateEnabled && targetLanguage !== 'en' ? (
+                  <>
+                    <Globe className="w-3 h-3" />
+                    <span>Translate &amp; Send</span>
+                  </>
+                ) : (
+                  <>
+                    <Send className="w-3 h-3" />
+                    <span>Send</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       </div>
