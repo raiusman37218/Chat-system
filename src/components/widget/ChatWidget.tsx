@@ -20,6 +20,7 @@ import {
   ThumbsUp,
   ThumbsDown,
   ExternalLink,
+  Globe,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { Message } from '@/types/database';
@@ -94,6 +95,7 @@ export default function ChatWidget({
   const [isOfflineSubmitted, setIsOfflineSubmitted] = useState(false);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [visitorId, setVisitorId] = useState<string>('');
+  const [visitorOriginalToggled, setVisitorOriginalToggled] = useState<Record<string, boolean>>({});
 
   // Help Desk state
   const [isHelpOpen, setIsHelpOpen] = useState(false);
@@ -672,6 +674,20 @@ export default function ChatWidget({
         setMessages((prev) =>
           prev.map((m) => (m.id === tempId ? savedMsg : m))
         );
+
+        // Trigger automatic translation so agents receive it in English
+        if (text) {
+          fetch('/api/translation/process-message', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              messageId: savedMsg.id,
+              conversationId: activeConvId,
+              text,
+              workspaceId: config.workspaceId,
+            }),
+          }).catch((err) => console.warn('[ChatWidget] Translation trigger error:', err));
+        }
 
         // Every visitor message gets a chance at an AI reply. The route decides
         // whether the assistant is on for this conversation.
@@ -1272,7 +1288,42 @@ export default function ChatWidget({
                       {isVisitor ? (
                         <p className="whitespace-pre-wrap leading-relaxed">{msg.content}</p>
                       ) : (
-                        <ChatMarkdown content={msg.content} className="leading-relaxed" />
+                        (() => {
+                          const translation = msg.metadata?.translation;
+                          const translatedText = translation?.translated_text || msg.metadata?.translated_text;
+                          const originalEnglish = translation?.original_english || msg.metadata?.original_english;
+                          const isShowingOriginal = visitorOriginalToggled[msg.id];
+
+                          const displayContent = isShowingOriginal
+                            ? (originalEnglish || msg.content)
+                            : (translatedText || msg.content);
+
+                          return (
+                            <div className="space-y-1">
+                              <ChatMarkdown content={displayContent} className="leading-relaxed" />
+                              {originalEnglish && translatedText && (
+                                <div className="pt-1 border-t border-slate-300/40 dark:border-slate-700/50 flex items-center justify-between text-[10px] text-slate-500 dark:text-slate-400 select-none">
+                                  <span className="inline-flex items-center gap-1 opacity-75">
+                                    <Globe className="w-2.5 h-2.5" />
+                                    {isShowingOriginal ? 'English (Original)' : 'Auto-translated'}
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      setVisitorOriginalToggled((prev) => ({
+                                        ...prev,
+                                        [msg.id]: !prev[msg.id],
+                                      }))
+                                    }
+                                    className="text-blue-600 dark:text-blue-400 hover:underline cursor-pointer font-medium ml-auto"
+                                  >
+                                    {isShowingOriginal ? 'Show translated' : 'Show English'}
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()
                       )}
                     </div>
 

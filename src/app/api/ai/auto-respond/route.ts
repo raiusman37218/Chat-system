@@ -110,7 +110,60 @@ export async function POST(req: NextRequest) {
         .limit(40),
     ]);
 
+    const msgs = (recentMessages || []).reverse();
+    const latestVisitorMsg = [...msgs].reverse().find((m) => m.sender_type === 'visitor' && !m.is_internal);
+
     const aiSettings = workspace?.ai_settings;
+
+    // Automatic Language Detection & English Translation for Support Agents
+    let detected = { code: 'en', name: 'English' };
+    if (latestVisitorMsg && latestVisitorMsg.content) {
+      detected = detectLanguage(latestVisitorMsg.content);
+      if (detected.code !== 'en' && (!latestVisitorMsg.metadata?.english_translation && !latestVisitorMsg.metadata?.translation?.english_text)) {
+        try {
+          const trans = await translateToEnglish({
+            text: latestVisitorMsg.content,
+            detectedLanguage: detected.code,
+            providerConfig: providerConfigFrom(aiSettings),
+          });
+          const englishTranslation = trans.englishText;
+
+          await supabase
+            .from('messages')
+            .update({
+              metadata: {
+                ...(latestVisitorMsg.metadata || {}),
+                translation: {
+                  is_translated: true,
+                  direction: 'visitor_to_agent',
+                  original_text: latestVisitorMsg.content,
+                  english_text: englishTranslation,
+                  detected_language: detected.code,
+                  language_name: trans.sourceLanguage,
+                },
+                detected_language: detected.code,
+                language_name: trans.sourceLanguage,
+                english_translation: englishTranslation,
+              },
+            })
+            .eq('id', latestVisitorMsg.id);
+
+          await supabase
+            .from('conversations')
+            .update({
+              channel_metadata: {
+                ...((conv?.channel_metadata as Record<string, any>) || {}),
+                visitor_language: detected.code,
+                language_name: trans.sourceLanguage,
+              },
+            })
+            .eq('id', conversation_id);
+        } catch (err) {
+          console.warn('[Auto-Respond] Inbound translation error:', err);
+        }
+      }
+    }
+
     if (aiSettings && (!aiSettings.enabled || !aiSettings.auto_response_enabled)) {
       return json({ replied: false, reason: 'AI auto-first-response disabled' });
     }
@@ -118,8 +171,6 @@ export async function POST(req: NextRequest) {
     if (!conv || (conv.workspace_id && conv.workspace_id !== workspace_id) || conv.status === 'closed') {
       return json({ replied: false, reason: 'Conversation not open' });
     }
-
-    const msgs = (recentMessages || []).reverse();
 
     // A handover sets ai_mode to 'disabled'; once a person owns the thread the
     // assistant stays out of it.
@@ -149,45 +200,6 @@ export async function POST(req: NextRequest) {
 
     // The newest line is the question; the rest of the burst is its context.
     const visitorMsg = unanswered[unanswered.length - 1];
-
-    // Language Detection & English Translation for Dashboard
-    const detected = detectLanguage(visitorMsg.content);
-    let englishTranslation = visitorMsg.content;
-    if (detected.code !== 'en' && !visitorMsg.metadata?.english_translation) {
-      try {
-        const trans = await translateToEnglish({
-          text: visitorMsg.content,
-          detectedLanguage: detected.code,
-          providerConfig: providerConfigFrom(aiSettings),
-        });
-        englishTranslation = trans.englishText;
-
-        await supabase
-          .from('messages')
-          .update({
-            metadata: {
-              ...(visitorMsg.metadata || {}),
-              detected_language: detected.code,
-              language_name: trans.sourceLanguage,
-              english_translation: englishTranslation,
-            },
-          })
-          .eq('id', visitorMsg.id);
-
-        await supabase
-          .from('conversations')
-          .update({
-            channel_metadata: {
-              ...((conv.channel_metadata as Record<string, any>) || {}),
-              visitor_language: detected.code,
-              language_name: trans.sourceLanguage,
-            },
-          })
-          .eq('id', conversation_id);
-      } catch (err) {
-        console.warn('[Auto-Respond] Translation error:', err);
-      }
-    }
 
     const burstContext = unanswered
       .slice(0, -1)

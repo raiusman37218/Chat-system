@@ -1307,6 +1307,20 @@ class ChatifyWidget {
       }
     }
 
+    // Trigger automatic translation so support agents receive it in English
+    if (content.trim()) {
+      fetch(`${this.config.apiUrl || ''}/api/translation/process-message`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messageId: data?.id,
+          conversationId: convId,
+          text: content.trim(),
+          workspaceId: this.config.workspaceId,
+        }),
+      }).catch(() => {});
+    }
+
     // Every visitor message gets a chance at an AI reply. The route decides
     // whether the assistant is on for this conversation, and skips it when not.
     if (this.config.workspaceId) {
@@ -4337,13 +4351,18 @@ class ChatifyWidget {
         ? `<span style="font-size:10px;font-style:italic;opacity:0.75;margin-left:4px;">(edited)</span>`
         : '';
 
+      const displayContent =
+        !isVisitor && (msg as any).metadata?.translation?.translated_text
+          ? (msg as any).metadata.translation.translated_text
+          : msg.content;
+
       bubble.innerHTML =
         quoteHtml +
         attachmentHtml +
-        (msg.content
+        (displayContent
           ? isVisitor
-            ? `<div class="chatify-msg-text">${this.escapeHTML(msg.content)}</div>`
-            : `<div class="chatify-msg-text chatify-msg-rich">${this.formatChatMarkdown(msg.content)}</div>`
+            ? `<div class="chatify-msg-text">${this.escapeHTML(displayContent)}</div>`
+            : `<div class="chatify-msg-text chatify-msg-rich">${this.formatChatMarkdown(displayContent)}</div>`
           : '') +
         `<div class="chatify-msg-time">${timeStr}${editedTag}${ticks}</div>`;
 

@@ -230,7 +230,11 @@ const ConversationItem = memo(function ConversationItem({
               <span>Bot:</span>
             </span>
           ) : null}
-          {conv.last_message?.content ||
+          {conv.last_message?.metadata?.translation?.english_text ||
+            conv.last_message?.metadata?.english_translation ||
+            conv.last_message?.metadata?.translation?.original_english ||
+            conv.last_message?.metadata?.original_english ||
+            conv.last_message?.content ||
             (conv.last_message?.attachment_url
               ? '📎 Attachment'
               : 'Conversation started')}
@@ -266,6 +270,26 @@ const ConversationItem = memo(function ConversationItem({
                 </span>
               </span>
             )}
+
+            {/* Foreign Language Badge */}
+            {(() => {
+              const langCode =
+                (conv.channel_metadata as any)?.visitor_language ||
+                conv.visitor?.language ||
+                conv.last_message?.metadata?.translation?.detected_language ||
+                conv.last_message?.metadata?.detected_language;
+              if (langCode && langCode !== 'en') {
+                return (
+                  <span
+                    title={`Visitor Language: ${langCode.toUpperCase()}`}
+                    className="inline-flex items-center gap-0.5 text-[9px] text-blue-600 dark:text-blue-400 bg-blue-500/10 px-1.5 py-0.5 rounded-md font-bold border border-blue-500/20 uppercase"
+                  >
+                    🌐 {langCode}
+                  </span>
+                );
+              }
+              return null;
+            })()}
 
             {/* AI Summary Badge */}
             {conv.summary && (
