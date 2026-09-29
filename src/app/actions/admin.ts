@@ -458,10 +458,24 @@ export async function updateSMTPSettingsAction(
   await assertAdminUser(workspaceId);
   const supabase = await createClient();
 
+  const sanitized: SMTPSettingsConfig = {
+    ...settings,
+    host: (settings.host || '').trim(),
+    port: Number(settings.port) || 465,
+    user: (settings.user || '').trim(),
+    pass: settings.pass || '',
+    from_name: (settings.from_name || '').trim(),
+    from_email: (settings.from_email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(settings.from_email.trim()))
+      ? settings.from_email.trim()
+      : (settings.user || '').trim(),
+    secure: settings.secure !== undefined ? settings.secure : Number(settings.port) === 465,
+    unread_threshold_minutes: Number(settings.unread_threshold_minutes) || 5,
+  };
+
   const { data: updated, error } = await supabase
     .from('workspaces')
     .update({
-      smtp_settings: settings,
+      smtp_settings: sanitized,
     })
     .eq('id', workspaceId)
     .select()

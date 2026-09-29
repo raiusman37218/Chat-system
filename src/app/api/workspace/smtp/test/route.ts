@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { testSmtpConnection, sendSmtpEmail } from '@/lib/email/smtp';
+import { testSmtpConnection, sendSmtpEmail, isValidEmail, getEffectiveFromEmail } from '@/lib/email/smtp';
 import { SMTPSettingsConfig } from '@/types/database';
 
 export async function POST(req: NextRequest) {
@@ -17,8 +17,21 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Normalize config
+    const normalizedConfig: SMTPSettingsConfig = {
+      ...config,
+      host: config.host.trim(),
+      port: Number(config.port) || 465,
+      user: config.user.trim(),
+      pass: config.pass,
+      from_name: (config.from_name || '').trim(),
+      from_email: (config.from_email && isValidEmail(config.from_email))
+        ? config.from_email.trim()
+        : config.user.trim(),
+    };
+
     // 1. Verify connection
-    const testResult = await testSmtpConnection(config);
+    const testResult = await testSmtpConnection(normalizedConfig);
     if (!testResult.success) {
       return NextResponse.json(
         { error: testResult.message || 'Could not connect to SMTP server' },
@@ -28,22 +41,36 @@ export async function POST(req: NextRequest) {
 
     // 2. Optionally send a real test email if an email is provided
     if (sendTestTo) {
-      const emailResult = await sendSmtpEmail(config, {
-        to: sendTestTo,
-        subject: `[SMTP Test] Successful connection from ${config.from_name || 'Support Desk'}`,
+      const recipient = sendTestTo.trim();
+      if (!isValidEmail(recipient)) {
+        return NextResponse.json(
+          { error: `Invalid test recipient email "${recipient}". Please enter a valid recipient address (e.g. yourname@gmail.com).` },
+          { status: 400 }
+        );
+      }
+
+      const effectiveSender = getEffectiveFromEmail(normalizedConfig);
+
+      const emailResult = await sendSmtpEmail(normalizedConfig, {
+        to: recipient,
+        subject: `[SMTP Test] Successful connection from ${normalizedConfig.from_name || 'Support Desk'}`,
         html: `
-          <div style="font-family: -apple-system, sans-serif; max-width: 500px; padding: 24px; border: 1px solid #e2e8f0; border-radius: 12px;">
-            <h2 style="color: #10b981; margin-top: 0;">✓ Hostinger SMTP Connected Successfully!</h2>
-            <p style="color: #334155; line-height: 1.5;">
-              Congratulations! Your Hostinger / custom SMTP credentials are verified and working perfectly.
-            </p>
-            <div style="background-color: #f8fafc; padding: 12px; border-radius: 8px; font-size: 13px; color: #64748b; margin: 16px 0;">
-              <div><strong>Host:</strong> ${config.host}</div>
-              <div><strong>Port:</strong> ${config.port} (Secure: ${config.port === 465 ? 'SSL' : 'TLS'})</div>
-              <div><strong>Sender:</strong> ${config.from_email || config.user}</div>
+          <div style="font-family: -apple-system, sans-serif; max-width: 520px; padding: 26px; border: 1px solid #e2e8f0; border-radius: 14px; background: #ffffff;">
+            <div style="display: inline-block; background: #ecfdf5; color: #059669; padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; margin-bottom: 12px;">
+              ✓ SMTP VERIFIED &amp; WORKING
             </div>
-            <p style="font-size: 13px; color: #94a3b8; margin-bottom: 0;">
-              Your customers will now receive automatic email alerts whenever they leave the chat for more than 5 minutes!
+            <h2 style="color: #0f172a; margin: 0 0 10px 0; font-size: 20px;">Hostinger SMTP Connected Successfully!</h2>
+            <p style="color: #475569; line-height: 1.55; font-size: 14px; margin: 0 0 16px 0;">
+              Congratulations! Your Hostinger / custom SMTP credentials are verified and email delivery is working at production level.
+            </p>
+            <div style="background-color: #f8fafc; padding: 14px 16px; border-radius: 10px; font-size: 13px; color: #475569; border: 1px solid #e2e8f0; line-height: 1.6;">
+              <div><strong>Host:</strong> ${normalizedConfig.host}</div>
+              <div><strong>Port:</strong> ${normalizedConfig.port} (${normalizedConfig.port === 465 ? 'SSL - Port 465' : 'TLS - Port 587'})</div>
+              <div><strong>Sender (&quot;From&quot;):</strong> &quot;${normalizedConfig.from_name || 'Support Desk'}&quot; &lt;${effectiveSender}&gt;</div>
+              <div><strong>Authenticated User:</strong> ${normalizedConfig.user}</div>
+            </div>
+            <p style="font-size: 13px; color: #64748b; margin: 16px 0 0 0; line-height: 1.5;">
+              Your customers will now receive automatic email alerts whenever an agent replies to their conversation and they haven&apos;t seen it for 5 minutes.
             </p>
           </div>
         `,
@@ -60,8 +87,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       success: true,
       message: sendTestTo
-        ? `Connection verified! A test email has been sent to ${sendTestTo}`
-        : 'SMTP connection verified successfully!',
+        ? `SMTP verified! A test email has been successfully sent to ${sendTestTo.trim()}`
+        : 'Hostinger SMTP connection verified successfully!',
     });
   } catch (error: any) {
     console.error('[SMTP Test Route Error]:', error);

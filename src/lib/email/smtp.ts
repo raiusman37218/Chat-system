@@ -1,6 +1,19 @@
 import nodemailer from 'nodemailer';
 import { SMTPSettingsConfig } from '@/types/database';
 
+export function isValidEmail(email: string | undefined | null): boolean {
+  if (!email) return false;
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+}
+
+export function getEffectiveFromEmail(config: SMTPSettingsConfig): string {
+  const customFrom = (config.from_email || '').trim();
+  if (isValidEmail(customFrom)) {
+    return customFrom;
+  }
+  return (config.user || '').trim();
+}
+
 export function createSmtpTransporter(config: SMTPSettingsConfig) {
   const isSecure = config.secure !== undefined 
     ? config.secure 
@@ -14,6 +27,9 @@ export function createSmtpTransporter(config: SMTPSettingsConfig) {
       user: config.user.trim(),
       pass: config.pass,
     },
+    connectionTimeout: 15000,
+    greetingTimeout: 15000,
+    socketTimeout: 20000,
     tls: {
       rejectUnauthorized: false,
     },
@@ -27,9 +43,15 @@ export async function testSmtpConnection(config: SMTPSettingsConfig): Promise<{ 
     return { success: true };
   } catch (error: any) {
     console.error('[SMTP Verify Error]:', error);
+    let msg = error.message || 'Failed to connect to SMTP server. Please check your credentials.';
+    if (msg.includes('EAUTH') || msg.includes('535')) {
+      msg = 'Authentication failed. Please verify your email address and password on Hostinger.';
+    } else if (msg.includes('ETIMEDOUT') || msg.includes('ECONNREFUSED')) {
+      msg = `Could not connect to ${config.host}:${config.port}. Please verify the host and port (465 SSL is recommended for Hostinger).`;
+    }
     return { 
       success: false, 
-      message: error.message || 'Failed to connect to SMTP server. Please check your credentials.' 
+      message: msg 
     };
   }
 }
@@ -48,12 +70,16 @@ export async function sendSmtpEmail(
 ): Promise<{ success: boolean; messageId?: string; error?: string }> {
   try {
     const transporter = createSmtpTransporter(config);
-    const fromAddress = `"${(config.from_name || 'Support Desk').replace(/"/g, '')}" <${config.from_email || config.user}>`;
+    const effectiveFrom = getEffectiveFromEmail(config);
+    const cleanSenderName = (config.from_name || 'Support Desk')
+      .replace(/["\r\n\\]/g, '')
+      .trim();
+    const fromAddress = `"${cleanSenderName}" <${effectiveFrom}>`;
 
     const info = await transporter.sendMail({
       from: fromAddress,
-      to: options.to,
-      replyTo: options.replyTo || config.from_email || config.user,
+      to: options.to.trim(),
+      replyTo: options.replyTo && isValidEmail(options.replyTo) ? options.replyTo.trim() : effectiveFrom,
       subject: options.subject,
       text: options.text || options.html.replace(/<[^>]+>/g, ''),
       html: options.html,
@@ -62,7 +88,11 @@ export async function sendSmtpEmail(
     return { success: true, messageId: info.messageId };
   } catch (error: any) {
     console.error('[SMTP Send Error]:', error);
-    return { success: false, error: error.message || 'Failed to send email' };
+    let errMsg = error.message || 'Failed to send email';
+    if (errMsg.includes('553') && errMsg.includes('Sender address rejected')) {
+      errMsg = `Hostinger rejected the sender address. Hostinger requires the "From" address to be your authenticated email (${config.user}).`;
+    }
+    return { success: false, error: errMsg };
   }
 }
 

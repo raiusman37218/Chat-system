@@ -22,20 +22,28 @@ interface SMTPSettingsSectionProps {
   onWorkspaceUpdated?: (updated: Workspace) => void;
 }
 
+const isValidEmail = (email: string | undefined | null) => {
+  if (!email) return false;
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+};
+
 export function SMTPSettingsSection({
   workspace,
   onWorkspaceUpdated,
 }: SMTPSettingsSectionProps) {
-  const initialSmtp = (workspace.smtp_settings as SMTPSettingsConfig | null) || {
-    enabled: true,
-    host: 'smtp.hostinger.com',
-    port: 465,
-    secure: true,
-    user: '',
-    pass: '',
-    from_email: '',
-    from_name: workspace.name || 'Support Desk',
-    unread_threshold_minutes: 5,
+  const rawSmtp = (workspace.smtp_settings as SMTPSettingsConfig | null);
+  const initialSmtp: SMTPSettingsConfig = {
+    enabled: rawSmtp?.enabled ?? true,
+    host: rawSmtp?.host || 'smtp.hostinger.com',
+    port: rawSmtp?.port || 465,
+    secure: rawSmtp?.secure ?? true,
+    user: rawSmtp?.user || '',
+    pass: rawSmtp?.pass || '',
+    from_email: (rawSmtp?.from_email && isValidEmail(rawSmtp.from_email))
+      ? rawSmtp.from_email
+      : (rawSmtp?.user || ''),
+    from_name: rawSmtp?.from_name || workspace.name || 'Support Desk',
+    unread_threshold_minutes: rawSmtp?.unread_threshold_minutes || 5,
   };
 
   const [smtp, setSmtp] = useState<SMTPSettingsConfig>(initialSmtp);
@@ -43,7 +51,7 @@ export function SMTPSettingsSection({
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
   const [checkingCron, setCheckingCron] = useState(false);
-  const [testEmailTo, setTestEmailTo] = useState('');
+  const [testEmailTo, setTestEmailTo] = useState('raiusman671@gmail.com');
   const [statusMessage, setStatusMessage] = useState<{
     type: 'success' | 'error' | 'info';
     text: string;
@@ -55,11 +63,12 @@ export function SMTPSettingsSection({
       host: 'smtp.hostinger.com',
       port: 465,
       secure: true,
+      from_email: isValidEmail(prev.from_email) ? prev.from_email : (prev.user || ''),
       from_name: prev.from_name || workspace.name || 'Support Desk',
     }));
     setStatusMessage({
       type: 'info',
-      text: 'Hostinger SMTP defaults applied (smtp.hostinger.com:465 SSL). Please enter your Hostinger email and password.',
+      text: 'Hostinger SMTP defaults applied (smtp.hostinger.com:465 SSL). Please ensure your Hostinger email and password are entered.',
     });
   };
 
@@ -67,7 +76,28 @@ export function SMTPSettingsSection({
     setTesting(true);
     setStatusMessage(null);
     try {
-      if (!smtp.host || !smtp.port || !smtp.user || !smtp.pass) {
+      const effectiveFrom = (smtp.from_email && isValidEmail(smtp.from_email))
+        ? smtp.from_email.trim()
+        : smtp.user.trim();
+
+      const normalizedConfig: SMTPSettingsConfig = {
+        ...smtp,
+        host: (smtp.host || 'smtp.hostinger.com').trim(),
+        port: Number(smtp.port) || 465,
+        user: smtp.user.trim(),
+        pass: smtp.pass,
+        from_name: (smtp.from_name || workspace.name || 'Support Desk').trim(),
+        from_email: effectiveFrom,
+        secure: Number(smtp.port) === 465,
+        unread_threshold_minutes: Number(smtp.unread_threshold_minutes) || 5,
+      };
+
+      // Auto-correct on screen if invalid text was present
+      if (smtp.from_email !== effectiveFrom) {
+        setSmtp(normalizedConfig);
+      }
+
+      if (!normalizedConfig.host || !normalizedConfig.port || !normalizedConfig.user || !normalizedConfig.pass) {
         setStatusMessage({
           type: 'error',
           text: 'Please fill in Host, Port, Username and Password before testing.',
@@ -76,12 +106,35 @@ export function SMTPSettingsSection({
         return;
       }
 
+      if (!isValidEmail(normalizedConfig.user)) {
+        setStatusMessage({
+          type: 'error',
+          text: 'Hostinger Email Address (Username) must be a valid email (e.g. helpdesk@range4ex.com).',
+        });
+        setTesting(false);
+        return;
+      }
+
+      let recipientToSend: string | undefined = undefined;
+      if (withTestEmail) {
+        const targetRecipient = testEmailTo.trim();
+        if (!targetRecipient || !isValidEmail(targetRecipient)) {
+          setStatusMessage({
+            type: 'error',
+            text: 'Please enter a valid recipient email (e.g. raiusman671@gmail.com) in the test email box.',
+          });
+          setTesting(false);
+          return;
+        }
+        recipientToSend = targetRecipient;
+      }
+
       const res = await fetch('/api/workspace/smtp/test', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          config: smtp,
-          sendTestTo: withTestEmail ? (testEmailTo || smtp.from_email || smtp.user) : undefined,
+          config: normalizedConfig,
+          sendTestTo: recipientToSend,
         }),
       });
 
@@ -111,12 +164,39 @@ export function SMTPSettingsSection({
     setSaving(true);
     setStatusMessage(null);
     try {
-      const res = await updateSMTPSettingsAction(workspace.id, smtp);
+      const effectiveFrom = (smtp.from_email && isValidEmail(smtp.from_email))
+        ? smtp.from_email.trim()
+        : smtp.user.trim();
+
+      const normalizedConfig: SMTPSettingsConfig = {
+        ...smtp,
+        host: (smtp.host || 'smtp.hostinger.com').trim(),
+        port: Number(smtp.port) || 465,
+        user: smtp.user.trim(),
+        pass: smtp.pass,
+        from_name: (smtp.from_name || workspace.name || 'Support Desk').trim(),
+        from_email: effectiveFrom,
+        secure: Number(smtp.port) === 465,
+        unread_threshold_minutes: Number(smtp.unread_threshold_minutes) || 5,
+      };
+
+      setSmtp(normalizedConfig);
+
+      if (!normalizedConfig.host || !normalizedConfig.user || !normalizedConfig.pass) {
+        setStatusMessage({
+          type: 'error',
+          text: 'Please fill in Host, Username and Password before saving.',
+        });
+        setSaving(false);
+        return;
+      }
+
+      const res = await updateSMTPSettingsAction(workspace.id, normalizedConfig);
       if (res.workspace) {
         onWorkspaceUpdated?.(res.workspace);
         setStatusMessage({
           type: 'success',
-          text: 'Hostinger SMTP settings and 5-minute email alerts saved successfully!',
+          text: '✓ Hostinger SMTP settings and 5-minute automated email notifications saved and active!',
         });
       }
     } catch (err: any) {
@@ -268,27 +348,32 @@ export function SMTPSettingsSection({
 
           <div>
             <label className="block text-xs font-semibold text-foreground mb-1.5">
-              Hostinger Email Address (Username)
+              Hostinger Email Address (Username) <span className="text-rose-500">*</span>
             </label>
             <input
               type="email"
               value={smtp.user}
               onChange={(e) => {
                 const val = e.target.value;
-                setSmtp({
-                  ...smtp,
+                setSmtp((prev) => ({
+                  ...prev,
                   user: val,
-                  from_email: smtp.from_email || val,
-                });
+                  from_email: (!prev.from_email || prev.from_email === prev.user || !isValidEmail(prev.from_email))
+                    ? val
+                    : prev.from_email,
+                }));
               }}
-              placeholder="support@yourdomain.com"
+              placeholder="helpdesk@range4ex.com"
               className="w-full rounded-lg border border-input bg-background px-3.5 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
             />
+            <p className="text-[11px] text-muted-foreground mt-1">
+              Your primary mailbox address on Hostinger
+            </p>
           </div>
 
           <div>
             <label className="block text-xs font-semibold text-foreground mb-1.5">
-              Email Password
+              Email Password <span className="text-rose-500">*</span>
             </label>
             <div className="relative">
               <input
@@ -309,16 +394,48 @@ export function SMTPSettingsSection({
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-foreground mb-1.5">
-              Sender Email (&quot;From&quot; Address)
-            </label>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="block text-xs font-semibold text-foreground">
+                Sender Email (&quot;From&quot; Address)
+              </label>
+              {smtp.user && smtp.from_email !== smtp.user && (
+                <button
+                  type="button"
+                  onClick={() => setSmtp((prev) => ({ ...prev, from_email: prev.user.trim() }))}
+                  className="text-[11px] font-semibold text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 hover:underline"
+                >
+                  Use Hostinger Email
+                </button>
+              )}
+            </div>
             <input
               type="email"
               value={smtp.from_email}
               onChange={(e) => setSmtp({ ...smtp, from_email: e.target.value })}
-              placeholder={smtp.user || 'support@yourdomain.com'}
-              className="w-full rounded-lg border border-input bg-background px-3.5 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              onBlur={() => {
+                if (smtp.from_email && !isValidEmail(smtp.from_email)) {
+                  if (smtp.user && isValidEmail(smtp.user)) {
+                    setSmtp((prev) => ({ ...prev, from_email: prev.user.trim() }));
+                  }
+                }
+              }}
+              placeholder={smtp.user || 'helpdesk@range4ex.com'}
+              className={`w-full rounded-lg border bg-background px-3.5 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 ${
+                smtp.from_email && !isValidEmail(smtp.from_email)
+                  ? 'border-rose-400 focus:border-rose-500 focus:ring-rose-500'
+                  : 'border-input focus:border-indigo-500 focus:ring-indigo-500'
+              }`}
             />
+            {smtp.from_email && !isValidEmail(smtp.from_email) ? (
+              <p className="text-[11px] text-rose-500 font-medium mt-1 flex items-center gap-1">
+                <AlertCircle className="h-3 w-3 shrink-0" />
+                Must be a valid email (e.g. {smtp.user || 'helpdesk@range4ex.com'}). Incomplete or invalid email causes Hostinger to reject delivery.
+              </p>
+            ) : (
+              <p className="text-[11px] text-muted-foreground mt-1">
+                Must be your Hostinger mailbox or authorized sender address
+              </p>
+            )}
           </div>
 
           <div>
