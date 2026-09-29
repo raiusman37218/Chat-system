@@ -1303,10 +1303,10 @@ export default function ChatWidget({
                             <div className="space-y-1">
                               <ChatMarkdown content={displayContent} className="leading-relaxed" />
                               {originalEnglish && translatedText && (
-                                <div className="pt-1 border-t border-slate-300/40 dark:border-slate-700/50 flex items-center justify-between text-[10px] text-slate-500 dark:text-slate-400 select-none">
-                                  <span className="inline-flex items-center gap-1 opacity-75">
-                                    <Globe className="w-2.5 h-2.5" />
-                                    {isShowingOriginal ? 'English (Original)' : 'Auto-translated'}
+                                <div className="mt-1.5 pt-1.5 border-t border-slate-300/80 dark:border-slate-700 flex items-center justify-between text-[11px] font-medium text-slate-600 dark:text-slate-300 select-none">
+                                  <span className="inline-flex items-center gap-1 font-bold text-blue-600 dark:text-blue-400">
+                                    <Globe className="w-3 h-3 shrink-0" />
+                                    {isShowingOriginal ? 'Original English' : 'Auto-translated'}
                                   </span>
                                   <button
                                     type="button"
@@ -1316,7 +1316,7 @@ export default function ChatWidget({
                                         [msg.id]: !prev[msg.id],
                                       }))
                                     }
-                                    className="text-blue-600 dark:text-blue-400 hover:underline cursor-pointer font-medium ml-auto"
+                                    className="px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-blue-600 dark:text-blue-400 hover:underline cursor-pointer font-bold text-[10.5px] ml-auto shadow-2xs"
                                   >
                                     {isShowingOriginal ? 'Show translated' : 'Show English'}
                                   </button>

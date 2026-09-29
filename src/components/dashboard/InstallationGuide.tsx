@@ -57,52 +57,52 @@ export function InstallationGuide({
 
   const GUIDES: Record<Platform, React.ReactNode> = {
     html: (
-      <ol className="space-y-2.5">
+      <ol className="space-y-3">
         {[
           'Open your site\'s main HTML template or master layout file.',
           'Scroll to the bottom and find the closing </body> tag.',
           'Paste the Chatify snippet directly above it.',
           'Save and deploy — the launcher appears for every visitor.',
         ].map((s, i) => (
-          <li key={i} className="flex gap-3">
-            <span className="shrink-0 w-5 h-5 rounded-md bg-surface-3 text-ink-2 text-[11px] font-semibold flex items-center justify-center">
+          <li key={i} className="flex gap-3.5 items-center">
+            <span className="shrink-0 w-6 h-6 rounded-lg bg-accent text-white text-[12px] font-extrabold flex items-center justify-center shadow-xs">
               {i + 1}
             </span>
-            <span className="text-[13px] leading-relaxed text-ink-2">{s}</span>
+            <span className="text-[13.5px] leading-relaxed text-ink font-medium">{s}</span>
           </li>
         ))}
       </ol>
     ),
     wordpress: (
-      <ol className="space-y-2.5">
+      <ol className="space-y-3">
         {[
           'Log in to your WordPress admin dashboard.',
           'Install a free header/footer plugin such as WPCode.',
           'Go to Code Snippets → Header & Footer.',
           'Paste the snippet into the Footer box and save.',
         ].map((s, i) => (
-          <li key={i} className="flex gap-3">
-            <span className="shrink-0 w-5 h-5 rounded-md bg-surface-3 text-ink-2 text-[11px] font-semibold flex items-center justify-center">
+          <li key={i} className="flex gap-3.5 items-center">
+            <span className="shrink-0 w-6 h-6 rounded-lg bg-accent text-white text-[12px] font-extrabold flex items-center justify-center shadow-xs">
               {i + 1}
             </span>
-            <span className="text-[13px] leading-relaxed text-ink-2">{s}</span>
+            <span className="text-[13.5px] leading-relaxed text-ink font-medium">{s}</span>
           </li>
         ))}
       </ol>
     ),
     shopify: (
-      <ol className="space-y-2.5">
+      <ol className="space-y-3">
         {[
           'Open your Shopify store admin.',
           'Go to Online Store → Themes.',
           'Next to your live theme: Actions (…) → Edit code.',
           'Open theme.liquid, paste above </body>, then Save.',
         ].map((s, i) => (
-          <li key={i} className="flex gap-3">
-            <span className="shrink-0 w-5 h-5 rounded-md bg-surface-3 text-ink-2 text-[11px] font-semibold flex items-center justify-center">
+          <li key={i} className="flex gap-3.5 items-center">
+            <span className="shrink-0 w-6 h-6 rounded-lg bg-accent text-white text-[12px] font-extrabold flex items-center justify-center shadow-xs">
               {i + 1}
             </span>
-            <span className="text-[13px] leading-relaxed text-ink-2">{s}</span>
+            <span className="text-[13.5px] leading-relaxed text-ink font-medium">{s}</span>
           </li>
         ))}
       </ol>
@@ -223,50 +223,46 @@ export default function RootLayout({ children }) {
           </div>
 
           {/* Snippet */}
-          <div>
-            <div className="flex items-baseline justify-between mb-2.5">
-              <h2 className="text-[14px] font-semibold">Your embed code</h2>
-              <button onClick={copyCode} className="btn btn-sm btn-primary">
+          <div className="card p-6 border-2 border-line-2 shadow-xs space-y-3">
+            <div className="flex items-center justify-between mb-1">
+              <div>
+                <h2 className="text-[15px] font-bold text-ink">Your Embed Code</h2>
+                <p className="text-[12px] text-ink-2">Copy this snippet and paste it right before the closing &lt;/body&gt; tag on your website.</p>
+              </div>
+              <button onClick={copyCode} className="btn btn-sm btn-primary font-bold shadow-xs px-4 py-2 shrink-0">
                 {copied ? (
                   <>
-                    <Check className="w-3.5 h-3.5" />
-                    Copied
+                    <Check className="w-4 h-4 text-emerald-300" />
+                    <span>Copied!</span>
                   </>
                 ) : (
                   <>
-                    <Copy className="w-3.5 h-3.5" />
-                    Copy snippet
+                    <Copy className="w-4 h-4" />
+                    <span>Copy snippet</span>
                   </>
                 )}
               </button>
             </div>
 
-            <pre className="code-block">{embedScript}</pre>
-
-            <p className="mt-2.5 text-[12.5px] leading-relaxed text-ink-3">
-              Paste it immediately before the closing{' '}
-              <code className="font-mono text-ink-2">&lt;/body&gt;</code> or{' '}
-              <code className="font-mono text-ink-2">&lt;/head&gt;</code> tag on
-              every page that should offer live support.
-            </p>
+            <pre className="p-4.5 rounded-xl bg-slate-950 text-emerald-400 font-mono text-[12.5px] border-2 border-slate-800 shadow-inner overflow-x-auto leading-relaxed">{embedScript}</pre>
           </div>
 
           {/* Platform guides */}
-          <div>
-            <div className="flex items-center justify-between gap-4 mb-3 flex-wrap">
-              <h2 className="text-[14px] font-semibold">
-                Platform-specific steps
+          <div className="card p-6 border-2 border-line-2 shadow-xs space-y-4">
+            <div className="flex items-center justify-between gap-4 flex-wrap border-b border-line-2 pb-3.5">
+              <h2 className="text-[15px] font-bold text-ink">
+                Platform-Specific Installation Steps
               </h2>
-              <div className="inline-flex items-center gap-0.5 p-0.5 rounded-lg bg-surface-2 border border-line">
+              <div className="inline-flex items-center gap-1 p-1 rounded-xl bg-surface-2 border-2 border-line-2">
                 {(Object.keys(PLATFORM_LABEL) as Platform[]).map((p) => (
                   <button
                     key={p}
                     onClick={() => setActivePlatform(p)}
                     className={cn(
-                      'h-7 px-3 rounded-md text-[12px] font-medium transition-colors',
+                      'h-7.5 px-3 rounded-lg text-[12px] font-bold transition-all',
                       activePlatform === p
-                        ? 'bg-surface text-ink shadow-xs'
-                        : 'text-ink-3 hover:text-ink'
+                        ? 'bg-accent text-white shadow-xs'
+                        : 'text-ink-2 hover:text-ink hover:bg-surface-3'
                     )}
                   >
                     {PLATFORM_LABEL[p]}
@@ -275,30 +271,30 @@ export default function RootLayout({ children }) {
               </div>
             </div>
 
-            <div className="card p-5">{GUIDES[activePlatform]}</div>
+            <div className="pt-1">{GUIDES[activePlatform]}</div>
           </div>
 
           {/* Verify */}
-          <div className="panel p-4 flex items-center justify-between gap-4 flex-wrap">
-            <div className="flex items-start gap-2.5 min-w-0">
-              <Check
-                className={cn(
-                  'w-4 h-4 mt-px shrink-0',
-                  hasVisitors ? 'text-success' : 'text-ink-3'
-                )}
-              />
-              <span className="text-[12.5px] leading-relaxed text-ink-2 min-w-0">
+          <div className="card p-5 border-2 border-line-2 shadow-xs flex items-center justify-between gap-4 flex-wrap bg-surface">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className={cn(
+                'w-8 h-8 rounded-lg flex items-center justify-center shrink-0 shadow-2xs',
+                hasVisitors ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30' : 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30'
+              )}>
+                <Check className="w-4 h-4" />
+              </div>
+              <div className="text-[13px] leading-relaxed text-ink min-w-0 font-medium">
                 {hasVisitors ? (
                   <>
-                    Traffic detected on{' '}
-                    <span className="font-mono text-ink">
+                    <span className="font-bold text-emerald-600 dark:text-emerald-400">Traffic detected</span> on{' '}
+                    <span className="font-mono text-ink font-bold">
                       {latestVisitorUrl || 'your site'}
                     </span>
                   </>
                 ) : (
-                  'No traffic yet. Open the simulator to verify your install in seconds.'
+                  <span className="text-ink-2 font-medium">No live visitor traffic detected yet. Use the simulator below to test in real-time.</span>
                 )}
-              </span>
+              </div>
             </div>
 
             <a
@@ -307,10 +303,10 @@ export default function RootLayout({ children }) {
               )}`}
               target="_blank"
               rel="noreferrer"
-              className="btn btn-sm btn-secondary shrink-0"
+              className="btn btn-sm btn-secondary font-bold border-2 border-line-2 hover:border-line-3 shrink-0 shadow-2xs gap-1.5"
             >
-              Test in simulator
-              <ExternalLink className="w-3.5 h-3.5" />
+              <span>Test in Simulator</span>
+              <ExternalLink className="w-3.5 h-3.5 text-accent" />
             </a>
           </div>
         </div>

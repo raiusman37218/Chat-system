@@ -13,6 +13,7 @@ import {
   ShieldCheck,
   Clock,
   ExternalLink,
+  Check,
 } from 'lucide-react';
 import { SMTPSettingsConfig, Workspace } from '@/types/database';
 import { updateSMTPSettingsAction } from '@/app/actions/admin';
@@ -238,17 +239,17 @@ export function SMTPSettingsSection({
   return (
     <div className="space-y-6">
       {/* Header Banner */}
-      <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
+      <div className="card border-2 border-line-2 bg-surface p-6 shadow-xs">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="flex items-start gap-4">
-            <div className="rounded-lg bg-indigo-500/10 p-3 text-indigo-500">
+            <div className="rounded-xl bg-accent text-white p-3 shadow-sm">
               <Mail className="h-6 w-6" />
             </div>
             <div>
-              <h3 className="text-lg font-semibold text-foreground">
+              <h3 className="text-lg font-bold text-ink">
                 Email &amp; Hostinger SMTP Integration
               </h3>
-              <p className="text-sm text-muted-foreground mt-0.5">
+              <p className="text-[13px] text-ink-2 mt-0.5 leading-relaxed">
                 Configure your custom workspace email credentials. When a user has not seen a query reply for 5 minutes, an automatic professional email notification is sent to them.
               </p>
             </div>
@@ -256,7 +257,7 @@ export function SMTPSettingsSection({
           <button
             type="button"
             onClick={applyHostingerPreset}
-            className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg bg-indigo-50 text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100 transition-colors shrink-0"
+            className="btn btn-sm btn-secondary font-bold text-xs gap-1.5 border-2 border-line-2 hover:border-line-3 text-accent shrink-0 shadow-xs"
           >
             <Sparkles className="h-3.5 w-3.5" />
             Auto-fill Hostinger Settings
@@ -265,49 +266,52 @@ export function SMTPSettingsSection({
       </div>
 
       {/* Main Form */}
-      <div className="rounded-xl border border-border bg-card p-6 shadow-sm space-y-6">
+      <div className="card border-2 border-line-2 bg-surface p-6 shadow-xs space-y-6">
         {/* Toggle 5-min alert */}
-        <div className="flex items-center justify-between p-4 rounded-lg bg-muted/40 border border-border">
-          <div className="space-y-0.5">
+        <div className="flex items-center justify-between p-4.5 rounded-xl bg-surface-2/70 border-2 border-line-2 shadow-2xs">
+          <div className="space-y-0.5 pr-4">
             <div className="flex items-center gap-2">
-              <Clock className="h-4 w-4 text-indigo-500" />
-              <label htmlFor="smtp-enabled-toggle" className="text-sm font-semibold text-foreground cursor-pointer">
+              <Clock className="h-4 w-4 text-accent" />
+              <label htmlFor="smtp-enabled-toggle" className="text-[14px] font-bold text-ink cursor-pointer">
                 Automated 5-Minute Unread Email Notifications
               </label>
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-[12px] text-ink-2 leading-relaxed">
               If a customer leaves the site or doesn&apos;t read an agent&apos;s reply within 5 minutes, email them the reply automatically with a direct link to the conversation.
             </p>
           </div>
-          <input
-            id="smtp-enabled-toggle"
-            type="checkbox"
-            checked={smtp.enabled}
-            onChange={(e) => setSmtp({ ...smtp, enabled: e.target.checked })}
-            className="h-5 w-5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
-          />
+          <label className="relative inline-flex items-center cursor-pointer shrink-0">
+            <input
+              id="smtp-enabled-toggle"
+              type="checkbox"
+              checked={smtp.enabled}
+              onChange={(e) => setSmtp({ ...smtp, enabled: e.target.checked })}
+              className="sr-only peer"
+            />
+            <div className="w-12 h-6.5 bg-line-2 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5.5 after:w-5.5 after:transition-all peer-checked:bg-accent shadow-xs"></div>
+          </label>
         </div>
 
         {/* Credentials Form */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
           <div>
-            <label className="block text-xs font-semibold text-foreground mb-1.5">
-              SMTP Host
+            <label className="block text-[13px] font-bold text-ink mb-1.5">
+              SMTP Host Server <span className="text-rose-500">*</span>
             </label>
             <input
               type="text"
               value={smtp.host}
               onChange={(e) => setSmtp({ ...smtp, host: e.target.value })}
               placeholder="smtp.hostinger.com"
-              className="w-full rounded-lg border border-input bg-background px-3.5 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              className="input text-sm font-medium border-2 border-line-2 focus:border-accent text-ink"
             />
-            <p className="text-[11px] text-muted-foreground mt-1">
-              Hostinger default is <code className="text-indigo-600 dark:text-indigo-400">smtp.hostinger.com</code>
+            <p className="text-[11.5px] text-ink-2 mt-1">
+              Hostinger default is <code className="font-mono font-bold text-accent">smtp.hostinger.com</code>
             </p>
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-foreground mb-1.5">
+            <label className="block text-[13px] font-bold text-ink mb-1.5">
               SMTP Port &amp; Encryption
             </label>
             <div className="flex gap-2">
@@ -323,7 +327,7 @@ export function SMTPSettingsSection({
                   });
                 }}
                 placeholder="465"
-                className="w-28 rounded-lg border border-input bg-background px-3.5 py-2.5 text-sm text-foreground focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                className="input w-28 text-sm font-mono font-bold border-2 border-line-2 focus:border-accent text-ink"
               />
               <select
                 value={smtp.port === 465 ? '465' : '587'}
@@ -335,19 +339,19 @@ export function SMTPSettingsSection({
                     secure: portNum === 465,
                   });
                 }}
-                className="flex-1 rounded-lg border border-input bg-background px-3 py-2.5 text-sm text-foreground focus:border-indigo-500 focus:outline-none"
+                className="input flex-1 text-sm font-semibold border-2 border-line-2 focus:border-accent text-ink"
               >
                 <option value="465">Port 465 (SSL - Recommended)</option>
                 <option value="587">Port 587 (TLS / STARTTLS)</option>
               </select>
             </div>
-            <p className="text-[11px] text-muted-foreground mt-1">
+            <p className="text-[11.5px] text-ink-2 mt-1">
               Use Port 465 for secure Hostinger SSL transmission
             </p>
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-foreground mb-1.5">
+            <label className="block text-[13px] font-bold text-ink mb-1.5">
               Hostinger Email Address (Username) <span className="text-rose-500">*</span>
             </label>
             <input
@@ -364,15 +368,15 @@ export function SMTPSettingsSection({
                 }));
               }}
               placeholder="helpdesk@range4ex.com"
-              className="w-full rounded-lg border border-input bg-background px-3.5 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              className="input text-sm font-medium border-2 border-line-2 focus:border-accent text-ink"
             />
-            <p className="text-[11px] text-muted-foreground mt-1">
+            <p className="text-[11.5px] text-ink-2 mt-1">
               Your primary mailbox address on Hostinger
             </p>
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-foreground mb-1.5">
+            <label className="block text-[13px] font-bold text-ink mb-1.5">
               Email Password <span className="text-rose-500">*</span>
             </label>
             <div className="relative">
@@ -381,12 +385,12 @@ export function SMTPSettingsSection({
                 value={smtp.pass}
                 onChange={(e) => setSmtp({ ...smtp, pass: e.target.value })}
                 placeholder="••••••••••••••••"
-                className="w-full rounded-lg border border-input bg-background pl-3.5 pr-10 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                className="input text-sm font-medium pr-10 border-2 border-line-2 focus:border-accent text-ink"
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-2 hover:text-ink p-1"
               >
                 {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </button>
@@ -395,14 +399,14 @@ export function SMTPSettingsSection({
 
           <div>
             <div className="flex items-center justify-between mb-1.5">
-              <label className="block text-xs font-semibold text-foreground">
+              <label className="block text-[13px] font-bold text-ink">
                 Sender Email (&quot;From&quot; Address)
               </label>
               {smtp.user && smtp.from_email !== smtp.user && (
                 <button
                   type="button"
                   onClick={() => setSmtp((prev) => ({ ...prev, from_email: prev.user.trim() }))}
-                  className="text-[11px] font-semibold text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 hover:underline"
+                  className="text-[11.5px] font-bold text-accent hover:underline"
                 >
                   Use Hostinger Email
                 </button>
@@ -420,26 +424,26 @@ export function SMTPSettingsSection({
                 }
               }}
               placeholder={smtp.user || 'helpdesk@range4ex.com'}
-              className={`w-full rounded-lg border bg-background px-3.5 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 ${
+              className={`input text-sm font-medium border-2 ${
                 smtp.from_email && !isValidEmail(smtp.from_email)
-                  ? 'border-rose-400 focus:border-rose-500 focus:ring-rose-500'
-                  : 'border-input focus:border-indigo-500 focus:ring-indigo-500'
+                  ? 'border-rose-500 focus:border-rose-500'
+                  : 'border-line-2 focus:border-accent text-ink'
               }`}
             />
             {smtp.from_email && !isValidEmail(smtp.from_email) ? (
-              <p className="text-[11px] text-rose-500 font-medium mt-1 flex items-center gap-1">
-                <AlertCircle className="h-3 w-3 shrink-0" />
-                Must be a valid email (e.g. {smtp.user || 'helpdesk@range4ex.com'}). Incomplete or invalid email causes Hostinger to reject delivery.
+              <p className="text-[11.5px] text-rose-500 font-semibold mt-1 flex items-center gap-1">
+                <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                Must be a valid email (e.g. {smtp.user || 'helpdesk@range4ex.com'}).
               </p>
             ) : (
-              <p className="text-[11px] text-muted-foreground mt-1">
-                Must be your Hostinger mailbox or authorized sender address
+              <p className="text-[11.5px] text-ink-2 mt-1">
+                Must match your Hostinger mailbox address
               </p>
             )}
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-foreground mb-1.5">
+            <label className="block text-[13px] font-bold text-ink mb-1.5">
               Sender Name
             </label>
             <input
@@ -447,7 +451,7 @@ export function SMTPSettingsSection({
               value={smtp.from_name}
               onChange={(e) => setSmtp({ ...smtp, from_name: e.target.value })}
               placeholder={workspace.name || 'Range HELP Desk'}
-              className="w-full rounded-lg border border-input bg-background px-3.5 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              className="input text-sm font-semibold border-2 border-line-2 focus:border-accent text-ink"
             />
           </div>
         </div>
@@ -455,31 +459,31 @@ export function SMTPSettingsSection({
         {/* Status Alerts */}
         {statusMessage && (
           <div
-            className={`p-4 rounded-lg text-sm flex items-start gap-3 ${
+            className={`p-4 rounded-xl text-sm font-semibold flex items-start gap-3 border-2 shadow-xs ${
               statusMessage.type === 'success'
-                ? 'bg-emerald-50 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
+                ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30'
                 : statusMessage.type === 'error'
-                ? 'bg-rose-50 text-rose-800 dark:bg-rose-950/40 dark:text-rose-300 border border-rose-200 dark:border-rose-800'
-                : 'bg-indigo-50 text-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800'
+                ? 'bg-rose-500/10 text-rose-700 dark:text-rose-300 border-rose-500/30'
+                : 'bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border-indigo-500/30'
             }`}
           >
-            {statusMessage.type === 'success' && <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-500" />}
-            {statusMessage.type === 'error' && <AlertCircle className="h-5 w-5 shrink-0 text-rose-500" />}
-            {statusMessage.type === 'info' && <ShieldCheck className="h-5 w-5 shrink-0 text-indigo-500" />}
+            {statusMessage.type === 'success' && <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-600" />}
+            {statusMessage.type === 'error' && <AlertCircle className="h-5 w-5 shrink-0 text-rose-600" />}
+            {statusMessage.type === 'info' && <ShieldCheck className="h-5 w-5 shrink-0 text-indigo-600" />}
             <div className="flex-1 whitespace-pre-wrap">{statusMessage.text}</div>
           </div>
         )}
 
         {/* Action Buttons */}
-        <div className="pt-4 border-t border-border flex flex-wrap items-center justify-between gap-3">
-          <div className="flex flex-wrap items-center gap-2">
+        <div className="pt-4 border-t-2 border-line-2 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-2.5">
             <button
               type="button"
               disabled={testing}
               onClick={() => handleTestConnection(false)}
-              className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-lg bg-secondary text-secondary-foreground hover:bg-secondary/80 border border-border transition-colors disabled:opacity-50"
+              className="btn btn-sm btn-secondary font-bold text-xs gap-1.5 border-2 border-line-2 hover:border-line-3"
             >
-              {testing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ShieldCheck className="h-3.5 w-3.5" />}
+              {testing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ShieldCheck className="h-3.5 w-3.5 text-accent" />}
               Test Connection
             </button>
 
@@ -489,13 +493,13 @@ export function SMTPSettingsSection({
                 placeholder="test@example.com"
                 value={testEmailTo}
                 onChange={(e) => setTestEmailTo(e.target.value)}
-                className="w-44 rounded-lg border border-input bg-background px-2.5 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-indigo-500"
+                className="input w-48 text-xs font-medium border-2 border-line-2 py-1.5 h-8"
               />
               <button
                 type="button"
                 disabled={testing}
                 onClick={() => handleTestConnection(true)}
-                className="inline-flex items-center gap-1 px-3 py-2 text-xs font-semibold rounded-lg bg-indigo-50 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100 transition-colors disabled:opacity-50"
+                className="btn btn-sm btn-accent font-bold text-xs gap-1.5 shadow-xs"
               >
                 <Send className="h-3 w-3" />
                 Send Test Email
@@ -507,7 +511,7 @@ export function SMTPSettingsSection({
               disabled={checkingCron}
               onClick={handleTriggerCronCheck}
               title="Manually trigger the 5-minute unread check"
-              className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-50"
+              className="btn btn-sm btn-ghost font-semibold text-xs text-ink-2 hover:text-ink gap-1.5"
             >
               {checkingCron ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Clock className="h-3.5 w-3.5" />}
               Run 5m Unread Check
@@ -518,9 +522,9 @@ export function SMTPSettingsSection({
             type="button"
             disabled={saving}
             onClick={handleSave}
-            className="inline-flex items-center gap-1.5 px-5 py-2.5 text-sm font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm transition-colors disabled:opacity-50"
+            className="btn btn-sm btn-primary font-bold text-sm px-5 py-2 shadow-sm gap-2"
           >
-            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
             Save Settings
           </button>
         </div>

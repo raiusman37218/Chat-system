@@ -1330,16 +1330,16 @@ export function ChatThread({
                 // If translation exists and was translated to customer's foreign language
                 if (englishText && translatedForeign && targetCode !== 'en') {
                   return (
-                    <div className="space-y-1.5">
+                    <div className="space-y-2">
                       <p className="whitespace-pre-wrap leading-relaxed">
                         {isExpanded ? translatedForeign : englishText}
                       </p>
-                      <div className="pt-1.5 border-t border-white/20 flex items-center justify-between gap-2 text-[10.5px] opacity-90 select-none">
-                        <span className="inline-flex items-center gap-1 font-medium">
-                          <Globe className="w-3 h-3 shrink-0" />
+                      <div className="pt-2 border-t border-white/25 flex items-center justify-between gap-2 text-[11px] select-none">
+                        <span className="inline-flex items-center gap-1.5 font-bold px-2 py-0.5 rounded-md bg-white/20 text-white border border-white/30 shadow-2xs">
+                          <Globe className="w-3.5 h-3.5 shrink-0" />
                           {isExpanded
-                            ? `Customer received in ${targetLangInfo?.name || targetCode}`
-                            : `Delivered to customer in ${targetLangInfo?.name || targetCode}`}
+                            ? `Delivered to customer in ${targetLangInfo?.name || targetCode}`
+                            : `Delivered in ${targetLangInfo?.name || targetCode}`}
                         </span>
                         <button
                           type="button"
@@ -1349,9 +1349,9 @@ export function ChatThread({
                               [msg.id]: !prev[msg.id],
                             }))
                           }
-                          className="underline font-semibold hover:opacity-100 opacity-80 transition-opacity cursor-pointer ml-auto"
+                          className="px-2 py-0.5 rounded-md bg-white/15 hover:bg-white/25 text-white font-bold text-[11px] underline transition-all cursor-pointer ml-auto"
                         >
-                          {isExpanded ? 'Show English' : `View in ${targetLangInfo?.name || 'translation'}`}
+                          {isExpanded ? 'Show English' : `View ${targetLangInfo?.name || 'Translation'}`}
                         </button>
                       </div>
                     </div>
@@ -1405,28 +1405,28 @@ export function ChatThread({
 
                 if (isForeign) {
                   return (
-                    <div className="space-y-1.5">
+                    <div className="space-y-2">
                       {englishText ? (
-                        <p className="whitespace-pre-wrap leading-relaxed">
+                        <p className="whitespace-pre-wrap leading-relaxed font-normal">
                           {isExpanded ? originalText : englishText}
                         </p>
                       ) : (
                         <div>
                           <p className="whitespace-pre-wrap leading-relaxed">{originalText}</p>
-                          <span className="inline-flex items-center gap-1 text-[11px] text-accent mt-1 animate-pulse font-medium">
-                            <Globe className="w-3 h-3 shrink-0 animate-spin" />
-                            Translating from {langInfo.name}...
+                          <span className="inline-flex items-center gap-1.5 text-[11.5px] text-accent mt-1.5 font-bold animate-pulse px-2 py-0.5 rounded-md bg-accent/10 border border-accent/20">
+                            <Globe className="w-3.5 h-3.5 shrink-0 animate-spin" />
+                            Auto-translating from {langInfo.name}...
                           </span>
                         </div>
                       )}
 
                       {englishText && (
-                        <div className="pt-1.5 border-t border-line/50 flex items-center justify-between gap-2 text-[11px] text-ink-3 select-none">
-                          <span className="inline-flex items-center gap-1 font-medium text-accent">
-                            <Globe className="w-3 h-3 text-accent shrink-0" />
+                        <div className="mt-2 pt-2 border-t-2 border-line-2 flex items-center justify-between gap-2 text-[11.5px] select-none">
+                          <span className="inline-flex items-center gap-1.5 font-bold px-2 py-0.5 rounded-md bg-accent/15 text-accent border border-accent/25">
+                            <Globe className="w-3.5 h-3.5 text-accent shrink-0" />
                             {isExpanded
                               ? `Original (${langInfo.name})`
-                              : `Translated from ${langInfo.name}`}
+                              : `Auto-translated from ${langInfo.name}`}
                           </span>
                           <button
                             type="button"
@@ -1436,9 +1436,9 @@ export function ChatThread({
                                 [msg.id]: !prev[msg.id],
                               }))
                             }
-                            className="text-[10.5px] font-semibold text-ink-2 hover:text-accent underline transition-colors cursor-pointer ml-auto"
+                            className="px-2.5 py-0.5 rounded-md bg-surface-2 border border-line-2 hover:border-accent text-ink font-bold text-[11px] transition-all cursor-pointer ml-auto shadow-2xs hover:text-accent"
                           >
-                            {isExpanded ? 'Show English' : `Show original`}
+                            {isExpanded ? 'Show English' : `Show Original (${langInfo.name})`}
                           </button>
                         </div>
                       )}
@@ -2147,16 +2147,16 @@ export function ChatThread({
             </div>
           </div>
 
-          {/* ── Auto-Translation Bar ── */}
+          {/* ── Auto-Translation Bar (High Visibility) ── */}
           {composerMode === 'reply' && (
-            <div className="px-3 py-1.5 flex items-center justify-between gap-2 border-b border-line/60 bg-blue-50/70 dark:bg-blue-950/25 text-[11.5px] text-ink-2">
-              <div className="flex items-center gap-2 min-w-0 flex-1">
+            <div className="px-3.5 py-2 flex items-center justify-between gap-3 border-b-2 border-blue-500/25 bg-blue-500/10 dark:bg-blue-950/40 text-[12px] text-ink font-medium">
+              <div className="flex items-center gap-2.5 min-w-0 flex-1">
                 <div
                   className={cn(
-                    'w-5 h-5 rounded-md flex items-center justify-center shrink-0 transition-colors',
+                    'w-6 h-6 rounded-lg flex items-center justify-center shrink-0 shadow-2xs transition-colors',
                     autoTranslateEnabled && targetLanguage !== 'en'
-                      ? 'bg-blue-500/15 text-blue-600 dark:text-blue-400'
-                      : 'bg-surface-3 text-ink-3'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-surface-3 text-ink-2 border border-line-2'
                   )}
                 >
                   <Globe className="w-3.5 h-3.5" />
@@ -2165,23 +2165,23 @@ export function ChatThread({
                   {autoTranslateEnabled && targetLanguage !== 'en' ? (
                     <span>
                       Customer speaks{' '}
-                      <strong className="text-blue-600 dark:text-blue-400 font-semibold">
+                      <strong className="text-blue-600 dark:text-blue-400 font-extrabold">
                         {getLanguageInfo(targetLanguage).name}
                         {getLanguageInfo(targetLanguage).nativeName
                           ? ` (${getLanguageInfo(targetLanguage).nativeName})`
                           : ''}
                       </strong>
-                      . Type in ANY language (Urdu, Roman Urdu, Hindi, English, etc.) — auto-delivered in {getLanguageInfo(targetLanguage).name} &amp; saved in English.
+                      . Type in ANY language — customer receives in {getLanguageInfo(targetLanguage).name} &amp; you see English.
                     </span>
                   ) : (
-                    <span className="text-ink-3">
-                      Auto-translate: type in any language, customer receives in their native language &amp; you see English.
+                    <span className="text-ink-2 font-medium">
+                      Auto-translate: write in any language, customer receives in their native language &amp; you see English.
                     </span>
                   )}
                 </div>
               </div>
 
-              <div className="flex items-center gap-1.5 shrink-0">
+              <div className="flex items-center gap-2 shrink-0">
                 <select
                   value={targetLanguage}
                   onChange={(e) => {
@@ -2191,7 +2191,7 @@ export function ChatThread({
                     }
                   }}
                   aria-label="Select Customer Language"
-                  className="text-[11px] font-medium bg-surface border border-line rounded-md px-2 py-0.5 text-ink focus:outline-none focus:ring-1 focus:ring-accent cursor-pointer"
+                  className="text-[11.5px] font-bold bg-surface border-2 border-line-2 rounded-lg px-2.5 py-1 text-ink focus:outline-none focus:ring-2 focus:ring-accent cursor-pointer shadow-2xs"
                 >
                   <option value="en">English (Original)</option>
                   <option value="ar">🇸🇦 Arabic (العربية)</option>
@@ -2207,7 +2207,7 @@ export function ChatThread({
                   <option value="it">🇮🇹 Italian (Italiano)</option>
                   <option value="id">🇮🇩 Indonesian (Bahasa Indonesia)</option>
                   <option value="fa">🇮🇷 Persian (فارسی)</option>
-                  <option value="he">🇮🇱 Hebrew (עבריت)</option>
+                  <option value="he">🇮🇱 Hebrew (עברית)</option>
                   <option value="bn">🇧🇩 Bengali (বাংলা)</option>
                   <option value="pa">🇮🇳 Punjabi (ਪੰਜਾਬੀ)</option>
                   <option value="ta">🇮🇳 Tamil (தமிழ்)</option>
@@ -2226,14 +2226,14 @@ export function ChatThread({
                   type="button"
                   onClick={() => setAutoTranslateEnabled(!autoTranslateEnabled)}
                   className={cn(
-                    'text-[10.5px] px-2 py-0.5 rounded-md font-semibold transition-all cursor-pointer',
+                    'text-[11.5px] px-3 py-1 rounded-lg font-extrabold transition-all cursor-pointer shadow-xs',
                     autoTranslateEnabled && targetLanguage !== 'en'
-                      ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-2xs'
-                      : 'bg-surface-3 hover:bg-surface-2 text-ink-3'
+                      ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-xs'
+                      : 'bg-surface border-2 border-line-2 hover:bg-surface-2 text-ink-2'
                   )}
                   title={
                     autoTranslateEnabled
-                      ? 'Disable translation and send raw English'
+                      ? 'Disable translation and send raw text'
                       : 'Enable automatic translation'
                   }
                 >

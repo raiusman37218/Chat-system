@@ -35,6 +35,10 @@ import {
   Columns4,
   Rows3,
   Mail,
+  Monitor,
+  Smartphone,
+  Laptop,
+  Eye,
 } from 'lucide-react';
 import { SMTPSettingsSection } from '@/components/admin/SMTPSettingsSection';
 import {
@@ -168,6 +172,9 @@ export function AdminSettingsPanel({
   const [helpTabLabel, setHelpTabLabel] = useState(workspace.help_center_tab_label || 'Help');
   const [showHelpTab, setShowHelpTab] = useState(workspace.show_help_tab !== false);
   const [previewOpen, setPreviewOpen] = useState(true);
+  const [previewDevice, setPreviewDevice] = useState<'desktop' | 'mobile'>('desktop');
+  const [widgetVisibilityDevice, setWidgetVisibilityDevice] = useState<'all' | 'desktop' | 'mobile'>('all');
+  const [showOnlineStatusBadge, setShowOnlineStatusBadge] = useState<boolean>(true);
 
   const handleSaveWidget = async () => {
     setSaving(true);
@@ -836,6 +843,26 @@ export function AdminSettingsPanel({
       </>
       )}
 
+      {/* Global Status Message Toast / Banner for both Embedded and Standalone */}
+      {statusMessage && (
+        <div className="fixed bottom-6 right-6 z-50 animate-rise pointer-events-none">
+          <div
+            className={`px-4 py-3 rounded-xl text-sm font-semibold flex items-center gap-2.5 shadow-2xl border ${
+              statusMessage.type === 'success'
+                ? 'bg-emerald-600 text-white border-emerald-500'
+                : 'bg-rose-600 text-white border-rose-500'
+            }`}
+          >
+            {statusMessage.type === 'success' ? (
+              <CheckCircle2 className="w-4 h-4 text-white shrink-0" />
+            ) : (
+              <AlertCircle className="w-4 h-4 text-white shrink-0" />
+            )}
+            <span>{statusMessage.text}</span>
+          </div>
+        </div>
+      )}
+
       {/* Tab Panels */}
       <div className={embedded ? 'w-full space-y-8 pb-16' : 'p-8 max-w-6xl mx-auto w-full space-y-8 pb-20'}>
         {/* ─────────────────────────────────────────────────────────────────── */}
@@ -845,74 +872,145 @@ export function AdminSettingsPanel({
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start animate-rise">
             {/* Left Column: Form Controls */}
             <div className="lg:col-span-7 space-y-6">
-              <div className="card p-6 space-y-5">
-                <div className="flex items-center justify-between border-b border-line pb-4">
+              {/* Header Action Bar */}
+              <div className="card p-5.5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-surface border-2 border-line-2 shadow-xs">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse shadow-xs" />
+                    <h3 className="text-[17px] font-extrabold text-ink tracking-tight">
+                      Live Chat Widget Configuration
+                    </h3>
+                  </div>
+                  <p className="text-[13px] text-ink-2 mt-0.5">
+                    Customize brand colors, logo, floating launcher button &amp; greetings in real time.
+                  </p>
+                </div>
+                <button
+                  onClick={handleSaveWidget}
+                  disabled={saving}
+                  className="btn btn-sm btn-primary gap-2 shadow-md font-bold px-4 py-2 shrink-0 text-[13px]"
+                >
+                  {saving ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                      <span>Saving…</span>
+                    </>
+                  ) : (
+                    <>
+                      <Check className="w-4 h-4" />
+                      <span>Save All Changes</span>
+                    </>
+                  )}
+                </button>
+              </div>
+
+              {/* Step 1: Brand Color & Visual Theme */}
+              <div className="card p-6 space-y-5 border-2 border-line-2 shadow-xs">
+                <div className="flex items-center gap-3 border-b border-line-2 pb-4">
+                  <span className="w-7 h-7 rounded-xl bg-accent text-white font-extrabold text-xs flex items-center justify-center shrink-0 shadow-xs">
+                    1
+                  </span>
                   <div>
-                    <h3 className="text-[15px] font-semibold text-ink">Brand Identity</h3>
-                    <p className="text-[12px] text-ink-3">
-                      Match the chat widget to your company branding.
+                    <h4 className="text-[15px] font-bold text-ink">Brand Color &amp; Accent</h4>
+                    <p className="text-[12.5px] text-ink-2 mt-0.5">
+                      Themes the widget header, floating launcher button, and active chat elements.
                     </p>
                   </div>
-                  <button
-                    onClick={handleSaveWidget}
-                    disabled={saving}
-                    className="btn btn-sm btn-primary gap-1.5 shadow-xs"
-                  >
-                    {saving ? 'Saving…' : 'Save Changes'}
-                  </button>
                 </div>
 
-                {/* Brand Color Picker */}
-                <div>
-                  <label className="field-label">Brand Color</label>
-                  <div className="flex items-center gap-3">
+                <div className="space-y-4">
+                  <div className="flex items-center gap-3.5">
                     <div className="relative flex items-center">
                       <input
                         type="color"
                         value={brandColor}
                         onChange={(e) => setBrandColor(e.target.value)}
-                        className="w-10 h-10 rounded-xl border border-line cursor-pointer p-0.5 bg-transparent"
+                        className="w-12 h-12 rounded-xl border-2 border-line-2 cursor-pointer p-0.5 bg-surface-2 shadow-xs hover:border-accent transition-colors"
+                        title="Pick custom color"
                       />
                     </div>
-                    <input
-                      type="text"
-                      value={brandColor}
-                      onChange={(e) => setBrandColor(e.target.value)}
-                      placeholder="#2563eb"
-                      className="input w-32 font-mono text-sm uppercase"
-                    />
-                    <div className="flex items-center gap-1.5 ml-2">
-                      {COLOR_PRESETS.map((color) => (
-                        <button
-                          key={color}
-                          type="button"
-                          onClick={() => setBrandColor(color)}
-                          style={{ backgroundColor: color }}
-                          className={`w-6 h-6 rounded-full border transition-transform hover:scale-110 ${
-                            brandColor.toLowerCase() === color.toLowerCase()
-                              ? 'ring-2 ring-accent ring-offset-2 scale-110'
-                              : 'border-white/20'
-                          }`}
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          value={brandColor}
+                          onChange={(e) => setBrandColor(e.target.value)}
+                          placeholder="#2563eb"
+                          className="input w-36 font-mono font-bold text-sm uppercase text-ink border-2 border-line-2 focus:border-accent shadow-xs"
                         />
-                      ))}
+                        <span className="text-[12px] font-semibold text-ink-2">Custom Hex Code</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Preset Swatches */}
+                  <div>
+                    <div className="text-[11.5px] font-extrabold text-ink-2 uppercase tracking-wider mb-2.5">
+                      Popular Brand Themes
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2.5">
+                      {[
+                        { color: '#2563eb', label: 'Chatify Blue' },
+                        { color: '#0d9488', label: 'Teal' },
+                        { color: '#10b981', label: 'Emerald' },
+                        { color: '#8b5cf6', label: 'Violet' },
+                        { color: '#ec4899', label: 'Pink' },
+                        { color: '#f97316', label: 'Orange' },
+                        { color: '#0f172a', label: 'Midnight Slate' },
+                      ].map(({ color, label }) => {
+                        const isSelected = brandColor.toLowerCase() === color.toLowerCase();
+                        return (
+                          <button
+                            key={color}
+                            type="button"
+                            onClick={() => setBrandColor(color)}
+                            className={cn(
+                              'flex items-center gap-2 px-3 py-1.5 rounded-xl border-2 text-[12px] font-bold transition-all shadow-2xs',
+                              isSelected
+                                ? 'border-accent bg-accent/15 text-accent ring-2 ring-accent/30 shadow-xs'
+                                : 'border-line-2 bg-surface hover:bg-surface-2 text-ink hover:border-line-3'
+                            )}
+                          >
+                            <span
+                              className="w-3.5 h-3.5 rounded-full shrink-0 border border-black/20 shadow-xs"
+                              style={{ backgroundColor: color }}
+                            />
+                            <span>{label}</span>
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
                 </div>
+              </div>
 
-                {/* Logo Upload */}
-                <div>
-                  <label className="field-label">Logo / Avatar</label>
-                  <div className="flex items-center gap-4">
-                    <div className="w-14 h-14 rounded-2xl border border-line bg-surface-2 flex items-center justify-center overflow-hidden shrink-0">
-                      {logoUrl ? (
-                        <img src={logoUrl} alt="Logo" className="w-full h-full object-cover" />
-                      ) : (
-                        <MessageSquare className="w-6 h-6 text-ink-3" />
-                      )}
-                    </div>
-                    <div className="space-y-1 flex-1">
-                      <label className="btn btn-xs btn-secondary cursor-pointer inline-flex items-center gap-1.5">
-                        <Upload className="w-3.5 h-3.5" />
+              {/* Step 2: Logo & Floating Launcher Button */}
+              <div className="card p-6 space-y-5 border-2 border-line-2 shadow-xs">
+                <div className="flex items-center gap-3 border-b border-line-2 pb-4">
+                  <span className="w-7 h-7 rounded-xl bg-accent text-white font-extrabold text-xs flex items-center justify-center shrink-0 shadow-xs">
+                    2
+                  </span>
+                  <div>
+                    <h4 className="text-[15px] font-bold text-ink">Logo &amp; Floating Launcher Icon</h4>
+                    <p className="text-[12.5px] text-ink-2 mt-0.5">
+                      Display your company logo inside the chat and on the website button.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Logo Image Upload */}
+                <div className="flex items-start gap-4">
+                  <div className="w-20 h-20 rounded-2xl border-2 border-line-2 bg-surface-2 flex items-center justify-center overflow-hidden shrink-0 shadow-inner">
+                    {logoUrl ? (
+                      <img src={logoUrl} alt="Logo" className="w-full h-full object-cover" />
+                    ) : (
+                      <MessageSquare className="w-8 h-8 text-ink-2" />
+                    )}
+                  </div>
+                  <div className="space-y-2.5 flex-1">
+                    <div className="flex items-center gap-2.5">
+                      <label className="btn btn-sm btn-secondary font-bold text-xs cursor-pointer inline-flex items-center gap-2 border-2 border-line-2 hover:border-line-3 shadow-xs">
+                        <Upload className="w-4 h-4 text-accent" />
                         <span>Upload New Logo</span>
                         <input
                           type="file"
@@ -921,241 +1019,589 @@ export function AdminSettingsPanel({
                           className="hidden"
                         />
                       </label>
-                      <input
-                        type="url"
-                        placeholder="Or enter image URL: https://example.com/logo.png"
-                        value={logoUrl}
-                        onChange={(e) => setLogoUrl(e.target.value)}
-                        className="input text-xs"
-                      />
-                      <p className="text-[11px] text-ink-3">
-                        This logo is displayed in your chat header, greeting banner, and optionally on the floating launcher button.
-                      </p>
+                      {logoUrl && (
+                        <button
+                          type="button"
+                          onClick={() => setLogoUrl('')}
+                          className="text-[12px] font-semibold text-rose-500 hover:text-rose-600 hover:underline px-2 py-1"
+                        >
+                          Remove Logo
+                        </button>
+                      )}
                     </div>
+                    <input
+                      type="url"
+                      placeholder="Or paste direct image URL (https://example.com/logo.png)"
+                      value={logoUrl}
+                      onChange={(e) => setLogoUrl(e.target.value)}
+                      className="input text-[12.5px] border-2 border-line-2 focus:border-accent text-ink font-medium"
+                    />
+                    <p className="text-[11.5px] text-ink-2">
+                      Recommended: 256x256 square PNG, JPG or SVG with a clean transparent or solid background.
+                    </p>
                   </div>
                 </div>
 
                 {/* Toggle: Show Logo on Floating Launcher Button */}
-                <div className="flex items-center justify-between p-3.5 rounded-xl border border-line bg-surface-2/60">
-                  <div className="space-y-0.5 pr-4">
-                    <div className="flex items-center gap-2">
-                      <label className="text-xs font-semibold text-ink cursor-pointer" htmlFor="toggle-launcher-logo">
-                        Show Logo on Chat Launcher Icon
-                      </label>
-                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${showLauncherLogo ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' : 'bg-ink-3/15 text-ink-3'}`}>
-                        {showLauncherLogo ? 'ON' : 'OFF'}
-                      </span>
+                <div className="p-4.5 rounded-2xl border-2 border-line-2 bg-surface-2/70 space-y-3.5 shadow-2xs">
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5 pr-4">
+                      <div className="flex items-center gap-2.5">
+                        <label
+                          className="text-[14px] font-bold text-ink cursor-pointer"
+                          htmlFor="toggle-launcher-logo"
+                        >
+                          Show Company Logo on Floating Chat Button
+                        </label>
+                        <span
+                          className={`text-[11px] font-extrabold px-2.5 py-0.5 rounded-full shadow-2xs ${
+                            showLauncherLogo
+                              ? 'bg-emerald-600 text-white'
+                              : 'bg-slate-300 dark:bg-slate-700 text-ink'
+                          }`}
+                        >
+                          {showLauncherLogo ? 'ACTIVE (ON)' : 'MUTED (OFF)'}
+                        </span>
+                      </div>
+                      <p className="text-[12px] text-ink-2">
+                        Choose whether visitors see your company logo or a classic chat bubble icon before clicking.
+                      </p>
                     </div>
-                    <p className="text-[11px] text-ink-3">
-                      When ON, your uploaded logo will replace the chat icon on the floating website button. When OFF, the classic chat bubble icon will be used.
+                    <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                      <input
+                        id="toggle-launcher-logo"
+                        type="checkbox"
+                        checked={showLauncherLogo}
+                        onChange={(e) => setShowLauncherLogo(e.target.checked)}
+                        className="sr-only peer"
+                      />
+                      <div className="w-12 h-6.5 bg-line-2 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5.5 after:w-5.5 after:transition-all peer-checked:bg-accent shadow-xs"></div>
+                    </label>
+                  </div>
+
+                  {/* Visual Comparison Cards */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-line-2">
+                    <div
+                      className={cn(
+                        'p-3 rounded-xl border-2 text-xs flex items-center gap-3 transition-all',
+                        showLauncherLogo
+                          ? 'border-emerald-500 bg-emerald-500/10 text-ink font-semibold shadow-xs ring-1 ring-emerald-500/20'
+                          : 'border-line-2 bg-surface opacity-75 text-ink-2'
+                      )}
+                    >
+                      <div
+                        className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 shadow-md ring-2 ring-white/50"
+                        style={{ backgroundColor: brandColor }}
+                      >
+                        {logoUrl ? (
+                          <img src={logoUrl} alt="Logo" className="w-5 h-5 rounded-full object-cover" />
+                        ) : (
+                          <span className="text-[10px] text-white font-extrabold">Logo</span>
+                        )}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="font-bold text-[12px] text-ink flex items-center gap-1.5">
+                          <span>Logo Icon Mode</span>
+                          {showLauncherLogo && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />}
+                        </div>
+                        <div className="text-[11px] text-ink-2 truncate">Displays your uploaded logo</div>
+                      </div>
+                    </div>
+
+                    <div
+                      className={cn(
+                        'p-3 rounded-xl border-2 text-xs flex items-center gap-3 transition-all',
+                        !showLauncherLogo
+                          ? 'border-emerald-500 bg-emerald-500/10 text-ink font-semibold shadow-xs ring-1 ring-emerald-500/20'
+                          : 'border-line-2 bg-surface opacity-75 text-ink-2'
+                      )}
+                    >
+                      <div
+                        className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 shadow-md ring-2 ring-white/50"
+                        style={{ backgroundColor: brandColor }}
+                      >
+                        <MessageSquare className="w-4 h-4 text-white" />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="font-bold text-[12px] text-ink flex items-center gap-1.5">
+                          <span>Classic Bubble Mode</span>
+                          {!showLauncherLogo && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />}
+                        </div>
+                        <div className="text-[11px] text-ink-2 truncate">Standard chat bubble icon</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Step 3: Screen Placement */}
+              <div className="card p-6 space-y-4 border-2 border-line-2 shadow-xs">
+                <div className="flex items-center gap-3 border-b border-line-2 pb-4">
+                  <span className="w-7 h-7 rounded-xl bg-accent text-white font-extrabold text-xs flex items-center justify-center shrink-0 shadow-xs">
+                    3
+                  </span>
+                  <div>
+                    <h4 className="text-[15px] font-bold text-ink">Screen Placement</h4>
+                    <p className="text-[12.5px] text-ink-2 mt-0.5">
+                      Position of the floating chat launcher on your website.
                     </p>
                   </div>
-                  <label className="relative inline-flex items-center cursor-pointer shrink-0">
-                    <input
-                      id="toggle-launcher-logo"
-                      type="checkbox"
-                      checked={showLauncherLogo}
-                      onChange={(e) => setShowLauncherLogo(e.target.checked)}
-                      className="sr-only peer"
-                    />
-                    <div className="w-11 h-6 bg-line peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-accent"></div>
-                  </label>
                 </div>
 
-                {/* Widget Position */}
-                <div>
-                  <label className="field-label">Widget Screen Position</label>
-                  <div className="grid grid-cols-2 gap-3">
-                    <button
-                      type="button"
-                      onClick={() => setWidgetPosition('right')}
-                      className={`p-3 rounded-xl border text-left text-xs font-medium transition-all ${
-                        widgetPosition === 'right'
-                          ? 'border-accent bg-accent/5 text-accent shadow-xs'
-                          : 'border-line text-ink hover:bg-surface-2'
-                      }`}
-                    >
-                      <div className="font-semibold text-[13px]">Bottom Right</div>
-                      <div className="text-ink-3 text-[11.5px] mt-0.5">
-                        Standard placement for live chat (recommended)
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                  <button
+                    type="button"
+                    onClick={() => setWidgetPosition('right')}
+                    className={`p-4 rounded-2xl border-2 text-left transition-all ${
+                      widgetPosition === 'right'
+                        ? 'border-accent bg-accent/10 ring-2 ring-accent/30 text-ink shadow-sm'
+                        : 'border-line-2 bg-surface hover:bg-surface-2 text-ink-2'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <div className="flex items-center gap-2">
+                        {widgetPosition === 'right' ? (
+                          <CheckCircle2 className="w-4 h-4 text-accent" />
+                        ) : (
+                          <div className="w-4 h-4 rounded-full border-2 border-line-2" />
+                        )}
+                        <span className="font-bold text-[13.5px] text-ink">Bottom Right</span>
                       </div>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setWidgetPosition('left')}
-                      className={`p-3 rounded-xl border text-left text-xs font-medium transition-all ${
-                        widgetPosition === 'left'
-                          ? 'border-accent bg-accent/5 text-accent shadow-xs'
-                          : 'border-line text-ink hover:bg-surface-2'
-                      }`}
-                    >
-                      <div className="font-semibold text-[13px]">Bottom Left</div>
-                      <div className="text-ink-3 text-[11.5px] mt-0.5">
-                        Great if other buttons occupy the bottom right
+                      <span className="text-[10.5px] px-2 py-0.5 rounded-full bg-accent text-white font-extrabold shadow-2xs">
+                        Recommended
+                      </span>
+                    </div>
+                    <div className="text-ink-2 text-[12px] leading-relaxed pl-6">
+                      Standard placement on 95% of websites. Maximum visibility for visitors.
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setWidgetPosition('left')}
+                    className={`p-4 rounded-2xl border-2 text-left transition-all ${
+                      widgetPosition === 'left'
+                        ? 'border-accent bg-accent/10 ring-2 ring-accent/30 text-ink shadow-sm'
+                        : 'border-line-2 bg-surface hover:bg-surface-2 text-ink-2'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <div className="flex items-center gap-2">
+                        {widgetPosition === 'left' ? (
+                          <CheckCircle2 className="w-4 h-4 text-accent" />
+                        ) : (
+                          <div className="w-4 h-4 rounded-full border-2 border-line-2" />
+                        )}
+                        <span className="font-bold text-[13.5px] text-ink">Bottom Left</span>
                       </div>
-                    </button>
+                      <span className="text-[10.5px] px-2 py-0.5 rounded-full bg-surface-3 text-ink-2 font-bold border border-line-2">
+                        Alternate
+                      </span>
+                    </div>
+                    <div className="text-ink-2 text-[12px] leading-relaxed pl-6">
+                      Great if your website already has a WhatsApp button or Back-to-Top on the right.
+                    </div>
+                  </button>
+                </div>
+              </div>
+
+              {/* Step 4: Greetings & Welcome Message */}
+              <div className="card p-6 space-y-4 border-2 border-line-2 shadow-xs">
+                <div className="flex items-center gap-3 border-b border-line-2 pb-4">
+                  <span className="w-7 h-7 rounded-xl bg-accent text-white font-extrabold text-xs flex items-center justify-center shrink-0 shadow-xs">
+                    4
+                  </span>
+                  <div>
+                    <h4 className="text-[15px] font-bold text-ink">Greeting &amp; Welcome Message</h4>
+                    <p className="text-[12.5px] text-ink-2 mt-0.5">
+                      The first messages visitors read when opening the live chat.
+                    </p>
                   </div>
                 </div>
 
-                {/* Welcome Message Text */}
-                <div className="space-y-3 pt-2">
+                <div className="space-y-3.5">
                   <div>
-                    <label className="field-label">Greeting Title</label>
+                    <label className="field-label text-ink font-bold text-[13px]">Greeting Title</label>
                     <input
                       type="text"
                       value={greetingTitle}
                       onChange={(e) => setGreetingTitle(e.target.value)}
                       placeholder="Hi there 👋"
-                      className="input"
+                      className="input text-sm font-semibold border-2 border-line-2 focus:border-accent text-ink"
                     />
                   </div>
                   <div>
-                    <label className="field-label">Welcome Message Text</label>
+                    <label className="field-label text-ink font-bold text-[13px]">Welcome Message Text</label>
                     <textarea
                       rows={3}
                       value={greetingMessage}
                       onChange={(e) => setGreetingMessage(e.target.value)}
                       placeholder="We're here to help! Ask us anything or browse our quick answers."
-                      className="input resize-none"
+                      className="input resize-none text-[13px] leading-relaxed border-2 border-line-2 focus:border-accent text-ink"
                     />
-                  </div>
-
-                  {/* Help Desk Tab Customization */}
-                  <div className="pt-3 border-t border-line space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <label className="field-label mb-0">Help Tab on Website Widget</label>
-                        <p className="text-[11.5px] text-ink-3">Show self-service articles tab in the chat launcher</p>
-                      </div>
-                      <label className="relative inline-flex items-center cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={showHelpTab}
-                          onChange={(e) => setShowHelpTab(e.target.checked)}
-                          className="sr-only peer"
-                        />
-                        <div className="w-10 h-5.5 bg-surface-3 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-line after:border after:rounded-full after:h-4.5 after:w-4.5 after:transition-all peer-checked:bg-accent"></div>
-                      </label>
-                    </div>
-
-                    <div>
-                      <label className="field-label">Help Tab Custom Label</label>
-                      <input
-                        type="text"
-                        value={helpTabLabel}
-                        onChange={(e) => setHelpTabLabel(e.target.value)}
-                        placeholder="e.g. Help Center, FAQs, Guides, Madad"
-                        className="input"
-                      />
-                      <p className="text-[11px] text-ink-3 mt-1">Visitors see this text on the widget bottom navigation button.</p>
-                    </div>
                   </div>
                 </div>
               </div>
-            </div>
 
-            {/* Right Column: Interactive Live Preview */}
-            <div className="lg:col-span-5 sticky top-36">
-              <div className="panel p-4 space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Sparkles className="w-4 h-4 text-accent" />
-                    <span className="text-[13px] font-semibold text-ink">Interactive Live Preview</span>
+              {/* Step 5: In-Widget Self-Service Help Desk Tab */}
+              <div className="card p-6 space-y-4 border-2 border-line-2 shadow-xs">
+                <div className="flex items-center gap-3 border-b border-line-2 pb-4">
+                  <span className="w-7 h-7 rounded-xl bg-accent text-white font-extrabold text-xs flex items-center justify-center shrink-0 shadow-xs">
+                    5
+                  </span>
+                  <div>
+                    <h4 className="text-[15px] font-bold text-ink">Self-Service Help Center Tab</h4>
+                    <p className="text-[12.5px] text-ink-2 mt-0.5">
+                      Allow visitors to browse knowledge base articles directly inside the chat window.
+                    </p>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setPreviewOpen(!previewOpen)}
-                    className="text-[11.5px] text-accent hover:underline"
-                  >
-                    {previewOpen ? 'Minimize Widget' : 'Expand Widget'}
-                  </button>
                 </div>
 
-                {/* Simulated Webpage Canvas */}
-                <div className="relative h-[480px] rounded-2xl bg-gradient-to-b from-slate-100 to-slate-200 dark:from-slate-900 dark:to-slate-950 border border-line p-4 overflow-hidden flex flex-col justify-between shadow-inner">
-                  {/* Fake Page Content */}
-                  <div className="space-y-3 opacity-40 select-none">
-                    <div className="h-4 w-28 bg-ink/20 rounded-full" />
-                    <div className="h-7 w-48 bg-ink/30 rounded-lg" />
-                    <div className="h-3 w-64 bg-ink/20 rounded-full" />
-                    <div className="h-3 w-52 bg-ink/20 rounded-full" />
+                <div className="space-y-3.5">
+                  <div className="flex items-center justify-between p-4 rounded-xl border-2 border-line-2 bg-surface-2/70 shadow-2xs">
+                    <div>
+                      <div className="text-[13.5px] font-bold text-ink">Show Help Tab in Widget</div>
+                      <p className="text-[12px] text-ink-2">
+                        Visitors can search helpful articles without leaving the chat launcher.
+                      </p>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={showHelpTab}
+                        onChange={(e) => setShowHelpTab(e.target.checked)}
+                        className="sr-only peer"
+                      />
+                      <div className="w-11 h-6 bg-line-2 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-accent shadow-xs"></div>
+                    </label>
+                  </div>
+
+                  <div>
+                    <label className="field-label text-ink font-bold text-[13px]">Help Tab Custom Button Label</label>
+                    <input
+                      type="text"
+                      value={helpTabLabel}
+                      onChange={(e) => setHelpTabLabel(e.target.value)}
+                      placeholder="e.g. Help, FAQs, Guides"
+                      className="input text-sm border-2 border-line-2 focus:border-accent text-ink font-semibold"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Step 6: Widget Visibility & Device Display Rules */}
+              <div className="card p-6 space-y-4 border-2 border-line-2 shadow-xs">
+                <div className="flex items-center gap-3 border-b border-line-2 pb-4">
+                  <span className="w-7 h-7 rounded-xl bg-accent text-white font-extrabold text-xs flex items-center justify-center shrink-0 shadow-xs">
+                    6
+                  </span>
+                  <div>
+                    <h4 className="text-[15px] font-bold text-ink">Widget Visibility &amp; Device Rules</h4>
+                    <p className="text-[12.5px] text-ink-2 mt-0.5">
+                      Control which devices show the widget and configure live presence visibility.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  {/* Device Visibility Selector */}
+                  <div>
+                    <label className="field-label text-ink font-bold text-[13px] mb-2.5 flex items-center justify-between">
+                      <span>Device Visibility</span>
+                      <span className="text-[11.5px] text-accent font-semibold">Active: {widgetVisibilityDevice === 'all' ? 'All Devices' : widgetVisibilityDevice === 'desktop' ? 'Desktop Only' : 'Mobile Only'}</span>
+                    </label>
+                    <div className="grid grid-cols-3 gap-2.5">
+                      {[
+                        { id: 'all', label: 'All Devices', sub: 'Desktop + Mobile', icon: Monitor },
+                        { id: 'desktop', label: 'Desktop Only', sub: 'Laptops & PCs', icon: Laptop },
+                        { id: 'mobile', label: 'Mobile Only', sub: 'Phones & Tablets', icon: Smartphone },
+                      ].map((item) => {
+                        const Icon = item.icon;
+                        const isSelected = widgetVisibilityDevice === item.id;
+                        return (
+                          <button
+                            key={item.id}
+                            type="button"
+                            onClick={() => {
+                              setWidgetVisibilityDevice(item.id as any);
+                              if (item.id === 'mobile') setPreviewDevice('mobile');
+                              if (item.id === 'desktop') setPreviewDevice('desktop');
+                            }}
+                            className={cn(
+                              'p-3 rounded-xl border-2 text-center flex flex-col items-center gap-1.5 transition-all shadow-2xs',
+                              isSelected
+                                ? 'border-accent bg-accent/15 ring-2 ring-accent/30 text-accent font-bold shadow-xs'
+                                : 'border-line-2 bg-surface hover:bg-surface-2 text-ink-2 hover:text-ink'
+                            )}
+                          >
+                            <Icon className="w-5 h-5" />
+                            <div className="text-[12px] font-bold leading-tight">{item.label}</div>
+                            <div className="text-[10px] text-ink-2 leading-none font-medium">{item.sub}</div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Online Presence Status Toggle */}
+                  <div className="flex items-center justify-between p-4 rounded-xl border-2 border-line-2 bg-surface-2/80 shadow-2xs">
+                    <div>
+                      <div className="text-[13.5px] font-bold text-ink flex items-center gap-2">
+                        <span>Show Live Presence Indicator</span>
+                        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse inline-block" />
+                      </div>
+                      <p className="text-[12px] text-ink-2 mt-0.5">
+                        Display a green &ldquo;We reply immediately&rdquo; status badge in the chat window header.
+                      </p>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                      <input
+                        type="checkbox"
+                        checked={showOnlineStatusBadge}
+                        onChange={(e) => setShowOnlineStatusBadge(e.target.checked)}
+                        className="sr-only peer"
+                      />
+                      <div className="w-11 h-6 bg-line-2 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-accent shadow-xs"></div>
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              {/* Bottom Sticky Save Bar */}
+              <div className="sticky bottom-6 z-10 card p-4.5 flex items-center justify-between bg-surface/95 backdrop-blur-md border-2 border-line-2 shadow-xl">
+                <div className="flex items-center gap-2.5 text-xs text-ink font-semibold">
+                  <Sparkles className="w-4 h-4 text-accent shrink-0" />
+                  <span>Changes apply to your website immediately after clicking save.</span>
+                </div>
+                <button
+                  onClick={handleSaveWidget}
+                  disabled={saving}
+                  className="btn btn-sm btn-primary gap-2 shadow-md font-bold px-6 py-2.5 shrink-0 text-[13px]"
+                >
+                  {saving ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                      <span>Saving…</span>
+                    </>
+                  ) : (
+                    <>
+                      <Check className="w-4 h-4" />
+                      <span>Save Changes</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+
+            {/* Right Column: Interactive Live Preview with Realistic Browser Frame */}
+            <div className="lg:col-span-5 sticky top-28 space-y-3">
+              <div className="panel p-4 space-y-3 bg-surface border-2 border-line-2 shadow-md">
+                <div className="flex items-center justify-between border-b border-line-2 pb-2.5">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-accent" />
+                    <span className="text-[14px] font-extrabold text-ink">Interactive Live Preview</span>
+                  </div>
+
+                  {/* Device Toggle + Open/Close */}
+                  <div className="flex items-center gap-2">
+                    <div className="flex items-center bg-surface-2 p-0.5 rounded-lg border border-line-2">
+                      <button
+                        type="button"
+                        onClick={() => setPreviewDevice('desktop')}
+                        className={cn(
+                          'p-1 rounded-md text-[11px] font-bold transition-all flex items-center gap-1',
+                          previewDevice === 'desktop'
+                            ? 'bg-surface text-accent shadow-xs'
+                            : 'text-ink-2 hover:text-ink'
+                        )}
+                        title="Desktop view"
+                      >
+                        <Laptop className="w-3.5 h-3.5" />
+                        <span className="hidden sm:inline">Desktop</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPreviewDevice('mobile')}
+                        className={cn(
+                          'p-1 rounded-md text-[11px] font-bold transition-all flex items-center gap-1',
+                          previewDevice === 'mobile'
+                            ? 'bg-surface text-accent shadow-xs'
+                            : 'text-ink-2 hover:text-ink'
+                        )}
+                        title="Mobile view"
+                      >
+                        <Smartphone className="w-3.5 h-3.5" />
+                        <span className="hidden sm:inline">Mobile</span>
+                      </button>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setPreviewOpen(!previewOpen)}
+                      className="text-[12px] font-bold text-accent hover:underline px-2.5 py-1 rounded-md hover:bg-accent/10 border border-accent/20"
+                    >
+                      {previewOpen ? 'Minimize' : 'Open'}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Realistic Simulated Webpage Canvas */}
+                <div
+                  className={cn(
+                    'relative h-[530px] rounded-2xl bg-canvas border-2 border-line-2 overflow-hidden flex flex-col justify-between shadow-inner transition-all duration-300',
+                    previewDevice === 'mobile' ? 'max-w-[340px] mx-auto ring-4 ring-black/10 dark:ring-white/10' : 'w-full'
+                  )}
+                >
+                  {/* Browser Window Title Bar */}
+                  <div className="h-8.5 bg-surface border-b border-line-2 px-3 flex items-center gap-2 shrink-0 select-none shadow-2xs">
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-2.5 h-2.5 rounded-full bg-rose-500 inline-block shadow-2xs" />
+                      <span className="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block shadow-2xs" />
+                      <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block shadow-2xs" />
+                    </div>
+                    <div className="flex-1 max-w-[220px] mx-auto h-5.5 rounded-md bg-surface-2 border border-line-2 px-2.5 flex items-center justify-center gap-1.5 text-[11px] font-mono text-ink font-semibold truncate shadow-2xs">
+                      <Globe className="w-3 h-3 text-accent shrink-0" />
+                      <span className="truncate">{cleanDomain(workspace.website_url) || 'yourwebsite.com'}</span>
+                    </div>
+                  </div>
+
+                  {/* Simulated Website Hero Mockup (Crisp & High Contrast) */}
+                  <div className="p-4 space-y-3.5 select-none overflow-hidden">
+                    <div className="flex items-center justify-between pb-2 border-b-2 border-line-2">
+                      <div className="flex items-center gap-2">
+                        <div
+                          className="w-6 h-6 rounded-lg flex items-center justify-center text-[11px] text-white font-extrabold shadow-xs"
+                          style={{ backgroundColor: brandColor }}
+                        >
+                          {(workspace.name || 'W').charAt(0)}
+                        </div>
+                        <span className="font-extrabold text-[13px] text-ink">{workspace.name}</span>
+                      </div>
+                      <div className="flex gap-2.5 text-[11px] text-ink-2 font-semibold">
+                        <span className="text-ink font-bold border-b border-ink">Home</span>
+                        <span>Catalog</span>
+                        <span>Support</span>
+                      </div>
+                    </div>
+
+                    <div className="p-4 rounded-xl bg-surface border-2 border-line-2 shadow-xs space-y-2 mt-2">
+                      <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-[10.5px] font-bold text-emerald-700 dark:text-emerald-300">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" />
+                        <span>Support Team Available</span>
+                      </div>
+                      <div className="font-extrabold text-[14px] text-ink leading-tight">Welcome to our Online Store</div>
+                      <p className="text-[12px] text-ink-2 leading-relaxed font-normal">
+                        Have a question about an order, shipment, or feature? Chat with our team in real-time.
+                      </p>
+                      <div className="pt-1 flex gap-2">
+                        <div
+                          className="px-3 py-1.5 rounded-lg text-[11px] font-bold text-white shadow-xs cursor-default"
+                          style={{ backgroundColor: brandColor }}
+                        >
+                          Explore Products
+                        </div>
+                        <div className="px-3 py-1.5 rounded-lg text-[11px] font-bold bg-surface-2 border border-line-2 text-ink cursor-default">
+                          Contact Sales
+                        </div>
+                      </div>
+                    </div>
                   </div>
 
                   {/* Opened Widget Window Preview */}
                   {previewOpen && (
                     <div
-                      className={`absolute bottom-16 ${
-                        widgetPosition === 'right' ? 'right-4' : 'left-4'
-                      } w-72 rounded-2xl bg-white dark:bg-slate-900 shadow-2xl border border-line overflow-hidden animate-rise flex flex-col z-20`}
-                      style={{ maxHeight: '380px' }}
+                      className={cn(
+                        'absolute bottom-16 rounded-2xl bg-surface shadow-2xl border-2 border-line-2 overflow-hidden animate-rise flex flex-col z-20',
+                        previewDevice === 'mobile'
+                          ? 'inset-x-2 bottom-14 max-h-[440px]'
+                          : widgetPosition === 'right'
+                          ? 'right-3 w-76 max-h-[400px]'
+                          : 'left-3 w-76 max-h-[400px]'
+                      )}
                     >
                       {/* Widget Header */}
                       <div
-                        className="p-4 text-white flex items-center justify-between"
+                        className="p-3.5 text-white flex items-center justify-between shadow-xs shrink-0"
                         style={{ backgroundColor: brandColor }}
                       >
-                        <div className="flex items-center gap-2.5">
-                          <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center overflow-hidden">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div className="w-8.5 h-8.5 rounded-full bg-white/20 border border-white/40 flex items-center justify-center overflow-hidden shrink-0 shadow-xs">
                             {logoUrl ? (
                               <img src={logoUrl} alt="Logo" className="w-full h-full object-cover" />
                             ) : (
-                              <img src="/chat-icon-white.png" alt="Logo" className="w-5 h-5 object-contain" />
+                              <img src="/chat-icon-white.png" alt="Logo" className="w-5.5 h-5.5 object-contain" />
                             )}
                           </div>
-                          <div>
-                            <div className="font-bold text-xs leading-tight">{workspace.name}</div>
-                            <div className="text-[10px] opacity-80 flex items-center gap-1">
-                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block" />
-                              We reply immediately
+                          <div className="min-w-0">
+                            <div className="font-extrabold text-[13px] leading-tight truncate text-white drop-shadow-xs">
+                              {workspace.name}
                             </div>
+                            {showOnlineStatusBadge && (
+                              <div className="text-[10.5px] text-white/95 flex items-center gap-1 font-semibold">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-300 inline-block animate-pulse" />
+                                <span>We reply immediately</span>
+                              </div>
+                            )}
                           </div>
                         </div>
                         <button
                           onClick={() => setPreviewOpen(false)}
-                          className="text-white/80 hover:text-white p-1"
+                          className="text-white/90 hover:text-white p-1 rounded-lg hover:bg-white/15 transition-colors"
+                          title="Minimize preview"
                         >
-                          <X className="w-3.5 h-3.5" />
+                          <X className="w-4 h-4" />
                         </button>
                       </div>
 
                       {/* Widget Body */}
-                      <div className="p-3.5 space-y-3 flex-1 overflow-y-auto bg-slate-50 dark:bg-slate-900/50 text-xs">
+                      <div className="p-3.5 space-y-3 flex-1 overflow-y-auto bg-surface-2/70 text-xs">
                         {/* Welcome Card */}
-                        <div className="p-3 rounded-xl bg-white dark:bg-slate-800 border border-line shadow-xs space-y-1">
-                          <div className="font-semibold text-[13px] text-ink">{greetingTitle}</div>
-                          <p className="text-ink-3 text-[11.5px] leading-relaxed">
+                        <div className="p-3.5 rounded-xl bg-surface border-2 border-line-2 shadow-xs space-y-1">
+                          <div className="font-extrabold text-[13.5px] text-ink">{greetingTitle}</div>
+                          <p className="text-ink-2 text-[12px] leading-relaxed font-normal">
                             {greetingMessage}
                           </p>
                         </div>
 
                         {/* Sample Bot/Agent Bubble */}
-                        <div className="flex gap-2">
+                        <div className="flex gap-2 items-start">
                           <div
-                            className="w-5 h-5 rounded-full flex items-center justify-center text-[9px] text-white shrink-0"
+                            className="w-6.5 h-6.5 rounded-full flex items-center justify-center text-[10.5px] text-white font-extrabold shrink-0 shadow-xs"
                             style={{ backgroundColor: brandColor }}
                           >
-                            C
+                            {(workspace.name || 'A').charAt(0)}
                           </div>
-                          <div className="p-2.5 rounded-xl rounded-tl-sm bg-white dark:bg-slate-800 border border-line text-ink text-[11px] shadow-xs">
+                          <div className="p-3 rounded-2xl rounded-tl-xs bg-surface border-2 border-line-2 text-ink text-[12px] shadow-xs font-semibold leading-relaxed">
                             How can our support team assist you today?
                           </div>
                         </div>
+
+                        {/* Self Service Help Center preview pill if enabled */}
+                        {showHelpTab && (
+                          <div className="p-2.5 rounded-xl bg-accent/10 border border-accent/25 flex items-center justify-between text-[11.5px] text-accent font-bold">
+                            <span className="flex items-center gap-1.5">
+                              <BookOpen className="w-3.5 h-3.5" />
+                              <span>{helpTabLabel || 'Help Articles'}</span>
+                            </span>
+                            <span className="text-[10px] bg-accent text-white px-2 py-0.5 rounded-md font-extrabold">Instant</span>
+                          </div>
+                        )}
                       </div>
 
                       {/* Widget Footer Input */}
-                      <div className="p-2 bg-white dark:bg-slate-900 border-t border-line flex items-center gap-1.5">
+                      <div className="p-2.5 bg-surface border-t-2 border-line-2 flex items-center gap-2 shrink-0">
                         <input
                           type="text"
                           disabled
                           placeholder="Send a message…"
-                          className="flex-1 text-[11px] px-2.5 py-1.5 rounded-lg bg-surface-2 border-0 outline-none"
+                          className="flex-1 text-[12px] px-3 py-1.5 rounded-lg bg-surface-2 border border-line-2 text-ink placeholder:text-ink-2 outline-none font-medium"
                         />
                         <button
                           type="button"
                           style={{ backgroundColor: brandColor }}
-                          className="w-7 h-7 rounded-lg text-white flex items-center justify-center shrink-0 shadow-xs"
+                          className="w-8 h-8 rounded-lg text-white flex items-center justify-center shrink-0 shadow-xs"
                         >
-                          <Send className="w-3.5 h-3.5" />
+                          <Send className="w-4 h-4" />
                         </button>
                       </div>
                     </div>
@@ -1163,29 +1609,35 @@ export function AdminSettingsPanel({
 
                   {/* Floating Launcher Bubble */}
                   <div
-                    className={`absolute bottom-3 ${
-                      widgetPosition === 'right' ? 'right-4' : 'left-4'
-                    } z-10`}
+                    className={cn(
+                      'absolute bottom-3 z-10',
+                      previewDevice === 'mobile'
+                        ? 'right-3'
+                        : widgetPosition === 'right'
+                        ? 'right-4'
+                        : 'left-4'
+                    )}
                   >
                     <button
                       type="button"
                       onClick={() => setPreviewOpen(!previewOpen)}
                       style={{ backgroundColor: brandColor }}
-                      className="w-12 h-12 rounded-full text-white flex items-center justify-center shadow-lg transition-transform hover:scale-105 active:scale-95"
+                      className="w-13 h-13 rounded-full text-white flex items-center justify-center shadow-2xl ring-4 ring-black/15 dark:ring-white/15 transition-transform hover:scale-105 active:scale-95"
+                      title={previewOpen ? 'Close widget preview' : 'Open widget preview'}
                     >
                       {previewOpen ? (
-                        <X className="w-5 h-5 text-white" />
+                        <X className="w-5.5 h-5.5 text-white" />
                       ) : showLauncherLogo && logoUrl ? (
                         <img
                           src={logoUrl}
                           alt="Chat"
-                          className="w-8 h-8 rounded-full object-cover bg-white p-0.5 shadow-sm"
+                          className="w-8.5 h-8.5 rounded-full object-cover bg-white p-0.5 shadow-sm"
                         />
                       ) : (
                         <img
                           src="/chat-icon-white.png"
                           alt="Chat"
-                          className="w-6 h-6 object-contain brightness-0 invert"
+                          className="w-6.5 h-6.5 object-contain"
                         />
                       )}
                     </button>
@@ -2879,8 +3331,8 @@ export function AdminSettingsPanel({
                   )}
 
                   {/* Table of DNS Records */}
-                  <div className="rounded-xl border border-line bg-surface overflow-hidden text-[12.5px]">
-                    <div className="grid grid-cols-12 px-4 py-2.5 bg-surface-2 border-b border-line font-semibold text-ink-2 text-[11.5px]">
+                  <div className="rounded-xl border-2 border-line-2 bg-surface overflow-hidden text-[12.5px] shadow-xs">
+                    <div className="grid grid-cols-12 px-4 py-2.5 bg-surface-2 border-b-2 border-line-2 font-bold text-ink text-[12px]">
                       <div className="col-span-2">Type</div>
                       <div className="col-span-3">Host / Name</div>
                       <div className="col-span-5">Target / Value</div>
@@ -2892,10 +3344,10 @@ export function AdminSettingsPanel({
                       const records = getExpectedDnsRecords(workspace);
                       return (
                         <>
-                          <div className="grid grid-cols-12 px-4 py-3 border-b border-line/60 items-center">
-                            <div className="col-span-2 font-mono font-bold text-accent">{records.primary.type}</div>
-                            <div className="col-span-3 font-mono text-ink truncate">{records.primary.name}</div>
-                            <div className="col-span-5 font-mono text-ink truncate">{records.primary.value}</div>
+                          <div className="grid grid-cols-12 px-4 py-3 border-b border-line-2 items-center">
+                            <div className="col-span-2 font-mono font-extrabold text-accent">{records.primary.type}</div>
+                            <div className="col-span-3 font-mono text-ink font-semibold truncate">{records.primary.name}</div>
+                            <div className="col-span-5 font-mono text-ink font-semibold truncate">{records.primary.value}</div>
                             <div className="col-span-2 text-right">
                               <button
                                 type="button"
@@ -2905,7 +3357,7 @@ export function AdminSettingsPanel({
                                   setTimeout(() => setCopiedCname(false), 2000);
                                   showStatus(`${records.primary.type} target copied!`);
                                 }}
-                                className="btn btn-xs btn-secondary"
+                                className="btn btn-xs btn-secondary font-bold border-2 border-line-2 hover:border-line-3"
                               >
                                 {copiedCname ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
                                 <span>{copiedCname ? 'Copied' : 'Copy'}</span>
@@ -2915,9 +3367,9 @@ export function AdminSettingsPanel({
 
                           {/* TXT RECORD */}
                           <div className="grid grid-cols-12 px-4 py-3 items-center">
-                            <div className="col-span-2 font-mono font-bold text-amber-500">TXT</div>
-                            <div className="col-span-3 font-mono text-ink truncate">{records.txt.name}</div>
-                            <div className="col-span-5 font-mono text-ink truncate">{records.txt.value}</div>
+                            <div className="col-span-2 font-mono font-extrabold text-amber-500">{records.txt.type}</div>
+                            <div className="col-span-3 font-mono text-ink font-semibold truncate">{records.txt.name}</div>
+                            <div className="col-span-5 font-mono text-ink font-semibold truncate">{records.txt.value}</div>
                             <div className="col-span-2 text-right">
                               <button
                                 type="button"
@@ -2927,7 +3379,7 @@ export function AdminSettingsPanel({
                                   setTimeout(() => setCopiedToken(false), 2000);
                                   showStatus('TXT verification value copied!');
                                 }}
-                                className="btn btn-xs btn-secondary"
+                                className="btn btn-xs btn-secondary font-bold border-2 border-line-2 hover:border-line-3"
                               >
                                 {copiedToken ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
                                 <span>{copiedToken ? 'Copied' : 'Copy'}</span>
