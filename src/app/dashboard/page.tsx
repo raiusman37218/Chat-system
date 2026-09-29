@@ -752,7 +752,8 @@ export default function DashboardPage() {
     isInternal: boolean = false,
     conversationId?: string,
     replyToId?: string | null,
-    attachmentUrl?: string | null
+    attachmentUrl?: string | null,
+    metadata?: Record<string, any> | null
   ) => {
     const targetId = conversationId || selectedConversationIdRef.current;
     if (!targetId) {
@@ -774,6 +775,7 @@ export default function DashboardPage() {
       sender_id: currentAgent.id,
       content: content || (attachmentUrl ? 'Sent an attachment' : ''),
       is_internal: isInternal,
+      ...(metadata ? { metadata } : {}),
       ...(attachmentUrl ? { attachment_url: attachmentUrl } : {}),
       // Omitted rather than set to null when there is no quote, so the insert
       // still works against a database that has not run the migration yet.

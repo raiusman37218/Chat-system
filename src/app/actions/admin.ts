@@ -462,9 +462,68 @@ export async function updateSMTPSettingsAction(
     .eq('id', workspaceId)
     .select()
     .single();
-
   if (error) throw new Error(error.message);
   return { success: true, workspace: updated as Workspace };
+}
+
+/**
+ * SECTION 10: Create Workspace & Link Agent
+ */
+export async function createWorkspaceAction(input: {
+  businessName: string;
+  websiteUrl?: string | null;
+  brandColor: string;
+  greetingTitle: string;
+  greetingMessage: string;
+  slug: string;
+  customDomain?: string | null;
+  verificationToken?: string | null;
+}) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+    error: authErr,
+  } = await supabase.auth.getUser();
+
+  if (authErr || !user) {
+    throw new Error('Unauthorized: Authentication required.');
+  }
+
+  // 1. Insert Workspace
+  const { data: ws, error: wsError } = await supabase
+    .from('workspaces')
+    .insert({
+      name: input.businessName,
+      website_url: input.websiteUrl || null,
+      brand_color: input.brandColor,
+      greeting_title: input.greetingTitle,
+      greeting_message: input.greetingMessage,
+      owner_id: user.id,
+      slug: input.slug,
+      custom_domain: input.customDomain || null,
+      custom_domain_status: input.customDomain ? 'pending' : null,
+      custom_domain_verification_token: input.customDomain ? input.verificationToken : null,
+    })
+    .select()
+    .single();
+
+  if (wsError || !ws) {
+    throw new Error(wsError?.message || 'Failed to create workspace.');
+  }
+
+  // 2. Link current agent to workspace
+  await supabase
+    .from('agents')
+    .upsert({
+      id: user.id,
+      name: user.user_metadata?.name || user.email?.split('@')[0] || 'Owner',
+      email: user.email || '',
+      workspace_id: ws.id,
+      role: 'owner',
+      status: 'online',
+    });
+
+  return { success: true, workspace: ws as Workspace };
 }
 
 

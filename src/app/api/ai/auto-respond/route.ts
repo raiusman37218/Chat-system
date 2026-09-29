@@ -7,6 +7,7 @@ import {
 } from '@/lib/ai/anthropic';
 import { dispatchOutboundMessage } from '@/lib/channels/dispatcher';
 import { providerConfigFrom, warmHelpIndex } from '@/lib/ai/help-answer';
+import { detectLanguage, translateToEnglish } from '@/lib/ai/translator';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://vfjsaynnubxywdbevxtx.supabase.co';
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZmanNheW5udWJ4eXdkYmV2eHR4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgyNTA5MDEsImV4cCI6MjEwMzgyNjkwMX0.YyBCXMqwrOk5BRhQafYLFw8tiM5PC8lc8Yocodw9wf0';
@@ -92,12 +93,12 @@ export async function POST(req: NextRequest) {
     const [{ data: workspace }, { data: conv }, { data: recentMessages }] = await Promise.all([
       supabase
         .from('workspaces')
-        .select('ai_settings, slug, custom_domain, custom_domain_status')
+        .select('name, greeting_title, greeting_message, ai_settings, slug, custom_domain, custom_domain_status')
         .eq('id', workspace_id)
         .single(),
       supabase
         .from('conversations')
-        .select('id, workspace_id, status, ai_mode, channel, visitor:visitors(name)')
+        .select('id, workspace_id, status, ai_mode, channel, channel_metadata, visitor:visitors(name)')
         .eq('id', conversation_id)
         .single(),
       // Only the recent end of the thread is ever used below.
@@ -126,20 +127,6 @@ export async function POST(req: NextRequest) {
       return json({ replied: false, reason: 'AI disabled on this conversation' });
     }
 
-    // Everything the visitor has said since anyone last replied is one
-    // unanswered turn.
-    //
-    // Anchoring on "the newest visitor message with nothing after it" dropped
-    // messages: a visitor who sends two lines in quick succession has the
-    // reply to the first land *after* the second, so the second looked
-    // answered and was never picked up. Working back from the last reply
-    // instead means a burst of messages is answered once, together.
-    //
-    // A reply's position is not always what it covered, though: when the
-    // second line arrives while the first is still being answered, that reply
-    // is stored after the second line without having seen it. So an AI reply
-    // records the last visitor message it read (`answered_until`), and only
-    // visitor messages after that point count as unanswered.
     const lastReply = [...msgs]
       .reverse()
       .find((m) => (m.sender_type === 'agent' || m.sender_type === 'ai') && !m.is_internal);
@@ -162,28 +149,58 @@ export async function POST(req: NextRequest) {
 
     // The newest line is the question; the rest of the burst is its context.
     const visitorMsg = unanswered[unanswered.length - 1];
+
+    // Language Detection & English Translation for Dashboard
+    const detected = detectLanguage(visitorMsg.content);
+    let englishTranslation = visitorMsg.content;
+    if (detected.code !== 'en' && !visitorMsg.metadata?.english_translation) {
+      try {
+        const trans = await translateToEnglish({
+          text: visitorMsg.content,
+          detectedLanguage: detected.code,
+          providerConfig: providerConfigFrom(aiSettings),
+        });
+        englishTranslation = trans.englishText;
+
+        await supabase
+          .from('messages')
+          .update({
+            metadata: {
+              ...(visitorMsg.metadata || {}),
+              detected_language: detected.code,
+              language_name: trans.sourceLanguage,
+              english_translation: englishTranslation,
+            },
+          })
+          .eq('id', visitorMsg.id);
+
+        await supabase
+          .from('conversations')
+          .update({
+            channel_metadata: {
+              ...((conv.channel_metadata as Record<string, any>) || {}),
+              visitor_language: detected.code,
+              language_name: trans.sourceLanguage,
+            },
+          })
+          .eq('id', conversation_id);
+      } catch (err) {
+        console.warn('[Auto-Respond] Translation error:', err);
+      }
+    }
+
     const burstContext = unanswered
       .slice(0, -1)
       .map((m) => m.content as string)
       .reverse();
 
-    // Older turns, so a follow-up like "and how long does that take?" still
-    // resolves against what was being discussed.
     const earlier = msgs
       .filter((m) => isVisitorLine(m) && !unanswered.includes(m))
       .map((m) => m.content as string)
       .reverse();
 
-    // Retrieval searches against what the *customer* said. Including the
-    // assistant's own replies would bias the search toward whatever it already
-    // answered, which is the opposite of what a follow-up needs.
     const history = [...burstContext, ...earlier].slice(0, 4);
 
-    // The model, unlike the retriever, does need both sides. Without its own
-    // previous replies it re-greets, repeats an answer it just gave, and
-    // cannot resolve "what about the other one?".
-    // Everything except the lines being answered now, so the model also sees
-    // the reply it gave to a message that came just before them.
     const turns = msgs
       .filter(
         (m) =>
@@ -212,6 +229,7 @@ export async function POST(req: NextRequest) {
       history,
       turns,
       helpCenterUrl: helpCenterUrlFor(workspace),
+      workspaceName: workspace?.name,
     });
 
     const aiResponseText = result.replyText;
@@ -220,8 +238,6 @@ export async function POST(req: NextRequest) {
     }
 
     // 3b. ATOMIC DOUBLE-CHECK: Re-query messages to guarantee no agent or AI replied during RAG generation
-    // An AI reply stored after this message but written before it arrived is
-    // not an answer to it, so AI replies are judged by what they read.
     const { data: lateReplies } = await supabase
       .from('messages')
       .select('sender_type, created_at, metadata')
@@ -242,6 +258,21 @@ export async function POST(req: NextRequest) {
       return json({ replied: false, reason: 'Already responded during generation' });
     }
 
+    // If response was delivered in native language, get English version for agents in dashboard
+    let aiEnglishTranslation = aiResponseText;
+    if (detected.code !== 'en') {
+      try {
+        const transAi = await translateToEnglish({
+          text: aiResponseText,
+          detectedLanguage: detected.code,
+          providerConfig: providerConfigFrom(aiSettings),
+        });
+        aiEnglishTranslation = transAi.englishText;
+      } catch {
+        aiEnglishTranslation = aiResponseText;
+      }
+    }
+
     // 4. Insert message as 'ai' sender
     const { data: insertedMsg, error: msgErr } = await supabase
       .from('messages')
@@ -251,8 +282,12 @@ export async function POST(req: NextRequest) {
         sender_id: null,
         content: aiResponseText,
         is_internal: false,
-        // What this reply actually read up to — see `answeredUntil` above.
-        metadata: { answered_until: visitorMsg.created_at },
+        metadata: {
+          answered_until: visitorMsg.created_at,
+          delivered_language: detected.code,
+          delivered_language_name: detected.name,
+          english_translation: aiEnglishTranslation,
+        },
       })
       .select()
       .single();
