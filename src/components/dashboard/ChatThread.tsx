@@ -602,7 +602,13 @@ export function ChatThread({
 
   // 6. Customer Language Auto-Detection & Sync
   const detectedVisitorLang = useMemo(() => {
-    // 1. Prioritize ACTUAL visitor messages in the thread (most recent first)
+    // 1. Check channel_metadata if already known for this conversation
+    const chanMeta = conversation.channel_metadata as Record<string, any> | undefined;
+    if (chanMeta?.visitor_language && chanMeta.visitor_language !== 'en' && SUPPORTED_LANGUAGES[chanMeta.visitor_language.toLowerCase()]) {
+      return chanMeta.visitor_language.toLowerCase();
+    }
+
+    // 2. Scan visitor messages in the thread (most recent first)
     const visitorMessages = [...messages]
       .reverse()
       .filter((m) => m.sender_type === 'visitor' && m.content?.trim());
@@ -620,18 +626,7 @@ export function ChatThread({
       }
     }
 
-    // If visitor has sent messages and none were foreign, visitor communicates in English
-    if (visitorMessages.length > 0) {
-      return 'en';
-    }
-
-    // 2. Check channel_metadata if explicitly set
-    const chanMeta = conversation.channel_metadata as Record<string, any> | undefined;
-    if (chanMeta?.visitor_language && SUPPORTED_LANGUAGES[chanMeta.visitor_language.toLowerCase()]) {
-      return chanMeta.visitor_language.toLowerCase();
-    }
-
-    // 3. Fallback to visitor profile language only if no messages exist yet
+    // 3. Check visitor profile language
     if (conversation.visitor?.language && conversation.visitor.language !== 'en') {
       const code = conversation.visitor.language.split('-')[0].toLowerCase();
       if (SUPPORTED_LANGUAGES[code]) return code;
@@ -665,26 +660,29 @@ export function ChatThread({
     if (detectedVisitorLang && detectedVisitorLang !== 'en') {
       setTargetLanguage(detectedVisitorLang);
       setAutoTranslateEnabled(true);
-    } else {
-      setTargetLanguage('en');
-      setAutoTranslateEnabled(false);
     }
   }, [detectedVisitorLang, conversation.id]);
+
+  // Set to track in-flight translation requests so we don't repeat them
+  const inFlightTranslationsRef = useRef<Set<string>>(new Set());
 
   // Auto-translate any incoming non-English visitor messages that haven't been translated yet
   useEffect(() => {
     const untranslated = messages.filter(
       (m) =>
         m.sender_type === 'visitor' &&
-        m.content &&
-        !m.metadata?.translation?.english_text &&
-        !m.metadata?.english_translation &&
-        detectLanguage(m.content).code !== 'en'
+        m.content?.trim() &&
+        !inFlightTranslationsRef.current.has(m.id) &&
+        (!m.metadata?.translation?.is_translated ||
+          !m.metadata?.translation?.english_text ||
+          (m.metadata?.translation?.detected_language !== 'en' &&
+            m.metadata?.translation?.english_text === m.content))
     );
 
     if (untranslated.length === 0) return;
 
     untranslated.forEach((m) => {
+      inFlightTranslationsRef.current.add(m.id);
       fetch('/api/translation/process-message', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -694,7 +692,11 @@ export function ChatThread({
           text: m.content,
           workspaceId: conversation.workspace_id,
         }),
-      }).catch((e) => console.warn('Inbound translation trigger failed:', e));
+      })
+        .catch((e) => {
+          inFlightTranslationsRef.current.delete(m.id);
+          console.warn('Inbound translation trigger failed:', e);
+        });
     });
   }, [messages, conversation.id, conversation.workspace_id]);
 
@@ -756,7 +758,20 @@ export function ChatThread({
       let finalContentToSend = text;
       let translationMetadata: Record<string, any> | null = null;
 
-      if (!isInternal && autoTranslateEnabled && targetLanguage && text) {
+      // Determine customer target language: state, detectedVisitorLang, or channel_metadata
+      const effectiveCustomerLang =
+        (targetLanguage && targetLanguage !== 'en')
+          ? targetLanguage
+          : (detectedVisitorLang && detectedVisitorLang !== 'en')
+          ? detectedVisitorLang
+          : (conversation.channel_metadata as any)?.visitor_language || 'en';
+
+      const shouldTranslate =
+        !isInternal &&
+        text.trim() &&
+        (autoTranslateEnabled || effectiveCustomerLang !== 'en' || detectLanguage(text).code !== 'en');
+
+      if (shouldTranslate) {
         setIsTranslating(true);
         try {
           const transRes = await fetch('/api/translation/translate', {
@@ -765,7 +780,7 @@ export function ChatThread({
             body: JSON.stringify({
               direction: 'agent_reply',
               text,
-              targetLanguage,
+              targetLanguage: effectiveCustomerLang,
               workspaceId: conversation.workspace_id,
             }),
           });
@@ -775,24 +790,24 @@ export function ChatThread({
               finalContentToSend = data.translatedText.trim();
               const englishText = data.englishText?.trim() || text;
               const detectedLang = data.detectedSourceLanguage || 'en';
-              const langInfo = getLanguageInfo(targetLanguage);
+              const langInfo = getLanguageInfo(effectiveCustomerLang);
               translationMetadata = {
                 translation: {
-                  is_translated: true,
+                  is_translated: Boolean(data.isTranslated || finalContentToSend !== text || englishText !== text),
                   direction: 'agent_to_visitor',
                   original_agent_input: text,
                   agent_input_language: detectedLang,
                   english_text: englishText,
                   original_english: englishText,
                   translated_text: finalContentToSend,
-                  target_language: targetLanguage,
+                  target_language: effectiveCustomerLang,
                   target_language_name: langInfo.name,
                 },
                 english_text: englishText,
                 original_english: englishText,
                 original_agent_input: text,
                 translated_text: finalContentToSend,
-                target_language: targetLanguage,
+                target_language: effectiveCustomerLang,
               };
             }
           }
@@ -1343,7 +1358,51 @@ export function ChatThread({
                 </div>
               </div>
             ) : isAI ? (
-              <ChatMarkdown content={msg.content} />
+              (() => {
+                const aiEnglish =
+                  msg.metadata?.english_translation ||
+                  msg.metadata?.translation?.english_text ||
+                  msg.content;
+                const aiDelivered = msg.content;
+                const deliveredLangCode =
+                  msg.metadata?.delivered_language ||
+                  msg.metadata?.translation?.target_language ||
+                  msg.metadata?.target_language;
+                const deliveredLangInfo = deliveredLangCode ? getLanguageInfo(deliveredLangCode) : null;
+                const isAiForeign = Boolean(
+                  (deliveredLangCode && deliveredLangCode !== 'en') ||
+                  (aiEnglish && aiDelivered && aiEnglish.trim().toLowerCase() !== aiDelivered.trim().toLowerCase())
+                );
+                const isExpanded = expandedTranslations[msg.id];
+
+                return (
+                  <div className="space-y-1.5">
+                    <ChatMarkdown content={isExpanded ? aiDelivered : aiEnglish} />
+                    {isAiForeign && (
+                      <div className="pt-1.5 border-t border-purple-500/20 flex items-center justify-between gap-2 text-[11px] select-none">
+                        <span className="inline-flex items-center gap-1.5 font-bold px-2 py-0.5 rounded-md bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20 shadow-2xs">
+                          <Globe className="w-3.5 h-3.5 shrink-0" />
+                          {isExpanded
+                            ? `Delivered to customer in ${deliveredLangInfo?.name || deliveredLangCode || 'Customer Language'}`
+                            : `Delivered in ${deliveredLangInfo?.name || deliveredLangCode || 'Customer Language'}`}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setExpandedTranslations((prev) => ({
+                              ...prev,
+                              [msg.id]: !prev[msg.id],
+                            }))
+                          }
+                          className="px-2 py-0.5 rounded-md bg-surface-2 border border-line-2 hover:border-purple-500 text-ink font-bold text-[11px] transition-all cursor-pointer ml-auto hover:text-purple-600"
+                        >
+                          {isExpanded ? 'Show English' : `View ${deliveredLangInfo?.name || 'Customer Language'}`}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()
             ) : isAgent ? (
               (() => {
                 const translationMeta = msg.metadata?.translation;
@@ -1421,7 +1480,7 @@ export function ChatThread({
                   );
                 }
 
-                return msg.content;
+                return englishText || msg.content;
               })()
             ) : (
               (() => {
@@ -1434,10 +1493,13 @@ export function ChatThread({
                   msg.metadata?.detected_language ||
                   (msg.content ? detectLanguage(msg.content).code : 'en');
                 const isForeign = detectedCode !== 'en';
+                const hasEnglishTranslation =
+                  Boolean(englishText) &&
+                  englishText.trim().toLowerCase() !== originalText.trim().toLowerCase();
                 const langInfo = getLanguageInfo(detectedCode);
                 const isExpanded = expandedTranslations[msg.id];
 
-                if (isForeign) {
+                if (isForeign || hasEnglishTranslation || translationMeta?.is_translated) {
                   return (
                     <div className="space-y-2">
                       {englishText ? (
@@ -1449,7 +1511,7 @@ export function ChatThread({
                           <p className="whitespace-pre-wrap leading-relaxed">{originalText}</p>
                           <span className="inline-flex items-center gap-1.5 text-[11.5px] text-accent mt-1.5 font-bold animate-pulse px-2 py-0.5 rounded-md bg-accent/10 border border-accent/20">
                             <Globe className="w-3.5 h-3.5 shrink-0 animate-spin" />
-                            Auto-translating from {langInfo.name}...
+                            Auto-translating to English...
                           </span>
                         </div>
                       )}
@@ -1480,7 +1542,7 @@ export function ChatThread({
                   );
                 }
 
-                return msg.content;
+                return englishText || msg.content;
               })()
             )}
           </div>

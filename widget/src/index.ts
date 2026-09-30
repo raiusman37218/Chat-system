@@ -4407,6 +4407,8 @@ class ChatifyWidget {
       const displayContent =
         !isVisitor && (msg as any).metadata?.translation?.translated_text
           ? (msg as any).metadata.translation.translated_text
+          : !isVisitor && (msg as any).metadata?.translated_text
+          ? (msg as any).metadata.translated_text
           : msg.content;
 
       bubble.innerHTML =

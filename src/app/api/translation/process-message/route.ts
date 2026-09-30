@@ -68,11 +68,15 @@ export async function POST(req: NextRequest) {
     // Translate to English
     const res = await translateToEnglish({
       text: messageText,
-      detectedLanguage: detected.code,
+      detectedLanguage: detected.code !== 'en' ? detected.code : undefined,
       providerConfig,
     });
 
-    const isNonEnglish = detected.code !== 'en';
+    const finalDetectedCode = res.detectedLanguageCode || detected.code || 'en';
+    const isNonEnglish =
+      !res.isOriginalEnglish ||
+      finalDetectedCode !== 'en' ||
+      res.englishText.trim().toLowerCase() !== messageText.trim().toLowerCase();
 
     // If messageId provided, update message row in database
     if (messageId) {
@@ -94,10 +98,10 @@ export async function POST(req: NextRequest) {
               direction: 'visitor_to_agent',
               original_text: messageText,
               english_text: res.englishText,
-              detected_language: detected.code,
+              detected_language: finalDetectedCode,
               language_name: res.sourceLanguage,
             },
-            detected_language: detected.code,
+            detected_language: finalDetectedCode,
             language_name: res.sourceLanguage,
             english_translation: res.englishText,
           },
@@ -119,16 +123,17 @@ export async function POST(req: NextRequest) {
           .update({
             channel_metadata: {
               ...((conv.channel_metadata as Record<string, any>) || {}),
-              visitor_language: detected.code,
+              visitor_language: finalDetectedCode,
               language_name: res.sourceLanguage,
             },
+            updated_at: new Date().toISOString(),
           })
           .eq('id', conversationId);
 
         if (conv.visitor_id) {
           await supabase
             .from('visitors')
-            .update({ language: detected.code })
+            .update({ language: finalDetectedCode })
             .eq('id', conv.visitor_id);
         }
       }
@@ -137,9 +142,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(
       {
         success: true,
-        detectedLanguage: detected.code,
+        detectedLanguage: finalDetectedCode,
         languageName: res.sourceLanguage,
-        isOriginalEnglish: res.isOriginalEnglish,
+        isOriginalEnglish: !isNonEnglish,
         englishText: res.englishText,
       },
       { headers: CORS_HEADERS }

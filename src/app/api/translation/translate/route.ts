@@ -62,16 +62,18 @@ export async function POST(req: NextRequest) {
 
       const res = await translateToEnglish({
         text,
-        detectedLanguage: detected.code,
+        detectedLanguage: sourceLanguage || (detected.code !== 'en' ? detected.code : undefined),
         providerConfig,
       });
+
+      const finalCode = res.detectedLanguageCode || detected.code || 'en';
 
       return NextResponse.json(
         {
           originalText: text,
           translatedText: res.englishText,
           englishText: res.englishText,
-          detectedLanguage: detected.code,
+          detectedLanguage: finalCode,
           languageName: res.sourceLanguage,
           isOriginalEnglish: res.isOriginalEnglish,
         },
@@ -80,7 +82,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (direction === 'agent_reply' || direction === 'from_english') {
-      const targetCode = targetLanguage || 'ar';
+      const targetCode = targetLanguage || 'en';
       const res = await translateAgentReply({
         text,
         targetLanguageCode: targetCode,

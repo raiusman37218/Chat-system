@@ -569,6 +569,13 @@ export default function DashboardPage() {
               prev.map((m) => (m.id === updatedMsg.id ? { ...m, ...updatedMsg } : m))
             );
           }
+          setConversations((prev) =>
+            prev.map((c) =>
+              c.id === updatedMsg.conversation_id && (!c.last_message || c.last_message.id === updatedMsg.id)
+                ? { ...c, last_message: { ...(c.last_message || {}), ...updatedMsg } }
+                : c
+            )
+          );
         }
       )
       .on(

@@ -83,6 +83,55 @@ export function decodeHtmlEntities(str: string): string {
     .replace(/&#(\d+);/g, (_, dec) => String.fromCharCode(Number(dec)));
 }
 
+
+/**
+ * Primary free translation & auto-detection engine via Google Translate GTX API.
+ * High-speed, zero API keys required, handles Roman Urdu, Italian, Arabic, Spanish, French, etc.
+ */
+export async function translateWithGoogleGtx(
+  text: string,
+  targetLang: string = 'en',
+  sourceLang: string = 'auto'
+): Promise<{ translated: string; detectedLanguage: string } | null> {
+  if (!text || !text.trim()) return null;
+  const s = sourceLang || 'auto';
+  const t = targetLang || 'en';
+
+  try {
+    const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${encodeURIComponent(
+      s
+    )}&tl=${encodeURIComponent(t)}&dt=t&q=${encodeURIComponent(text.trim())}`;
+    const res = await fetch(url, {
+      signal: AbortSignal.timeout(6000),
+      headers: {
+        'User-Agent':
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        Accept: 'application/json, text/plain, */*',
+      },
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const candidate = data[0]?.map((x: any) => x[0]).filter(Boolean).join('');
+    const rawDetected = data[2] || s;
+    let detected = (rawDetected || 'en').toLowerCase().split('-')[0];
+
+    // Normalize Hindi detection for Roman Urdu text
+    if (detected === 'hi' && (ROMAN_URDU_WORDS_REGEX.test(text.toLowerCase()) || /[\u0600-\u06FF]/.test(text))) {
+      detected = 'ur';
+    }
+
+    if (candidate && typeof candidate === 'string' && candidate.trim()) {
+      return {
+        translated: decodeHtmlEntities(candidate.trim()),
+        detectedLanguage: detected,
+      };
+    }
+  } catch (err) {
+    console.warn('[translateWithGoogleGtx] fetch error:', err);
+  }
+  return null;
+}
+
 /**
  * Free translation fallback via MyMemory with zero API keys required.
  */
@@ -94,28 +143,44 @@ export async function translateViaFreeApi(
   if (!text || !text.trim()) return text;
   const s = sourceLang === 'en' ? 'en' : (sourceLang || 'auto');
   const t = targetLang || 'en';
-  if (s === t) return text;
+  if (s === t && s !== 'auto') return text;
 
+  // 1. Primary: Google GTX
+  const googleRes = await translateWithGoogleGtx(text, t, s);
+  if (googleRes?.translated) {
+    return googleRes.translated;
+  }
+
+  // 2. Secondary: MyMemory fallback
   try {
-    const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text.trim())}&langpair=${encodeURIComponent(s)}|${encodeURIComponent(t)}`;
+    const sPair = s === 'auto' ? 'en' : s;
+    const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(
+      text.trim()
+    )}&langpair=${encodeURIComponent(sPair)}|${encodeURIComponent(t)}`;
     const res = await fetch(url, {
-      signal: AbortSignal.timeout(6000),
+      signal: AbortSignal.timeout(5000),
       headers: { Accept: 'application/json' },
     });
-    if (!res.ok) return null;
-    const data = await res.json();
-    const candidate = data?.responseData?.translatedText;
-    if (candidate && typeof candidate === 'string' && candidate.trim()) {
-      if (candidate.startsWith('MYMEMORY WARNING:')) {
-        return null;
+    if (res.ok) {
+      const data = await res.json();
+      const candidate = data?.responseData?.translatedText;
+      if (
+        candidate &&
+        typeof candidate === 'string' &&
+        candidate.trim() &&
+        !candidate.startsWith('MYMEMORY WARNING:')
+      ) {
+        return decodeHtmlEntities(candidate.trim());
       }
-      return decodeHtmlEntities(candidate.trim());
     }
   } catch (err) {
     console.warn('[translateViaFreeApi] Translation fetch failed:', err);
   }
   return null;
 }
+
+const ROMAN_URDU_WORDS_REGEX =
+  /\b(hum|humein|humay|ham|hamara|hamari|main|mein|aap|ap|tum|aapko|apko|aapka|apka|aapki|apki|mera|meri|mere|mujhe|mujhko|mujhy|chahiye|chahye|chahie|shukriya|shukria|theek|thik|hai|hain|hoga|hogi|kya|kia|kaise|kese|kaisay|batao|bataen|bataiye|kitna|kitni|kitne|denge|dainge|karenge|krenge|karen|karo|karein|madad|acha|accha|salam|assalam|walekum|nahi|nahin|bhi|kuch|koi|yeh|woh|mil|jayega|jayegi|milega)\b/i;
 
 /**
  * Detects the language of a customer message.
@@ -213,12 +278,15 @@ export function detectLanguage(text: string): { code: string; name: string } {
     return { code: 'vi', name: 'Vietnamese' };
   }
 
-  // Roman Urdu / Hindi patterns (Latin script)
   const lower = trimmed.toLowerCase();
-  const romanUrduWords =
-    /\b(hum|hm|ham|main|mein|aap|ap|tum|aapko|apko|aapka|apka|aapki|apki|mera|meri|mere|mujhe|mujhko|chahiye|chahye|shukriya|shukria|theek|thik|hai|hain|ho|hoga|hogi|kya|kia|kaise|kese|kaisay|batao|bataen|bataiye|kitna|kitni|kitne|denge|dainge|karenge|krenge|karen|karo|karein|madad|acha|accha|salam|assalam|walekum|nahi|nahin|mat|bhi|aur|kuch|koi|ab|ye|yeh|wo|woh|mil|jayega|jayegi|milega)\b/i;
-  if (romanUrduWords.test(lower)) {
-    return { code: 'ur', name: 'Urdu (Roman)' };
+
+  // Italian patterns (check before Roman Urdu to avoid collisions like 'ho', 'carta', etc.)
+  if (
+    /\b(ciao|buongiorno|buonasera|grazie|mille|quanto|costa|prezzo|aiuto|carta|pagamento|sconto|adesso|posso|effettuare|domani|mattina|ricarico|codice|disponibile|per favore|come|avrò|oppure|faccio|risulta)\b/i.test(
+      lower
+    )
+  ) {
+    return { code: 'it', name: 'Italian' };
   }
 
   // Spanish patterns
@@ -270,15 +338,6 @@ export function detectLanguage(text: string): { code: string; name: string } {
     return { code: 'pt', name: 'Portuguese' };
   }
 
-  // Italian patterns
-  if (
-    /\b(ciao|buongiorno|grazie|quanto|costa|prezzo|aiuto|ho bisogno|per favore)\b/i.test(
-      lower
-    )
-  ) {
-    return { code: 'it', name: 'Italian' };
-  }
-
   // Indonesian / Malay patterns
   if (
     /\b(selamat|pagi|siang|malam|terima|kasih|berapa|harganya|bisa|bantu|saya|tolong)\b/i.test(
@@ -313,12 +372,18 @@ export function detectLanguage(text: string): { code: string; name: string } {
     return { code: 'sv', name: 'Swedish' };
   }
 
+  // Roman Urdu / Hindi patterns (Latin script)
+  if (ROMAN_URDU_WORDS_REGEX.test(lower)) {
+    return { code: 'ur', name: 'Urdu (Roman)' };
+  }
+
   // Default to English
   return { code: 'en', name: 'English' };
 }
 
 /**
  * Translates customer text into English for support agents in the dashboard.
+ * Auto-detects foreign languages (including Italian, Arabic, Urdu, Spanish, etc.) and guarantees English output.
  */
 export async function translateToEnglish({
   text,
@@ -328,24 +393,34 @@ export async function translateToEnglish({
   text: string;
   detectedLanguage?: string;
   providerConfig?: ProviderConfig | null;
-}): Promise<{ englishText: string; sourceLanguage: string; isOriginalEnglish: boolean }> {
+}): Promise<{
+  englishText: string;
+  sourceLanguage: string;
+  detectedLanguageCode: string;
+  isOriginalEnglish: boolean;
+}> {
   if (!text || !text.trim()) {
-    return { englishText: text, sourceLanguage: 'en', isOriginalEnglish: true };
+    return {
+      englishText: text || '',
+      sourceLanguage: 'English',
+      detectedLanguageCode: 'en',
+      isOriginalEnglish: true,
+    };
   }
 
-  const detection = detectedLanguage
-    ? {
-        code: detectedLanguage,
-        name: SUPPORTED_LANGUAGES[detectedLanguage]?.name || detectedLanguage,
-      }
-    : detectLanguage(text);
+  const trimmed = text.trim();
 
-  // If already English, no translation needed
-  if (detection.code === 'en') {
-    return { englishText: text, sourceLanguage: 'English', isOriginalEnglish: true };
+  // If text has only numbers, punctuation, or emojis (e.g. "5000", "???")
+  if (!/[a-zA-Z\u00C0-\uFFFF]/.test(trimmed)) {
+    return {
+      englishText: trimmed,
+      sourceLanguage: 'English',
+      detectedLanguageCode: 'en',
+      isOriginalEnglish: true,
+    };
   }
 
-  // 1. Try AI provider if configured
+  // 1. Try AI provider if configured in workspace
   if (isConfigured(providerConfig)) {
     try {
       const res = await chat(providerConfig!, {
@@ -353,39 +428,73 @@ export async function translateToEnglish({
           'You are a professional real-time customer support translator.\n' +
           'Translate the customer message into clear, natural, accurate English so the support agent can easily understand their issue or question.\n' +
           'Preserve all numbers, proper nouns, emails, and links exactly as they are.\n' +
-          'Output ONLY the translated English text, without commentary, notes, or quotes.',
-        messages: [{ role: 'user', content: text }],
+          'Respond with ONLY a JSON object: {"english_text": "...", "detected_language": "2-letter ISO code", "is_original_english": boolean}',
+        messages: [{ role: 'user', content: trimmed }],
         maxTokens: 500,
         temperature: 0,
         reasoning: 'fast',
         timeoutMs: 6000,
       });
 
-      const translated = res.text?.trim();
-      if (translated) {
-        return {
-          englishText: translated,
-          sourceLanguage: detection.name,
-          isOriginalEnglish: false,
-        };
+      const raw = res.text?.trim() || '';
+      const jsonMatch = raw.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        const parsed = JSON.parse(jsonMatch[0]);
+        if (parsed.english_text) {
+          const code = (parsed.detected_language || 'en').toLowerCase();
+          const langInfo = getLanguageInfo(code);
+          return {
+            englishText: parsed.english_text.trim(),
+            sourceLanguage: langInfo.name,
+            detectedLanguageCode: code,
+            isOriginalEnglish: Boolean(parsed.is_original_english || (code === 'en' && parsed.english_text.trim() === trimmed)),
+          };
+        }
       }
     } catch (err) {
-      console.warn('[translateToEnglish] AI Provider error, falling back to free API:', err);
+      console.warn('[translateToEnglish] AI Provider error, falling back to Google engine:', err);
     }
   }
 
-  // 2. Fallback to free translation engine (MyMemory)
-  const freeTranslation = await translateViaFreeApi(text, detection.code, 'en');
-  if (freeTranslation) {
+  // 2. High-speed Google GTX translation & language auto-detection
+  const googleRes = await translateWithGoogleGtx(trimmed, 'en', detectedLanguage || 'auto');
+  if (googleRes) {
+    const code = googleRes.detectedLanguage || 'en';
+    const langInfo = getLanguageInfo(code);
+    const isDifferent = googleRes.translated.trim().toLowerCase() !== trimmed.toLowerCase();
+    const isNonEnglish = code !== 'en' || isDifferent;
+
     return {
-      englishText: freeTranslation,
-      sourceLanguage: detection.name,
-      isOriginalEnglish: false,
+      englishText: googleRes.translated,
+      sourceLanguage: langInfo.name,
+      detectedLanguageCode: code,
+      isOriginalEnglish: !isNonEnglish,
     };
   }
 
-  // 3. Fallback: return original text with detected language
-  return { englishText: text, sourceLanguage: detection.name, isOriginalEnglish: false };
+  // 3. Fallback: MyMemory
+  const heuristic = detectedLanguage
+    ? { code: detectedLanguage, name: getLanguageInfo(detectedLanguage).name }
+    : detectLanguage(trimmed);
+
+  if (heuristic.code !== 'en') {
+    const freeTranslation = await translateViaFreeApi(trimmed, heuristic.code, 'en');
+    if (freeTranslation) {
+      return {
+        englishText: freeTranslation,
+        sourceLanguage: heuristic.name,
+        detectedLanguageCode: heuristic.code,
+        isOriginalEnglish: false,
+      };
+    }
+  }
+
+  return {
+    englishText: trimmed,
+    sourceLanguage: heuristic.name,
+    detectedLanguageCode: heuristic.code,
+    isOriginalEnglish: heuristic.code === 'en',
+  };
 }
 
 /**
@@ -396,6 +505,8 @@ const ROMAN_URDU_DICTIONARY: Record<string, string> = {
   hum: 'ہم',
   hm: 'ہم',
   ham: 'ہم',
+  humein: 'ہمیں',
+  humay: 'ہمیں',
   main: 'میں',
   mein: 'میں',
   me: 'میں',
@@ -414,6 +525,7 @@ const ROMAN_URDU_DICTIONARY: Record<string, string> = {
   krenge: 'کریں گے',
   karengay: 'کریں گے',
   karen: 'کریں',
+  karo: 'کریں',
   karna: 'کرنا',
   denge: 'دیں گے',
   dainge: 'دیں گے',
@@ -430,6 +542,7 @@ const ROMAN_URDU_DICTIONARY: Record<string, string> = {
   thanks: 'شکریہ',
   chahiye: 'چاہیے',
   chahye: 'چاہیے',
+  chahie: 'چاہیے',
   theek: 'ٹھیک',
   thik: 'ٹھیک',
   acha: 'اچھا',
@@ -447,7 +560,6 @@ const ROMAN_URDU_DICTIONARY: Record<string, string> = {
   bataen: 'بتائیں',
   hai: 'ہے',
   hain: 'ہیں',
-  ho: 'ہو',
   hoga: 'ہوگا',
   hogi: 'ہوگی',
   nahi: 'نہیں',
@@ -520,13 +632,10 @@ export async function translateAgentReply({
     };
   }
 
-  const targetLang = targetLanguageCode || 'ar';
+  const targetLang = targetLanguageCode || 'en';
   const targetLangInfo = getLanguageInfo(targetLang);
-  const detectedSource = sourceLanguageCode
-    ? { code: sourceLanguageCode, name: getLanguageInfo(sourceLanguageCode).name }
-    : detectLanguage(text);
 
-  // 1. Try AI provider if configured
+  // 1. Try AI provider if configured in workspace
   if (isConfigured(providerConfig)) {
     try {
       const brandContext = businessName ? ` representing ${businessName}` : '';
@@ -536,9 +645,9 @@ export async function translateAgentReply({
           `A support agent wrote a reply to a customer in their preferred language (could be English, Roman Urdu, Urdu, Hindi, Spanish, French, Arabic, German, etc.).\n` +
           `The customer speaks: ${targetLangInfo.name} (language code: "${targetLang}").\n\n` +
           `Your task:\n` +
-          `1. "customer_text": Translate the agent's message into natural, polite, respectful, and friendly ${targetLangInfo.name} for the customer. If the agent's text is already in ${targetLangInfo.name}, keep it natural in ${targetLangInfo.name}.\n` +
+          `1. "customer_text": Translate the agent's message into natural, polite, respectful, and friendly ${targetLangInfo.name} for the customer. If target is English, provide clear English.\n` +
           `2. "english_text": Translate the agent's message into clear, natural, professional English for the support agent's dashboard. If the agent typed in English, keep it in English.\n` +
-          `3. "detected_source_language": The 2-letter ISO code or name of the language the agent wrote in.\n\n` +
+          `3. "detected_source_language": The 2-letter ISO code of the language the agent wrote in.\n\n` +
           `Important:\n` +
           `- Accurately understand Roman Urdu/Hindi Latin transliterations (e.g. "hum aapko 20% discount denge" -> English: "We will give you a 20% discount", translated to customer language).\n` +
           `- Keep all numbers, prices, URLs, emails, codes, and proper names untouched.\n` +
@@ -556,11 +665,12 @@ export async function translateAgentReply({
         try {
           const parsed = JSON.parse(jsonMatch[0]);
           if (parsed.customer_text && parsed.english_text) {
+            const detectedCode = parsed.detected_source_language || 'en';
             return {
               translatedText: parsed.customer_text.trim(),
               englishText: parsed.english_text.trim(),
-              detectedSourceLanguage: parsed.detected_source_language || detectedSource.code,
-              sourceLanguageName: getLanguageInfo(parsed.detected_source_language || detectedSource.code).name,
+              detectedSourceLanguage: detectedCode,
+              sourceLanguageName: getLanguageInfo(detectedCode).name,
               targetLanguage: targetLang,
               targetLanguageName: targetLangInfo.name,
               isTranslated: true,
@@ -569,54 +679,52 @@ export async function translateAgentReply({
         } catch (_) {}
       }
     } catch (err) {
-      console.warn('[translateAgentReply] AI Provider failed, falling back to free engine:', err);
+      console.warn('[translateAgentReply] AI Provider failed, falling back to Google engine:', err);
     }
   }
 
-  // 2. Fallback: Free translation engine (MyMemory)
+  // 2. High-speed Google GTX translation engine
+  // Step 2a: Generate English translation for dashboard
   let englishText = text;
-  let sourceForTranslation = text;
-  const isRomanUrdu =
-    detectedSource.name.includes('Roman') ||
-    (detectedSource.code === 'ur' && !/[\u0600-\u06FF]/.test(text));
+  let detectedSourceLang = sourceLanguageCode || 'en';
 
-  if (isRomanUrdu) {
-    sourceForTranslation = romanUrduToUrdu(text);
-  }
-
-  // Translate to English for agent dashboard if not originally in English
-  if (detectedSource.code !== 'en' || isRomanUrdu) {
-    const sourceLangForEn = isRomanUrdu ? 'ur' : detectedSource.code;
-    const toEn = await translateViaFreeApi(sourceForTranslation, sourceLangForEn, 'en');
-    if (toEn) {
-      englishText = toEn;
+  const enRes = await translateWithGoogleGtx(text, 'en', sourceLanguageCode || 'auto');
+  if (enRes) {
+    englishText = enRes.translated;
+    detectedSourceLang = enRes.detectedLanguage || 'en';
+  } else {
+    // Fallback: Check if Roman Urdu
+    const isRoman = ROMAN_URDU_WORDS_REGEX.test(text.toLowerCase());
+    if (isRoman) {
+      const urduScript = romanUrduToUrdu(text);
+      const toEn = await translateViaFreeApi(urduScript, 'ur', 'en');
+      if (toEn) englishText = toEn;
+      detectedSourceLang = 'ur';
     }
   }
 
-  // Translate to target language for customer
+  // Step 2b: Translate to customer's target language
   let customerText = text;
-  if (targetLang === detectedSource.code && !isRomanUrdu) {
-    customerText = text;
-  } else if (targetLang === 'en') {
+  if (targetLang === 'en') {
     customerText = englishText;
+  } else if (targetLang === detectedSourceLang) {
+    customerText = text;
   } else {
-    // Pivot from englishText to target language for high accuracy
-    const fromEnglish = await translateViaFreeApi(englishText, 'en', targetLang);
-    if (fromEnglish) {
-      customerText = fromEnglish;
+    // Pivot from englishText to customer's target language for maximum accuracy
+    const targetRes = await translateWithGoogleGtx(englishText, targetLang, 'en');
+    if (targetRes?.translated) {
+      customerText = targetRes.translated;
     } else {
-      const direct = await translateViaFreeApi(sourceForTranslation, detectedSource.code, targetLang);
-      if (direct) {
-        customerText = direct;
-      }
+      const direct = await translateViaFreeApi(text, detectedSourceLang, targetLang);
+      if (direct) customerText = direct;
     }
   }
 
   return {
     translatedText: customerText,
     englishText,
-    detectedSourceLanguage: detectedSource.code,
-    sourceLanguageName: detectedSource.name,
+    detectedSourceLanguage: detectedSourceLang,
+    sourceLanguageName: getLanguageInfo(detectedSourceLang).name,
     targetLanguage: targetLang,
     targetLanguageName: targetLangInfo.name,
     isTranslated: customerText !== text || englishText !== text,
@@ -650,3 +758,4 @@ export async function translateFromEnglish({
     isTranslated: res.isTranslated,
   };
 }
+
