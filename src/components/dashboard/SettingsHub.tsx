@@ -22,10 +22,12 @@ import {
   AlertCircle,
   Menu,
   ShieldCheck,
+  Smartphone,
 } from 'lucide-react';
 import { Agent, CannedResponse, Workspace } from '@/types/database';
 import { cn } from '@/lib/utils';
 import { InstallationGuide } from '@/components/dashboard/InstallationGuide';
+import { MobileAppSettingsCard } from '@/components/dashboard/MobileAppSettingsCard';
 import { SMTPSettingsSection } from '@/components/admin/SMTPSettingsSection';
 import {
   IntegrationsSettings,
@@ -39,6 +41,7 @@ import {
 export type SectionId =
   | 'widget'
   | 'install'
+  | 'mobile'
   | 'channels'
   | 'email'
   | 'domains'
@@ -125,6 +128,27 @@ const SETTING_GROUPS: SettingGroup[] = [
           hasVisitors
             ? { text: 'Live Traffic', variant: 'emerald' }
             : { text: 'Ready to Embed', variant: 'blue' },
+      },
+      {
+        id: 'mobile',
+        label: 'Mobile App & Shortcuts',
+        description: 'Add Chatify to your Android or iPhone home screen without Play Store',
+        Icon: Smartphone,
+        adminOnly: false,
+        keywords: [
+          'mobile',
+          'app',
+          'pwa',
+          'android',
+          'iphone',
+          'ios',
+          'shortcut',
+          'home screen',
+          'install',
+          'play store',
+          'qr',
+        ],
+        getBadge: () => ({ text: 'PWA Ready', variant: 'emerald' }),
       },
       {
         id: 'channels',
@@ -745,6 +769,9 @@ export function SettingsHub({
                   latestVisitorUrl={latestVisitorUrl}
                 />
               )}
+
+              {/* Mobile App & Shortcuts */}
+              {active === 'mobile' && <MobileAppSettingsCard />}
 
               {/* Omnichannel Chat Channels */}
               {active === 'channels' && (

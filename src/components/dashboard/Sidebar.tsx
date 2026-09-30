@@ -11,6 +11,7 @@ import {
   Inbox,
   Radio,
   Settings,
+  Smartphone,
   Sparkles,
   Volume2,
   VolumeX,
@@ -37,6 +38,7 @@ interface SidebarProps {
   onUpdateAgentStatus: (status: AgentStatus) => void;
   onLogout: () => void;
   onOpenShortcuts?: () => void;
+  onOpenMobileInstall?: () => void;
 }
 
 const STATUS_TINT: Record<AgentStatus, string> = {
@@ -54,6 +56,7 @@ export function Sidebar({
   onUpdateAgentStatus,
   onLogout,
   onOpenShortcuts,
+  onOpenMobileInstall,
 }: SidebarProps) {
   const soundActive = React.useSyncExternalStore(
     sound.subscribe,
@@ -224,6 +227,16 @@ export function Sidebar({
                 className="w-7 h-7 rounded-lg flex items-center justify-center text-ink-3 hover:text-ink hover:bg-surface-3 transition-colors text-[11px] font-mono font-bold"
               >
                 ?
+              </button>
+            )}
+            {onOpenMobileInstall && (
+              <button
+                onClick={onOpenMobileInstall}
+                title="Mobile App / Home Screen Shortcut"
+                aria-label="Mobile App / Home Screen Shortcut"
+                className="w-7 h-7 rounded-lg flex items-center justify-center text-ink-3 hover:text-accent hover:bg-surface-3 transition-colors"
+              >
+                <Smartphone className="w-3.5 h-3.5" />
               </button>
             )}
           </div>

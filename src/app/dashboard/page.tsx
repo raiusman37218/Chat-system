@@ -14,10 +14,12 @@ import { AnalyticsDashboard } from '@/components/admin/AnalyticsDashboard';
 import { HelpDeskDashboard } from '@/components/dashboard/HelpDeskDashboard';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { KeyboardShortcutsModal } from '@/components/ui/KeyboardShortcutsModal';
+import { MobileInstallModal } from '@/components/pwa/MobileInstallModal';
+import { MobileInstallBanner } from '@/components/pwa/MobileInstallBanner';
 import { sound } from '@/lib/sound';
 import { sendBrowserNotification, cn } from '@/lib/utils';
 import { updateFaviconBadge } from '@/lib/favicon';
-import { BarChart2, BookOpen, Inbox, Radio, Settings } from 'lucide-react';
+import { BarChart2, BookOpen, Inbox, Radio, Settings, Smartphone } from 'lucide-react';
 
 /**
  * Whether the AI assistant is the one replying on a thread. Mirrors the checks
@@ -40,6 +42,7 @@ export default function DashboardPage() {
   const [allAgents, setAllAgents] = useState<Agent[]>([]);
   const [cannedResponses, setCannedResponses] = useState<CannedResponse[]>([]);
   const [showShortcutsModal, setShowShortcutsModal] = useState(false);
+  const [showMobileInstallModal, setShowMobileInstallModal] = useState(false);
   const [isDetailsSidebarOpen, setIsDetailsSidebarOpen] = useState(true);
   const [articlesCount, setArticlesCount] = useState(0);
 
@@ -1077,6 +1080,7 @@ export default function DashboardPage() {
           onUpdateAgentStatus={handleUpdateAgentStatus}
           onLogout={handleLogout}
           onOpenShortcuts={() => setShowShortcutsModal(true)}
+          onOpenMobileInstall={() => setShowMobileInstallModal(true)}
         />
       </div>
 
@@ -1086,12 +1090,15 @@ export default function DashboardPage() {
           {/* Conversation List: full width on mobile when no conversation active */}
           <div
             className={cn(
-              'h-full shrink-0',
+              'h-full shrink-0 flex flex-col',
               selectedConversationId
                 ? 'hidden md:flex md:w-[340px] xl:w-[360px]'
                 : 'flex w-full md:w-[340px] xl:w-[360px] pb-14 md:pb-0'
             )}
           >
+            <div className="px-3 pt-2.5 pb-0">
+              <MobileInstallBanner onOpenModal={() => setShowMobileInstallModal(true)} />
+            </div>
             <ConversationList
               conversations={conversations}
               selectedConversationId={selectedConversationId}
@@ -1288,6 +1295,15 @@ export default function DashboardPage() {
                 <span>{label}</span>
               </button>
             ))}
+
+          <button
+            onClick={() => setShowMobileInstallModal(true)}
+            className="flex flex-col items-center justify-center gap-0.5 px-3 py-1 rounded-lg text-[10px] font-medium text-ink-3 hover:text-accent transition-colors"
+            title="Mobile App Shortcut"
+          >
+            <Smartphone className="w-4 h-4 text-accent" />
+            <span>App</span>
+          </button>
         </nav>
       )}
 
@@ -1295,6 +1311,12 @@ export default function DashboardPage() {
       <KeyboardShortcutsModal
         isOpen={showShortcutsModal}
         onClose={() => setShowShortcutsModal(false)}
+      />
+
+      {/* 5. Mobile App & Shortcut Installer Modal */}
+      <MobileInstallModal
+        isOpen={showMobileInstallModal}
+        onClose={() => setShowMobileInstallModal(false)}
       />
     </div>
   );
