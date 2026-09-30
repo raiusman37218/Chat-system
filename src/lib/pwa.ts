@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useSyncExternalStore } from 'react';
+import { useState, useEffect } from 'react';
 
 // Custom types for BeforeInstallPromptEvent
 export interface BeforeInstallPromptEvent extends Event {
@@ -19,11 +19,20 @@ declare global {
   }
 }
 
+export interface PwaState {
+  canInstall: boolean;
+  isStandalone: boolean;
+  isInstalled: boolean;
+}
+
 class PwaManager {
   private deferredPrompt: BeforeInstallPromptEvent | null = null;
   private listeners = new Set<() => void>();
-  private isStandalone = false;
-  private isInstalled = false;
+  private state: PwaState = {
+    canInstall: false,
+    isStandalone: false,
+    isInstalled: false,
+  };
 
   constructor() {
     if (typeof window !== 'undefined') {
@@ -33,55 +42,77 @@ class PwaManager {
   }
 
   private checkStandalone() {
-    const isStandaloneDisplay =
-      typeof window !== 'undefined' &&
-      window.matchMedia('(display-mode: standalone)').matches;
-    const isNavigatorStandalone =
-      typeof window !== 'undefined' && (window.navigator as any).standalone === true;
-    this.isStandalone = !!(isStandaloneDisplay || isNavigatorStandalone);
-    if (this.isStandalone) {
-      this.isInstalled = true;
+    try {
+      const isStandaloneDisplay =
+        typeof window !== 'undefined' &&
+        window.matchMedia('(display-mode: standalone)').matches;
+      const isNavigatorStandalone =
+        typeof window !== 'undefined' &&
+        (window.navigator as any)?.standalone === true;
+      const isStandalone = !!(isStandaloneDisplay || isNavigatorStandalone);
+
+      this.state = {
+        canInstall: !!this.deferredPrompt,
+        isStandalone,
+        isInstalled: isStandalone || this.state.isInstalled,
+      };
+    } catch (e) {
+      // Safe fallback
     }
   }
 
   private initListeners() {
-    window.addEventListener('beforeinstallprompt', (e) => {
-      e.preventDefault();
-      this.deferredPrompt = e;
-      this.notify();
-    });
-
-    window.addEventListener('appinstalled', () => {
-      this.deferredPrompt = null;
-      this.isInstalled = true;
-      this.notify();
-    });
-
-    // Check display-mode media query change
     try {
+      window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        this.deferredPrompt = e;
+        this.state = {
+          ...this.state,
+          canInstall: true,
+        };
+        this.notify();
+      });
+
+      window.addEventListener('appinstalled', () => {
+        this.deferredPrompt = null;
+        this.state = {
+          canInstall: false,
+          isStandalone: true,
+          isInstalled: true,
+        };
+        this.notify();
+      });
+
       window.matchMedia('(display-mode: standalone)').addEventListener('change', (e) => {
-        this.isStandalone = e.matches;
-        if (e.matches) this.isInstalled = true;
+        this.state = {
+          ...this.state,
+          isStandalone: e.matches,
+          isInstalled: e.matches || this.state.isInstalled,
+        };
         this.notify();
       });
     } catch (e) {}
   }
 
   private notify() {
-    this.listeners.forEach((listener) => listener());
+    this.listeners.forEach((listener) => {
+      try {
+        listener();
+      } catch (err) {
+        console.error(err);
+      }
+    });
   }
 
-  public subscribe = (listener: () => void) => {
+  public subscribe = (listener: () => void): (() => void) => {
     this.listeners.add(listener);
-    return () => this.listeners.delete(listener);
+    return () => {
+      this.listeners.delete(listener);
+    };
   };
 
-  public getSnapshot = () => {
-    return {
-      canInstall: !!this.deferredPrompt,
-      isStandalone: this.isStandalone,
-      isInstalled: this.isInstalled,
-    };
+  public getState = (): PwaState => {
+    return this.state;
   };
 
   public async promptInstall(): Promise<'accepted' | 'dismissed' | 'unsupported'> {
@@ -94,7 +125,11 @@ class PwaManager {
       const choice = await this.deferredPrompt.userChoice;
       if (choice.outcome === 'accepted') {
         this.deferredPrompt = null;
-        this.isInstalled = true;
+        this.state = {
+          ...this.state,
+          canInstall: false,
+          isInstalled: true,
+        };
         this.notify();
       }
       return choice.outcome;
@@ -108,6 +143,7 @@ class PwaManager {
 export const pwaManager = new PwaManager();
 
 export function usePwa() {
+  const [pwaState, setPwaState] = useState<PwaState>(() => pwaManager.getState());
   const [deviceInfo, setDeviceInfo] = useState({
     isIOS: false,
     isAndroid: false,
@@ -115,11 +151,17 @@ export function usePwa() {
     isSafari: false,
   });
 
-  const pwaState = useSyncExternalStore(
-    pwaManager.subscribe,
-    pwaManager.getSnapshot,
-    () => ({ canInstall: false, isStandalone: false, isInstalled: false })
-  );
+  useEffect(() => {
+    // Sync initial state after hydration
+    setPwaState(pwaManager.getState());
+
+    const unsubscribe = pwaManager.subscribe(() => {
+      setPwaState(pwaManager.getState());
+    });
+    return () => {
+      unsubscribe();
+    };
+  }, []);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
