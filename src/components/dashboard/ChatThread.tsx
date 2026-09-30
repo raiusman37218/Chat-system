@@ -190,6 +190,7 @@ export function ChatThread({
   const [expandedTranslations, setExpandedTranslations] = useState<Record<string, boolean>>({});
   const [showTranslateMenu, setShowTranslateMenu] = useState<boolean>(false);
   const translateMenuRef = useRef<HTMLDivElement>(null);
+  const bottomTranslateBtnRef = useRef<HTMLButtonElement>(null);
 
   // Features State: Auto-Assign, Snooze, Merge, Mentions
   const [isAutoAssigning, setIsAutoAssigning] = useState(false);
@@ -642,7 +643,12 @@ export function ChatThread({
   // Close translation menu when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (translateMenuRef.current && !translateMenuRef.current.contains(event.target as Node)) {
+      const target = event.target as Node;
+      if (
+        translateMenuRef.current &&
+        !translateMenuRef.current.contains(target) &&
+        (!bottomTranslateBtnRef.current || !bottomTranslateBtnRef.current.contains(target))
+      ) {
         setShowTranslateMenu(false);
       }
     };
@@ -2085,7 +2091,7 @@ export function ChatThread({
         {/* Unified Linear-Style Composer Card */}
         <div
           className={cn(
-            'rounded-2xl border transition-all duration-200 overflow-hidden shadow-xs focus-within:shadow-md',
+            'rounded-2xl border transition-all duration-200 shadow-xs focus-within:shadow-md relative bg-surface',
             isInternalMode
               ? 'bg-amber-500/5 border-amber-500/40 focus-within:border-amber-500/80 focus-within:ring-2 focus-within:ring-amber-500/20'
               : 'bg-surface border-line focus-within:border-accent/80 focus-within:ring-2 focus-within:ring-accent/20'
@@ -2094,7 +2100,7 @@ export function ChatThread({
           {/* Replying to — kept above the toolbar so the message being
               answered stays in view while the answer is written. */}
           {replyPreview && !isInternalMode && (
-            <div className="flex items-start gap-2 px-3 pt-2.5 pb-2 border-b border-line/40 bg-accent-soft/30">
+            <div className="flex items-start gap-2 px-3 pt-2.5 pb-2 border-b border-line/40 bg-accent-soft/30 rounded-t-2xl">
               <span className="mt-0.5 w-0.5 self-stretch rounded-full bg-accent shrink-0" />
               <div className="min-w-0 flex-1">
                 <p className="text-[11px] font-semibold text-accent">
@@ -2117,7 +2123,12 @@ export function ChatThread({
           )}
 
           {/* Composer Header Bar */}
-          <div className="px-3 pt-2 pb-1.5 flex items-center justify-between gap-2 border-b border-line/40 bg-surface-2/30">
+          <div
+            className={cn(
+              'px-3 pt-2 pb-1.5 flex items-center justify-between gap-2 border-b border-line/40 bg-surface-2/30',
+              !replyPreview && 'rounded-t-2xl'
+            )}
+          >
             <div className="inline-flex items-center gap-1 p-0.5 rounded-lg bg-surface-2 border border-line/60">
               <button
                 type="button"
@@ -2194,8 +2205,8 @@ export function ChatThread({
 
                   {/* Popover Dropdown Menu */}
                   {showTranslateMenu && (
-                    <div className="absolute right-0 top-full mt-1.5 z-40 w-76 bg-surface rounded-xl border border-line shadow-2xl p-3 space-y-3 animate-pop">
-                      <div className="flex items-center justify-between border-b border-line/60 pb-2">
+                    <div className="absolute right-0 bottom-full mb-2 z-50 w-80 max-h-[min(520px,calc(100vh-140px))] overflow-y-auto overscroll-contain bg-surface rounded-2xl border border-line shadow-2xl p-3.5 space-y-3 animate-pop focus:outline-none">
+                      <div className="sticky -top-3.5 -mx-3.5 -mt-3.5 px-3.5 pt-3 pb-2.5 bg-surface/95 backdrop-blur-md border-b border-line/60 flex items-center justify-between z-10 rounded-t-2xl">
                         <div className="flex items-center gap-1.5 text-[12px] font-bold text-ink">
                           <Globe className="w-3.5 h-3.5 text-blue-500" />
                           <span>Translation Settings</span>
@@ -2204,6 +2215,7 @@ export function ChatThread({
                           type="button"
                           onClick={() => setShowTranslateMenu(false)}
                           className="text-ink-3 hover:text-ink p-1 rounded-md hover:bg-surface-2 transition-colors cursor-pointer"
+                          title="Close settings"
                         >
                           <X className="w-3.5 h-3.5" />
                         </button>
@@ -2503,7 +2515,7 @@ export function ChatThread({
           )}
 
           {/* Composer Footer Action Bar */}
-          <div className="px-3 py-2 bg-surface-2/40 border-t border-line/40 flex items-center justify-between text-[11px] text-ink-3">
+          <div className="px-3 py-2 bg-surface-2/40 border-t border-line/40 flex items-center justify-between text-[11px] text-ink-3 rounded-b-2xl">
             <div className="flex items-center gap-1.5 flex-wrap">
               <span>Press</span>
               <span className="kbd text-[9.5px]">Ctrl ↵</span>
@@ -2561,6 +2573,7 @@ export function ChatThread({
             <div className="flex items-center gap-2">
               {!isInternalMode && autoTranslateEnabled && targetLanguage !== 'en' && (
                 <button
+                  ref={bottomTranslateBtnRef}
                   type="button"
                   onClick={() => setShowTranslateMenu((prev) => !prev)}
                   className="hidden sm:inline-flex items-center gap-1.5 text-[11px] font-semibold text-blue-600 dark:text-blue-400 bg-blue-500/10 hover:bg-blue-500/15 border border-blue-500/25 px-2 py-1 rounded-md cursor-pointer transition-colors shadow-2xs"
