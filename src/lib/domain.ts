@@ -81,7 +81,12 @@ export function isPlatformHost(host: string): boolean {
   return (
     h === 'localhost' ||
     h === '127.0.0.1' ||
+    h.startsWith('192.168.') ||
+    h.startsWith('10.') ||
+    h.startsWith('172.') ||
+    /^[0-9.]+$/.test(h) ||
     h.endsWith('.vercel.app') ||
+    h.endsWith('.loca.lt') ||
     extra.includes(h)
   );
 }

@@ -1,62 +1,79 @@
-// Chatify Progressive Web App Service Worker (v1.0.0)
-const CACHE_NAME = 'chatify-pwa-v1';
+// Chatify Progressive Web App Service Worker (v2.0.0)
+const CACHE_NAME = 'chatify-pwa-v2';
 
 const STATIC_ASSETS = [
-  '/',
-  '/dashboard',
-  '/manifest.webmanifest',
-  '/chat-icon.png',
   '/icon-192.png',
   '/icon-512.png',
   '/icon-maskable-512.png',
   '/apple-touch-icon.png',
   '/favicon.png',
+  '/manifest.webmanifest',
 ];
 
-// 1. Install Event: Pre-cache static core assets
+// 1. Install Event: Cache icons and static metadata
 self.addEventListener('install', (event) => {
+  self.skipWaiting();
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
       return cache.addAll(STATIC_ASSETS).catch((err) => {
-        console.warn('[Chatify SW] Pre-cache error:', err);
+        console.debug('[Chatify SW] Pre-cache non-fatal warning:', err);
       });
     })
   );
-  self.skipWaiting();
 });
 
-// 2. Activate Event: Clean up old caches and claim clients
+// 2. Activate Event: Wipe all old caches and claim clients immediately
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((keys) => {
-      return Promise.all(
-        keys.map((key) => {
-          if (key !== CACHE_NAME) {
-            return caches.delete(key);
-          }
-        })
-      );
-    }).then(() => self.clients.claim())
+    caches
+      .keys()
+      .then((keys) => {
+        return Promise.all(
+          keys.map((key) => {
+            if (key !== CACHE_NAME) {
+              return caches.delete(key);
+            }
+          })
+        );
+      })
+      .then(() => self.clients.claim())
   );
 });
 
-// 3. Fetch Event: Smart network-first for pages and API, cache-first for static
+// 3. Message Event: Allow manual skip waiting from client
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
+});
+
+// 4. Fetch Event:
+// CRITICAL: NEVER intercept 'navigate' requests! Let the browser handle page navigations,
+// cookies, auth redirects, and streaming server responses directly without trapping the user
+// in fake offline/reload loops.
 self.addEventListener('fetch', (event) => {
   const { request } = event;
+
+  // Let browser natively handle all page navigations
+  if (request.mode === 'navigate') {
+    return;
+  }
+
   const url = new URL(request.url);
 
-  // Ignore non-GET, Chrome extension requests, and API / Supabase / Websocket calls
+  // Bypass non-GET, internal HMR, Supabase APIs, Cloudinary, and Next.js APIs
   if (
     request.method !== 'GET' ||
     !url.protocol.startsWith('http') ||
     url.pathname.startsWith('/api/') ||
+    url.pathname.startsWith('/_next/webpack-hmr') ||
     url.hostname.includes('supabase.co') ||
     url.hostname.includes('cloudinary.com')
   ) {
     return;
   }
 
-  // Static assets (images, fonts, Next.js static files) -> Stale-while-revalidate
+  // Static assets (images, icons, fonts) -> Stale-while-revalidate
   if (
     url.pathname.startsWith('/_next/static/') ||
     url.pathname.endsWith('.png') ||
@@ -82,60 +99,11 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // HTML Page Navigation -> Network-first with cache fallback
-  if (request.mode === 'navigate') {
-    event.respondWith(
-      fetch(request)
-        .then((response) => {
-          if (response && response.status === 200) {
-            const resClone = response.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(request, resClone));
-          }
-          return response;
-        })
-        .catch(async () => {
-          const cached = await caches.match(request);
-          if (cached) return cached;
-          const fallback = await caches.match('/dashboard');
-          if (fallback) return fallback;
-          return new Response(
-            `<!DOCTYPE html>
-            <html lang="en">
-              <head>
-                <meta charset="utf-8" />
-                <meta name="viewport" content="width=device-width, initial-scale=1" />
-                <title>Chatify — Offline</title>
-                <style>
-                  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #08080a; color: #fff; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; text-align: center; padding: 20px; }
-                  .card { background: #141418; border: 1px solid #27272a; padding: 32px; border-radius: 20px; max-width: 380px; width: 100%; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
-                  h1 { font-size: 20px; margin-bottom: 8px; font-weight: 700; }
-                  p { color: #a1a1aa; font-size: 14px; line-height: 1.5; margin-bottom: 24px; }
-                  button { background: #2563eb; color: #fff; border: none; padding: 12px 24px; border-radius: 12px; font-size: 14px; font-weight: 600; cursor: pointer; width: 100%; }
-                </style>
-              </head>
-              <body>
-                <div class="card">
-                  <div style="font-size: 40px; margin-bottom: 16px;">📶</div>
-                  <h1>You are currently offline</h1>
-                  <p>Check your internet connection to continue chatting and managing live visitors.</p>
-                  <button onclick="window.location.reload()">Retry Connection</button>
-                </div>
-              </body>
-            </html>`,
-            { headers: { 'Content-Type': 'text/html' } }
-          );
-        })
-    );
-    return;
-  }
-
-  // Default fallback
-  event.respondWith(
-    caches.match(request).then((cached) => cached || fetch(request))
-  );
+  // Pass through everything else
+  return;
 });
 
-// 4. Push Notification Handler
+// 5. Push Notification Handler
 self.addEventListener('push', (event) => {
   let data = { title: 'Chatify Live Chat', body: 'New message received', icon: '/icon-192.png' };
   try {
@@ -161,7 +129,7 @@ self.addEventListener('push', (event) => {
   event.waitUntil(self.registration.showNotification(data.title || 'Chatify', options));
 });
 
-// 5. Notification Click Handler
+// 6. Notification Click Handler
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
   const targetUrl = (event.notification.data && event.notification.data.url) || '/dashboard';
