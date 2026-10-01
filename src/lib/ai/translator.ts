@@ -120,6 +120,20 @@ export async function translateWithGoogleGtx(
       detected = 'ur';
     }
 
+    // Tagalog false-detection safeguard:
+    // Google GTX frequently misclassifies English typos or short informal greetings (e.g. "helow", "helo", "hlo", "hi", "j") as Tagalog ('tl')
+    if (detected === 'tl') {
+      const TAGALOG_AUTHENTIC_WORDS =
+        /\b(kumusta|kamusta|salamat|opo|po|ang|mga|sa|ko|mo|ba|ako|ikaw|siya|ito|iyon|magandang|umaga|hapon|gabi|ano|bakit|paano|kailan|saan|hindi|wala|meron|mayroon|paki|lahat|namin|natin|ninyo|sila|kanila|dito|doon|dyan|gusto|ayaw|puwede|pwede|kailangan|kasi|pero|dahil|para|kung)\b/i;
+      const isEnglishGreetingOrShort =
+        /^(helow|helo|hello|hlo|hlw|hi|hii|hiii|hey|heyy|ok|okay|k|pls|plz|thanks|thx|yes|no|j)$/i.test(text.trim()) ||
+        !TAGALOG_AUTHENTIC_WORDS.test(text);
+
+      if (isEnglishGreetingOrShort) {
+        detected = 'en';
+      }
+    }
+
     if (candidate && typeof candidate === 'string' && candidate.trim()) {
       return {
         translated: decodeHtmlEntities(candidate.trim()),
@@ -188,6 +202,15 @@ const ROMAN_URDU_WORDS_REGEX =
 export function detectLanguage(text: string): { code: string; name: string } {
   if (!text || !text.trim()) return { code: 'en', name: 'English' };
   const trimmed = text.trim();
+
+  // Fast-track common English greetings, single letters, and typos
+  if (
+    /^(helow|helo|hello|hlo|hlw|hi|hii|hiii|hey|heyy|ok|okay|k|yes|yeah|yup|no|nope|pls|plz|thanks|thank\s+you|thx|ty|welcome|good\s+morning|good\s+afternoon|good\s+evening|good\s+night|tc|gm|gn|[a-z])$/i.test(
+      trimmed
+    )
+  ) {
+    return { code: 'en', name: 'English' };
+  }
 
   // Arabic / Urdu / Persian script detection
   if (/[\u0600-\u06FF]/.test(trimmed)) {
@@ -461,8 +484,7 @@ export async function translateToEnglish({
   if (googleRes) {
     const code = googleRes.detectedLanguage || 'en';
     const langInfo = getLanguageInfo(code);
-    const isDifferent = googleRes.translated.trim().toLowerCase() !== trimmed.toLowerCase();
-    const isNonEnglish = code !== 'en' || isDifferent;
+    const isNonEnglish = code !== 'en';
 
     return {
       englishText: googleRes.translated,
@@ -720,6 +742,11 @@ export async function translateAgentReply({
     }
   }
 
+  const isActuallyTranslated =
+    targetLang === 'en'
+      ? englishText.trim().toLowerCase() !== text.trim().toLowerCase()
+      : customerText.trim().toLowerCase() !== text.trim().toLowerCase();
+
   return {
     translatedText: customerText,
     englishText,
@@ -727,7 +754,7 @@ export async function translateAgentReply({
     sourceLanguageName: getLanguageInfo(detectedSourceLang).name,
     targetLanguage: targetLang,
     targetLanguageName: targetLangInfo.name,
-    isTranslated: customerText !== text || englishText !== text,
+    isTranslated: isActuallyTranslated,
   };
 }
 

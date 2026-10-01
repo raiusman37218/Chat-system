@@ -73,10 +73,7 @@ export async function POST(req: NextRequest) {
     });
 
     const finalDetectedCode = res.detectedLanguageCode || detected.code || 'en';
-    const isNonEnglish =
-      !res.isOriginalEnglish ||
-      finalDetectedCode !== 'en' ||
-      res.englishText.trim().toLowerCase() !== messageText.trim().toLowerCase();
+    const isNonEnglish = finalDetectedCode !== 'en' && !res.isOriginalEnglish;
 
     // If messageId provided, update message row in database
     if (messageId) {
@@ -110,7 +107,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Update conversation visitor language
-    if (conversationId && isNonEnglish) {
+    if (conversationId) {
       const { data: conv } = await supabase
         .from('conversations')
         .select('channel_metadata, visitor_id')
@@ -130,7 +127,7 @@ export async function POST(req: NextRequest) {
           })
           .eq('id', conversationId);
 
-        if (conv.visitor_id) {
+        if (conv.visitor_id && isNonEnglish) {
           await supabase
             .from('visitors')
             .update({ language: finalDetectedCode })

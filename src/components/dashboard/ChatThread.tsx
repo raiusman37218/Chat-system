@@ -185,7 +185,7 @@ export function ChatThread({
 
   // Features State: Auto-Translation (Bidirectional English <-> Customer Language)
   const [targetLanguage, setTargetLanguage] = useState<string>('en');
-  const [autoTranslateEnabled, setAutoTranslateEnabled] = useState<boolean>(true);
+  const [autoTranslateEnabled, setAutoTranslateEnabled] = useState<boolean>(false);
   const [isTranslating, setIsTranslating] = useState<boolean>(false);
   const [expandedTranslations, setExpandedTranslations] = useState<Record<string, boolean>>({});
   const [showTranslateMenu, setShowTranslateMenu] = useState<boolean>(false);
@@ -602,32 +602,41 @@ export function ChatThread({
 
   // 6. Customer Language Auto-Detection & Sync
   const detectedVisitorLang = useMemo(() => {
-    // 1. Check channel_metadata if already known for this conversation
-    const chanMeta = conversation.channel_metadata as Record<string, any> | undefined;
-    if (chanMeta?.visitor_language && chanMeta.visitor_language !== 'en' && SUPPORTED_LANGUAGES[chanMeta.visitor_language.toLowerCase()]) {
-      return chanMeta.visitor_language.toLowerCase();
-    }
-
-    // 2. Scan visitor messages in the thread (most recent first)
+    // 1. Scan visitor messages in the thread (most recent first)
     const visitorMessages = [...messages]
       .reverse()
       .filter((m) => m.sender_type === 'visitor' && m.content?.trim());
 
-    for (const msg of visitorMessages) {
-      const transLang =
-        msg.metadata?.translation?.detected_language ||
-        msg.metadata?.detected_language;
-      if (transLang && transLang !== 'en' && SUPPORTED_LANGUAGES[transLang.toLowerCase()]) {
-        return transLang.toLowerCase();
-      }
-      const det = detectLanguage(msg.content);
-      if (det.code && det.code !== 'en' && SUPPORTED_LANGUAGES[det.code]) {
-        return det.code;
+    if (visitorMessages.length > 0) {
+      for (const msg of visitorMessages) {
+        const text = msg.content.trim();
+        // Skip purely numeric/punctuation messages or empty
+        if (!/[a-zA-Z\u00C0-\uFFFF]/.test(text)) continue;
+
+        const transLang =
+          msg.metadata?.translation?.detected_language ||
+          msg.metadata?.detected_language;
+
+        // If explicitly detected and supported
+        if (transLang && SUPPORTED_LANGUAGES[transLang.toLowerCase()]) {
+          return transLang.toLowerCase();
+        }
+
+        const det = detectLanguage(text);
+        if (det.code && SUPPORTED_LANGUAGES[det.code]) {
+          return det.code;
+        }
       }
     }
 
+    // 2. Check channel_metadata if already known for this conversation
+    const chanMeta = conversation.channel_metadata as Record<string, any> | undefined;
+    if (chanMeta?.visitor_language && SUPPORTED_LANGUAGES[chanMeta.visitor_language.toLowerCase()]) {
+      return chanMeta.visitor_language.toLowerCase();
+    }
+
     // 3. Check visitor profile language
-    if (conversation.visitor?.language && conversation.visitor.language !== 'en') {
+    if (conversation.visitor?.language) {
       const code = conversation.visitor.language.split('-')[0].toLowerCase();
       if (SUPPORTED_LANGUAGES[code]) return code;
     }
@@ -655,13 +664,27 @@ export function ChatThread({
     };
   }, [showTranslateMenu]);
 
+  // Track previous conversation ID to detect when user switches conversations
+  const prevConvIdRef = useRef<string>(conversation.id);
+
   // Sync target language when conversation or detected visitor language changes
   useEffect(() => {
-    if (detectedVisitorLang && detectedVisitorLang !== 'en') {
+    const isNewConv = prevConvIdRef.current !== conversation.id;
+    if (isNewConv) {
+      prevConvIdRef.current = conversation.id;
+      if (detectedVisitorLang && detectedVisitorLang !== 'en') {
+        setTargetLanguage(detectedVisitorLang);
+        setAutoTranslateEnabled(true);
+      } else {
+        setTargetLanguage('en');
+        setAutoTranslateEnabled(false);
+      }
+    } else if (detectedVisitorLang && detectedVisitorLang !== 'en' && targetLanguage === 'en') {
+      // Inbound foreign message detected in current thread
       setTargetLanguage(detectedVisitorLang);
       setAutoTranslateEnabled(true);
     }
-  }, [detectedVisitorLang, conversation.id]);
+  }, [detectedVisitorLang, conversation.id, targetLanguage]);
 
   // Set to track in-flight translation requests so we don't repeat them
   const inFlightTranslationsRef = useRef<Set<string>>(new Set());
@@ -758,18 +781,20 @@ export function ChatThread({
       let finalContentToSend = text;
       let translationMetadata: Record<string, any> | null = null;
 
-      // Determine customer target language: state, detectedVisitorLang, or channel_metadata
-      const effectiveCustomerLang =
-        (targetLanguage && targetLanguage !== 'en')
-          ? targetLanguage
-          : (detectedVisitorLang && detectedVisitorLang !== 'en')
-          ? detectedVisitorLang
-          : (conversation.channel_metadata as any)?.visitor_language || 'en';
+      // Determine customer target language: controlled strictly by state
+      const effectiveCustomerLang = targetLanguage || 'en';
 
+      // Check if agent typed in a foreign language (e.g. Urdu, Roman Urdu, Hindi)
+      const agentInputLang = detectLanguage(text).code;
+      const isAgentWritingForeign = autoTranslateEnabled && effectiveCustomerLang === 'en' && agentInputLang !== 'en';
+
+      // CRITICAL FIX: Only translate if autoTranslateEnabled is TRUE!
+      // If the agent turns off auto-translation, NEVER translate!
       const shouldTranslate =
         !isInternal &&
-        text.trim() &&
-        (autoTranslateEnabled || effectiveCustomerLang !== 'en' || detectLanguage(text).code !== 'en');
+        text.trim().length > 0 &&
+        autoTranslateEnabled &&
+        (effectiveCustomerLang !== 'en' || isAgentWritingForeign);
 
       if (shouldTranslate) {
         setIsTranslating(true);
@@ -786,14 +811,19 @@ export function ChatThread({
           });
           if (transRes.ok) {
             const data = await transRes.json();
-            if (data.translatedText && data.translatedText.trim()) {
+            const wasTranslated = Boolean(
+              data.isTranslated ||
+              (data.translatedText && data.translatedText.trim().toLowerCase() !== text.trim().toLowerCase())
+            );
+
+            if (wasTranslated && data.translatedText && data.translatedText.trim()) {
               finalContentToSend = data.translatedText.trim();
               const englishText = data.englishText?.trim() || text;
               const detectedLang = data.detectedSourceLanguage || 'en';
               const langInfo = getLanguageInfo(effectiveCustomerLang);
               translationMetadata = {
                 translation: {
-                  is_translated: Boolean(data.isTranslated || finalContentToSend !== text || englishText !== text),
+                  is_translated: true,
                   direction: 'agent_to_visitor',
                   original_agent_input: text,
                   agent_input_language: detectedLang,
@@ -1420,8 +1450,17 @@ export function ChatThread({
                 const targetLangInfo = targetCode ? getLanguageInfo(targetCode) : null;
                 const isExpanded = expandedTranslations[msg.id];
 
+                const wasActuallyTranslatedToForeign = Boolean(
+                  translationMeta?.is_translated &&
+                  targetCode &&
+                  targetCode !== 'en' &&
+                  translatedForeign &&
+                  englishText &&
+                  translatedForeign.trim().toLowerCase() !== (originalInput || englishText).trim().toLowerCase()
+                );
+
                 // If translation exists and was translated to customer's foreign language
-                if (englishText && translatedForeign && targetCode !== 'en') {
+                if (wasActuallyTranslatedToForeign) {
                   return (
                     <div className="space-y-2">
                       <p className="whitespace-pre-wrap leading-relaxed">
@@ -2324,42 +2363,43 @@ export function ChatThread({
                         </div>
                         <select
                           value={targetLanguage}
-                          onChange={(e) => {
-                            setTargetLanguage(e.target.value);
-                            if (e.target.value !== 'en') {
+                          onChange={async (e) => {
+                            const newLang = e.target.value;
+                            setTargetLanguage(newLang);
+                            if (newLang !== 'en') {
                               setAutoTranslateEnabled(true);
+                            } else {
+                              setAutoTranslateEnabled(false);
+                            }
+                            try {
+                              const supabase = createClient();
+                              const langInfo = getLanguageInfo(newLang);
+                              await supabase
+                                .from('conversations')
+                                .update({
+                                  channel_metadata: {
+                                    ...((conversation.channel_metadata as any) || {}),
+                                    visitor_language: newLang,
+                                    language_name: langInfo.name,
+                                  },
+                                })
+                                .eq('id', conversation.id);
+                            } catch (err) {
+                              console.warn('Failed to update conversation language preference:', err);
                             }
                           }}
                           aria-label="Select Customer Language"
                           className="w-full text-[11.5px] font-semibold bg-surface border border-line-2 rounded-lg px-2.5 py-1.5 text-ink focus:outline-none focus:ring-2 focus:ring-accent cursor-pointer shadow-2xs"
                         >
                           <option value="en">🇬🇧 English (Original / No Translation)</option>
-                          <option value="ar">🇸🇦 Arabic (العربية)</option>
-                          <option value="hi">🇮🇳 Hindi (हिन्दी)</option>
-                          <option value="ur">🇵🇰 Urdu (اردو)</option>
-                          <option value="es">🇪🇸 Spanish (Español)</option>
-                          <option value="fr">🇫🇷 French (Français)</option>
-                          <option value="de">🇩🇪 German (Deutsch)</option>
-                          <option value="tr">🇹🇷 Turkish (Türkçe)</option>
-                          <option value="ru">🇷🇺 Russian (Русский)</option>
-                          <option value="zh">🇨🇳 Chinese (中文)</option>
-                          <option value="pt">🇵🇹 Portuguese (Português)</option>
-                          <option value="it">🇮🇹 Italian (Italiano)</option>
-                          <option value="id">🇮🇩 Indonesian (Bahasa Indonesia)</option>
-                          <option value="fa">🇮🇷 Persian (فارسی)</option>
-                          <option value="he">🇮🇱 Hebrew (עברית)</option>
-                          <option value="bn">🇧🇩 Bengali (বাংলা)</option>
-                          <option value="pa">🇮🇳 Punjabi (ਪੰਜਾਬੀ)</option>
-                          <option value="ta">🇮🇳 Tamil (தமிழ்)</option>
-                          <option value="te">🇮🇳 Telugu (తెలుగు)</option>
-                          <option value="th">🇹🇭 Thai (ไทย)</option>
-                          <option value="el">🇬🇷 Greek (Ελληνικά)</option>
-                          <option value="ja">🇯🇵 Japanese (日本語)</option>
-                          <option value="ko">🇰🇷 Korean (한국어)</option>
-                          <option value="vi">🇻🇳 Vietnamese (Tiếng Việt)</option>
-                          <option value="nl">🇳🇱 Dutch (Nederlands)</option>
-                          <option value="pl">🇵🇱 Polish (Polski)</option>
-                          <option value="sv">🇸🇪 Swedish (Svenska)</option>
+                          {Object.values(SUPPORTED_LANGUAGES)
+                            .filter((l) => l.code !== 'en')
+                            .sort((a, b) => a.name.localeCompare(b.name))
+                            .map((l) => (
+                              <option key={l.code} value={l.code}>
+                                {l.flag || '🌐'} {l.name} {l.nativeName && l.nativeName !== l.name ? `(${l.nativeName})` : ''}
+                              </option>
+                            ))}
                         </select>
                       </div>
 
@@ -2374,12 +2414,12 @@ export function ChatThread({
                           onClick={() => setAutoTranslateEnabled(!autoTranslateEnabled)}
                           className={cn(
                             'text-[10.5px] px-2.5 py-1 rounded-md font-bold transition-all cursor-pointer shadow-2xs',
-                            autoTranslateEnabled && targetLanguage !== 'en'
+                            autoTranslateEnabled
                               ? 'bg-blue-600 hover:bg-blue-700 text-white'
                               : 'bg-surface-2 hover:bg-surface-3 text-ink-2 border border-line'
                           )}
                         >
-                          {autoTranslateEnabled && targetLanguage !== 'en' ? 'Enabled (ON)' : 'Disabled (OFF)'}
+                          {autoTranslateEnabled ? 'Enabled (ON)' : 'Disabled (OFF)'}
                         </button>
                       </div>
 
