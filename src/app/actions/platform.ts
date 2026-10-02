@@ -1,7 +1,8 @@
 'use server';
 
+import { cookies } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
-import { Workspace, Agent } from '@/types/database';
+import { Workspace, Agent, SuperAdminAuditLog } from '@/types/database';
 
 export interface CompanyMetricItem {
   id: string;
@@ -40,9 +41,10 @@ export interface PlatformCompaniesData {
 }
 
 /**
- * Ensures caller is an authenticated user
+ * Server-side guard: Ensures caller is an authenticated platform super admin
+ * Checks is_super_admin stored in the database.
  */
-async function assertAuthenticated(): Promise<{ user: any; agent: Agent | null }> {
+async function assertSuperAdmin(): Promise<{ user: any; agent: Agent }> {
   const supabase = await createClient();
   const {
     data: { user },
@@ -50,23 +52,53 @@ async function assertAuthenticated(): Promise<{ user: any; agent: Agent | null }
   } = await supabase.auth.getUser();
 
   if (error || !user) {
-    throw new Error('Unauthorized: Authentication required.');
+    throw new Error('401 Unauthorized: Authentication required.');
   }
 
-  const { data: agent } = await supabase
+  const { data: agent, error: agentError } = await supabase
     .from('agents')
     .select('*')
     .eq('id', user.id)
     .maybeSingle();
 
-  return { user, agent: agent as Agent | null };
+  if (agentError || !agent || !agent.is_super_admin) {
+    throw new Error('403 Forbidden: Platform super admin privileges required.');
+  }
+
+  return { user, agent: agent as Agent };
+}
+
+/**
+ * Inserts an immutable audit log record for super admin actions
+ */
+async function recordSuperAdminAudit(params: {
+  admin: Agent;
+  action: string;
+  workspaceId?: string | null;
+  workspaceName?: string | null;
+  details?: Record<string, any>;
+}) {
+  try {
+    const supabase = await createClient();
+    await supabase.from('super_admin_audit_logs').insert({
+      admin_id: params.admin.id,
+      admin_email: params.admin.email,
+      admin_name: params.admin.name || null,
+      action: params.action,
+      workspace_id: params.workspaceId || null,
+      workspace_name: params.workspaceName || null,
+      details: params.details || {},
+    });
+  } catch (err) {
+    console.error('Failed to write super admin audit log:', err);
+  }
 }
 
 /**
  * Retrieves platform-wide summary of all registered companies and their aggregated data
  */
 export async function getPlatformCompaniesAction(): Promise<PlatformCompaniesData> {
-  await assertAuthenticated();
+  const { agent } = await assertSuperAdmin();
   const supabase = await createClient();
 
   const { data, error } = await supabase.rpc('fn_get_platform_companies_summary');
@@ -82,7 +114,7 @@ export async function getPlatformCompaniesAction(): Promise<PlatformCompaniesDat
  * Loads deep drill-down details for a specific company
  */
 export async function getCompanyDrilldownAction(workspaceId: string) {
-  await assertAuthenticated();
+  const { agent } = await assertSuperAdmin();
   const supabase = await createClient();
 
   const [
@@ -114,6 +146,17 @@ export async function getCompanyDrilldownAction(workspaceId: string) {
       .limit(10),
   ]);
 
+  await recordSuperAdminAudit({
+    admin: agent,
+    action: 'view_company_drilldown',
+    workspaceId,
+    workspaceName: workspace?.name || null,
+    details: {
+      agents_count: agents?.length || 0,
+      recent_conversations_count: recentConversations?.length || 0,
+    },
+  });
+
   return {
     workspace: workspace as Workspace | null,
     agents: (agents || []) as Agent[],
@@ -133,7 +176,7 @@ export async function createCompanyAction(data: {
   greeting_title?: string;
   greeting_message?: string;
 }) {
-  const { user } = await assertAuthenticated();
+  const { user, agent } = await assertSuperAdmin();
   const supabase = await createClient();
 
   const { data: newWs, error } = await supabase
@@ -157,5 +200,124 @@ export async function createCompanyAction(data: {
     throw new Error(`Failed to create company workspace: ${error.message}`);
   }
 
+  await recordSuperAdminAudit({
+    admin: agent,
+    action: 'create_company',
+    workspaceId: newWs.id,
+    workspaceName: newWs.name,
+    details: {
+      website_url: newWs.website_url,
+      brand_color: newWs.brand_color,
+    },
+  });
+
   return { success: true, workspace: newWs as Workspace };
+}
+
+/**
+ * Super Admin Action: Switch into another company's workspace
+ * Writes an audit log record and stores viewing state in an HTTP-only cookie.
+ */
+export async function switchWorkspaceAction(params: {
+  workspaceId: string;
+  workspaceName?: string;
+}) {
+  const { agent } = await assertSuperAdmin();
+  const supabase = await createClient();
+
+  const { data: workspace, error } = await supabase
+    .from('workspaces')
+    .select('*')
+    .eq('id', params.workspaceId)
+    .single();
+
+  if (error || !workspace) {
+    throw new Error('Workspace not found or inaccessible.');
+  }
+
+  // Record audit log
+  await recordSuperAdminAudit({
+    admin: agent,
+    action: 'switch_workspace',
+    workspaceId: workspace.id,
+    workspaceName: workspace.name,
+    details: {
+      previous_workspace_id: agent.workspace_id || null,
+      switched_at: new Date().toISOString(),
+    },
+  });
+
+  // Set cookie for dashboard viewing
+  const cookieStore = await cookies();
+  cookieStore.set('super_admin_viewing_workspace_id', workspace.id, {
+    path: '/',
+    httpOnly: true,
+    sameSite: 'lax',
+    maxAge: 60 * 60 * 24, // 24 hours
+  });
+
+  return {
+    success: true,
+    workspace: workspace as Workspace,
+  };
+}
+
+/**
+ * Super Admin Action: Exit viewing another workspace and revert to native view
+ */
+export async function exitSuperAdminWorkspaceViewAction() {
+  const { agent } = await assertSuperAdmin();
+  const cookieStore = await cookies();
+  const prevViewingId = cookieStore.get('super_admin_viewing_workspace_id')?.value;
+
+  cookieStore.delete('super_admin_viewing_workspace_id');
+
+  if (prevViewingId) {
+    await recordSuperAdminAudit({
+      admin: agent,
+      action: 'exit_switched_workspace',
+      workspaceId: prevViewingId,
+      details: {
+        exited_at: new Date().toISOString(),
+      },
+    });
+  }
+
+  return { success: true };
+}
+
+/**
+ * Super Admin Action: Get super admin audit logs
+ */
+export async function getSuperAdminAuditLogsAction(options: {
+  limit?: number;
+  offset?: number;
+  actionFilter?: string;
+} = {}): Promise<{ logs: SuperAdminAuditLog[]; totalCount: number }> {
+  await assertSuperAdmin();
+  const supabase = await createClient();
+
+  const limit = options.limit || 50;
+  const offset = options.offset || 0;
+
+  let query = supabase
+    .from('super_admin_audit_logs')
+    .select('*', { count: 'exact' });
+
+  if (options.actionFilter && options.actionFilter !== 'all') {
+    query = query.eq('action', options.actionFilter);
+  }
+
+  const { data, count, error } = await query
+    .order('created_at', { ascending: false })
+    .range(offset, offset + limit - 1);
+
+  if (error) {
+    throw new Error(`Failed to load super admin audit logs: ${error.message}`);
+  }
+
+  return {
+    logs: (data || []) as SuperAdminAuditLog[],
+    totalCount: count || 0,
+  };
 }

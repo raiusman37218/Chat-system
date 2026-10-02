@@ -31,6 +31,7 @@ import {
   getPlatformCompaniesAction,
   getCompanyDrilldownAction,
   createCompanyAction,
+  switchWorkspaceAction,
   PlatformCompaniesData,
   CompanyMetricItem,
 } from '@/app/actions/platform';
@@ -62,6 +63,7 @@ export function CompaniesAdminDashboard({
   // Create modal state
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [switchingId, setSwitchingId] = useState<string | null>(null);
 
   // Status feedback toast
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -69,6 +71,27 @@ export function CompaniesAdminDashboard({
   const showToast = (text: string) => {
     setToastMessage(text);
     setTimeout(() => setToastMessage(null), 3500);
+  };
+
+  const handleSwitch = async (comp: CompanyMetricItem) => {
+    try {
+      setSwitchingId(comp.id);
+      const res = await switchWorkspaceAction({
+        workspaceId: comp.id,
+        workspaceName: comp.name,
+      });
+      if (res.success && res.workspace) {
+        if (onSwitchWorkspace) {
+          onSwitchWorkspace(res.workspace);
+        }
+        showToast(`Switched active workspace to "${comp.name}"! Audit log recorded.`);
+      }
+    } catch (err: any) {
+      console.error('Failed to switch workspace:', err);
+      showToast(err.message || 'Failed to switch workspace');
+    } finally {
+      setSwitchingId(null);
+    }
   };
 
   const loadData = async (showRefresh = false) => {
@@ -424,17 +447,17 @@ export function CompaniesAdminDashboard({
                       </div>
                     ) : (
                       <button
-                        onClick={() => {
-                          if (onSwitchWorkspace) {
-                            onSwitchWorkspace(comp as any);
-                            showToast(`Switched active workspace to "${comp.name}"!`);
-                          }
-                        }}
-                        className="h-9 px-3.5 rounded-xl bg-accent text-accent-ink hover:opacity-90 text-[12px] font-semibold flex items-center gap-1.5 transition-all shadow-xs"
+                        onClick={() => handleSwitch(comp)}
+                        disabled={switchingId === comp.id}
+                        className="h-9 px-3.5 rounded-xl bg-accent text-accent-ink hover:opacity-90 text-[12px] font-semibold flex items-center gap-1.5 transition-all shadow-xs disabled:opacity-50"
                         title="Switch into this workspace inbox and dashboard"
                       >
-                        <ArrowRight className="w-3.5 h-3.5" />
-                        <span>Switch</span>
+                        {switchingId === comp.id ? (
+                          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <ArrowRight className="w-3.5 h-3.5" />
+                        )}
+                        <span>{switchingId === comp.id ? 'Switching...' : 'Switch'}</span>
                       </button>
                     )}
                   </div>

@@ -94,7 +94,7 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  // Role-based protection for /admin routes
+  // Platform super admin protection for /admin routes
   if (request.nextUrl.pathname.startsWith('/admin')) {
     if (!user) {
       const loginUrl = new URL('/login', request.url);
@@ -104,14 +104,21 @@ export async function middleware(request: NextRequest) {
 
     const { data: agent } = await supabase
       .from('agents')
-      .select('role')
+      .select('is_super_admin')
       .eq('id', user.id)
       .single();
 
-    if (!agent || (agent.role !== 'admin' && agent.role !== 'owner')) {
-      const dashboardUrl = new URL('/dashboard', request.url);
-      dashboardUrl.searchParams.set('error', 'unauthorized_admin_access');
-      return NextResponse.redirect(dashboardUrl);
+    if (!agent?.is_super_admin) {
+      return new NextResponse(
+        JSON.stringify({
+          error: 'Forbidden',
+          message: 'Platform super admin privileges required.',
+        }),
+        {
+          status: 403,
+          headers: { 'content-type': 'application/json' },
+        }
+      );
     }
   }
 

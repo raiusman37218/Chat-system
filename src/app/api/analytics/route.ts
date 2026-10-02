@@ -1,12 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://vfjsaynnubxywdbevxtx.supabase.co';
-const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZmanNheW5udWJ4eXdkYmV2eHR4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgyNTA5MDEsImV4cCI6MjEwMzgyNjkwMX0.YyBCXMqwrOk5BRhQafYLFw8tiM5PC8lc8Yocodw9wf0';
-
-function getSupabase() {
-  return createClient(SUPABASE_URL, SUPABASE_KEY);
-}
+import { createClient } from '@/lib/supabase/server';
 
 export async function GET(req: NextRequest) {
   try {
@@ -15,7 +8,7 @@ export async function GET(req: NextRequest) {
     const timeRange = searchParams.get('range') || '30d'; // '7d' | '30d' | '90d'
     const granularity = searchParams.get('granularity') || 'daily'; // 'daily' | 'weekly' | 'monthly'
 
-    const supabase = getSupabase();
+    const supabase = await createClient();
 
     // Determine cutoff date
     const now = new Date();

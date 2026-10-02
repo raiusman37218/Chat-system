@@ -57,6 +57,19 @@ export interface Agent {
   status: AgentStatus;
   created_at: string;
   workspace_id?: string | null;
+  is_super_admin?: boolean;
+}
+
+export interface SuperAdminAuditLog {
+  id: string;
+  admin_id: string;
+  admin_email: string;
+  admin_name: string | null;
+  action: string;
+  workspace_id: string | null;
+  workspace_name: string | null;
+  details: Record<string, any>;
+  created_at: string;
 }
 
 export type AgentInsert = Partial<Agent>;

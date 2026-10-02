@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import { Agent, Conversation, Message, Visitor, Workspace, AgentStatus, ConversationStatus, ConversationPriority, CannedResponse } from '@/types/database';
 import { Sidebar, type View } from '@/components/dashboard/Sidebar';
@@ -19,7 +20,8 @@ import { MobileInstallBanner } from '@/components/pwa/MobileInstallBanner';
 import { sound } from '@/lib/sound';
 import { sendBrowserNotification, cn } from '@/lib/utils';
 import { updateFaviconBadge } from '@/lib/favicon';
-import { BarChart2, BookOpen, Inbox, Radio, Settings, Smartphone } from 'lucide-react';
+import { BarChart2, BookOpen, Inbox, Radio, Settings, Smartphone, ShieldAlert, LogOut } from 'lucide-react';
+import { exitSuperAdminWorkspaceViewAction } from '@/app/actions/platform';
 
 /**
  * Whether the AI assistant is the one replying on a thread. Mirrors the checks
@@ -38,6 +40,7 @@ export default function DashboardPage() {
 
   const [loading, setLoading] = useState(true);
   const [currentAgent, setCurrentAgent] = useState<Agent | null>(null);
+  const [isViewingAsSuperAdmin, setIsViewingAsSuperAdmin] = useState(false);
   const [currentWorkspace, setCurrentWorkspace] = useState<Workspace | null>(null);
   const [allAgents, setAllAgents] = useState<Agent[]>([]);
   const [cannedResponses, setCannedResponses] = useState<CannedResponse[]>([]);
@@ -156,7 +159,28 @@ export default function DashboardPage() {
 
       // Check if user has a workspace
       let workspace: Workspace | null = null;
-      if (agent?.workspace_id) {
+      let viewingSuperAdmin = false;
+
+      // If user is a super admin, check if they are viewing a switched workspace
+      if (agent?.is_super_admin) {
+        const cookieMatch = typeof document !== 'undefined' ? document.cookie.match(/super_admin_viewing_workspace_id=([^;]+)/) : null;
+        const switchedId = cookieMatch ? decodeURIComponent(cookieMatch[1].trim()) : null;
+        if (switchedId) {
+          const { data: switchedWs } = await supabase
+            .from('workspaces')
+            .select('*')
+            .eq('id', switchedId)
+            .maybeSingle();
+          if (switchedWs) {
+            workspace = switchedWs as Workspace;
+            viewingSuperAdmin = true;
+          }
+        }
+      }
+
+      setIsViewingAsSuperAdmin(viewingSuperAdmin);
+
+      if (!workspace && agent?.workspace_id) {
         const { data: wsData } = await supabase
           .from('workspaces')
           .select('*')
@@ -1065,8 +1089,43 @@ export default function DashboardPage() {
     );
   }
 
+  const handleExitSuperAdminView = async () => {
+    await exitSuperAdminWorkspaceViewAction();
+    window.location.reload();
+  };
+
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-canvas relative">
+    <div className="flex flex-col h-screen w-screen overflow-hidden bg-canvas relative">
+      {/* Super Admin Switch Banner */}
+      {isViewingAsSuperAdmin && (
+        <div className="bg-gradient-to-r from-purple-700 via-indigo-700 to-purple-800 text-white px-6 py-2.5 text-xs font-semibold flex items-center justify-between shadow-md z-50 shrink-0">
+          <div className="flex items-center gap-2.5">
+            <span className="flex h-2 w-2 rounded-full bg-amber-400 animate-ping" />
+            <ShieldAlert className="w-4 h-4 text-amber-300" />
+            <span>
+              Viewing as super admin: <strong className="underline underline-offset-2">{currentWorkspace?.name}</strong>{' '}
+              <span className="opacity-80 font-mono text-[11px]">({currentWorkspace?.id})</span>
+            </span>
+          </div>
+          <div className="flex items-center gap-2.5">
+            <Link
+              href="/admin"
+              className="px-3 py-1 rounded-lg bg-white/20 hover:bg-white/30 text-white text-[11.5px] font-bold transition-colors"
+            >
+              Super Admin Area
+            </Link>
+            <button
+              onClick={handleExitSuperAdminView}
+              className="px-3 py-1 rounded-lg bg-red-500/80 hover:bg-red-600 text-white text-[11.5px] font-bold flex items-center gap-1.5 transition-colors"
+            >
+              <LogOut className="w-3 h-3" />
+              <span>Exit Super Admin View</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div className="flex flex-1 overflow-hidden relative">
       {/* 1. Left Sidebar Navigation (Desktop) */}
       <div
         className={cn(
@@ -1321,6 +1380,7 @@ export default function DashboardPage() {
         isOpen={showMobileInstallModal}
         onClose={() => setShowMobileInstallModal(false)}
       />
+      </div>
     </div>
   );
 }

@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { Agent, Workspace, CannedResponse } from '@/types/database';
 import { AdminClientLayout } from '@/app/admin/AdminClientLayout';
 
-export default async function AdminPage() {
+export default async function AdminAuditPage() {
   const supabase = await createClient();
 
   const {
@@ -12,7 +12,7 @@ export default async function AdminPage() {
   } = await supabase.auth.getUser();
 
   if (!user) {
-    redirect('/login?redirect=/admin');
+    redirect('/login?redirect=/admin/audit');
   }
 
   // Verify server-side platform super admin flag from database
@@ -46,7 +46,6 @@ export default async function AdminPage() {
 
   const workspaceId = agent.workspace_id || 'a0000000-0000-0000-0000-000000000001';
 
-  // Load initial workspace, team agents, and canned responses
   const [{ data: workspace }, { data: agents }, { data: cannedResponses }] = await Promise.all([
     supabase.from('workspaces').select('*').eq('id', workspaceId).single(),
     supabase.from('agents').select('*').eq('workspace_id', workspaceId).order('name'),
@@ -67,6 +66,7 @@ export default async function AdminPage() {
       agent={agent as Agent}
       initialAgents={(agents as Agent[]) || []}
       initialCannedResponses={(cannedResponses as CannedResponse[]) || []}
+      initialTab="audit"
     />
   );
 }
