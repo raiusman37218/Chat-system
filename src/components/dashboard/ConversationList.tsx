@@ -100,12 +100,14 @@ interface ConversationItemProps {
   conversation: Conversation;
   isSelected: boolean;
   onSelect: (id: string) => void;
+  currentAgent?: Agent | null;
 }
 
 const ConversationItem = memo(function ConversationItem({
   conversation: conv,
   isSelected,
   onSelect,
+  currentAgent,
 }: ConversationItemProps) {
   const online = isVisitorOnline(
     conv.visitor?.last_seen || conv.visitor?.last_seen_at,
@@ -222,7 +224,12 @@ const ConversationItem = memo(function ConversationItem({
                   <Check className="w-3 h-3 text-ink-3/70 stroke-[2]" />
                 )}
               </span>
-              <span>You:</span>
+              <span>
+                {conv.last_message?.sender_id === currentAgent?.id
+                  ? 'You'
+                  : conv.last_message?.agent?.name?.split(' ')[0] || conv.agent?.name?.split(' ')[0] || 'Agent'}
+                :
+              </span>
             </span>
           ) : fromAi ? (
             <span className="text-purple-600 dark:text-purple-400 font-medium inline-flex items-center gap-0.5 mr-1">
@@ -871,6 +878,7 @@ export function ConversationList({
               conversation={conv}
               isSelected={conv.id === selectedConversationId}
               onSelect={onSelectConversation}
+              currentAgent={currentAgent}
             />
           ))
         )}

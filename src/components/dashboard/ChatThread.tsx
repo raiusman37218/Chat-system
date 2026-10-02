@@ -1588,10 +1588,18 @@ export function ChatThread({
 
           <div
             className={cn(
-              'mt-1 flex items-center gap-1 px-1 text-[10.5px] text-ink-3',
+              'mt-1 flex items-center gap-1.5 px-1 text-[10.5px] text-ink-3',
               (isAgent || isAI) && 'justify-end'
             )}
           >
+            {isAgent && (
+              <span className="font-semibold text-ink-2">
+                {msg.sender_id === currentAgent?.id
+                  ? 'You'
+                  : msg.agent?.name || agentsList.find((a) => a.id === msg.sender_id)?.name || 'Agent'}
+                {' ·'}
+              </span>
+            )}
             <span className="tabular-nums">{formatTime(msg.created_at)}</span>
             {msg.metadata?.is_edited && (
               <span className="italic text-[10px] text-ink-3/70 ml-0.5">(edited)</span>
