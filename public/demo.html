@@ -486,15 +486,9 @@
         <a onclick="navigateTo('#solutions')">Solutions</a>
         <a onclick="navigateTo('#pricing')">Pricing</a>
         <a onclick="navigateTo('#docs')">API Docs</a>
-        <a href="javascript:void(0)" data-chatify-help style="color: #93c5fd; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;">
-          📖 Help &amp; FAQs
-        </a>
       </nav>
 
       <div style="display:flex; align-items:center; gap:8px;">
-        <button class="sim-action-btn" data-chatify-help style="background: rgba(59, 130, 246, 0.15); border: 1px solid rgba(59, 130, 246, 0.4); color: #93c5fd; padding: 7px 14px; border-radius: 8px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 5px;">
-          📖 Help
-        </button>
         <button class="btn-primary" onclick="openChatBubble()">
           Talk to Support
         </button>
@@ -682,9 +676,9 @@
       }
     }
 
-    // 6. Dynamically load the Chatify widget
+    // 6. Dynamically load the Chatify widget (with cache busting)
     const widgetScript = document.createElement('script');
-    widgetScript.src = '/widget.js';
+    widgetScript.src = '/widget.js?v=' + Date.now();
     if (workspaceId) {
       widgetScript.setAttribute('data-workspace-id', workspaceId);
     }

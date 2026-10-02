@@ -431,11 +431,15 @@ class ChatifyWidget {
       }
 
       this.renderFaqList();
+      this.updateThemeAndTexts();
+      this.initNavbarAutoTrigger();
     } catch (err) {
       console.warn('[Chatify] Failed to fetch dynamic articles or sections:', err);
       this.sections = [];
       this.faqs = [];
       this.renderFaqList();
+      this.updateThemeAndTexts();
+      this.initNavbarAutoTrigger();
     }
   }
 
@@ -1671,7 +1675,7 @@ class ChatifyWidget {
             <span class="chatify-nav-inline-badge" id="navMsgInlineBadge" style="display:none;">1</span>
           </span>
         </button>
-        <button class="chatify-nav-item" data-tab="help" id="navHelp">
+        <button class="chatify-nav-item" data-tab="help" id="navHelp" style="display:none;">
           <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <circle cx="12" cy="12" r="10"></circle>
             <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
@@ -2008,6 +2012,9 @@ class ChatifyWidget {
   }
 
   public switchTab(tab: 'home' | 'messages' | 'help') {
+    if (tab === 'help' && (this.config.showHelpTab === false || this.faqs.length === 0)) {
+      tab = 'home';
+    }
     this.activeTab = tab;
 
     const tabHome = this.shadow?.getElementById('tabHome');
@@ -2134,15 +2141,19 @@ class ChatifyWidget {
       homeSearchSpan.textContent = `🔍 Search for ${this.config.helpTabLabel.toLowerCase()} articles...`;
     }
 
-    // Toggle Help Tab & Home Card Visibility based on showHelpTab setting
+    // Toggle Help Tab & Home Card Visibility based on showHelpTab setting and whether articles exist
     const navHelpBtn = this.shadow?.getElementById('navHelp') as HTMLElement | null;
     const cardHelpSearch = this.shadow?.getElementById('cardHelpSearch') as HTMLElement | null;
-    if (this.config.showHelpTab === false) {
+    const hasPublishedArticles = this.faqs.length > 0;
+    if (this.config.showHelpTab === false || !hasPublishedArticles) {
       if (navHelpBtn) navHelpBtn.style.display = 'none';
       if (cardHelpSearch) cardHelpSearch.style.display = 'none';
+      if (this.activeTab === 'help') {
+        this.switchTab('home');
+      }
     } else {
       if (navHelpBtn) navHelpBtn.style.display = 'flex';
-      if (cardHelpSearch) cardHelpSearch.style.display = this.faqs.length > 0 ? 'block' : 'none';
+      if (cardHelpSearch) cardHelpSearch.style.display = 'block';
     }
   }
 
@@ -4745,6 +4756,10 @@ class ChatifyWidget {
   }
 
   public openHelp() {
+    if (this.config.showHelpTab === false || this.faqs.length === 0) {
+      this.open('home');
+      return;
+    }
     this.open('help');
     setTimeout(() => {
       (this.shadow?.getElementById('helpSearchInput') as HTMLInputElement)?.focus();
@@ -4956,6 +4971,9 @@ class ChatifyWidget {
       const helpTrigger = target.closest('[data-chatify-help], .chatify-help-trigger');
       if (helpTrigger) {
         e.preventDefault();
+        if (this.config.showHelpTab === false || this.faqs.length === 0) {
+          return;
+        }
         this.openHelp();
         return;
       }
@@ -5008,13 +5026,26 @@ class ChatifyWidget {
    */
   private initNavbarAutoTrigger() {
     const navConfig = this.config.navbarTriggerConfig;
-    if (!navConfig || navConfig.enabled === false) return;
+    // 1. Must be OFF by default for every workspace and only run when the owner explicitly enables it.
+    if (!navConfig || navConfig.enabled !== true) {
+      document.getElementById('chatifyNavTriggerBtn')?.remove();
+      document.getElementById('chatifyNavTriggerBtnMobile')?.remove();
+      return;
+    }
+
+    const action = navConfig.action || 'help';
+
+    // 4. If the workspace has zero published articles or Help tab is disabled, do nothing for help triggers
+    if ((action === 'help' || action === 'redirect') && (this.config.showHelpTab === false || this.faqs.length === 0)) {
+      document.getElementById('chatifyNavTriggerBtn')?.remove();
+      document.getElementById('chatifyNavTriggerBtnMobile')?.remove();
+      return;
+    }
 
     const label = (navConfig.label || 'FAQ').trim();
     if (!label) return;
 
     const labelLower = label.toLowerCase();
-    const action = navConfig.action || 'help';
 
     const performAction = (e?: Event) => {
       if (e) e.preventDefault();
@@ -5035,61 +5066,84 @@ class ChatifyWidget {
     const attachOrInject = () => {
       if (typeof document === 'undefined') return;
 
-      // 1. SMART HOOKING: Look for existing matching links ONLY in header/nav (never match footer or body)
-      const navLinks = Array.from(
-        document.querySelectorAll<HTMLElement>(
-          'header nav a, nav a, header .navbar a, [role="navigation"] a, header [role="menubar"] a, header a'
-        )
-      );
+      // 2. Explicit CSS Selector Targeting ONLY:
+      // Never hijack existing links on host site named "Help" or "FAQ".
+      // Only a link the owner explicitly targets with a CSS selector may be hooked.
+      const targetSelector = navConfig.target_selector?.trim();
+      let targetedElementHooked = false;
 
-      let alreadyHooked = false;
+      if (targetSelector) {
+        try {
+          const targetedElements = Array.from(document.querySelectorAll<HTMLElement>(targetSelector));
+          for (const el of targetedElements) {
+            if (
+              el.closest('#chatifyWidgetContainer') ||
+              el.id === 'chatifyNavTriggerBtn' ||
+              el.id === 'chatifyNavTriggerBtnMobile'
+            ) {
+              continue;
+            }
 
-      for (const link of navLinks) {
-        if (
-          link.closest('#chatifyWidgetContainer') ||
-          link.id === 'chatifyNavTriggerBtn' ||
-          link.id === 'chatifyNavTriggerBtnMobile'
-        ) {
-          continue;
-        }
-        if (link.hasAttribute('data-chatify-hooked')) {
-          alreadyHooked = true;
-          break;
-        }
-
-        const text = (link.textContent || '').trim().toLowerCase();
-        const href = (link.getAttribute('href') || '').toLowerCase();
-
-        // Exact match or matching path
-        const exactTextMatch = text === labelLower;
-        const hrefMatch =
-          href === `/${labelLower}` ||
-          href === `/en/${labelLower}` ||
-          (labelLower === 'faq' && (href.endsWith('/faq') || href.includes('/faq'))) ||
-          (labelLower === 'help' && (href.endsWith('/help') || href.includes('/help')));
-
-        if (exactTextMatch || hrefMatch) {
-          link.setAttribute('data-chatify-hooked', 'true');
-          link.setAttribute('data-chatify-help', 'true');
-          link.style.cursor = 'pointer';
-          link.addEventListener('click', (e) => performAction(e));
-          alreadyHooked = true;
-
-          // Remove any injected buttons since native link matches
-          document.getElementById('chatifyNavTriggerBtn')?.remove();
-          document.getElementById('chatifyNavTriggerBtnMobile')?.remove();
-          break;
+            const tagName = el.tagName.toLowerCase();
+            if (
+              tagName === 'a' ||
+              tagName === 'button' ||
+              el.getAttribute('role') === 'button' ||
+              el.getAttribute('role') === 'link'
+            ) {
+              if (!el.hasAttribute('data-chatify-hooked')) {
+                el.setAttribute('data-chatify-hooked', 'true');
+                el.setAttribute('data-chatify-help', 'true');
+                el.style.cursor = 'pointer';
+                el.addEventListener('click', (e) => performAction(e));
+              }
+              targetedElementHooked = true;
+            }
+          }
+        } catch (err) {
+          console.warn('[Chatify] Invalid target_selector:', targetSelector, err);
         }
       }
 
-      // If a native link in the header/nav was hooked, no need to inject
-      if (alreadyHooked) return;
+      // If an explicitly targeted link/button was hooked, remove any injected buttons and do not inject
+      if (targetedElementHooked) {
+        document.getElementById('chatifyNavTriggerBtn')?.remove();
+        document.getElementById('chatifyNavTriggerBtnMobile')?.remove();
+        return;
+      }
 
-      // 2. AUTO-INJECTION: Inject into desktop navbar and mobile header
+      // 3. Do not inject a duplicate button if already injected or if a similar one exists on the host site
+      if (document.getElementById('chatifyNavTriggerBtn')) return;
+
+      const existingNavItems = Array.from(
+        document.querySelectorAll<HTMLElement>(
+          'header a, header button, nav a, nav button, [role="navigation"] a, [role="navigation"] button, .navbar a, .navbar button'
+        )
+      );
+
+      const hasSimilarLink = existingNavItems.some((item) => {
+        if (
+          item.closest('#chatifyWidgetContainer') ||
+          item.id === 'chatifyNavTriggerBtn' ||
+          item.id === 'chatifyNavTriggerBtnMobile'
+        ) {
+          return false;
+        }
+        const text = (item.textContent || '').trim().toLowerCase();
+        const ariaLabel = (item.getAttribute('aria-label') || '').trim().toLowerCase();
+        return text === labelLower || ariaLabel === labelLower || item.getAttribute('data-chatify-help') === 'true';
+      });
+
+      if (hasSimilarLink) {
+        // A similar button/link already exists on the host site navbar; do not inject duplicate
+        return;
+      }
+
+      // AUTO-INJECTION: Inject into desktop navbar and mobile header
       if (navConfig.auto_inject !== false) {
         // Find desktop navigation container
         const selector =
-          navConfig.target_selector ||
+          targetSelector ||
           'header nav ul, nav ul, header nav, nav, [role="navigation"] ul, [role="navigation"], .navbar-nav, .navbar';
         const container = document.querySelector<HTMLElement>(selector);
 

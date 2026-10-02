@@ -808,7 +808,7 @@ export default function ChatWidget({
           </div>
 
           <div className="flex items-center gap-1">
-            {showHelpTab && (
+            {showHelpTab && helpArticles.length > 0 && (
               <button
                 onClick={() => {
                   setIsHelpOpen((prev) => {

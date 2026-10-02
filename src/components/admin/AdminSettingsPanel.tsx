@@ -750,10 +750,10 @@ export function AdminSettingsPanel({
   // ──────────────────────────────────────────────────────────────────────────
   const [navbarConfig, setNavbarConfig] = useState<NavbarTriggerConfig>(
     workspace.navbar_trigger_config || {
-      enabled: true,
+      enabled: false,
       label: 'FAQ',
       action: 'help',
-      auto_inject: true,
+      auto_inject: false,
       style: 'navbar_link',
     }
   );

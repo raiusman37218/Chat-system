@@ -135,30 +135,25 @@ function LoginForm() {
         </div>
       )}
 
-      <GoogleButton
-        onClick={handleGoogleLogin}
-        loading={googleLoading}
-        disabled={loading}
-        text="Continue with Google"
-      />
+      {googleEnabled && (
+        <>
+          <GoogleButton
+            onClick={handleGoogleLogin}
+            loading={googleLoading}
+            disabled={loading}
+            text="Continue with Google"
+          />
 
-      {/* Shown only to whoever can act on it — the provider is off in Supabase,
-          so the button would otherwise fail with no explanation. */}
-      {googleEnabled === false && (
-        <p className="mt-2 text-[11.5px] leading-relaxed text-ink-3">
-          Google sign-in needs to be switched on in Supabase → Authentication →
-          Providers before this works.
-        </p>
+          <div className="relative my-6 text-center text-[12px] text-ink-3">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-line-2" />
+            </div>
+            <span className="relative bg-surface px-3 text-ink-3">
+              or continue with email
+            </span>
+          </div>
+        </>
       )}
-
-      <div className="relative my-6 text-center text-[12px] text-ink-3">
-        <div className="absolute inset-0 flex items-center">
-          <div className="w-full border-t border-line-2" />
-        </div>
-        <span className="relative bg-surface px-3 text-ink-3">
-          or continue with email
-        </span>
-      </div>
 
       <form onSubmit={handleLogin} className="space-y-4">
         <div>
