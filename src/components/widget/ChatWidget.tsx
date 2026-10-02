@@ -97,6 +97,8 @@ export default function ChatWidget({
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [visitorId, setVisitorId] = useState<string>('');
   const [visitorOriginalToggled, setVisitorOriginalToggled] = useState<Record<string, boolean>>({});
+  const [workspaceGreetingMessage, setWorkspaceGreetingMessage] = useState<string>('');
+  const [workspaceBusinessHours, setWorkspaceBusinessHours] = useState<any>(null);
 
   // Help Desk state
   const [isHelpOpen, setIsHelpOpen] = useState(false);
@@ -133,7 +135,7 @@ export default function ChatWidget({
         const [{ data: wsData }, { data: sectionsData }, { data: articlesData }] = await Promise.all([
           supabase
             .from('public_workspaces')
-            .select('id, name, slug, custom_domain, custom_domain_status, website_url, help_center_tab_label, show_help_tab, widget_position')
+            .select('id, name, slug, custom_domain, custom_domain_status, website_url, help_center_tab_label, show_help_tab, widget_position, greeting_message, business_hours')
             .eq('id', config.workspaceId)
             .maybeSingle(),
           supabase
@@ -153,6 +155,8 @@ export default function ChatWidget({
 
         if (wsData) {
           if (wsData.name) setWorkspaceName(wsData.name);
+          if (wsData.greeting_message) setWorkspaceGreetingMessage(wsData.greeting_message);
+          if (wsData.business_hours) setWorkspaceBusinessHours(wsData.business_hours);
           if (wsData.help_center_tab_label) setHelpTabLabel(wsData.help_center_tab_label);
           if (typeof wsData.show_help_tab === 'boolean') setShowHelpTab(wsData.show_help_tab);
           if (wsData.widget_position) {
@@ -194,29 +198,59 @@ export default function ChatWidget({
     }
   }, []);
 
-  // 4. Check Agent Online Status
+  // Helper: check if outside business hours
+  function isOutsideBusinessHours(businessHours: any): boolean {
+    if (!businessHours || !businessHours.enabled || !businessHours.schedule) return false;
+    try {
+      const now = new Date();
+      const tz = businessHours.timezone || 'UTC';
+      const dayName = new Intl.DateTimeFormat('en-US', { weekday: 'long', timeZone: tz }).format(now).toLowerCase();
+      const daySchedule = businessHours.schedule[dayName];
+      if (!daySchedule || !daySchedule.enabled) return true;
+
+      const timeStr = new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: tz }).format(now);
+      if (timeStr < daySchedule.start || timeStr > daySchedule.end) {
+        return true;
+      }
+      return false;
+    } catch {
+      return false;
+    }
+  }
+
+  const replyTimeText = workspaceGreetingMessage || config.welcomeText || '';
+
+  // 4. Check Agent Online Status & Business Hours
   useEffect(() => {
     async function checkAgentStatus() {
-      const { data: agents } = await supabase
-        .from('agents')
-        .select('id, status');
-
-      if (agents && agents.length > 0) {
-        const hasOnline = agents.some((a: any) => a.status === 'online');
-        setIsAgentOnline(hasOnline);
-      } else {
-        setIsAgentOnline(false);
+      let query = supabase.from('agents').select('id, status');
+      if (config.workspaceId) {
+        query = query.eq('workspace_id', config.workspaceId);
       }
+      const { data: agents } = await query;
+      const hasOnline = Boolean(agents && agents.length > 0 && agents.some((a: any) => a.status === 'online'));
+
+      let isBusinessHoursOpen = false;
+      if (workspaceBusinessHours?.enabled) {
+        isBusinessHoursOpen = !isOutsideBusinessHours(workspaceBusinessHours);
+      }
+
+      setIsAgentOnline(hasOnline || isBusinessHoursOpen);
     }
 
     checkAgentStatus();
 
     // Listen for agent status changes in real time
+    let channelConfig: any = { event: '*', schema: 'public', table: 'agents' };
+    if (config.workspaceId) {
+      channelConfig.filter = `workspace_id=eq.${config.workspaceId}`;
+    }
+
     const agentChannel = supabase
-      .channel('public-agent-status')
+      .channel(`public-agent-status-${config.workspaceId || 'all'}`)
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'agents' },
+        channelConfig,
         () => {
           checkAgentStatus();
         }
@@ -226,7 +260,7 @@ export default function ChatWidget({
     return () => {
       supabase.removeChannel(agentChannel);
     };
-  }, [supabase]);
+  }, [supabase, config.workspaceId, workspaceBusinessHours]);
 
   // 5. Auto-Greeting Trigger
   useEffect(() => {
@@ -787,7 +821,7 @@ export default function ChatWidget({
                     ? 'bg-emerald-400 animate-pulse'
                     : 'bg-slate-400'
                 }`}
-                title={isAgentOnline ? 'Agent is online' : 'Agents away'}
+                title={isAgentOnline ? 'Agent is online' : "We're away, leave a message and we'll reply by email"}
               />
             </div>
 
@@ -802,7 +836,9 @@ export default function ChatWidget({
                   }`}
                 />
                 <span>
-                  {isAgentOnline ? 'Active now · Quick replies' : 'Away · Leave a message'}
+                  {isAgentOnline
+                    ? (replyTimeText ? `Online · ${replyTimeText}` : 'Online · Active now')
+                    : "We're away, leave a message and we'll reply by email"}
                 </span>
               </div>
             </div>
@@ -1174,7 +1210,7 @@ export default function ChatWidget({
               <div>
                 <p className="font-semibold">Support is currently offline</p>
                 <p className="text-amber-700/80 dark:text-amber-400/80 mt-0.5">
-                  Send your message and we'll reply directly to your email as soon as we return.
+                  We're away, leave a message and we'll reply by email
                 </p>
               </div>
             </div>

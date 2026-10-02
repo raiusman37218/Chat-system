@@ -33,6 +33,7 @@ interface WidgetConfig {
   customDomain?: string;
   navbarTriggerConfig?: NavbarTriggerConfig;
   apiUrl?: string;
+  businessHours?: any;
 }
 
 interface MessageItem {
@@ -125,6 +126,8 @@ class ChatifyWidget {
   private emojiSearchQuery: string = '';
   private currentPopupMsgId: string | null = null;
   private popupCloseTimer: ReturnType<typeof setTimeout> | null = null;
+  private workspaceAgents: Array<{ id: string; name?: string; avatar_url?: string | null; status?: string }> = [];
+  private presenceInterval: ReturnType<typeof setInterval> | null = null;
 
   private audioCtx: AudioContext | null = null;
 
@@ -284,39 +287,33 @@ class ChatifyWidget {
         if (data.navbar_trigger_config) {
           this.config.navbarTriggerConfig = data.navbar_trigger_config;
         }
-        this.initNavbarAutoTrigger();
-
-        this.updateThemeAndTexts();
-
-        // Check Business Hours schedule
-        if (data.business_hours?.enabled) {
-          const isOutside = this.isOutsideBusinessHours(data.business_hours);
-          const statusPill = this.shadow?.getElementById('homeStatusPill');
-          const cardSub = this.shadow?.getElementById('homeCardSub');
-          const btnCta = this.shadow?.querySelector('#btnGoToMessages span');
-          if (isOutside) {
-            if (statusPill) {
-              statusPill.innerHTML = '<span class="chatify-pulse-dot away"></span> Typically replies in a few hours';
-            }
-            if (cardSub) {
-              cardSub.textContent = "Leave a message and we'll reply as soon as we're back online.";
-            }
-            if (btnCta) {
-              btnCta.textContent = "Leave us a message";
-            }
-          } else {
-            if (statusPill) {
-              statusPill.innerHTML = '<span class="chatify-pulse-dot online"></span> Typically replies in 5m';
-            }
-            if (cardSub) {
-              cardSub.textContent = "Ask us anything, or share your feedback.";
-            }
-            if (btnCta) {
-              btnCta.textContent = "Send us a message";
-            }
-          }
+        if (data.business_hours) {
+          this.config.businessHours = data.business_hours;
         }
+        if (Array.isArray(data.agents)) {
+          this.workspaceAgents = data.agents;
+        }
+
+        this.initNavbarAutoTrigger();
+        this.updateThemeAndTexts();
       }
+
+      // If agents weren't returned by RPC or need fallback, query directly
+      if (this.workspaceAgents.length === 0 && this.config.workspaceId) {
+        try {
+          const { data: directAgents } = await this.supabase
+            .from('agents')
+            .select('id, name, avatar_url, status')
+            .eq('workspace_id', this.config.workspaceId);
+          if (directAgents && directAgents.length > 0) {
+            this.workspaceAgents = directAgents;
+          }
+        } catch {}
+      }
+
+      this.renderAvatarsStack(this.workspaceAgents);
+      this.updatePresenceAndTexts();
+      this.subscribeToAgentsRealtime();
 
       // Load Help Desk / Knowledge Base articles dynamically
       await this.loadWorkspaceArticles();
@@ -1489,14 +1486,10 @@ class ChatifyWidget {
           <!-- Start Chat Card (shown when no conversation exists yet) -->
           <div class="chatify-card chatify-card-action" id="cardStartChat">
             <div class="chatify-card-head">
-              <div class="chatify-avatars-stack" id="homeAvatarsStack">
-                <div class="chatify-mini-avatar" style="background:linear-gradient(135deg,#3b82f6,#1d4ed8);">A</div>
-                <div class="chatify-mini-avatar" style="background:linear-gradient(135deg,#8b5cf6,#6d28d9);">S</div>
-                <div class="chatify-mini-avatar" style="background:linear-gradient(135deg,#10b981,#047857);">M</div>
-              </div>
+              <div class="chatify-avatars-stack" id="homeAvatarsStack"></div>
               <span class="chatify-status-pill" id="homeStatusPill">
-                <span class="chatify-pulse-dot online"></span>
-                <span>Typically replies in 5m</span>
+                <span class="chatify-pulse-dot away"></span>
+                <span>We're away, leave a message and we'll reply by email</span>
               </span>
               <span class="chatify-home-unread-pill" id="homeCardUnreadPill" style="display:none;">1 new message</span>
             </div>
@@ -1876,6 +1869,14 @@ class ChatifyWidget {
         this.handleSendMessage();
       }
     });
+
+    this.renderAvatarsStack(this.workspaceAgents);
+    this.updatePresenceAndTexts();
+    if (!this.presenceInterval) {
+      this.presenceInterval = setInterval(() => {
+        this.updatePresenceAndTexts();
+      }, 60000);
+    }
   }
 
   private handleSelectImage(file: File) {
@@ -2049,6 +2050,157 @@ class ChatifyWidget {
     }
   }
 
+  public getReplyTimeText(): string {
+    if (this.config.subtitle && this.config.subtitle.trim()) {
+      return this.config.subtitle.trim();
+    }
+    return 'Typically replies in under 5 minutes';
+  }
+
+  private checkIsOnline(): boolean {
+    const hasOnlineAgent = this.workspaceAgents.some((a) => a.status === 'online');
+    const bh = this.config.businessHours;
+    const isBusinessHoursEnforced = Boolean(bh && bh.enabled);
+    const isBusinessHoursOpen = isBusinessHoursEnforced && !this.isOutsideBusinessHours(bh);
+    return Boolean(hasOnlineAgent || isBusinessHoursOpen);
+  }
+
+  private updatePresenceAndTexts() {
+    const isOnline = this.checkIsOnline();
+    const replyTimeText = this.getReplyTimeText();
+    const offlineText = "We're away, leave a message and we'll reply by email";
+
+    // 1. Home Card Status Pill (#homeStatusPill)
+    const statusPill = this.shadow?.getElementById('homeStatusPill');
+    if (statusPill) {
+      if (isOnline) {
+        statusPill.title = 'Online';
+        statusPill.innerHTML = `<span class="chatify-pulse-dot online"></span> <span>${replyTimeText}</span>`;
+      } else {
+        statusPill.title = offlineText;
+        statusPill.innerHTML = `<span class="chatify-pulse-dot away"></span> <span>${offlineText}</span>`;
+      }
+    }
+
+    // 2. Home Card Subtitle (#homeCardSub)
+    const cardSub = this.shadow?.getElementById('homeCardSub');
+    if (cardSub) {
+      cardSub.textContent = isOnline
+        ? 'Ask us anything, or share your feedback.'
+        : offlineText;
+    }
+
+    // 3. Home CTA Button Text
+    const btnCta = this.shadow?.querySelector('#btnGoToMessages span');
+    if (btnCta) {
+      btnCta.textContent = isOnline ? 'Send us a message' : 'Leave us a message';
+    }
+
+    // 4. Chat Header Subtitle (#chatifyHeaderSubtitle)
+    const chatHeaderSub = this.shadow?.getElementById('chatifyHeaderSubtitle');
+    if (chatHeaderSub) {
+      chatHeaderSub.textContent = isOnline ? replyTimeText : offlineText;
+    }
+
+    // 5. Chat Header Avatar Dot (.chatify-online-dot inside #chatifyHeaderAvatar)
+    const headerOnlineDot = this.shadow?.querySelector('#chatifyHeaderAvatar .chatify-online-dot') as HTMLElement | null;
+    if (headerOnlineDot) {
+      headerOnlineDot.style.display = isOnline ? 'block' : 'none';
+    }
+
+    // 6. Popup Status Dot (.chatify-popup-status-dot inside #chatifyPopupCard)
+    const popupStatusDot = this.shadow?.querySelector('.chatify-popup-status-dot') as HTMLElement | null;
+    if (popupStatusDot) {
+      popupStatusDot.style.display = isOnline ? 'block' : 'none';
+    }
+  }
+
+  private renderAvatarsStack(agents: Array<{ id: string; name?: string; avatar_url?: string | null }>) {
+    const container = this.shadow?.getElementById('homeAvatarsStack');
+    if (!container) return;
+
+    container.innerHTML = '';
+
+    const gradients = [
+      'linear-gradient(135deg, #3b82f6, #1d4ed8)',
+      'linear-gradient(135deg, #8b5cf6, #6d28d9)',
+      'linear-gradient(135deg, #10b981, #047857)',
+      'linear-gradient(135deg, #f59e0b, #d97706)',
+      'linear-gradient(135deg, #ec4899, #be185d)',
+    ];
+
+    const displayAgents = agents && agents.length > 0 ? agents.slice(0, 3) : [];
+
+    if (displayAgents.length === 0) {
+      const fallbackDiv = document.createElement('div');
+      fallbackDiv.className = 'chatify-mini-avatar';
+      fallbackDiv.style.background = gradients[0];
+      if (this.config.logoUrl) {
+        fallbackDiv.innerHTML = `<img src="${this.config.logoUrl}" alt="Support" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;" />`;
+      } else {
+        const initials = this.getSenderInitials(this.config.businessName || this.config.title || 'Support');
+        fallbackDiv.textContent = initials;
+      }
+      container.appendChild(fallbackDiv);
+      return;
+    }
+
+    displayAgents.forEach((agent, idx) => {
+      const avatarDiv = document.createElement('div');
+      avatarDiv.className = 'chatify-mini-avatar';
+      avatarDiv.style.background = gradients[idx % gradients.length];
+      avatarDiv.title = agent.name || 'Agent';
+
+      if (agent.avatar_url) {
+        const img = document.createElement('img');
+        img.src = agent.avatar_url;
+        img.alt = agent.name || 'Agent';
+        img.style.cssText = 'width:100%;height:100%;object-fit:cover;border-radius:inherit;';
+        img.onerror = () => {
+          avatarDiv.innerHTML = '';
+          avatarDiv.textContent = this.getSenderInitials(agent.name || 'Agent');
+        };
+        avatarDiv.appendChild(img);
+      } else {
+        avatarDiv.textContent = this.getSenderInitials(agent.name || 'Agent');
+      }
+
+      container.appendChild(avatarDiv);
+    });
+  }
+
+  private subscribeToAgentsRealtime() {
+    if (!this.config.workspaceId) return;
+
+    this.supabase
+      .channel(`chatify-agents-${this.config.workspaceId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'agents',
+          filter: `workspace_id=eq.${this.config.workspaceId}`,
+        },
+        async () => {
+          try {
+            const { data } = await this.supabase
+              .from('agents')
+              .select('id, name, avatar_url, status')
+              .eq('workspace_id', this.config.workspaceId);
+            if (data) {
+              this.workspaceAgents = data;
+              this.renderAvatarsStack(this.workspaceAgents);
+              this.updatePresenceAndTexts();
+            }
+          } catch (e) {
+            console.warn('[Chatify] Error updating agent presence:', e);
+          }
+        }
+      )
+      .subscribe();
+  }
+
   private updateThemeAndTexts() {
     const styleEl = this.shadow?.getElementById('chatify-theme-style');
     if (styleEl) {
@@ -2159,6 +2311,9 @@ class ChatifyWidget {
       if (navHelpBtn) navHelpBtn.style.display = 'flex';
       if (cardHelpSearch) cardHelpSearch.style.display = 'block';
     }
+
+    this.renderAvatarsStack(this.workspaceAgents);
+    this.updatePresenceAndTexts();
   }
 
   /* ---------------------------------------------------------------- theme */
@@ -2832,6 +2987,12 @@ class ChatifyWidget {
         font-size: 11.5px;
         font-weight: 600;
         color: var(--w-ink-2);
+        max-width: calc(100% - 70px);
+      }
+
+      .chatify-status-pill span:not(.chatify-pulse-dot) {
+        overflow: hidden;
+        text-overflow: ellipsis;
         white-space: nowrap;
       }
 

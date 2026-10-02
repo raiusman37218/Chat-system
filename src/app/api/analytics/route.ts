@@ -47,7 +47,7 @@ export async function GET(req: NextRequest) {
           .eq('workspace_id', workspaceId),
         supabase
           .from('messages')
-          .select('conversation_id, sender_type, created_at')
+          .select('conversation_id, sender_type, sender_id, is_internal, created_at')
           .gte('created_at', startDate.toISOString())
           .order('created_at', { ascending: true }),
       ]);
@@ -57,9 +57,17 @@ export async function GET(req: NextRequest) {
     const agentList = agents || [];
     const msgList = messages || [];
 
-    // Map messages by conversation_id for First Response Time (FRT) calculation
-    const msgsByConv = new Map<string, Array<{ sender_type: string; created_at: string }>>();
-    for (const m of msgList) {
+    // Map messages by conversation_id
+    interface MsgItem {
+      conversation_id: string;
+      sender_type: string;
+      sender_id?: string | null;
+      is_internal?: boolean;
+      created_at: string;
+    }
+
+    const msgsByConv = new Map<string, MsgItem[]>();
+    for (const m of msgList as MsgItem[]) {
       if (!msgsByConv.has(m.conversation_id)) {
         msgsByConv.set(m.conversation_id, []);
       }
@@ -94,55 +102,130 @@ export async function GET(req: NextRequest) {
     }
 
     for (const c of convList) {
-      const assignedId = c.assigned_agent_id;
-      if (assignedId && !agentMetrics.has(assignedId)) {
-        agentMetrics.set(assignedId, {
-          handled: 0,
-          resolved: 0,
-          frtList: [],
-          resList: [],
-          csatList: [],
-        });
-      }
-      const aMetric = assignedId ? agentMetrics.get(assignedId) : null;
-      if (aMetric) aMetric.handled += 1;
+      const convMsgs = msgsByConv.get(c.id) || [];
+      const humanMsgs = convMsgs.filter(
+        (m) => m.sender_type === 'agent' && !m.is_internal && m.sender_id
+      );
 
-      // CSAT
-      if (c.csat_rating && c.csat_rating >= 1 && c.csat_rating <= 5) {
-        csatValues.push(c.csat_rating);
-        if (aMetric) aMetric.csatList.push(c.csat_rating);
+      // Distinct human agents who actively sent replies in this conversation
+      const respondingAgentIds = new Set<string>();
+      for (const hm of humanMsgs) {
+        if (hm.sender_id) respondingAgentIds.add(hm.sender_id);
       }
 
-      // Resolution Time
-      if (c.status === 'closed' && c.closed_at) {
-        if (aMetric) aMetric.resolved += 1;
-        const resSeconds = (new Date(c.closed_at).getTime() - new Date(c.created_at).getTime()) / 1000;
-        if (resSeconds > 0 && resSeconds < 30 * 24 * 3600) {
-          resValues.push(resSeconds);
-          if (aMetric) aMetric.resList.push(resSeconds);
+      // If no human reply has been sent yet, fall back to assigned_agent_id
+      const handlingAgentIds = new Set<string>(respondingAgentIds);
+      if (handlingAgentIds.size === 0 && c.assigned_agent_id) {
+        handlingAgentIds.add(c.assigned_agent_id);
+      }
+
+      // 1. Handled Count: attribute to each agent who worked on / replied in this conversation
+      for (const agentId of handlingAgentIds) {
+        if (!agentMetrics.has(agentId)) {
+          agentMetrics.set(agentId, {
+            handled: 0,
+            resolved: 0,
+            frtList: [],
+            resList: [],
+            csatList: [],
+          });
         }
+        agentMetrics.get(agentId)!.handled += 1;
       }
 
-      // First Response Time (FRT)
-      const convMsgs = msgsByConv.get(c.id);
-      if (convMsgs && convMsgs.length > 1) {
+      // 2. First Response Time (FRT)
+      if (convMsgs.length > 1) {
         const firstVisitorMsg = convMsgs.find((m) => m.sender_type === 'visitor');
         if (firstVisitorMsg) {
-          const firstAgentMsg = convMsgs.find(
+          // Overall workspace FRT: first agent or AI message after visitor message
+          const firstAnyAgentMsg = convMsgs.find(
             (m) =>
               (m.sender_type === 'agent' || m.sender_type === 'ai') &&
+              !m.is_internal &&
               new Date(m.created_at) >= new Date(firstVisitorMsg.created_at)
           );
 
-          if (firstAgentMsg) {
+          if (firstAnyAgentMsg) {
             const frtSeconds =
-              (new Date(firstAgentMsg.created_at).getTime() -
+              (new Date(firstAnyAgentMsg.created_at).getTime() -
                 new Date(firstVisitorMsg.created_at).getTime()) /
               1000;
             if (frtSeconds >= 0 && frtSeconds < 7 * 24 * 3600) {
               frtValues.push(frtSeconds);
-              if (aMetric) aMetric.frtList.push(frtSeconds);
             }
+          }
+
+          // Per-agent FRT: calculated from the human agent who sent the first human reply!
+          const firstHumanReply = convMsgs.find(
+            (m) =>
+              m.sender_type === 'agent' &&
+              !m.is_internal &&
+              new Date(m.created_at) >= new Date(firstVisitorMsg.created_at)
+          );
+
+          if (firstHumanReply) {
+            const agentFrtSeconds =
+              (new Date(firstHumanReply.created_at).getTime() -
+                new Date(firstVisitorMsg.created_at).getTime()) /
+              1000;
+            if (agentFrtSeconds >= 0 && agentFrtSeconds < 7 * 24 * 3600) {
+              const responderId = firstHumanReply.sender_id || c.assigned_agent_id;
+              if (responderId) {
+                if (!agentMetrics.has(responderId)) {
+                  agentMetrics.set(responderId, {
+                    handled: 0,
+                    resolved: 0,
+                    frtList: [],
+                    resList: [],
+                    csatList: [],
+                  });
+                }
+                agentMetrics.get(responderId)!.frtList.push(agentFrtSeconds);
+              }
+            }
+          }
+        }
+      }
+
+      // 3. Resolution Time & CSAT
+      const lastHumanMsg = [...humanMsgs].reverse()[0];
+      const primaryAgentId = lastHumanMsg?.sender_id || c.assigned_agent_id;
+
+      // CSAT
+      if (c.csat_rating && c.csat_rating >= 1 && c.csat_rating <= 5) {
+        csatValues.push(c.csat_rating);
+        if (primaryAgentId) {
+          if (!agentMetrics.has(primaryAgentId)) {
+            agentMetrics.set(primaryAgentId, {
+              handled: 0,
+              resolved: 0,
+              frtList: [],
+              resList: [],
+              csatList: [],
+            });
+          }
+          agentMetrics.get(primaryAgentId)!.csatList.push(c.csat_rating);
+        }
+      }
+
+      // Resolution Time
+      if (c.status === 'closed' && c.closed_at) {
+        const resSeconds = (new Date(c.closed_at).getTime() - new Date(c.created_at).getTime()) / 1000;
+        if (resSeconds > 0 && resSeconds < 30 * 24 * 3600) {
+          resValues.push(resSeconds);
+          if (primaryAgentId) {
+            if (!agentMetrics.has(primaryAgentId)) {
+              agentMetrics.set(primaryAgentId, {
+                handled: 0,
+                resolved: 0,
+                frtList: [],
+                resList: [],
+                csatList: [],
+              });
+            }
+            const aMetric = agentMetrics.get(primaryAgentId)!;
+            aMetric.resolved += 1;
+            aMetric.resList.push(resSeconds);
           }
         }
       }

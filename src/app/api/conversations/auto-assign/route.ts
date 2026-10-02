@@ -25,35 +25,69 @@ export async function POST(req: NextRequest) {
 
     const supabase = getSupabase();
 
-    // 1. Fetch online agents first
-    let { data: agents, error: aErr } = await supabase
+    // 1. Fetch conversation to determine workspace
+    const { data: conv, error: convErr } = await supabase
+      .from('conversations')
+      .select('id, workspace_id, assigned_agent_id')
+      .eq('id', conversation_id)
+      .single();
+
+    if (convErr || !conv) {
+      return NextResponse.json({ error: 'Conversation not found' }, { status: 404 });
+    }
+
+    const wsId = conv.workspace_id;
+
+    // Check workspace auto-assignment setting
+    if (wsId) {
+      const { data: ws } = await supabase
+        .from('workspaces')
+        .select('auto_assignment')
+        .eq('id', wsId)
+        .single();
+
+      if (ws?.auto_assignment && ws.auto_assignment.enabled === false) {
+        return NextResponse.json({
+          success: false,
+          assigned: false,
+          reason: 'Auto-assignment is disabled for this workspace',
+        });
+      }
+    }
+
+    // 2. Fetch online agents for this workspace
+    let query = supabase
       .from('agents')
-      .select('id, name, email, avatar_url, status')
+      .select('id, name, email, avatar_url, status, workspace_id')
       .eq('status', 'online');
 
+    if (wsId) {
+      query = query.eq('workspace_id', wsId);
+    }
+
+    let { data: agents, error: aErr } = await query;
     if (aErr) throw aErr;
 
-    // Fallback: If no agents are marked 'online', fetch all agents
+    // If no agents are marked 'online', return unassigned as specified
     if (!agents || agents.length === 0) {
-      const { data: allAgents } = await supabase
-        .from('agents')
-        .select('id, name, email, avatar_url, status');
-      agents = allAgents || [];
+      return NextResponse.json({
+        success: true,
+        assigned: false,
+        message: 'No online agents available for auto-assignment',
+      });
     }
 
-    if (agents.length === 0) {
-      return NextResponse.json(
-        { error: 'No agents available in the system' },
-        { status: 404 }
-      );
-    }
-
-    // 2. Query open conversation counts per agent to balance workload
-    const { data: openConvs, error: cErr } = await supabase
+    // 3. Query open conversation counts per agent to balance workload
+    let openQuery = supabase
       .from('conversations')
       .select('assigned_agent_id')
       .eq('status', 'open');
 
+    if (wsId) {
+      openQuery = openQuery.eq('workspace_id', wsId);
+    }
+
+    const { data: openConvs, error: cErr } = await openQuery;
     if (cErr) throw cErr;
 
     const workloadMap: Record<string, number> = {};
@@ -67,16 +101,15 @@ export async function POST(req: NextRequest) {
       }
     });
 
-    // 3. Pick the agent with the fewest active tickets
+    // 4. Pick the agent with the fewest active tickets
     agents.sort((a, b) => workloadMap[a.id] - workloadMap[b.id]);
     const chosenAgent = agents[0];
 
-    // 4. Update the conversation
+    // 5. Update the conversation
     const { error: uErr } = await supabase
       .from('conversations')
       .update({
         assigned_agent_id: chosenAgent.id,
-        agent_id: chosenAgent.id,
         updated_at: new Date().toISOString(),
       })
       .eq('id', conversation_id);
@@ -85,6 +118,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
+      assigned: true,
       agent: chosenAgent,
       activeTickets: workloadMap[chosenAgent.id] + 1,
     });

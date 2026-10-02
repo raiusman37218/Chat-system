@@ -753,11 +753,23 @@ export default function DashboardPage() {
     if (!currentAgent) {
       throw new Error('Your session expired — reload and try again.');
     }
+    const target = conversations.find((c) => c.id === targetId);
     if (!isInternal) {
-      const target = conversations.find((c) => c.id === targetId);
       if (target && isAiAnswering(target, currentWorkspaceRef.current)) {
         throw new Error('AI autopilot is replying to this conversation — take over to reply.');
       }
+    }
+
+    const isFirstAgentReply = !isInternal && target && !target.assigned_agent_id;
+
+    if (isFirstAgentReply) {
+      setConversations((prev) =>
+        prev.map((c) =>
+          c.id === targetId
+            ? { ...c, assigned_agent_id: currentAgent.id, agent: currentAgent }
+            : c
+        )
+      );
     }
 
     const { error } = await supabase.from('messages').insert({
@@ -780,7 +792,10 @@ export default function DashboardPage() {
 
     await supabase
       .from('conversations')
-      .update({ updated_at: new Date().toISOString() })
+      .update({
+        updated_at: new Date().toISOString(),
+        ...(isFirstAgentReply ? { assigned_agent_id: currentAgent.id } : {}),
+      })
       .eq('id', targetId);
   };
 
