@@ -378,17 +378,29 @@ export function AdminSettingsPanel({
 
   const handleInviteAgent = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!inviteName || !inviteEmail) return;
+    if (!inviteName.trim() || !inviteEmail.trim()) return;
 
     setInviting(true);
     try {
       const res = await inviteAgentAction(workspace.id, {
-        name: inviteName,
-        email: inviteEmail,
+        name: inviteName.trim(),
+        email: inviteEmail.trim(),
         role: inviteRole,
       });
+
+      if (!res.success) {
+        showStatus(res.error || 'Failed to invite agent', 'error');
+        return;
+      }
+
       if (res.agent) {
-        setAgents((prev) => [...prev, res.agent]);
+        setAgents((prev) => {
+          const exists = prev.some((a) => a.id === res.agent!.id);
+          if (exists) {
+            return prev.map((a) => (a.id === res.agent!.id ? res.agent! : a));
+          }
+          return [...prev, res.agent!];
+        });
         setInviteModalOpen(false);
         setInviteName('');
         setInviteEmail('');
@@ -404,8 +416,12 @@ export function AdminSettingsPanel({
   const handleUpdateRole = async (agentId: string, newRole: 'admin' | 'agent') => {
     try {
       const res = await updateAgentRoleAction(workspace.id, agentId, newRole);
+      if (!res.success) {
+        showStatus(res.error || 'Failed to update agent role', 'error');
+        return;
+      }
       if (res.agent) {
-        setAgents((prev) => prev.map((a) => (a.id === agentId ? res.agent : a)));
+        setAgents((prev) => prev.map((a) => (a.id === agentId ? res.agent! : a)));
         showStatus(`Updated role to ${newRole}`);
       }
     } catch (err: any) {
@@ -417,7 +433,11 @@ export function AdminSettingsPanel({
     if (!confirm(`Are you sure you want to remove ${agentName} from the workspace?`)) return;
 
     try {
-      await removeAgentAction(workspace.id, agentId);
+      const res = await removeAgentAction(workspace.id, agentId);
+      if (!res.success) {
+        showStatus(res.error || 'Failed to remove agent', 'error');
+        return;
+      }
       setAgents((prev) => prev.filter((a) => a.id !== agentId));
       showStatus(`Removed ${agentName}`);
     } catch (err: any) {

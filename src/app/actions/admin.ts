@@ -1,6 +1,7 @@
 'use server';
 
 import { createClient } from '@/lib/supabase/server';
+import { serviceClient } from '@/lib/supabase/service';
 import {
   Workspace,
   Agent,
@@ -172,62 +173,194 @@ export async function inviteAgentAction(
     email: string;
     role: 'admin' | 'agent';
   }
-) {
-  await assertAdminUser(workspaceId);
-  const supabase = await createClient();
+): Promise<{ success: boolean; agent?: Agent; error?: string }> {
+  try {
+    await assertAdminUser(workspaceId);
 
-  // Create an invited agent entry
-  const { data: inserted, error } = await supabase
-    .from('agents')
-    .insert({
-      workspace_id: workspaceId,
-      name: data.name.trim(),
-      email: data.email.trim().toLowerCase(),
-      role: data.role,
-      status: 'offline',
-    })
-    .select()
-    .single();
+    const email = data.email?.trim().toLowerCase();
+    const name = data.name?.trim();
+    const role = data.role === 'admin' ? 'admin' : 'agent';
 
-  if (error) throw new Error(error.message);
-  return { success: true, agent: inserted as Agent };
+    if (!email || !email.includes('@')) {
+      return { success: false, error: 'Please provide a valid email address.' };
+    }
+    if (!name) {
+      return { success: false, error: "Please provide the agent's full name." };
+    }
+
+    const adminClient = serviceClient();
+
+    // 1. Check if the user is already part of THIS workspace
+    const { data: existingWorkspaceAgent } = await adminClient
+      .from('agents')
+      .select('*')
+      .eq('workspace_id', workspaceId)
+      .ilike('email', email)
+      .maybeSingle();
+
+    if (existingWorkspaceAgent) {
+      return {
+        success: false,
+        error: `A team member with email "${email}" is already part of this workspace.`,
+      };
+    }
+
+    // 2. Check if the user already exists in auth.users or agents
+    let targetUserId: string | null = null;
+
+    try {
+      const { data: usersData } = await adminClient.auth.admin.listUsers({ perPage: 1000 });
+      const foundUser = usersData?.users?.find((u) => u.email?.toLowerCase() === email);
+      if (foundUser) {
+        targetUserId = foundUser.id;
+      }
+    } catch (listErr) {
+      console.warn('Could not list users from auth.admin:', listErr);
+    }
+
+    if (!targetUserId) {
+      const { data: existingAgent } = await adminClient
+        .from('agents')
+        .select('id')
+        .ilike('email', email)
+        .maybeSingle();
+      if (existingAgent?.id) {
+        targetUserId = existingAgent.id;
+      }
+    }
+
+    // 3. If user doesn't exist in auth, invite or create them
+    if (!targetUserId) {
+      const { data: inviteData, error: inviteErr } = await adminClient.auth.admin.inviteUserByEmail(
+        email,
+        {
+          data: {
+            name,
+            workspace_id: workspaceId,
+            role,
+          },
+        }
+      );
+
+      if (inviteData?.user?.id) {
+        targetUserId = inviteData.user.id;
+      } else {
+        // Fallback: create auth user directly if invite email failed (e.g. SMTP limits or email restrictions)
+        const { data: createData, error: createErr } = await adminClient.auth.admin.createUser({
+          email,
+          email_confirm: true,
+          user_metadata: {
+            name,
+            workspace_id: workspaceId,
+            role,
+          },
+        });
+
+        if (createErr || !createData?.user?.id) {
+          return {
+            success: false,
+            error: inviteErr?.message || createErr?.message || 'Failed to create user account.',
+          };
+        }
+        targetUserId = createData.user.id;
+      }
+    }
+
+    // 4. Upsert into public.agents
+    const { data: inserted, error: agentError } = await adminClient
+      .from('agents')
+      .upsert(
+        {
+          id: targetUserId,
+          workspace_id: workspaceId,
+          name,
+          email,
+          role,
+          status: 'offline',
+        },
+        { onConflict: 'id' }
+      )
+      .select()
+      .single();
+
+    if (agentError || !inserted) {
+      return {
+        success: false,
+        error: agentError?.message || 'Failed to link agent to workspace.',
+      };
+    }
+
+    return { success: true, agent: inserted as Agent };
+  } catch (err: any) {
+    console.error('Error in inviteAgentAction:', err);
+    return {
+      success: false,
+      error: err.message || 'Failed to invite agent. Please try again.',
+    };
+  }
 }
 
 export async function updateAgentRoleAction(
   workspaceId: string,
   agentId: string,
   role: 'admin' | 'agent'
-) {
-  await assertAdminUser(workspaceId);
-  const supabase = await createClient();
+): Promise<{ success: boolean; agent?: Agent; error?: string }> {
+  try {
+    await assertAdminUser(workspaceId);
+    const adminClient = serviceClient();
 
-  const { data: updated, error } = await supabase
-    .from('agents')
-    .update({ role })
-    .eq('id', agentId)
-    .eq('workspace_id', workspaceId)
-    .select()
-    .single();
+    const { data: updated, error } = await adminClient
+      .from('agents')
+      .update({ role })
+      .eq('id', agentId)
+      .eq('workspace_id', workspaceId)
+      .select()
+      .single();
 
-  if (error) throw new Error(error.message);
-  return { success: true, agent: updated as Agent };
+    if (error || !updated) {
+      return {
+        success: false,
+        error: error?.message || 'Failed to update agent role.',
+      };
+    }
+    return { success: true, agent: updated as Agent };
+  } catch (err: any) {
+    console.error('Error in updateAgentRoleAction:', err);
+    return {
+      success: false,
+      error: err.message || 'Failed to update agent role.',
+    };
+  }
 }
 
-export async function removeAgentAction(workspaceId: string, agentId: string) {
-  const { agent: currentAgent } = await assertAdminUser(workspaceId);
-  if (currentAgent.id === agentId) {
-    throw new Error('You cannot remove yourself from the workspace.');
+export async function removeAgentAction(
+  workspaceId: string,
+  agentId: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { agent: currentAgent } = await assertAdminUser(workspaceId);
+    if (currentAgent.id === agentId) {
+      return { success: false, error: 'You cannot remove yourself from the workspace.' };
+    }
+
+    const adminClient = serviceClient();
+    const { error } = await adminClient
+      .from('agents')
+      .update({ workspace_id: null })
+      .eq('id', agentId)
+      .eq('workspace_id', workspaceId);
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+    return { success: true };
+  } catch (err: any) {
+    console.error('Error in removeAgentAction:', err);
+    return {
+      success: false,
+      error: err.message || 'Failed to remove agent.',
+    };
   }
-
-  const supabase = await createClient();
-  const { error } = await supabase
-    .from('agents')
-    .delete()
-    .eq('id', agentId)
-    .eq('workspace_id', workspaceId);
-
-  if (error) throw new Error(error.message);
-  return { success: true };
 }
 
 /**
