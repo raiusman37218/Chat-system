@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   AlertTriangle,
   AtSign,
@@ -176,6 +177,8 @@ export function ChatThread({
   const [showMacros, setShowMacros] = useState(false);
   const [macroSearch, setMacroSearch] = useState('');
   const [showTagPicker, setShowTagPicker] = useState(false);
+  const [tagPickerCoords, setTagPickerCoords] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
+  const tagMenuRef = useRef<HTMLDivElement>(null);
   const [customTagInput, setCustomTagInput] = useState('');
   const [aiDrafting, setAiDrafting] = useState(false);
   const [collisionAgents, setCollisionAgents] = useState<
@@ -458,14 +461,56 @@ export function ChatThread({
     }
   }, [conversation.id, messages.length]);
 
-  // Close the tag popover on an outside click.
+  // Close the tag popover on an outside click and track positioning
   useEffect(() => {
     if (!showTagPicker) return;
-    const onDown = (e: MouseEvent) => {
-      if (!tagPickerRef.current?.contains(e.target as Node)) setShowTagPicker(false);
+
+    const updateTagPosition = () => {
+      if (!tagPickerRef.current) return;
+      const rect = tagPickerRef.current.getBoundingClientRect();
+      const menuWidth = 224; // w-56
+      let left = rect.left;
+      if (left + menuWidth > window.innerWidth - 8) {
+        left = Math.max(8, window.innerWidth - menuWidth - 8);
+      }
+      setTagPickerCoords({
+        top: Math.round(rect.bottom + 6),
+        left: Math.round(left),
+      });
     };
+
+    updateTagPosition();
+
+    const onDown = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (
+        !tagPickerRef.current?.contains(target) &&
+        !tagMenuRef.current?.contains(target)
+      ) {
+        setShowTagPicker(false);
+      }
+    };
+
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        setShowTagPicker(false);
+      }
+    };
+
+    window.addEventListener('scroll', updateTagPosition, true);
+    window.addEventListener('resize', updateTagPosition);
+    window.addEventListener('keydown', onKey, { capture: true });
     document.addEventListener('mousedown', onDown);
-    return () => document.removeEventListener('mousedown', onDown);
+
+    return () => {
+      window.removeEventListener('scroll', updateTagPosition, true);
+      window.removeEventListener('resize', updateTagPosition);
+      window.removeEventListener('keydown', onKey, { capture: true });
+      document.removeEventListener('mousedown', onDown);
+    };
   }, [showTagPicker]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -947,6 +992,10 @@ export function ChatThread({
 
     // Escape closes popups or triggers onBack
     if (e.key === 'Escape') {
+      if (showTagPicker) {
+        setShowTagPicker(false);
+        return;
+      }
       if (showMacros) {
         setShowMacros(false);
         return;
@@ -1974,47 +2023,59 @@ export function ChatThread({
             Add
           </button>
 
-          {showTagPicker && (
-            <div className="absolute top-[calc(100%+6px)] left-0 z-50 w-56 p-2 rounded-xl border border-line bg-surface shadow-lg animate-pop">
-              <div className="eyebrow px-1.5 pb-1.5">Tags</div>
-              <div className="space-y-0.5 mb-2">
-                {PRESET_TAGS.map((pt) => {
-                  const active = (conversation.tags || []).includes(pt);
-                  return (
-                    <button
-                      key={pt}
-                      onClick={() => handleToggleTag(pt)}
-                      className={cn(
-                        'w-full flex items-center justify-between px-2 py-1.5 rounded-lg text-[12.5px] transition-colors',
-                        active
-                          ? 'bg-accent-soft text-accent font-medium'
-                          : 'text-ink hover:bg-surface-3'
-                      )}
-                    >
-                      {pt}
-                      {active && <Check className="w-3.5 h-3.5" />}
-                    </button>
-                  );
-                })}
-              </div>
-              <div className="pt-2 border-t border-line flex items-center gap-1.5">
-                <input
-                  type="text"
-                  placeholder="Custom tag"
-                  value={customTagInput}
-                  onChange={(e) => setCustomTagInput(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleAddCustomTag()}
-                  className="input input-sm flex-1"
-                />
-                <button
-                  onClick={handleAddCustomTag}
-                  className="btn btn-sm btn-primary shrink-0"
-                >
-                  Add
-                </button>
-              </div>
-            </div>
-          )}
+          {showTagPicker &&
+            typeof document !== 'undefined' &&
+            createPortal(
+              <div
+                ref={tagMenuRef}
+                style={{
+                  position: 'fixed',
+                  top: `${tagPickerCoords.top}px`,
+                  left: `${tagPickerCoords.left}px`,
+                  zIndex: 9999,
+                }}
+                className="w-56 p-2 rounded-xl border border-line bg-surface shadow-2xl animate-pop"
+              >
+                <div className="eyebrow px-1.5 pb-1.5">Tags</div>
+                <div className="space-y-0.5 mb-2">
+                  {PRESET_TAGS.map((pt) => {
+                    const active = (conversation.tags || []).includes(pt);
+                    return (
+                      <button
+                        key={pt}
+                        onClick={() => handleToggleTag(pt)}
+                        className={cn(
+                          'w-full flex items-center justify-between px-2 py-1.5 rounded-lg text-[12.5px] transition-colors cursor-pointer',
+                          active
+                            ? 'bg-accent-soft text-accent font-medium'
+                            : 'text-ink hover:bg-surface-3'
+                        )}
+                      >
+                        {pt}
+                        {active && <Check className="w-3.5 h-3.5" />}
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="pt-2 border-t border-line flex items-center gap-1.5">
+                  <input
+                    type="text"
+                    placeholder="Custom tag"
+                    value={customTagInput}
+                    onChange={(e) => setCustomTagInput(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleAddCustomTag()}
+                    className="input input-sm flex-1"
+                  />
+                  <button
+                    onClick={handleAddCustomTag}
+                    className="btn btn-sm btn-primary shrink-0"
+                  >
+                    Add
+                  </button>
+                </div>
+              </div>,
+              document.body
+            )}
         </div>
 
         {conversation.csat_rating && (
