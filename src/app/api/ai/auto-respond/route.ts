@@ -51,27 +51,31 @@ export async function OPTIONS() {
   return new NextResponse(null, { status: 204, headers: CORS_HEADERS });
 }
 
-// In-memory set to prevent concurrent auto-response runs for the same conversation
+// In-memory sets to prevent concurrent auto-response runs
 const inFlightConversations = new Set<string>();
+const inFlightMessages = new Set<string>();
 
 export async function POST(req: NextRequest) {
   let lockAcquired = false;
+  let messageLockAcquired = false;
   let conversation_id: string | undefined;
+  let targetVisitorMsgId: string | undefined;
 
   try {
     const body = await req.json();
     conversation_id = body.conversation_id;
     const workspace_id = body.workspace_id;
+    const requested_message_id = body.message_id || body.messageId;
 
     if (!conversation_id || !workspace_id) {
       return json({ error: 'Missing conversation_id or workspace_id' }, { status: 400 });
     }
 
-    // 0. One run per conversation at a time. A message that arrives while the
-    // previous one is still being answered used to be turned away here, and
-    // since nothing retried it, that message never got a reply. It now waits
-    // its turn; once the earlier reply lands, the checks below see it as the
-    // unanswered message and answer it.
+    if (requested_message_id && inFlightMessages.has(requested_message_id)) {
+      return json({ replied: false, reason: 'Auto-response already in progress for this message' });
+    }
+
+    // 0. One run per conversation at a time.
     const waitUntil = Date.now() + 45_000;
     while (inFlightConversations.has(conversation_id)) {
       if (Date.now() > waitUntil) {
@@ -104,25 +108,111 @@ export async function POST(req: NextRequest) {
       // Only the recent end of the thread is ever used below.
       supabase
         .from('messages')
-        .select('id, sender_type, content, is_internal, created_at, metadata')
+        .select('id, sender_type, content, is_internal, created_at, metadata, reply_to_message_id')
         .eq('conversation_id', conversation_id)
         .order('created_at', { ascending: false })
         .limit(40),
     ]);
 
     const msgs = (recentMessages || []).reverse();
-    const latestVisitorMsg = [...msgs].reverse().find((m) => m.sender_type === 'visitor' && !m.is_internal);
+    const isVisitorLine = (m: (typeof msgs)[number]) =>
+      m.sender_type === 'visitor' && !m.is_internal;
+
+    // Gather all visitor message IDs that have already been answered or handed over
+    const answeredVisitorMessageIds = new Set<string>();
+    for (const m of msgs) {
+      if (m.sender_type === 'ai' || m.sender_type === 'agent') {
+        if (m.reply_to_message_id) answeredVisitorMessageIds.add(m.reply_to_message_id);
+        if (m.metadata?.answered_message_id) answeredVisitorMessageIds.add(m.metadata.answered_message_id);
+        if (m.metadata?.reply_to_message_id) answeredVisitorMessageIds.add(m.metadata.reply_to_message_id);
+        if (m.metadata?.handover_for_message_id) answeredVisitorMessageIds.add(m.metadata.handover_for_message_id);
+      }
+    }
+
+    // Determine target visitor message
+    let visitorMsg: (typeof msgs)[number] | undefined;
+    if (requested_message_id) {
+      visitorMsg = msgs.find((m) => m.id === requested_message_id && isVisitorLine(m));
+      if (!visitorMsg) {
+        const { data: specificMsg } = await supabase
+          .from('messages')
+          .select('id, sender_type, content, is_internal, created_at, metadata, reply_to_message_id')
+          .eq('id', requested_message_id)
+          .eq('conversation_id', conversation_id)
+          .maybeSingle();
+
+        if (specificMsg && isVisitorLine(specificMsg)) {
+          visitorMsg = specificMsg;
+        }
+      }
+    }
+
+    if (!visitorMsg) {
+      const lastReply = [...msgs]
+        .reverse()
+        .find((m) => (m.sender_type === 'agent' || m.sender_type === 'ai') && !m.is_internal);
+      const answeredUntil = lastReply
+        ? Date.parse(
+            (lastReply.sender_type === 'ai' && lastReply.metadata?.answered_until) ||
+              lastReply.created_at
+          )
+        : -Infinity;
+
+      const unanswered = msgs.filter(
+        (m) =>
+          isVisitorLine(m) &&
+          !answeredVisitorMessageIds.has(m.id) &&
+          Date.parse(m.created_at) > answeredUntil
+      );
+
+      if (unanswered.length === 0) {
+        return json({ replied: false, reason: 'Already responded' });
+      }
+
+      visitorMsg = unanswered[unanswered.length - 1];
+    }
+
+    if (!visitorMsg) {
+      return json({ replied: false, reason: 'No visitor message found to answer' });
+    }
+
+    const currentVisitorMsgId: string = visitorMsg.id;
+    targetVisitorMsgId = currentVisitorMsgId;
+
+    // Idempotency Guard 1: In-flight duplicate prevention
+    if (inFlightMessages.has(currentVisitorMsgId)) {
+      return json({ replied: false, reason: `Auto-response already in progress for message ${currentVisitorMsgId}` });
+    }
+    inFlightMessages.add(currentVisitorMsgId);
+    messageLockAcquired = true;
+
+    // Idempotency Guard 2: In-memory answered check
+    if (answeredVisitorMessageIds.has(currentVisitorMsgId)) {
+      return json({ replied: false, reason: `Already responded to message ${currentVisitorMsgId}` });
+    }
+
+    // Idempotency Guard 3: Database-level existence check
+    const { data: existingAnswer } = await supabase
+      .from('messages')
+      .select('id, sender_type, is_internal, reply_to_message_id, metadata')
+      .eq('conversation_id', conversation_id)
+      .or(`reply_to_message_id.eq.${currentVisitorMsgId},metadata->>answered_message_id.eq.${currentVisitorMsgId},metadata->>handover_for_message_id.eq.${currentVisitorMsgId}`)
+      .limit(1);
+
+    if (existingAnswer && existingAnswer.length > 0) {
+      return json({ replied: false, reason: `Already responded to message ${targetVisitorMsgId}` });
+    }
 
     const aiSettings = workspace?.ai_settings;
 
     // Automatic Language Detection & English Translation for Support Agents
     let detected = { code: 'en', name: 'English' };
-    if (latestVisitorMsg && latestVisitorMsg.content) {
-      detected = detectLanguage(latestVisitorMsg.content);
-      if (detected.code !== 'en' && (!latestVisitorMsg.metadata?.english_translation && !latestVisitorMsg.metadata?.translation?.english_text)) {
+    if (visitorMsg && visitorMsg.content) {
+      detected = detectLanguage(visitorMsg.content);
+      if (detected.code !== 'en' && (!visitorMsg.metadata?.english_translation && !visitorMsg.metadata?.translation?.english_text)) {
         try {
           const trans = await translateToEnglish({
-            text: latestVisitorMsg.content,
+            text: visitorMsg.content,
             detectedLanguage: detected.code,
             providerConfig: providerConfigFrom(aiSettings),
           });
@@ -132,11 +222,11 @@ export async function POST(req: NextRequest) {
             .from('messages')
             .update({
               metadata: {
-                ...(latestVisitorMsg.metadata || {}),
+                ...(visitorMsg.metadata || {}),
                 translation: {
                   is_translated: true,
                   direction: 'visitor_to_agent',
-                  original_text: latestVisitorMsg.content,
+                  original_text: visitorMsg.content,
                   english_text: englishTranslation,
                   detected_language: detected.code,
                   language_name: trans.sourceLanguage,
@@ -146,7 +236,7 @@ export async function POST(req: NextRequest) {
                 english_translation: englishTranslation,
               },
             })
-            .eq('id', latestVisitorMsg.id);
+            .eq('id', visitorMsg.id);
 
           await supabase
             .from('conversations')
@@ -178,36 +268,14 @@ export async function POST(req: NextRequest) {
       return json({ replied: false, reason: 'AI disabled on this conversation' });
     }
 
-    const lastReply = [...msgs]
-      .reverse()
-      .find((m) => (m.sender_type === 'agent' || m.sender_type === 'ai') && !m.is_internal);
-    const answeredUntil = lastReply
-      ? Date.parse(
-          (lastReply.sender_type === 'ai' && lastReply.metadata?.answered_until) ||
-            lastReply.created_at
-        )
-      : -Infinity;
-    const isVisitorLine = (m: (typeof msgs)[number]) =>
-      m.sender_type === 'visitor' && !m.is_internal;
-
-    const unanswered = msgs.filter(
-      (m) => isVisitorLine(m) && Date.parse(m.created_at) > answeredUntil
-    );
-
-    if (unanswered.length === 0) {
-      return json({ replied: false, reason: 'Already responded' });
-    }
-
-    // The newest line is the question; the rest of the burst is its context.
-    const visitorMsg = unanswered[unanswered.length - 1];
-
-    const burstContext = unanswered
-      .slice(0, -1)
+    const burstContext = msgs
+      .filter((m) => isVisitorLine(m) && m.id !== targetVisitorMsgId && Date.parse(m.created_at) <= Date.parse(visitorMsg.created_at))
+      .slice(-3)
       .map((m) => m.content as string)
       .reverse();
 
     const earlier = msgs
-      .filter((m) => isVisitorLine(m) && !unanswered.includes(m))
+      .filter((m) => isVisitorLine(m) && m.id !== targetVisitorMsgId && !burstContext.includes(m.content as string))
       .map((m) => m.content as string)
       .reverse();
 
@@ -216,7 +284,7 @@ export async function POST(req: NextRequest) {
     const turns = msgs
       .filter(
         (m) =>
-          !unanswered.includes(m) &&
+          m.id !== targetVisitorMsgId &&
           !m.is_internal &&
           ['visitor', 'agent', 'ai'].includes(m.sender_type) &&
           typeof m.content === 'string' &&
@@ -252,22 +320,37 @@ export async function POST(req: NextRequest) {
     // 3b. ATOMIC DOUBLE-CHECK: Re-query messages to guarantee no agent or AI replied during RAG generation
     const { data: lateReplies } = await supabase
       .from('messages')
-      .select('sender_type, created_at, metadata')
+      .select('id, sender_type, is_internal, reply_to_message_id, metadata, created_at')
+      .eq('conversation_id', conversation_id)
+      .or(`reply_to_message_id.eq.${targetVisitorMsgId},metadata->>answered_message_id.eq.${targetVisitorMsgId},metadata->>handover_for_message_id.eq.${targetVisitorMsgId}`)
+      .limit(5);
+
+    if (lateReplies && lateReplies.length > 0) {
+      return json({ replied: false, reason: 'Already responded for this visitor message during generation' });
+    }
+
+    const { data: humanReplies } = await supabase
+      .from('messages')
+      .select('id')
       .eq('conversation_id', conversation_id)
       .eq('is_internal', false)
-      .in('sender_type', ['agent', 'ai'])
+      .eq('sender_type', 'agent')
       .gt('created_at', visitorMsg.created_at)
-      .limit(10);
+      .limit(1);
 
-    const visitorAt = Date.parse(visitorMsg.created_at);
-    const alreadyAnswered = (lateReplies || []).some(
-      (m) =>
-        m.sender_type === 'agent' ||
-        Date.parse(m.metadata?.answered_until || m.created_at) >= visitorAt
-    );
-
-    if (alreadyAnswered) {
+    if (humanReplies && humanReplies.length > 0) {
       return json({ replied: false, reason: 'Already responded during generation' });
+    }
+
+    // Check if conversation was closed or handed over during generation
+    const { data: freshConv } = await supabase
+      .from('conversations')
+      .select('status, ai_mode')
+      .eq('id', conversation_id)
+      .single();
+
+    if (freshConv && (freshConv.status === 'closed' || freshConv.ai_mode === 'disabled')) {
+      return json({ replied: false, reason: 'Conversation status changed during generation' });
     }
 
     // If response was delivered in native language, get English version for agents in dashboard
@@ -285,7 +368,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 4. Insert message as 'ai' sender
+    // 4. Insert message as 'ai' sender with idempotency keys
     const { data: insertedMsg, error: msgErr } = await supabase
       .from('messages')
       .insert({
@@ -294,7 +377,10 @@ export async function POST(req: NextRequest) {
         sender_id: null,
         content: aiResponseText,
         is_internal: false,
+        reply_to_message_id: targetVisitorMsgId,
         metadata: {
+          answered_message_id: targetVisitorMsgId,
+          reply_to_message_id: targetVisitorMsgId,
           answered_until: visitorMsg.created_at,
           delivered_language: detected.code,
           delivered_language_name: detected.name,
@@ -305,6 +391,9 @@ export async function POST(req: NextRequest) {
       .single();
 
     if (msgErr) {
+      if ((msgErr as any).code === '23505') {
+        return json({ replied: false, reason: 'Already responded for this visitor message' });
+      }
       throw msgErr;
     }
 
@@ -315,6 +404,7 @@ export async function POST(req: NextRequest) {
         supabase,
         conversationId: conversation_id,
         workspaceId: workspace_id,
+        visitorMessageId: targetVisitorMsgId,
         reason: result.handoverReason || 'Inquiry not covered in Help Desk documentation.',
         channel: conv.channel || 'web',
       });
@@ -332,11 +422,17 @@ export async function POST(req: NextRequest) {
 
     return json({ replied: true, message: insertedMsg, handed_over: result.shouldHandover });
   } catch (error: any) {
+    if (error?.code === '23505') {
+      return json({ replied: false, reason: 'Already responded for this visitor message' });
+    }
     console.error('Error in AI auto-respond:', error);
     return json({ error: error.message || 'Auto-respond failed' }, { status: 500 });
   } finally {
     if (lockAcquired && conversation_id) {
       inFlightConversations.delete(conversation_id);
+    }
+    if (messageLockAcquired && targetVisitorMsgId) {
+      inFlightMessages.delete(targetVisitorMsgId);
     }
   }
 }

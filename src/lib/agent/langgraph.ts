@@ -220,13 +220,14 @@ export async function triggerLangGraphAgent(params: LangGraphTriggerParams) {
     // context. The incoming message is already stored, so it is dropped here.
     const { data: recent } = await supabase
       .from('messages')
-      .select('sender_type, content')
+      .select('id, sender_type, content')
       .eq('conversation_id', conversationId)
       .eq('is_internal', false)
       .in('sender_type', ['visitor', 'agent', 'ai'])
       .order('created_at', { ascending: false })
       .limit(11);
     const prior = (recent || []).slice(1).reverse().filter((m) => m.content?.trim());
+    const latestVisitorMsg = (recent || []).find((m) => m.sender_type === 'visitor');
 
     const result = await generateHelpDeskResponseWithHandover({
       workspaceId,
@@ -248,7 +249,7 @@ export async function triggerLangGraphAgent(params: LangGraphTriggerParams) {
     });
 
     if (result.replyText) {
-      await insertAndDispatchReply(supabase, conversationId, workspaceId, result.replyText, sender.channel);
+      await insertAndDispatchReply(supabase, conversationId, workspaceId, result.replyText, sender.channel, latestVisitorMsg?.id);
     }
 
     // If inquiry cannot be answered from docs or user requested a human, execute handover!
@@ -258,6 +259,7 @@ export async function triggerLangGraphAgent(params: LangGraphTriggerParams) {
         supabase,
         conversationId,
         workspaceId,
+        visitorMessageId: latestVisitorMsg?.id,
         reason: result.handoverReason || 'Inquiry requires human specialist assistance.',
         channel: sender.channel,
       });
@@ -283,7 +285,8 @@ async function insertAndDispatchReply(
   conversationId: string,
   workspaceId: string,
   replyText: string,
-  channel: string
+  channel: string,
+  replyToMessageId?: string
 ) {
   // 1. Insert into Supabase
   const { data: insertedMsg, error: msgErr } = await supabase
@@ -293,11 +296,19 @@ async function insertAndDispatchReply(
       sender_type: 'ai',
       content: replyText,
       is_internal: false,
+      reply_to_message_id: replyToMessageId || null,
+      metadata: {
+        answered_message_id: replyToMessageId || null,
+      },
     })
     .select()
     .single();
 
   if (msgErr) {
+    if ((msgErr as any).code === '23505') {
+      console.log(`[AI Bridge] Reply already inserted for message ${replyToMessageId}. Skipping.`);
+      return;
+    }
     console.error('Failed to insert AI reply:', msgErr);
     return;
   }

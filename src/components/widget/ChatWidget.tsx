@@ -699,6 +699,7 @@ export default function ChatWidget({
             body: JSON.stringify({
               conversation_id: activeConvId,
               workspace_id: config.workspaceId,
+              message_id: savedMsg?.id,
             }),
           }).catch(() => {});
         }

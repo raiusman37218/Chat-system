@@ -326,14 +326,32 @@ export async function executeHandoverToHuman({
   workspaceId,
   reason,
   channel = 'web',
+  visitorMessageId,
 }: {
   supabase: ReturnType<typeof getSupabase>;
   conversationId: string;
   workspaceId: string;
   reason: string;
   channel?: string;
+  visitorMessageId?: string;
 }) {
   try {
+    // 0. Idempotency guard: refuse to create a second handover note for the same visitor message
+    if (visitorMessageId) {
+      const { data: existingHandover } = await supabase
+        .from('messages')
+        .select('id')
+        .eq('conversation_id', conversationId)
+        .eq('is_internal', true)
+        .or(`reply_to_message_id.eq.${visitorMessageId},metadata->>handover_for_message_id.eq.${visitorMessageId}`)
+        .limit(1);
+
+      if (existingHandover && existingHandover.length > 0) {
+        console.log(`[executeHandoverToHuman] Handover note already exists for visitor message ${visitorMessageId}. Skipping duplicate note.`);
+        return;
+      }
+    }
+
     // 1. Escalate conversation in Supabase
     await supabase
       .from('conversations')
@@ -345,13 +363,27 @@ export async function executeHandoverToHuman({
       })
       .eq('id', conversationId);
 
-    // 2. Insert private internal note for human support agents
-    await supabase.from('messages').insert({
+    // 2. Insert private internal note for human support agents with visitor message reference
+    const { error: insertErr } = await supabase.from('messages').insert({
       conversation_id: conversationId,
       sender_type: 'ai',
       content: `🤖 [AI Handover to Real Agent]: Handed over to human agent.\nReason: ${reason}`,
       is_internal: true,
+      reply_to_message_id: visitorMessageId || null,
+      metadata: {
+        is_handover: true,
+        handover_for_message_id: visitorMessageId || null,
+        reason,
+      },
     });
+
+    if (insertErr) {
+      if ((insertErr as any).code === '23505') {
+        console.log(`[executeHandoverToHuman] Handover note already exists for visitor message ${visitorMessageId} (unique violation). Skipping.`);
+        return;
+      }
+      throw insertErr;
+    }
 
     // 3. Attempt auto-assignment to available human agent
     const { data: ws } = await supabase
@@ -369,6 +401,9 @@ export async function executeHandoverToHuman({
       }).catch((e) => console.warn('[Auto-Assign Error during Handover]:', e));
     }
   } catch (err: any) {
+    if (err?.code === '23505') {
+      return;
+    }
     console.error('[executeHandoverToHuman Error]:', err.message);
   }
 }

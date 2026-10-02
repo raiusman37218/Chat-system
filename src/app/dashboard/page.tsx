@@ -75,8 +75,6 @@ export default function DashboardPage() {
   const currentWorkspaceRef = useRef<Workspace | null>(null);
   currentWorkspaceRef.current = currentWorkspace;
 
-  const scheduledAutoRepliesRef = useRef<Set<string>>(new Set());
-
   // Dynamically update favicon badge and title count when unread conversations change
   useEffect(() => {
     const unreadTotal = conversations.reduce(
@@ -655,23 +653,6 @@ export default function DashboardPage() {
                 workspace_id: currentWorkspaceIdRef.current,
               }),
             }).catch((err) => console.error('[Slack Dispatch]:', err));
-
-            // Schedule Claude AI Auto-First-Response check if unassigned and not already scheduled
-            const wsId = newConv.workspace_id || currentWorkspaceIdRef.current;
-            if (wsId && !scheduledAutoRepliesRef.current.has(newConv.id)) {
-              scheduledAutoRepliesRef.current.add(newConv.id);
-              const delay = currentWorkspaceRef.current?.ai_settings?.auto_response_delay_seconds || 20;
-              setTimeout(() => {
-                fetch('/api/ai/auto-respond', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    conversation_id: newConv.id,
-                    workspace_id: wsId,
-                  }),
-                }).catch((err) => console.warn('[AI Auto-Respond]:', err));
-              }, delay * 1000);
-            }
           } else if (payload.eventType === 'UPDATE') {
             const updated = payload.new as Conversation;
             setConversations((prev) =>

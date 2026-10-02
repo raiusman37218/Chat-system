@@ -1295,7 +1295,7 @@ export function ChatThread({
         >
           {/* Quote the message being answered, so "yes, that's right" is never
               ambiguous about which of the last four questions it answers. */}
-          {msg.reply_to_message_id && (
+          {msg.reply_to_message_id && msg.sender_type !== 'ai' && (
             <QuotedMessage
               quoted={messageById.get(msg.reply_to_message_id) || null}
               visitorName={displayName}

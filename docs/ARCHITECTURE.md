@@ -259,11 +259,12 @@ The dashboard is the central hub for support agents and workspace owners.
 
 ## 2. AI Auto-Reply & Article Matching Architecture
 
-### 2.1 Triggering Code Paths
-The AI auto-reply system is initiated across **three distinct code paths**:
+### 2.1 Triggering Code Path & Idempotency Architecture
+The AI auto-reply system is initiated from **exactly one path**: the visitor chat interface upon message creation, protected by multi-layer idempotency guards.
 
-1. **Path 1: Standalone Shadow DOM Widget (`widget/src/index.ts:1335`)**:
-   - Inside `ChatifyWidget.sendMessage()`, immediately after the visitor's message is inserted into Supabase `messages` table, the widget executes an asynchronous background POST:
+1. **Primary Trigger: Visitor Message Creation**:
+   - **Standalone Shadow DOM Widget (`widget/src/index.ts:1335`)**:
+     Immediately after the visitor's message is inserted into Supabase `messages` table, the widget executes an asynchronous background POST with `message_id`:
      ```ts
      fetch(`${this.config.apiUrl || ''}/api/ai/auto-respond`, {
        method: 'POST',
@@ -271,11 +272,12 @@ The AI auto-reply system is initiated across **three distinct code paths**:
        body: JSON.stringify({
          conversation_id: this.conversationId,
          workspace_id: this.config.workspaceId,
+         message_id: data.id,
        }),
      });
      ```
-2. **Path 2: React Chat Widget (`src/components/widget/ChatWidget.tsx:696`)**:
-   - Inside `handleSendMessage()`, after message insertion, the React component fires:
+   - **React Chat Widget (`src/components/widget/ChatWidget.tsx:696`)**:
+     Provides identical single-path triggering in preview/demo mode:
      ```ts
      fetch('/api/ai/auto-respond', {
        method: 'POST',
@@ -283,24 +285,17 @@ The AI auto-reply system is initiated across **three distinct code paths**:
        body: JSON.stringify({
          conversation_id: activeConvId,
          workspace_id: currentWorkspace.id,
+         message_id: savedMsg.id,
        }),
      });
      ```
-3. **Path 3: Dashboard Realtime Message Listener (`src/app/dashboard/page.tsx:649-673`)**:
-   - When an agent has the dashboard open, a Supabase Realtime subscription listens for `INSERT` events on `messages`.
-   - If an incoming message has `sender_type === 'visitor'`, is not internal, conversation `ai_mode !== 'disabled'`, and workspace `ai_settings.auto_response_enabled` is active, the dashboard executes:
-     ```ts
-     fetch('/api/ai/auto-respond', {
-       method: 'POST',
-       headers: { 'Content-Type': 'application/json' },
-       body: JSON.stringify({
-         conversation_id: newMsg.conversation_id,
-         workspace_id: currentWorkspaceRef.current.id,
-       }),
-     });
-     ```
-4. **Path 4: External / Omnichannel Dispatch**:
-   - Directly callable by incoming webhooks (e.g., Meta / WhatsApp / LinkedIn webhooks) after translating incoming external messages.
+   - *(Note: Redundant realtime listeners in the Agent Dashboard have been removed to guarantee exactly one trigger path).*
+
+2. **Multi-Layer Idempotency Guards**:
+   - **In-Flight Memory Locks**: Prevents concurrent runs for the same `conversation_id` or `message_id`.
+   - **Pre-Execution Check**: Refuses to run if an AI reply or handover note already exists referencing `targetVisitorMsgId` (in memory or database via `reply_to_message_id` or `metadata.answered_message_id`).
+   - **Pre-Insert Atomic Double-Check**: Verifies again right before insertion that no concurrent worker or human agent replied during RAG generation.
+   - **Database Unique Constraints**: `idx_messages_unique_ai_reply_per_visitor_msg` and `idx_messages_unique_ai_handover_per_visitor_msg` enforce at the database level that exactly one AI message and one handover note can exist per visitor message ID.
 
 ---
 

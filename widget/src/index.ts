@@ -1339,7 +1339,11 @@ class ChatifyWidget {
       fetch(`${this.config.apiUrl || ''}/api/ai/auto-respond`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ conversation_id: convId, workspace_id: this.config.workspaceId }),
+        body: JSON.stringify({
+          conversation_id: convId,
+          workspace_id: this.config.workspaceId,
+          message_id: data?.id,
+        }),
       }).catch(() => {});
     }
   }
@@ -4384,7 +4388,7 @@ class ChatifyWidget {
 
       // When the agent replied to a particular message, show which one. The
       // visitor otherwise has to guess which of their questions was answered.
-      const quoted = msg.reply_to_message_id
+      const quoted = msg.reply_to_message_id && msg.sender_type !== 'ai'
         ? this.messages.find((m) => m.id === msg.reply_to_message_id)
         : null;
       const quoteHtml = quoted
