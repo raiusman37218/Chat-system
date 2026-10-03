@@ -103,6 +103,11 @@ export async function updateWidgetSettingsAction(
     help_center_tab_label?: string;
     show_help_tab?: boolean;
     help_center_tab_icon?: string;
+    launcher_offset_bottom?: number;
+    launcher_offset_side?: number;
+    widget_z_index?: number;
+    enable_proactive_welcome?: boolean;
+    proactive_delay_seconds?: number;
   }
 ) {
   await assertAdminUser(workspaceId);
@@ -127,6 +132,21 @@ export async function updateWidgetSettingsAction(
   }
   if (data.help_center_tab_icon !== undefined) {
     updatePayload.help_center_tab_icon = data.help_center_tab_icon;
+  }
+  if (data.launcher_offset_bottom !== undefined) {
+    updatePayload.launcher_offset_bottom = Math.max(0, Number(data.launcher_offset_bottom));
+  }
+  if (data.launcher_offset_side !== undefined) {
+    updatePayload.launcher_offset_side = Math.max(0, Number(data.launcher_offset_side));
+  }
+  if (data.widget_z_index !== undefined) {
+    updatePayload.widget_z_index = Math.max(1, Number(data.widget_z_index));
+  }
+  if (data.enable_proactive_welcome !== undefined) {
+    updatePayload.enable_proactive_welcome = Boolean(data.enable_proactive_welcome);
+  }
+  if (data.proactive_delay_seconds !== undefined) {
+    updatePayload.proactive_delay_seconds = Math.max(8, Number(data.proactive_delay_seconds));
   }
 
   const { data: updated, error } = await supabase

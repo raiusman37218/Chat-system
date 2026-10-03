@@ -34,6 +34,11 @@ interface WidgetConfig {
   navbarTriggerConfig?: NavbarTriggerConfig;
   apiUrl?: string;
   businessHours?: any;
+  offsetBottom?: number;
+  offsetSide?: number;
+  zIndex?: number;
+  enableProactiveWelcome?: boolean;
+  proactiveDelaySeconds?: number;
 }
 
 interface MessageItem {
@@ -196,6 +201,8 @@ class ChatifyWidget {
           this.scrollToBottom(false);
         }
       } catch {}
+
+      this.initProactiveWelcome();
     });
   }
 
@@ -234,9 +241,15 @@ class ChatifyWidget {
       helpTabIcon: script?.getAttribute('data-help-icon') || '📖',
       logoUrl: urlLogo || script?.getAttribute('data-logo-url') || script?.getAttribute('data-logo') || undefined,
       showLauncherLogo: urlShowLauncherLogo !== null ? urlShowLauncherLogo !== 'false' : (script?.getAttribute('data-show-launcher-logo') !== 'false'),
+      welcomeText: script?.getAttribute('data-welcome-text') || undefined,
       businessName: script?.getAttribute('data-business-name') || script?.getAttribute('data-company-name') || undefined,
       customDomain: script?.getAttribute('data-custom-domain') || undefined,
       apiUrl,
+      offsetBottom: script?.hasAttribute('data-offset-bottom') ? parseInt(script.getAttribute('data-offset-bottom')!, 10) : 20,
+      offsetSide: script?.hasAttribute('data-offset-side') ? parseInt(script.getAttribute('data-offset-side')!, 10) : 20,
+      zIndex: script?.hasAttribute('data-z-index') ? parseInt(script.getAttribute('data-z-index')!, 10) : 2147483000,
+      enableProactiveWelcome: script?.getAttribute('data-enable-proactive-welcome') !== 'false' && script?.getAttribute('data-proactive-welcome') !== 'false',
+      proactiveDelaySeconds: Math.max(8, parseInt(script?.getAttribute('data-proactive-delay') || '8', 10)),
     };
   }
 
@@ -263,7 +276,35 @@ class ChatifyWidget {
         if (data.name) this.config.businessName = data.name;
         if (data.brand_color) this.config.primaryColor = data.brand_color;
         if (data.greeting_title) this.config.title = data.greeting_title;
-        if (data.greeting_message) this.config.subtitle = data.greeting_message;
+        if (data.greeting_message) {
+          this.config.subtitle = data.greeting_message;
+          this.config.welcomeText = data.greeting_message;
+        }
+        if (typeof data.launcher_offset_bottom === 'number') {
+          this.config.offsetBottom = data.launcher_offset_bottom;
+        } else if (data.navbar_trigger_config?.launcher_offset_bottom !== undefined) {
+          this.config.offsetBottom = Number(data.navbar_trigger_config.launcher_offset_bottom);
+        }
+        if (typeof data.launcher_offset_side === 'number') {
+          this.config.offsetSide = data.launcher_offset_side;
+        } else if (data.navbar_trigger_config?.launcher_offset_side !== undefined) {
+          this.config.offsetSide = Number(data.navbar_trigger_config.launcher_offset_side);
+        }
+        if (typeof data.widget_z_index === 'number') {
+          this.config.zIndex = data.widget_z_index;
+        } else if (data.navbar_trigger_config?.widget_z_index !== undefined) {
+          this.config.zIndex = Number(data.navbar_trigger_config.widget_z_index);
+        }
+        if (typeof data.enable_proactive_welcome === 'boolean') {
+          this.config.enableProactiveWelcome = data.enable_proactive_welcome;
+        } else if (data.navbar_trigger_config?.enable_proactive_welcome !== undefined) {
+          this.config.enableProactiveWelcome = Boolean(data.navbar_trigger_config.enable_proactive_welcome);
+        }
+        if (typeof data.proactive_delay_seconds === 'number') {
+          this.config.proactiveDelaySeconds = Math.max(8, data.proactive_delay_seconds);
+        } else if (data.navbar_trigger_config?.proactive_delay_seconds !== undefined) {
+          this.config.proactiveDelaySeconds = Math.max(8, Number(data.navbar_trigger_config.proactive_delay_seconds));
+        }
         if (data.widget_position) {
           this.config.position = data.widget_position === 'left' ? 'bottom-left' : 'bottom-right';
         }
@@ -1494,7 +1535,7 @@ class ChatifyWidget {
         <div class="chatify-home-hero">
           <div class="chatify-brand-row">
             <div class="chatify-home-avatar" id="homeBrandAvatar">
-              <img src="${CHATIFY_ICON_DATA_URI}" alt="Logo" style="width:100%;height:100%;object-fit:contain;border-radius:inherit;" />
+              ${this.renderBrandAvatarHTML(false)}
             </div>
             <button class="chatify-icon-btn" id="homeCloseBtn" title="Close Messenger">
               <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -1519,7 +1560,9 @@ class ChatifyWidget {
             </div>
             <div class="chatify-open-conv-preview">
               <div class="chatify-open-conv-avatar-col">
-                <div class="chatify-mini-avatar" id="openConvAvatar" style="background:linear-gradient(135deg,var(--w-brand),#1e40af); width:34px; height:34px; font-size:13px; margin-left:0;">💬</div>
+                <div class="chatify-mini-avatar" id="openConvAvatar" style="background:var(--w-brand); width:34px; height:34px; font-size:13px; margin-left:0; color:var(--w-on-brand); font-weight:700; display:flex; align-items:center; justify-content:center; border-radius:50%; overflow:hidden;">
+                  ${this.renderBrandAvatarHTML(false)}
+                </div>
               </div>
               <div class="chatify-open-conv-text-col">
                 <div class="chatify-open-conv-sender-row">
@@ -1591,8 +1634,7 @@ class ChatifyWidget {
               </svg>
             </button>
             <div class="chatify-avatar" id="chatifyHeaderAvatar">
-              <img src="${CHATIFY_ICON_DATA_URI}" alt="Logo" style="width:100%;height:100%;object-fit:contain;border-radius:inherit;" />
-              <span class="chatify-online-dot"></span>
+              ${this.renderBrandAvatarHTML(true)}
             </div>
             <div class="chatify-header-text">
               <h3 id="chatifyHeaderTitle">${this.config.title}</h3>
@@ -2337,19 +2379,17 @@ class ChatifyWidget {
     // Update Header Avatar in Messages Tab
     const headerAvatar = this.shadow?.getElementById('chatifyHeaderAvatar');
     if (headerAvatar) {
-      const logoSrc = this.config.logoUrl || CHATIFY_ICON_DATA_URI;
-      const fallback = CHATIFY_ICON_DATA_URI;
-      headerAvatar.innerHTML = `
-        <img src="${logoSrc}" onerror="this.onerror=null;this.src='${fallback}'" alt="Logo" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;" />
-        <span class="chatify-online-dot"></span>
-      `;
+      headerAvatar.innerHTML = this.renderBrandAvatarHTML(true);
     }
 
     const brandAvatar = this.shadow?.getElementById('homeBrandAvatar');
     if (brandAvatar) {
-      const logoSrc = this.config.logoUrl || CHATIFY_ICON_DATA_URI;
-      const fallback = CHATIFY_ICON_DATA_URI;
-      brandAvatar.innerHTML = `<img src="${logoSrc}" onerror="this.onerror=null;this.src='${fallback}'" alt="Logo" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;" />`;
+      brandAvatar.innerHTML = this.renderBrandAvatarHTML(false);
+    }
+
+    const openConvAvatar = this.shadow?.getElementById('openConvAvatar');
+    if (openConvAvatar) {
+      openConvAvatar.innerHTML = this.renderBrandAvatarHTML(false);
     }
 
     const homeGreeting = this.shadow?.getElementById('homeGreetingTitle');
@@ -2453,6 +2493,11 @@ class ChatifyWidget {
     const onBrand = this.luminance(brand) > 0.62 ? '#0b0b0f' : '#ffffff';
     const brandDeep = this.shade(brand, -0.34);
     const left = this.config.position === 'bottom-left';
+    const offsetBottom = typeof this.config.offsetBottom === 'number' ? this.config.offsetBottom : 20;
+    const offsetSide = typeof this.config.offsetSide === 'number' ? this.config.offsetSide : 20;
+    const zIndex = typeof this.config.zIndex === 'number' ? this.config.zIndex : 2147483000;
+    const popupBottom = offsetBottom + 66;
+    const windowBottom = offsetBottom + 68;
 
     return `
       :host {
@@ -2543,8 +2588,8 @@ class ChatifyWidget {
 
       .chatify-launcher {
         position: fixed;
-        ${left ? 'left: 20px;' : 'right: 20px;'}
-        bottom: 20px;
+        ${left ? `left: ${offsetSide}px;` : `right: ${offsetSide}px;`}
+        bottom: ${offsetBottom}px;
         width: 56px;
         height: 56px;
         border-radius: 50%;
@@ -2555,7 +2600,7 @@ class ChatifyWidget {
         align-items: center;
         justify-content: center;
         box-shadow: 0 8px 24px var(--w-brand-a28), 0 2px 8px rgba(11,11,15,.16);
-        z-index: 2147483000;
+        z-index: ${zIndex};
         transition: transform .28s var(--w-spring), box-shadow .2s var(--w-ease);
       }
 
@@ -2636,14 +2681,14 @@ class ChatifyWidget {
 
       .chatify-message-popup {
         position: fixed;
-        ${left ? 'left: 20px;' : 'right: 20px;'}
-        bottom: 86px;
+        ${left ? `left: ${offsetSide}px;` : `right: ${offsetSide}px;`}
+        bottom: ${popupBottom}px;
         width: 350px;
         max-width: calc(100vw - 40px);
         display: flex;
         flex-direction: column;
         gap: 8px;
-        z-index: 2147482995;
+        z-index: ${zIndex - 5};
         pointer-events: auto;
         animation: chatifyPopupSlideIn 0.32s cubic-bezier(0.16, 1, 0.3, 1) forwards;
       }
@@ -2854,8 +2899,8 @@ class ChatifyWidget {
 
       .chatify-window {
         position: fixed;
-        ${left ? 'left: 20px;' : 'right: 20px;'}
-        bottom: 88px;
+        ${left ? `left: ${offsetSide}px;` : `right: ${offsetSide}px;`}
+        bottom: ${windowBottom}px;
         width: 396px;
         max-width: calc(100vw - 40px);
         height: 640px;
@@ -2867,19 +2912,76 @@ class ChatifyWidget {
         display: none;
         flex-direction: column;
         overflow: hidden;
-        z-index: 2147483000;
+        z-index: ${zIndex};
         animation: w-window-in .34s var(--w-ease) both;
+      }
+
+      .chatify-avatar-initial {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        text-transform: uppercase;
+        border-radius: inherit;
+        background: var(--w-brand);
+        color: var(--w-on-brand);
+        user-select: none;
       }
 
       @media (max-width: 480px) {
         .chatify-window {
-          left: 0; right: 0; bottom: 0;
-          width: 100vw;
-          max-width: 100vw;
-          height: 100dvh;
-          max-height: 100dvh;
-          border-radius: 0;
-          border: none;
+          inset: 0 !important;
+          left: 0 !important;
+          right: 0 !important;
+          top: 0 !important;
+          bottom: 0 !important;
+          width: 100vw !important;
+          max-width: 100vw !important;
+          height: 100% !important;
+          height: 100dvh !important;
+          max-height: 100dvh !important;
+          border-radius: 0 !important;
+          border: none !important;
+          box-shadow: none !important;
+          z-index: ${zIndex + 1} !important;
+        }
+
+        .chatify-launcher.widget-is-open {
+          display: none !important;
+        }
+
+        .chatify-message-popup {
+          left: 12px !important;
+          right: 12px !important;
+          width: auto !important;
+          max-width: calc(100vw - 24px) !important;
+          bottom: ${offsetBottom + 64}px !important;
+        }
+
+        .chatify-close-btn,
+        .chatify-icon-btn#homeCloseBtn {
+          width: 38px !important;
+          height: 38px !important;
+          min-width: 38px !important;
+          min-height: 38px !important;
+          border-radius: 50% !important;
+          display: flex !important;
+          align-items: center !important;
+          justify-content: center !important;
+          cursor: pointer !important;
+          touch-action: manipulation !important;
+        }
+
+        .chatify-close-btn {
+          background: var(--w-surface-2) !important;
+          color: var(--w-ink) !important;
+          border: 1px solid var(--w-line-2) !important;
+        }
+
+        .chatify-icon-btn#homeCloseBtn {
+          background: rgba(255, 255, 255, 0.25) !important;
+          color: #ffffff !important;
+          border: 1px solid rgba(255, 255, 255, 0.35) !important;
         }
       }
 
@@ -4534,9 +4636,13 @@ class ChatifyWidget {
         .replace(/^Welcome to\s+/i, '')
         .replace(/\s*Support\s*$/i, '')
         .replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}️]+\s*$/u, '')
+        .replace(/^the\s+/i, '')
         .trim() || (this.config.businessName || this.config.title || 'our company');
 
-      const welcomeContent = this.config.welcomeText || `welcome to the ${rawName}`;
+      const customWelcome = this.config.welcomeText?.trim();
+      const welcomeContent = customWelcome
+        ? customWelcome.charAt(0).toUpperCase() + customWelcome.slice(1)
+        : `Welcome to ${rawName}`;
       const { data: savedMsg } = await this.supabase
         .from('messages')
         .insert({
@@ -4803,6 +4909,14 @@ class ChatifyWidget {
     const openIcon = this.shadow?.getElementById('chatifyIconOpen');
     const closeIcon = this.shadow?.getElementById('chatifyIconClose');
 
+    const launcher = this.shadow?.getElementById('chatifyLauncherBtn');
+    if (launcher) {
+      launcher.classList.toggle('widget-is-open', this.isOpen);
+    }
+    if (this.container) {
+      this.container.classList.toggle('widget-is-open', this.isOpen);
+    }
+
     if (win && openIcon && closeIcon) {
       if (this.isOpen) {
         this.hideMessagePopup(false);
@@ -5033,6 +5147,111 @@ class ChatifyWidget {
     return this.isOpen;
   }
 
+  // ── Brand Avatar & Overlay Helpers ─────────────────────────────────────
+  public getBrandInitial(): string {
+    const raw = (this.config.businessName || this.config.title || 'Support')
+      .replace(/^Welcome to\s+/i, '')
+      .replace(/\s*Support\s*$/i, '')
+      .replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}️]+\s*$/u, '')
+      .replace(/^the\s+/i, '')
+      .trim();
+    return (raw.charAt(0) || 'S').toUpperCase();
+  }
+
+  public renderBrandAvatarHTML(includeOnlineDot: boolean = false): string {
+    const initial = this.getBrandInitial();
+    const dotHTML = includeOnlineDot ? '<span class="chatify-online-dot"></span>' : '';
+
+    if (this.config.logoUrl) {
+      return `
+        <img src="${this.config.logoUrl}" alt="Logo" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;" onerror="this.style.display='none';if(this.nextElementSibling){this.nextElementSibling.style.display='flex';}" />
+        <span class="chatify-avatar-initial" style="display:none;width:100%;height:100%;border-radius:inherit;background:var(--w-brand);color:var(--w-on-brand);align-items:center;justify-content:center;font-weight:700;font-size:inherit;">${initial}</span>
+        ${dotHTML}
+      `;
+    }
+
+    return `
+      <span class="chatify-avatar-initial" style="display:flex;width:100%;height:100%;border-radius:inherit;background:var(--w-brand);color:var(--w-on-brand);align-items:center;justify-content:center;font-weight:700;font-size:inherit;">${initial}</span>
+      ${dotHTML}
+    `;
+  }
+
+  public hasHostModalOrOverlay(): boolean {
+    if (typeof document === 'undefined') return false;
+    try {
+      // 1. Check native <dialog open> or ARIA dialog/alertdialog elements
+      const dialogElements = document.querySelectorAll('dialog[open], [role="dialog"], [role="alertdialog"], [aria-modal="true"]');
+      for (let i = 0; i < dialogElements.length; i++) {
+        const el = dialogElements[i] as HTMLElement;
+        if (this.container && (el === this.container || this.container.contains(el))) continue;
+        const style = window.getComputedStyle(el);
+        if (style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0') {
+          const rect = el.getBoundingClientRect();
+          if (rect.width > 0 && rect.height > 0) {
+            return true;
+          }
+        }
+      }
+
+      // 2. Check for fixed or absolute full-screen overlays covering >= 70% viewport
+      const vw = window.innerWidth || document.documentElement.clientWidth || 0;
+      const vh = window.innerHeight || document.documentElement.clientHeight || 0;
+      if (vw > 0 && vh > 0) {
+        const candidates = document.querySelectorAll('div, section, aside, [class*="modal"], [class*="overlay"], [class*="backdrop"]');
+        for (let i = 0; i < candidates.length; i++) {
+          const el = candidates[i] as HTMLElement;
+          if (this.container && (el === this.container || this.container.contains(el))) continue;
+
+          const style = window.getComputedStyle(el);
+          if ((style.position === 'fixed' || style.position === 'absolute') &&
+              style.display !== 'none' &&
+              style.visibility !== 'hidden') {
+            const opacity = parseFloat(style.opacity || '1');
+            if (opacity > 0.05) {
+              const rect = el.getBoundingClientRect();
+              if (rect.width >= vw * 0.7 && rect.height >= vh * 0.7) {
+                return true;
+              }
+            }
+          }
+        }
+      }
+    } catch {
+      // Fail safely without throwing
+    }
+    return false;
+  }
+
+  private initProactiveWelcome() {
+    if (this.config.enableProactiveWelcome === false) return;
+    const delay = Math.max(8, this.config.proactiveDelaySeconds || 8);
+
+    setTimeout(() => {
+      if (this.isOpen || this.messages.length > 0) return;
+      try {
+        if (sessionStorage.getItem('chatify_proactive_welcome_dismissed') === '1') return;
+      } catch {}
+
+      if (this.hasHostModalOrOverlay()) return;
+
+      const rawName = (this.config.businessName || this.config.title || 'Support')
+        .replace(/^Welcome to\s+/i, '')
+        .replace(/\s*Support\s*$/i, '')
+        .replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}️]+\s*$/u, '')
+        .replace(/^the\s+/i, '')
+        .trim() || 'Support';
+      const customWelcome = this.config.welcomeText?.trim();
+      const welcomeContent = customWelcome
+        ? customWelcome.charAt(0).toUpperCase() + customWelcome.slice(1)
+        : `Welcome to ${rawName}`;
+
+      this.showMessagePopup({
+        id: 'proactive-welcome',
+        content: welcomeContent,
+      }, rawName);
+    }, delay * 1000);
+  }
+
   // ── Unread Message Popup Helpers ─────────────────────────────────────
   private getSenderInitials(name: string): string {
     if (!name) return 'TD';
@@ -5046,6 +5265,7 @@ class ChatifyWidget {
 
   public showMessagePopup(message: { id?: string; content?: string; attachment_url?: string | null }, senderName?: string) {
     if (this.isOpen) return;
+    if (this.hasHostModalOrOverlay()) return;
     const popup = this.shadow?.getElementById('chatifyMessagePopup');
     if (!popup) return;
 
@@ -5105,6 +5325,9 @@ class ChatifyWidget {
         sessionStorage.setItem(`chatify_popup_dismissed_${this.currentPopupMsgId}`, '1');
       } catch {}
     }
+    try {
+      sessionStorage.setItem('chatify_proactive_welcome_dismissed', '1');
+    } catch {}
     this.hideMessagePopup(true);
   }
 

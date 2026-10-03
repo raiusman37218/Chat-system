@@ -70,12 +70,16 @@ export default function ChatWidget({
   );
   const companyName = config.companyName || 'Support';
   const [workspaceName, setWorkspaceName] = useState<string>(config.companyName || '');
-  const rawBusiness = (config.companyName || 'our business')
+  const rawBusiness = (config.companyName || 'our team')
     .replace(/^Welcome to\s+/i, '')
     .replace(/\s*Support\s*$/i, '')
-    .trim() || config.companyName || 'our business';
-  const welcomeText = config.welcomeText || `welcome to the ${rawBusiness}`;
-  const autoGreetingDelay = config.autoGreetingDelaySeconds ?? 5;
+    .replace(/^the\s+/i, '')
+    .trim() || config.companyName || 'our team';
+  const customWelcome = config.welcomeText?.trim();
+  const welcomeText = customWelcome
+    ? customWelcome.charAt(0).toUpperCase() + customWelcome.slice(1)
+    : `Welcome to ${rawBusiness}`;
+  const autoGreetingDelay = Math.max(8, config.autoGreetingDelaySeconds ?? 8);
   const autoGreetingText = config.autoGreetingText || welcomeText;
 
   // 2. Component State
@@ -563,13 +567,17 @@ export default function ChatWidget({
         .limit(1);
 
       if (!existingMsgs || existingMsgs.length === 0) {
-        const rawName = (workspaceName || config.companyName || 'our company')
+        const rawName = (workspaceName || config.companyName || 'our team')
           .replace(/^Welcome to\s+/i, '')
           .replace(/\s*Support\s*$/i, '')
           .replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}️]+\s*$/u, '')
-          .trim() || (workspaceName || config.companyName || 'our company');
+          .replace(/^the\s+/i, '')
+          .trim() || (workspaceName || config.companyName || 'our team');
 
-        const welcomeContent = config.welcomeText || `welcome to the ${rawName}`;
+        const customWelcome = config.welcomeText?.trim();
+        const welcomeContent = customWelcome
+          ? customWelcome.charAt(0).toUpperCase() + customWelcome.slice(1)
+          : `Welcome to ${rawName}`;
         const { data: savedMsg } = await supabase
           .from('messages')
           .insert({
@@ -795,7 +803,7 @@ export default function ChatWidget({
         } ${
           mode === 'window-only'
             ? 'w-full h-full flex flex-col'
-            : 'w-[380px] sm:w-[410px] h-[590px] max-h-[calc(100vh-100px)] rounded-2xl shadow-2xl flex flex-col mb-4 border border-slate-200/80 dark:border-slate-800'
+            : 'w-full max-w-[100vw] sm:max-w-none sm:w-[410px] h-[100dvh] sm:h-[590px] fixed sm:relative inset-0 sm:inset-auto sm:max-h-[calc(100vh-100px)] rounded-none sm:rounded-2xl shadow-2xl flex flex-col sm:mb-4 border-0 sm:border border-slate-200/80 dark:border-slate-800 z-50 sm:z-auto'
         } bg-white dark:bg-slate-900 overflow-hidden`}
         style={{
           boxShadow:
@@ -808,12 +816,26 @@ export default function ChatWidget({
           style={{ backgroundColor: brandColor }}
         >
           <div className="flex items-center gap-3">
-            <div className="relative w-10 h-10 rounded-full bg-white/20 flex items-center justify-center overflow-hidden border border-white/30 backdrop-blur-sm">
-              <img
-                src={config.logoUrl || '/chat-icon-white.png'}
-                alt={companyName}
-                className="w-full h-full object-contain p-1"
-              />
+            <div className="relative w-10 h-10 rounded-full bg-white/20 flex items-center justify-center overflow-hidden border border-white/30 backdrop-blur-sm shrink-0">
+              {config.logoUrl ? (
+                <img
+                  src={config.logoUrl}
+                  alt={companyName}
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none';
+                    if (e.currentTarget.nextElementSibling) {
+                      (e.currentTarget.nextElementSibling as HTMLElement).style.display = 'flex';
+                    }
+                  }}
+                />
+              ) : null}
+              <span
+                style={{ display: config.logoUrl ? 'none' : 'flex' }}
+                className="w-full h-full items-center justify-center font-bold text-white text-base select-none"
+              >
+                {rawBusiness.charAt(0).toUpperCase()}
+              </span>
               {/* Online/Offline Status Dot */}
               <span
                 className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white ${
@@ -876,10 +898,11 @@ export default function ChatWidget({
                 toggleWidget(false);
                 onClose?.();
               }}
-              className="p-1.5 rounded-lg hover:bg-white/20 transition-colors text-white"
+              className="w-9 h-9 sm:w-8 sm:h-8 rounded-full sm:rounded-lg bg-white/15 sm:bg-transparent hover:bg-white/25 transition-colors text-white flex items-center justify-center shrink-0"
               title="Close chat"
+              aria-label="Close chat"
             >
-              <X className="w-5 h-5" />
+              <X className="w-5.5 h-5.5 sm:w-5 sm:h-5" />
             </button>
           </div>
         </div>
@@ -1639,7 +1662,7 @@ export default function ChatWidget({
       {/* FLOATING CIRCULAR LAUNCHER BUBBLE                                      */}
       {/* ---------------------------------------------------------------------- */}
       {mode !== 'window-only' && (
-        <div className={`flex ${isPositionLeft ? 'justify-start' : 'justify-end'}`}>
+        <div className={`${isOpen ? 'hidden sm:flex' : 'flex'} ${isPositionLeft ? 'justify-start' : 'justify-end'}`}>
           <button
             onClick={() => toggleWidget()}
             style={{ backgroundColor: brandColor }}

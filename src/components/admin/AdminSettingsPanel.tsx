@@ -171,6 +171,21 @@ export function AdminSettingsPanel({
   );
   const [helpTabLabel, setHelpTabLabel] = useState(workspace.help_center_tab_label || 'Help');
   const [showHelpTab, setShowHelpTab] = useState(workspace.show_help_tab !== false);
+  const [launcherOffsetBottom, setLauncherOffsetBottom] = useState<number>(
+    workspace.launcher_offset_bottom ?? 20
+  );
+  const [launcherOffsetSide, setLauncherOffsetSide] = useState<number>(
+    workspace.launcher_offset_side ?? 20
+  );
+  const [widgetZIndex, setWidgetZIndex] = useState<number>(
+    workspace.widget_z_index ?? 2147483000
+  );
+  const [enableProactiveWelcome, setEnableProactiveWelcome] = useState<boolean>(
+    workspace.enable_proactive_welcome !== false
+  );
+  const [proactiveDelaySeconds, setProactiveDelaySeconds] = useState<number>(
+    Math.max(8, workspace.proactive_delay_seconds ?? 8)
+  );
   const [previewOpen, setPreviewOpen] = useState(true);
   const [previewDevice, setPreviewDevice] = useState<'desktop' | 'mobile'>('desktop');
   const [widgetVisibilityDevice, setWidgetVisibilityDevice] = useState<'all' | 'desktop' | 'mobile'>('all');
@@ -188,6 +203,11 @@ export function AdminSettingsPanel({
         greeting_message: greetingMessage,
         help_center_tab_label: helpTabLabel,
         show_help_tab: showHelpTab,
+        launcher_offset_bottom: launcherOffsetBottom,
+        launcher_offset_side: launcherOffsetSide,
+        widget_z_index: widgetZIndex,
+        enable_proactive_welcome: enableProactiveWelcome,
+        proactive_delay_seconds: proactiveDelaySeconds,
       });
       if (res.workspace) {
         setWorkspace(res.workspace);
@@ -1223,6 +1243,65 @@ export function AdminSettingsPanel({
                     </div>
                   </button>
                 </div>
+
+                {/* Launcher Offsets & Widget Z-Index */}
+                <div className="pt-4 border-t border-line-2 space-y-3.5">
+                  <div>
+                    <h5 className="text-[13px] font-bold text-ink">Launcher Offsets &amp; Z-Index</h5>
+                    <p className="text-[11.5px] text-ink-2">
+                      Adjust exact pixel spacing and stack order so the chat button never blocks your site's navigation or buttons.
+                    </p>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                      <label className="field-label text-ink font-semibold text-[12px] mb-1 block">
+                        Bottom Offset (px)
+                      </label>
+                      <input
+                        type="number"
+                        min={0}
+                        max={300}
+                        value={launcherOffsetBottom}
+                        onChange={(e) => setLauncherOffsetBottom(Number(e.target.value))}
+                        className="input text-xs border-2 border-line-2 focus:border-accent text-ink font-semibold"
+                        placeholder="20"
+                      />
+                      <p className="text-[11px] text-ink-2 mt-1">Default: 20px</p>
+                    </div>
+
+                    <div>
+                      <label className="field-label text-ink font-semibold text-[12px] mb-1 block">
+                        Side Offset (px)
+                      </label>
+                      <input
+                        type="number"
+                        min={0}
+                        max={300}
+                        value={launcherOffsetSide}
+                        onChange={(e) => setLauncherOffsetSide(Number(e.target.value))}
+                        className="input text-xs border-2 border-line-2 focus:border-accent text-ink font-semibold"
+                        placeholder="20"
+                      />
+                      <p className="text-[11px] text-ink-2 mt-1">Default: 20px</p>
+                    </div>
+
+                    <div>
+                      <label className="field-label text-ink font-semibold text-[12px] mb-1 block">
+                        Widget Z-Index
+                      </label>
+                      <input
+                        type="number"
+                        min={1}
+                        max={2147483647}
+                        value={widgetZIndex}
+                        onChange={(e) => setWidgetZIndex(Number(e.target.value))}
+                        className="input text-xs border-2 border-line-2 focus:border-accent text-ink font-semibold"
+                        placeholder="2147483000"
+                      />
+                      <p className="text-[11px] text-ink-2 mt-1">Default: 2147483000</p>
+                    </div>
+                  </div>
+                </div>
               </div>
 
               {/* Step 4: Greetings & Welcome Message */}
@@ -1256,9 +1335,55 @@ export function AdminSettingsPanel({
                       rows={3}
                       value={greetingMessage}
                       onChange={(e) => setGreetingMessage(e.target.value)}
-                      placeholder="We're here to help! Ask us anything or browse our quick answers."
+                      placeholder={`Welcome to ${workspace.name || 'our support'}`}
                       className="input resize-none text-[13px] leading-relaxed border-2 border-line-2 focus:border-accent text-ink"
                     />
+                    <p className="text-[11px] text-ink-2 mt-1">
+                      Customise the welcome message sent when visitors start a conversation.
+                    </p>
+                  </div>
+
+                  {/* Proactive Welcome Bubble Setting */}
+                  <div className="p-4 rounded-xl border-2 border-line-2 bg-surface-2/70 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-0.5 pr-4">
+                        <label className="text-[13.5px] font-bold text-ink cursor-pointer" htmlFor="toggle-proactive-welcome">
+                          Proactive Welcome Bubble
+                        </label>
+                        <p className="text-[12px] text-ink-2">
+                          Show an unobtrusive bubble invitation next to the launcher. Automatically delayed and suppressed when host page modals or overlays are open.
+                        </p>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                        <input
+                          id="toggle-proactive-welcome"
+                          type="checkbox"
+                          checked={enableProactiveWelcome}
+                          onChange={(e) => setEnableProactiveWelcome(e.target.checked)}
+                          className="sr-only peer"
+                        />
+                        <div className="w-11 h-6 bg-line-2 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-accent shadow-xs"></div>
+                      </label>
+                    </div>
+
+                    {enableProactiveWelcome && (
+                      <div className="pt-2 border-t border-line-2 flex items-center justify-between gap-4">
+                        <div>
+                          <label className="text-[12px] font-semibold text-ink block">
+                            Display Delay (Seconds)
+                          </label>
+                          <span className="text-[11px] text-ink-2">Minimum delay is 8 seconds after page load</span>
+                        </div>
+                        <input
+                          type="number"
+                          min={8}
+                          max={120}
+                          value={proactiveDelaySeconds}
+                          onChange={(e) => setProactiveDelaySeconds(Math.max(8, Number(e.target.value)))}
+                          className="input w-24 text-xs font-semibold text-center border-2 border-line-2 focus:border-accent text-ink"
+                        />
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -1531,12 +1656,12 @@ export function AdminSettingsPanel({
                   {previewOpen && (
                     <div
                       className={cn(
-                        'absolute bottom-16 rounded-2xl bg-surface shadow-2xl border-2 border-line-2 overflow-hidden animate-rise flex flex-col z-20',
+                        'absolute rounded-2xl bg-surface shadow-2xl border-2 border-line-2 overflow-hidden animate-rise flex flex-col z-20',
                         previewDevice === 'mobile'
-                          ? 'inset-x-2 bottom-14 max-h-[440px]'
+                          ? 'inset-0 w-full h-full max-h-none rounded-none'
                           : widgetPosition === 'right'
-                          ? 'right-3 w-76 max-h-[400px]'
-                          : 'left-3 w-76 max-h-[400px]'
+                          ? 'right-3 bottom-16 w-76 max-h-[400px]'
+                          : 'left-3 bottom-16 w-76 max-h-[400px]'
                       )}
                     >
                       {/* Widget Header */}
@@ -1549,7 +1674,9 @@ export function AdminSettingsPanel({
                             {logoUrl ? (
                               <img src={logoUrl} alt="Logo" className="w-full h-full object-cover" />
                             ) : (
-                              <img src="/chat-icon-white.png" alt="Logo" className="w-5.5 h-5.5 object-contain" />
+                              <span className="text-[12px] font-bold text-white uppercase flex items-center justify-center w-full h-full select-none">
+                                {(workspace.name || 'W').charAt(0)}
+                              </span>
                             )}
                           </div>
                           <div className="min-w-0">
@@ -1566,10 +1693,16 @@ export function AdminSettingsPanel({
                         </div>
                         <button
                           onClick={() => setPreviewOpen(false)}
-                          className="text-white/90 hover:text-white p-1 rounded-lg hover:bg-white/15 transition-colors"
-                          title="Minimize preview"
+                          className={cn(
+                            'text-white/90 hover:text-white transition-colors flex items-center justify-center shrink-0',
+                            previewDevice === 'mobile'
+                              ? 'w-8 h-8 rounded-full bg-white/20 hover:bg-white/30'
+                              : 'p-1 rounded-lg hover:bg-white/15'
+                          )}
+                          title="Close preview"
+                          aria-label="Close preview"
                         >
-                          <X className="w-4 h-4" />
+                          <X className="w-4.5 h-4.5" />
                         </button>
                       </div>
 
@@ -1631,6 +1764,7 @@ export function AdminSettingsPanel({
                   <div
                     className={cn(
                       'absolute bottom-3 z-10',
+                      previewDevice === 'mobile' && previewOpen ? 'hidden' : 'block',
                       previewDevice === 'mobile'
                         ? 'right-3'
                         : widgetPosition === 'right'

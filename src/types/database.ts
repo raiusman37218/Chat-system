@@ -400,6 +400,11 @@ export interface Workspace {
   help_center_footer_text?: string | null;
   help_center_layout?: 'grid-2' | 'grid-3' | 'grid-4' | 'list' | null;
   navbar_trigger_config?: NavbarTriggerConfig | null;
+  launcher_offset_bottom?: number | null;
+  launcher_offset_side?: number | null;
+  widget_z_index?: number | null;
+  enable_proactive_welcome?: boolean | null;
+  proactive_delay_seconds?: number | null;
   created_at: string;
 }
 
