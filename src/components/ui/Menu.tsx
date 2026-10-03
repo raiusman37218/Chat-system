@@ -186,7 +186,14 @@ export function Menu<T extends string>({
         aria-expanded={open}
         aria-controls={menuId}
         aria-label={label}
-        onClick={() => setOpen((o) => !o)}
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          if (!open) {
+            updatePosition();
+          }
+          setOpen((o) => !o);
+        }}
         className="block w-full text-left"
       >
         {trigger ? (
@@ -229,7 +236,7 @@ export function Menu<T extends string>({
               zIndex: 9999,
             }}
             className={cn(
-              'min-w-[190px] p-1 rounded-xl border border-line bg-surface shadow-2xl animate-pop',
+              'w-64 max-w-[calc(100vw-16px)] p-1 rounded-xl border border-line bg-surface shadow-2xl animate-pop',
               menuClassName
             )}
           >

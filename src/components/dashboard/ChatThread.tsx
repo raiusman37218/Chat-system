@@ -561,8 +561,25 @@ export function ChatThread({
 
     const el = e.target;
     el.style.height = 'auto';
-    el.style.height = `${Math.min(el.scrollHeight, 160)}px`;
+    const computedLineHeight = 22;
+    const minHeight = computedLineHeight * 3; // ~66px (3 lines)
+    const maxHeight = computedLineHeight * 10; // ~220px (10 lines)
+    const nextHeight = Math.min(Math.max(el.scrollHeight, minHeight), maxHeight);
+    el.style.height = `${nextHeight}px`;
   };
+
+  // Keep reply composer auto-grown from 3 to 10 lines whenever inputText changes
+  useEffect(() => {
+    if (textareaRef.current) {
+      const el = textareaRef.current;
+      el.style.height = 'auto';
+      const computedLineHeight = 22;
+      const minHeight = computedLineHeight * 3;
+      const maxHeight = computedLineHeight * 10;
+      const nextHeight = Math.min(Math.max(el.scrollHeight, minHeight), maxHeight);
+      el.style.height = `${nextHeight}px`;
+    }
+  }, [inputText]);
 
   // 1. Auto-Assign Handler
   const handleAutoAssign = async () => {
@@ -1069,6 +1086,8 @@ export function ChatThread({
     (visitor?.email
       ? visitor.email.split('@')[0]
       : `Visitor ${conversation.visitor_id.slice(0, 6)}`);
+  const truncatedDisplayName =
+    displayName.length > 24 ? `${displayName.slice(0, 24)}…` : displayName;
 
   const isOnline = Boolean(
     visitor?.is_online !== false &&
@@ -1705,13 +1724,9 @@ export function ChatThread({
     : null;
 
   return (
-    <div className="@container/thread flex-1 min-w-0 h-screen flex flex-col bg-canvas">
-      {/* ── Header ──
-          min-h rather than a fixed h: a fixed height clipped its own content
-          the moment anything wrapped. The identity block takes the remaining
-          width (flex-1) instead of collapsing, and the name line never wraps —
+    <div className="@container/thread flex-1 min-w-0 h-screen flex flex-col bg-canvas overflow-x-hidden">
       {/* ── Header ── */}
-      <header className="shrink-0 px-4 py-2.5 min-h-16 flex items-center justify-between gap-3 border-b border-line bg-surface">
+      <header className="shrink-0 px-3 sm:px-4 py-2 min-h-16 flex items-center justify-between gap-2 border-b border-line bg-surface max-w-full overflow-hidden">
         <div className="flex items-center gap-2.5 min-w-0 flex-1 overflow-hidden">
           {onBack && (
             <button
@@ -1731,10 +1746,13 @@ export function ChatThread({
             className="shrink-0"
           />
           <div className="min-w-0 flex-1 overflow-hidden">
-            {/* Line 1: identity only, always one line, truncated */}
+            {/* Line 1: customer name (truncated with ellipsis only after 24 characters) & channel */}
             <div className="flex items-center gap-2 min-w-0 overflow-hidden">
-              <h2 className="text-[15px] font-bold tracking-tight truncate min-w-0">
-                {displayName}
+              <h2
+                className="text-[14px] sm:text-[15px] font-bold tracking-tight text-ink shrink-0 truncate max-w-full"
+                title={displayName}
+              >
+                {truncatedDisplayName}
               </h2>
               {conversation.channel && conversation.channel !== 'web' && (
                 <ChannelBadge
@@ -1743,11 +1761,27 @@ export function ChatThread({
                   size="xs"
                 />
               )}
+            </div>
+
+            {/* Line 2: status and sentiment badges, plus visitor details */}
+            <div className="flex items-center gap-1.5 text-[11px] text-ink-3 min-w-0 overflow-hidden truncate mt-0.5">
+              {/* Conversation status badge */}
+              {(() => {
+                const cur = STATUS_OPTIONS.find((s) => s.value === conversation.status) || STATUS_OPTIONS[0];
+                return (
+                  <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded-full text-[10px] font-semibold bg-surface-2 border border-line text-ink-2 shrink-0">
+                    <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: cur.dot }} />
+                    {cur.label}
+                  </span>
+                );
+              })()}
+
+              {/* Sentiment badge */}
               {(conversation.sentiment === 'positive' ||
                 conversation.sentiment === 'negative') && (
                 <span
                   className={cn(
-                    'pill shrink-0',
+                    'pill shrink-0 text-[10px] py-0 px-1.5 h-4',
                     conversation.sentiment === 'positive'
                       ? 'pill-success'
                       : 'pill-danger'
@@ -1755,21 +1789,19 @@ export function ChatThread({
                   title={`Visitor tone: ${conversation.sentiment}`}
                 >
                   {conversation.sentiment === 'positive' ? (
-                    <Smile className="w-3 h-3" />
+                    <Smile className="w-2.5 h-2.5" />
                   ) : (
-                    <Frown className="w-3 h-3" />
+                    <Frown className="w-2.5 h-2.5" />
                   )}
                   {conversation.sentiment === 'positive'
                     ? 'Positive'
                     : 'Frustrated'}
                 </span>
               )}
-            </div>
 
-            {/* Line 2: details, fully truncated */}
-            <div className="flex items-center gap-1.5 text-[11.5px] text-ink-3 min-w-0 overflow-hidden truncate">
+              {/* Activity status */}
               {isOnline ? (
-                <span className="inline-flex items-center gap-1.5 text-success font-medium shrink-0">
+                <span className="inline-flex items-center gap-1 text-success font-medium shrink-0">
                   <span className="live-dot" />
                   Active now
                 </span>
@@ -1785,13 +1817,13 @@ export function ChatThread({
                   <span aria-hidden className="shrink-0 text-ink-3">
                     ·
                   </span>
-                  <span className="inline-flex items-center gap-1.5 shrink-0 text-ink-2 font-medium" title={visitorPlace.label}>
+                  <span className="inline-flex items-center gap-1 shrink-0 text-ink-2 font-medium" title={visitorPlace.label}>
                     <CountryFlag
                       flag={visitorPlace.flag}
                       countryCode={visitorPlace.countryCode}
-                      className="w-4 h-3 shrink-0"
+                      className="w-3.5 h-2.5 shrink-0"
                     />
-                    <span className="truncate max-w-[150px]">{visitorPlace.label}</span>
+                    <span className="truncate max-w-[120px]">{visitorPlace.label}</span>
                   </span>
                 </>
               )}
@@ -1830,17 +1862,18 @@ export function ChatThread({
           </div>
         </div>
 
-        {/* Actions strip in header */}
-        <div className="flex items-center gap-1.5 shrink-0 ml-auto">
+        {/* Actions strip in header: keep in one row without shifting or wrapping */}
+        <div className="flex items-center gap-1 sm:gap-1.5 shrink-0 ml-auto flex-nowrap">
           <Menu<ConversationStatus>
             value={conversation.status}
             options={STATUS_OPTIONS}
             label="Status"
+            className="shrink-0"
             onChange={(v) => onUpdateStatus(v)}
             trigger={({ active, open }) => (
               <span
                 className={cn(
-                  'btn btn-sm btn-secondary gap-1.5',
+                  'btn btn-sm btn-secondary gap-1.5 shrink-0 px-2 sm:px-2.5',
                   open && 'bg-surface-3'
                 )}
                 title={`Status: ${active?.label ?? ''}`}
@@ -1849,7 +1882,7 @@ export function ChatThread({
                   className="w-1.5 h-1.5 rounded-full shrink-0"
                   style={{ background: active?.dot }}
                 />
-                <span className="hidden @xl/thread:inline">{active?.label}</span>
+                <span className="hidden @2xl/thread:inline">{active?.label}</span>
                 <ChevronDown
                   className={cn(
                     'w-3.5 h-3.5 text-ink-3 transition-transform duration-150',
@@ -1863,7 +1896,7 @@ export function ChatThread({
           {conversation.status !== 'closed' ? (
             <button
               onClick={() => onUpdateStatus('closed')}
-              className="btn btn-sm btn-primary shadow-xs"
+              className="btn btn-sm btn-primary shadow-xs shrink-0 px-2 sm:px-2.5"
               title="Close and resolve this conversation"
             >
               <CheckCircle2 className="w-3.5 h-3.5" />
@@ -1872,7 +1905,7 @@ export function ChatThread({
           ) : (
             <button
               onClick={() => onUpdateStatus('open')}
-              className="btn btn-sm btn-secondary shadow-xs"
+              className="btn btn-sm btn-secondary shadow-xs shrink-0 px-2 sm:px-2.5"
             >
               <RotateCcw className="w-3.5 h-3.5" />
               <span className="hidden @2xl/thread:inline">Reopen</span>
@@ -1883,6 +1916,7 @@ export function ChatThread({
           <Menu<ThreadAction>
             value={"" as ThreadAction}
             label="More actions"
+            className="shrink-0"
             options={[
               ...(onToggleAiMode
                 ? [
@@ -1928,7 +1962,7 @@ export function ChatThread({
             trigger={({ open }) => (
               <span
                 className={cn(
-                  "btn btn-sm btn-secondary w-8.5 px-0",
+                  "btn btn-sm btn-secondary w-8 h-8 px-0 flex items-center justify-center shrink-0",
                   open && "bg-surface-3"
                 )}
                 title="More actions"
@@ -1945,7 +1979,7 @@ export function ChatThread({
               title={isDetailsSidebarOpen ? "Hide CRM details panel" : "Show CRM details panel"}
               aria-label={isDetailsSidebarOpen ? "Hide CRM details panel" : "Show CRM details panel"}
               className={cn(
-                "btn btn-sm btn-secondary w-8.5 px-0 transition-all",
+                "btn btn-sm btn-secondary w-8 h-8 px-0 flex items-center justify-center shrink-0 transition-all",
                 isDetailsSidebarOpen ? "text-accent bg-accent/10 border-accent/30" : "text-ink-3 hover:text-ink"
               )}
             >
@@ -1959,8 +1993,8 @@ export function ChatThread({
         </div>
       </header>
 
-      {/* ── Meta bar: perfectly scrollable single row without overlapping ── */}
-      <div className="shrink-0 px-4 py-2 flex items-center gap-2 border-b border-line bg-surface-2 overflow-x-auto scrollbar-none whitespace-nowrap">
+      {/* ── Toolbar bar: wraps to two lines instead of scrolling horizontally ── */}
+      <div className="shrink-0 px-3 sm:px-4 py-1.5 flex flex-wrap items-center gap-x-2 gap-y-1.5 border-b border-line bg-surface-2 min-h-[38px]">
         <Menu<ConversationPriority>
           value={currentPriority}
           options={PRIORITY_OPTIONS}
@@ -2609,7 +2643,7 @@ export function ChatThread({
           <div className="p-3">
             <textarea
               ref={textareaRef}
-              rows={2}
+              rows={3}
               disabled={replyLocked}
               value={inputText}
               onChange={handleInputChange}
@@ -2624,7 +2658,7 @@ export function ChatThread({
                   ? 'Add a caption for this picture (optional)…'
                   : `Reply to ${displayName}…`
               }
-              className="w-full bg-transparent text-[13px] leading-relaxed text-ink resize-none focus:outline-none placeholder:text-ink-3 min-h-[48px] max-h-40"
+              className="w-full bg-transparent text-[13px] leading-relaxed text-ink resize-none focus:outline-none placeholder:text-ink-3 min-h-[66px] max-h-[220px] overflow-y-auto"
             />
           </div>
 

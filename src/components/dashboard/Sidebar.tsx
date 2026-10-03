@@ -122,7 +122,7 @@ export function Sidebar({
   ];
 
   return (
-    <aside className="w-[220px] shrink-0 h-screen flex flex-col bg-surface border-r border-line select-none relative z-10">
+    <aside className="w-[220px] shrink-0 h-screen flex flex-col bg-surface border-r border-line select-none relative z-10 overflow-hidden">
       {/* Workspace Identity Card */}
       <div className="p-3 border-b border-line/80">
         <div className="flex items-center justify-between gap-2.5 p-2 rounded-xl bg-surface-2/80 hover:bg-surface-2 transition-all border border-line/60">
@@ -192,8 +192,8 @@ export function Sidebar({
 
       {/* Footer: Quick controls + Agent Profile */}
       <div className="p-3 border-t border-line/80 space-y-2.5 bg-surface-2/40">
-        <div className="flex items-center justify-between px-1">
-          <div className="flex items-center gap-1">
+        <div className="flex items-center justify-between px-1 gap-1.5 flex-wrap">
+          <div className="flex items-center gap-1 shrink-0">
             <button
               onClick={toggleSound}
               title={soundActive ? 'Sound notifications: ON' : 'Sound notifications: MUTED'}
@@ -240,7 +240,7 @@ export function Sidebar({
               </button>
             )}
           </div>
-          <ThemeToggle />
+          <ThemeToggle className="shrink-0" />
         </div>
 
         {/* Agent Profile & Status Card */}

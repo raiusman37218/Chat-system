@@ -1209,7 +1209,7 @@ export default function DashboardPage() {
           {activeConversation ? (
             <div
               className={cn(
-                'flex-1 flex overflow-hidden',
+                'flex-1 min-w-0 flex overflow-hidden',
                 selectedConversationId ? 'flex w-full' : 'hidden md:flex'
               )}
             >
@@ -1268,8 +1268,8 @@ export default function DashboardPage() {
               )}
             </div>
           ) : (
-            <div className="hidden md:flex flex-1 flex-col items-center justify-center p-8 bg-canvas text-center select-none">
-              <div className="max-w-md w-full p-8 rounded-3xl border border-line bg-surface shadow-md flex flex-col items-center animate-rise">
+            <div className="hidden md:flex flex-1 min-w-0 flex-col items-center justify-center p-4 sm:p-6 lg:p-8 bg-canvas text-center select-none overflow-y-auto w-full">
+              <div className="max-w-md w-full p-5 sm:p-8 rounded-3xl border border-line bg-surface shadow-md flex flex-col items-center animate-rise min-w-0">
                 <div className="relative mb-5">
                   <div className="w-16 h-16 rounded-2xl bg-accent/10 border border-accent/20 flex items-center justify-center text-accent shadow-inner">
                     <Inbox className="w-8 h-8" />
@@ -1286,25 +1286,25 @@ export default function DashboardPage() {
                   Select a visitor from your inbox on the left to start replying, or monitor active traffic on the live radar.
                 </p>
 
-                <div className="flex items-center gap-2.5 w-full mb-6">
+                <div className="flex flex-wrap sm:flex-nowrap items-center gap-2.5 w-full mb-6">
                   <button
                     onClick={() => setActiveView('visitors')}
-                    className="flex-1 btn btn-sm btn-secondary shadow-xs hover:border-line-2 gap-1.5"
+                    className="flex-1 min-w-[130px] btn btn-sm btn-secondary shadow-xs hover:border-line-2 gap-1.5"
                   >
-                    <Radio className="w-3.5 h-3.5 text-emerald-500" />
-                    Live Radar ({counts.liveVisitors})
+                    <Radio className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                    <span className="truncate">Live Radar ({counts.liveVisitors})</span>
                   </button>
                   <button
                     onClick={() => setActiveView('settings')}
-                    className="flex-1 btn btn-sm btn-primary shadow-xs gap-1.5"
+                    className="flex-1 min-w-[130px] btn btn-sm btn-primary shadow-xs gap-1.5"
                   >
-                    <Settings className="w-3.5 h-3.5" />
-                    Widget Setup
+                    <Settings className="w-3.5 h-3.5 shrink-0" />
+                    <span className="truncate">Widget Setup</span>
                   </button>
                 </div>
 
                 {/* Keyboard Quick Guide */}
-                <div className="w-full pt-4 border-t border-line/60 grid grid-cols-2 gap-2 text-[11px] text-ink-3 text-left">
+                <div className="w-full pt-4 border-t border-line/60 grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] text-ink-3 text-left">
                   <div className="flex items-center justify-between px-2 py-1 rounded-lg bg-surface-2">
                     <span>Search Inbox</span>
                     <span className="kbd text-[9.5px]">Ctrl K</span>
