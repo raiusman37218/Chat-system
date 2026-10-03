@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { SMTPSettingsConfig, Workspace } from '@/types/database';
 import { updateSMTPSettingsAction } from '@/app/actions/admin';
+import { cn } from '@/lib/utils';
 
 interface SMTPSettingsSectionProps {
   workspace: Workspace;
@@ -58,19 +59,71 @@ export function SMTPSettingsSection({
     text: string;
   } | null>(null);
 
-  const applyHostingerPreset = () => {
-    setSmtp((prev) => ({
-      ...prev,
-      host: 'smtp.hostinger.com',
-      port: 465,
-      secure: true,
-      from_email: isValidEmail(prev.from_email) ? prev.from_email : (prev.user || ''),
-      from_name: prev.from_name || workspace.name || 'Support Desk',
-    }));
-    setStatusMessage({
-      type: 'info',
-      text: 'Hostinger SMTP defaults applied (smtp.hostinger.com:465 SSL). Please ensure your Hostinger email and password are entered.',
-    });
+  const applyPreset = (presetId: 'hostinger' | 'gmail' | 'outlook' | 'zoho' | 'custom') => {
+    switch (presetId) {
+      case 'hostinger':
+        setSmtp((prev) => ({
+          ...prev,
+          host: 'smtp.hostinger.com',
+          port: 465,
+          secure: true,
+          from_email: isValidEmail(prev.from_email) ? prev.from_email : (prev.user || ''),
+          from_name: prev.from_name || workspace.name || 'Support Desk',
+        }));
+        setStatusMessage({
+          type: 'info',
+          text: 'Hostinger SMTP defaults applied (smtp.hostinger.com:465 SSL).',
+        });
+        break;
+      case 'gmail':
+        setSmtp((prev) => ({
+          ...prev,
+          host: 'smtp.gmail.com',
+          port: 465,
+          secure: true,
+          from_email: isValidEmail(prev.from_email) ? prev.from_email : (prev.user || ''),
+          from_name: prev.from_name || workspace.name || 'Support Desk',
+        }));
+        setStatusMessage({
+          type: 'info',
+          text: 'Gmail SMTP defaults applied (smtp.gmail.com:465 SSL). Note: Generate an App Password in your Google Account security settings.',
+        });
+        break;
+      case 'outlook':
+        setSmtp((prev) => ({
+          ...prev,
+          host: 'smtp.office365.com',
+          port: 587,
+          secure: false,
+          from_email: isValidEmail(prev.from_email) ? prev.from_email : (prev.user || ''),
+          from_name: prev.from_name || workspace.name || 'Support Desk',
+        }));
+        setStatusMessage({
+          type: 'info',
+          text: 'Outlook / Microsoft 365 defaults applied (smtp.office365.com:587 STARTTLS).',
+        });
+        break;
+      case 'zoho':
+        setSmtp((prev) => ({
+          ...prev,
+          host: 'smtp.zoho.com',
+          port: 465,
+          secure: true,
+          from_email: isValidEmail(prev.from_email) ? prev.from_email : (prev.user || ''),
+          from_name: prev.from_name || workspace.name || 'Support Desk',
+        }));
+        setStatusMessage({
+          type: 'info',
+          text: 'Zoho Mail defaults applied (smtp.zoho.com:465 SSL).',
+        });
+        break;
+      case 'custom':
+        setStatusMessage({
+          type: 'info',
+          text: 'Custom SMTP mode selected. Enter your host, port, username, and password below.',
+        });
+        break;
+    }
   };
 
   const handleTestConnection = async (withTestEmail: boolean = false) => {
@@ -239,7 +292,7 @@ export function SMTPSettingsSection({
   return (
     <div className="space-y-6">
       {/* Header Banner */}
-      <div className="card border-2 border-line-2 bg-surface p-6 shadow-xs">
+      <div className="card border-2 border-line-2 bg-surface p-6 shadow-xs space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="flex items-start gap-4">
             <div className="rounded-xl bg-accent text-white p-3 shadow-sm">
@@ -247,7 +300,7 @@ export function SMTPSettingsSection({
             </div>
             <div>
               <h3 className="text-lg font-bold text-ink">
-                Email &amp; Hostinger SMTP Integration
+                Email (SMTP) Integration
               </h3>
               <p className="text-[13px] text-ink-2 mt-0.5 leading-relaxed">
                 Configure your custom workspace email credentials. When a user has not seen a query reply for 5 minutes, an automatic professional email notification is sent to them.
@@ -256,11 +309,78 @@ export function SMTPSettingsSection({
           </div>
           <button
             type="button"
-            onClick={applyHostingerPreset}
+            onClick={() => applyPreset('hostinger')}
             className="btn btn-sm btn-secondary font-bold text-xs gap-1.5 border-2 border-line-2 hover:border-line-3 text-accent shrink-0 shadow-xs"
           >
             <Sparkles className="h-3.5 w-3.5" />
             Auto-fill Hostinger Settings
+          </button>
+        </div>
+
+        {/* Preset Selector */}
+        <div className="pt-2 border-t border-line/60 flex flex-wrap items-center gap-2">
+          <span className="text-[11.5px] font-semibold text-ink-3 uppercase tracking-wider mr-1">
+            Presets:
+          </span>
+          <button
+            type="button"
+            onClick={() => applyPreset('hostinger')}
+            className={cn(
+              "px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all",
+              smtp.host === 'smtp.hostinger.com'
+                ? "bg-accent/10 border-accent/40 text-accent font-bold shadow-2xs"
+                : "bg-surface-2 border-line text-ink-2 hover:text-ink hover:bg-surface-3"
+            )}
+          >
+            Hostinger
+          </button>
+          <button
+            type="button"
+            onClick={() => applyPreset('gmail')}
+            className={cn(
+              "px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all",
+              smtp.host === 'smtp.gmail.com'
+                ? "bg-accent/10 border-accent/40 text-accent font-bold shadow-2xs"
+                : "bg-surface-2 border-line text-ink-2 hover:text-ink hover:bg-surface-3"
+            )}
+          >
+            Gmail
+          </button>
+          <button
+            type="button"
+            onClick={() => applyPreset('outlook')}
+            className={cn(
+              "px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all",
+              smtp.host === 'smtp.office365.com'
+                ? "bg-accent/10 border-accent/40 text-accent font-bold shadow-2xs"
+                : "bg-surface-2 border-line text-ink-2 hover:text-ink hover:bg-surface-3"
+            )}
+          >
+            Outlook / Office 365
+          </button>
+          <button
+            type="button"
+            onClick={() => applyPreset('zoho')}
+            className={cn(
+              "px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all",
+              smtp.host === 'smtp.zoho.com'
+                ? "bg-accent/10 border-accent/40 text-accent font-bold shadow-2xs"
+                : "bg-surface-2 border-line text-ink-2 hover:text-ink hover:bg-surface-3"
+            )}
+          >
+            Zoho Mail
+          </button>
+          <button
+            type="button"
+            onClick={() => applyPreset('custom')}
+            className={cn(
+              "px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all",
+              !['smtp.hostinger.com', 'smtp.gmail.com', 'smtp.office365.com', 'smtp.zoho.com'].includes(smtp.host)
+                ? "bg-accent/10 border-accent/40 text-accent font-bold shadow-2xs"
+                : "bg-surface-2 border-line text-ink-2 hover:text-ink hover:bg-surface-3"
+            )}
+          >
+            Custom SMTP
           </button>
         </div>
       </div>
@@ -306,7 +426,7 @@ export function SMTPSettingsSection({
               className="input text-sm font-medium border-2 border-line-2 focus:border-accent text-ink"
             />
             <p className="text-[11.5px] text-ink-2 mt-1">
-              Hostinger default is <code className="font-mono font-bold text-accent">smtp.hostinger.com</code>
+              Hostinger: <code className="font-mono font-bold text-accent">smtp.hostinger.com</code> &bull; Gmail: <code className="font-mono font-bold text-accent">smtp.gmail.com</code>
             </p>
           </div>
 
@@ -346,13 +466,13 @@ export function SMTPSettingsSection({
               </select>
             </div>
             <p className="text-[11.5px] text-ink-2 mt-1">
-              Use Port 465 for secure Hostinger SSL transmission
+              Use Port 465 for SSL or Port 587 for TLS / STARTTLS
             </p>
           </div>
 
           <div>
             <label className="block text-[13px] font-bold text-ink mb-1.5">
-              Hostinger Email Address (Username) <span className="text-rose-500">*</span>
+              SMTP Email Address (Username) <span className="text-rose-500">*</span>
             </label>
             <input
               type="email"
@@ -367,11 +487,11 @@ export function SMTPSettingsSection({
                     : prev.from_email,
                 }));
               }}
-              placeholder="helpdesk@range4ex.com"
+              placeholder="support@company.com"
               className="input text-sm font-medium border-2 border-line-2 focus:border-accent text-ink"
             />
             <p className="text-[11.5px] text-ink-2 mt-1">
-              Your primary mailbox address on Hostinger
+              Your primary authenticated mailbox address
             </p>
           </div>
 

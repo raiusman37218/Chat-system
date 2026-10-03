@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { Building2, Settings, ArrowLeft, ShieldAlert, LogOut, ExternalLink } from 'lucide-react';
 import { Workspace, Agent, CannedResponse } from '@/types/database';
 import { CompaniesAdminDashboard } from '@/components/admin/CompaniesAdminDashboard';
-import { AdminSettingsPanel } from '@/components/admin/AdminSettingsPanel';
+import { SettingsHub } from '@/components/dashboard/SettingsHub';
 import { SuperAdminAuditLogView } from '@/components/admin/SuperAdminAuditLogView';
 import { exitSuperAdminWorkspaceViewAction } from '@/app/actions/platform';
 import { cn } from '@/lib/utils';
@@ -154,11 +154,12 @@ export function AdminClientLayout({
           ) : activeTab === 'audit' ? (
             <SuperAdminAuditLogView />
           ) : (
-            <AdminSettingsPanel
+            <SettingsHub
               workspace={currentWorkspace}
               currentAgent={agent}
-              initialAgents={initialAgents}
-              initialCannedResponses={initialCannedResponses}
+              agents={initialAgents}
+              cannedResponses={initialCannedResponses}
+              onWorkspaceUpdated={(newWs) => setCurrentWorkspace(newWs)}
             />
           )}
         </div>

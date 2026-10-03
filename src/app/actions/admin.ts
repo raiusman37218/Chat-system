@@ -527,6 +527,21 @@ export async function updateAISettingsAction(
     .single();
 
   if (error) throw new Error(error.message);
+
+  try {
+    const adminClient = serviceClient();
+    await adminClient
+      .from('workspace_integrations')
+      .update({
+        langgraph_enabled: finalSettings.enabled,
+        langgraph_auto_pilot: finalSettings.auto_pilot ?? finalSettings.auto_response_enabled,
+        langgraph_system_prompt: finalSettings.system_prompt || null,
+      })
+      .eq('workspace_id', workspaceId);
+  } catch (syncErr) {
+    console.warn('[updateAISettingsAction] Non-fatal integrations sync error:', syncErr);
+  }
+
   return { success: true, workspace: updated as Workspace };
 }
 

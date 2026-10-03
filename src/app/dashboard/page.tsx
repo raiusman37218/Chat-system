@@ -1321,6 +1321,7 @@ export default function DashboardPage() {
           onLogout={handleLogout}
           onOpenShortcuts={() => setShowShortcutsModal(true)}
           onOpenMobileInstall={() => setShowMobileInstallModal(true)}
+          hasVisitors={visitors.length > 0}
         />
       </div>
 

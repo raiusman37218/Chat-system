@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import {
   Bot,
   Clock,
@@ -17,6 +17,7 @@ import {
   Copy,
   Check,
   ChevronRight,
+  ChevronDown,
   Sparkles,
   CheckCircle2,
   AlertCircle,
@@ -63,6 +64,7 @@ export interface SettingItem {
     agents: Agent[];
     cannedResponses: CannedResponse[];
     hasVisitors: boolean;
+    connectedChannelsCount?: number;
   }) => { text: string; variant: 'emerald' | 'amber' | 'blue' | 'neutral' } | null;
 }
 
@@ -169,7 +171,10 @@ const SETTING_GROUPS: SettingGroup[] = [
           'alerts',
           'notifications',
         ],
-        getBadge: () => ({ text: '4 Channels', variant: 'neutral' }),
+        getBadge: ({ connectedChannelsCount = 0 }) => ({
+          text: `${connectedChannelsCount} connected`,
+          variant: connectedChannelsCount > 0 ? 'emerald' : 'neutral',
+        }),
       },
     ],
   },
@@ -180,14 +185,17 @@ const SETTING_GROUPS: SettingGroup[] = [
     items: [
       {
         id: 'email',
-        label: 'Hostinger Email & SMTP',
-        description: 'Hostinger credentials, delivery testing & 5-minute unread email alerts',
+        label: 'Email (SMTP)',
+        description: 'SMTP credentials, delivery testing & 5-minute unread email alerts',
         Icon: Mail,
         adminOnly: true,
         keywords: [
           'email',
-          'hostinger',
           'smtp',
+          'hostinger',
+          'gmail',
+          'outlook',
+          'zoho',
           'mail',
           'unread',
           'notifications',
@@ -199,7 +207,7 @@ const SETTING_GROUPS: SettingGroup[] = [
         getBadge: ({ workspace }) => {
           const user = (workspace?.smtp_settings as any)?.user;
           return user
-            ? { text: 'Hostinger Active', variant: 'emerald' }
+            ? { text: 'SMTP Active', variant: 'emerald' }
             : { text: 'Setup Required', variant: 'amber' };
         },
       },
@@ -279,10 +287,25 @@ const SETTING_GROUPS: SettingGroup[] = [
           'auto assign',
         ],
         getBadge: ({ workspace }) => {
-          const enabled = (workspace?.business_hours as any)?.enabled;
-          return enabled
-            ? { text: 'Scheduled', variant: 'emerald' }
-            : { text: '24/7 Always Open', variant: 'neutral' };
+          const bh = workspace?.business_hours as any;
+          if (!bh || !bh.enabled) {
+            return { text: '24/7 Always Open', variant: 'neutral' };
+          }
+          const schedule = bh.schedule || {};
+          const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'] as const;
+          const activeDays = days.filter((d) => schedule[d]?.enabled);
+          if (activeDays.length === 0) {
+            return { text: 'Closed', variant: 'amber' };
+          }
+          if (activeDays.length === 5 && !schedule.saturday?.enabled && !schedule.sunday?.enabled) {
+            const mon = schedule.monday;
+            return { text: `Mon–Fri ${mon?.start || '09:00'}–${mon?.end || '17:00'}`, variant: 'emerald' };
+          }
+          if (activeDays.length === 7) {
+            const mon = schedule.monday;
+            return { text: `Everyday ${mon?.start || '09:00'}–${mon?.end || '17:00'}`, variant: 'emerald' };
+          }
+          return { text: `${activeDays.length} Days/wk`, variant: 'emerald' };
         },
       },
       {
@@ -314,8 +337,8 @@ const SETTING_GROUPS: SettingGroup[] = [
     items: [
       {
         id: 'ai',
-        label: 'AI Assistant & Copilot',
-        description: 'Smart auto-replies, draft suggestions and model configuration',
+        label: 'AI Assistant & Knowledge Agent',
+        description: 'Unified AI assistant, knowledge base auto-pilot and model provider',
         Icon: Bot,
         adminOnly: true,
         keywords: [
@@ -330,6 +353,8 @@ const SETTING_GROUPS: SettingGroup[] = [
           'langgraph',
           'assistant',
           'smart reply',
+          'knowledge base',
+          'autopilot',
         ],
         getBadge: ({ workspace }) => {
           const enabled = (workspace?.ai_settings as any)?.enabled;
@@ -468,7 +493,7 @@ interface SettingsHubProps {
   currentAgent: Agent | null;
   agents: Agent[];
   cannedResponses: CannedResponse[];
-  hasVisitors: boolean;
+  hasVisitors?: boolean;
   latestVisitorUrl?: string;
   onWorkspaceUpdated?: (ws: Workspace) => void;
 }
@@ -478,7 +503,7 @@ export function SettingsHub({
   currentAgent,
   agents,
   cannedResponses,
-  hasVisitors,
+  hasVisitors = false,
   latestVisitorUrl,
   onWorkspaceUpdated,
 }: SettingsHubProps) {
@@ -490,6 +515,52 @@ export function SettingsHub({
   const [channelTab, setChannelTab] = useState<IntegrationTab>('whatsapp');
   const [copiedWsId, setCopiedWsId] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [topDropdownOpen, setTopDropdownOpen] = useState(false);
+  const [integrations, setIntegrations] = useState<any>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!workspace?.id) return;
+    const supabase = createClient();
+    supabase
+      .from('workspace_integrations')
+      .select('*')
+      .eq('workspace_id', workspace.id)
+      .maybeSingle()
+      .then(({ data }: { data: any }) => {
+        if (data) setIntegrations(data);
+      });
+  }, [workspace?.id]);
+
+  const connectedChannelsCount = useMemo(() => {
+    if (!integrations) return 0;
+    let count = 0;
+    if (integrations.whatsapp_enabled && integrations.whatsapp_access_token?.trim()) count++;
+    if (integrations.meta_enabled && integrations.meta_page_access_token?.trim()) count++;
+    if (integrations.linkedin_enabled && integrations.linkedin_access_token?.trim()) count++;
+    if (integrations.slack_enabled && integrations.slack_webhook_url?.trim()) count++;
+    return count;
+  }, [integrations]);
+
+  // Scroll content to top whenever switching tabs
+  useEffect(() => {
+    if (contentRef.current) {
+      contentRef.current.scrollTo({ top: 0, behavior: 'instant' });
+    }
+  }, [active, channelTab]);
+
+  const handleSelectTab = (tabId: SectionId) => {
+    setActive(tabId);
+    setMobileMenuOpen(false);
+    setTopDropdownOpen(false);
+    if (contentRef.current) {
+      contentRef.current.scrollTo({ top: 0, behavior: 'instant' });
+    }
+  };
+
+  const allAllowedItems = useMemo(() => {
+    return SETTING_GROUPS.flatMap((g) => g.items.filter((item) => !item.adminOnly || isAdmin));
+  }, [isAdmin]);
 
   // Filter groups and sections based on role and search query
   const filteredGroups = useMemo(() => {
@@ -580,10 +651,10 @@ export function SettingsHub({
       {/* ─────────────────────────────────────────────────────────────────── */}
       <header className="shrink-0 px-4 md:px-7 h-16 flex items-center justify-between border-b border-line bg-surface z-10">
         <div className="flex items-center gap-3 min-w-0">
-          {/* Mobile hamburger */}
+          {/* Mobile / Narrow Screen Menu Toggle */}
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="md:hidden p-1.5 rounded-lg border border-line bg-surface-2 hover:bg-surface-3 text-ink-2"
+            className="min-[1100px]:hidden p-1.5 rounded-lg border border-line bg-surface-2 hover:bg-surface-3 text-ink-2"
             title="Toggle Settings Navigation"
           >
             <Menu className="w-4 h-4" />
@@ -672,8 +743,8 @@ export function SettingsHub({
           className={cn(
             'w-72 shrink-0 border-r border-line-2 bg-surface flex flex-col transition-all duration-200 z-20 shadow-xs',
             mobileMenuOpen
-              ? 'absolute inset-y-0 left-0 w-72 shadow-2xl bg-surface'
-              : 'hidden md:flex'
+              ? 'fixed inset-y-0 left-0 w-72 shadow-2xl bg-surface z-50 flex'
+              : 'hidden min-[1100px]:flex'
           )}
         >
           {/* Search Box */}
@@ -739,15 +810,13 @@ export function SettingsHub({
                         agents,
                         cannedResponses,
                         hasVisitors,
+                        connectedChannelsCount,
                       });
 
                       return (
                         <button
                           key={item.id}
-                          onClick={() => {
-                            setActive(item.id);
-                            setMobileMenuOpen(false);
-                          }}
+                          onClick={() => handleSelectTab(item.id)}
                           aria-current={isActive ? 'page' : undefined}
                           className={cn(
                             'w-full min-h-[42px] px-3 py-2 rounded-xl flex items-center gap-2.5 text-left text-[13px] transition-all group',
@@ -767,7 +836,7 @@ export function SettingsHub({
                             <Icon className="w-4 h-4" />
                           </div>
 
-                          <span className="truncate flex-1 font-semibold">{item.label}</span>
+                          <span className="flex-1 font-semibold text-[13px] leading-snug text-left line-clamp-2 break-words">{item.label}</span>
 
                           {badge && (
                             <span
@@ -809,14 +878,101 @@ export function SettingsHub({
         {mobileMenuOpen && (
           <div
             onClick={() => setMobileMenuOpen(false)}
-            className="md:hidden fixed inset-0 bg-black/40 z-10"
+            className="min-[1100px]:hidden fixed inset-0 bg-black/40 z-40"
           />
         )}
 
         {/* ───────────────────────────────────────────────────────────────── */}
         {/* 3. RIGHT CONTENT AREA: SECTION BODY */}
         {/* ───────────────────────────────────────────────────────────────── */}
-        <main className="flex-1 min-w-0 overflow-y-auto flex flex-col bg-canvas">
+        <main ref={contentRef} className="flex-1 min-w-0 overflow-y-auto flex flex-col bg-canvas">
+          {/* Below 1100px Sub-navigation Bar: Collapsible Dropdown & Fast Horizontal Chips */}
+          <div className="min-[1100px]:hidden shrink-0 border-b border-line-2 bg-surface px-4 py-2.5 space-y-2 sticky top-0 z-30 shadow-2xs backdrop-blur-md bg-surface/95">
+            <div className="flex items-center gap-2">
+              <div className="relative flex-1">
+                <button
+                  type="button"
+                  onClick={() => setTopDropdownOpen(!topDropdownOpen)}
+                  className="w-full flex items-center justify-between gap-2.5 px-3 py-2 rounded-xl border border-line bg-surface-2 hover:bg-surface-3 text-left transition-colors"
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="w-6 h-6 rounded-lg bg-accent text-white flex items-center justify-center shrink-0">
+                      <currentItem.Icon className="w-3.5 h-3.5" />
+                    </div>
+                    <span className="text-[13px] font-bold text-ink truncate">
+                      {currentItem.label}
+                    </span>
+                    {currentGroup && (
+                      <span className="text-[11px] text-ink-3 hidden sm:inline">
+                        ({currentGroup.title})
+                      </span>
+                    )}
+                  </div>
+                  <ChevronDown className={cn("w-4 h-4 text-ink-2 shrink-0 transition-transform", topDropdownOpen && "rotate-180")} />
+                </button>
+
+                {topDropdownOpen && (
+                  <div className="absolute top-full left-0 right-0 mt-1.5 max-h-80 overflow-y-auto rounded-xl border border-line bg-surface shadow-2xl z-50 p-2 space-y-3">
+                    {SETTING_GROUPS.map((group) => {
+                      const groupItems = group.items.filter((item) => !item.adminOnly || isAdmin);
+                      if (groupItems.length === 0) return null;
+                      return (
+                        <div key={group.id} className="space-y-1">
+                          <div className="px-2 py-1 text-[11px] font-bold uppercase tracking-wider text-ink-3">
+                            {group.title}
+                          </div>
+                          {groupItems.map((item) => {
+                            const isSelected = item.id === active;
+                            const Icon = item.Icon;
+                            return (
+                              <button
+                                key={item.id}
+                                type="button"
+                                onClick={() => handleSelectTab(item.id)}
+                                className={cn(
+                                  'w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-left text-[13px] transition-colors',
+                                  isSelected
+                                    ? 'bg-accent/10 text-accent font-bold'
+                                    : 'text-ink hover:bg-surface-2 font-medium'
+                                )}
+                              >
+                                <Icon className="w-4 h-4 shrink-0 text-ink-2" />
+                                <span className="flex-1 line-clamp-2 break-words leading-tight">{item.label}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Horizontal Scroll Bar */}
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 no-scrollbar">
+              {allAllowedItems.map((item) => {
+                const isSelected = item.id === active;
+                const Icon = item.Icon;
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => handleSelectTab(item.id)}
+                    className={cn(
+                      'shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-medium transition-all whitespace-nowrap',
+                      isSelected
+                        ? 'bg-accent text-white font-bold shadow-xs'
+                        : 'bg-surface-2 hover:bg-surface-3 text-ink-2 border border-line-2 hover:text-ink'
+                    )}
+                  >
+                    <Icon className="w-3.5 h-3.5 shrink-0" />
+                    <span>{item.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
           {/* Section Breadcrumb & Header Banner */}
           {currentItem && (
             <div className="px-6 md:px-8 pt-6 pb-5 border-b border-line-2 bg-surface shadow-2xs">

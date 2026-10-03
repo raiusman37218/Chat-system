@@ -39,6 +39,7 @@ interface SidebarProps {
   onLogout: () => void;
   onOpenShortcuts?: () => void;
   onOpenMobileInstall?: () => void;
+  hasVisitors?: boolean;
 }
 
 const STATUS_TINT: Record<AgentStatus, string> = {
@@ -57,6 +58,7 @@ export function Sidebar({
   onLogout,
   onOpenShortcuts,
   onOpenMobileInstall,
+  hasVisitors = false,
 }: SidebarProps) {
   const soundActive = React.useSyncExternalStore(
     sound.subscribe,
@@ -139,9 +141,11 @@ export function Sidebar({
                 <span className="text-[13px] font-bold text-ink truncate leading-tight">
                   {workspace?.name || 'Chatify'}
                 </span>
-                <span className="text-[9px] font-bold px-1 py-0.5 rounded bg-accent-soft text-accent uppercase tracking-wider">
-                  Live
-                </span>
+                {hasVisitors && (
+                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 uppercase tracking-wider">
+                    Live
+                  </span>
+                )}
               </div>
               <div className="text-[11px] text-ink-3 truncate flex items-center gap-1 mt-0.5">
                 <span className="truncate">{workspace?.website_url ? workspace.website_url.replace(/^https?:\/\//, '') : 'Workspace Active'}</span>

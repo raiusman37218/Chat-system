@@ -145,8 +145,8 @@ async function testNewSchemaAndRealtime() {
     .from('canned_responses')
     .insert({
       agent_id: authData.user.id,
-      shortcut: 'sla_guarantee',
-      content: 'Our Enterprise SLA provides guaranteed 99.99% uptime with 24/7 priority escalation.',
+      shortcut: 'pricing_info',
+      content: 'Our standard plan starts at $29/mo and includes unlimited chat history and team members.',
     })
     .select()
     .single();

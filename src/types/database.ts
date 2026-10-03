@@ -246,8 +246,10 @@ export interface AISettingsConfig {
   api_key?: string | null;
   /** Only for 'compatible': base URL of an OpenAI-shaped endpoint. */
   base_url?: string | null;
-  /** Superseded by api_key; still read so older workspaces keep working. */
+  /** Legacy key field kept for backward compatibility */
   anthropic_api_key?: string | null;
+  /** Whether AI autopilot answers all incoming messages continuously */
+  auto_pilot?: boolean;
 }
 
 export interface HelpSection {

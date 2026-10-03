@@ -18,14 +18,47 @@ export async function GET(req: NextRequest) {
   const token = searchParams.get('hub.verify_token');
   const challenge = searchParams.get('hub.challenge');
 
-  const defaultVerifySecret = process.env.META_VERIFY_TOKEN || 'chatify_meta_verify_secret';
+  if (mode === 'subscribe' && token && challenge) {
+    const supabase = getSupabase();
 
-  if (mode === 'subscribe' && (token === defaultVerifySecret || token)) {
-    console.log('✓ [Meta Webhook] Handshake verified successfully!');
-    return new NextResponse(challenge, { status: 200 });
+    // 1. Check if workspaceId is explicitly provided in webhook URL
+    const workspaceId = searchParams.get('workspaceId') || searchParams.get('workspace_id');
+    if (workspaceId) {
+      const { data } = await supabase
+        .from('workspace_integrations')
+        .select('meta_verify_token')
+        .eq('workspace_id', workspaceId)
+        .maybeSingle();
+
+      if (data?.meta_verify_token && data.meta_verify_token === token) {
+        console.log(`✓ [Meta Webhook] Handshake verified for workspace ${workspaceId}!`);
+        return new NextResponse(challenge, { status: 200 });
+      }
+    }
+
+    // 2. Check if token matches any workspace's unique meta_verify_token
+    const { data: matched } = await supabase
+      .from('workspace_integrations')
+      .select('id, workspace_id')
+      .eq('meta_verify_token', token)
+      .maybeSingle();
+
+    if (matched) {
+      console.log(`✓ [Meta Webhook] Handshake verified for workspace ${matched.workspace_id}!`);
+      return new NextResponse(challenge, { status: 200 });
+    }
+
+    // 3. Fallback for legacy environment override if configured
+    if (process.env.META_VERIFY_TOKEN && token === process.env.META_VERIFY_TOKEN) {
+      console.log('✓ [Meta Webhook] Handshake verified via server env token!');
+      return new NextResponse(challenge, { status: 200 });
+    }
+
+    console.warn(`[Meta Webhook] Verification token mismatch. Received: "${token}"`);
+    return new NextResponse('Verification token mismatch', { status: 403 });
   }
 
-  return new NextResponse('Verification token mismatch', { status: 403 });
+  return new NextResponse('Invalid verification request', { status: 400 });
 }
 
 /**

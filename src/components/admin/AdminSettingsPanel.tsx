@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { testAiProviderAction } from '@/app/actions/knowledge';
 import {
   Palette,
@@ -39,6 +39,8 @@ import {
   Smartphone,
   Laptop,
   Eye,
+  Search,
+  ChevronDown,
 } from 'lucide-react';
 import { SMTPSettingsSection } from '@/components/admin/SMTPSettingsSection';
 import {
@@ -115,6 +117,77 @@ const DEFAULT_SCHEDULE: BusinessHoursConfig = {
   },
 };
 
+const ALL_TIMEZONES: string[] = (() => {
+  try {
+    if (typeof Intl !== 'undefined' && 'supportedValuesOf' in Intl) {
+      return (Intl as any).supportedValuesOf('timeZone');
+    }
+  } catch {
+    // fallback below
+  }
+  return [
+    'UTC',
+    'Africa/Cairo',
+    'Africa/Casablanca',
+    'Africa/Johannesburg',
+    'Africa/Lagos',
+    'Africa/Nairobi',
+    'America/Anchorage',
+    'America/Argentina/Buenos_Aires',
+    'America/Bogota',
+    'America/Chicago',
+    'America/Denver',
+    'America/Halifax',
+    'America/Los_Angeles',
+    'America/Mexico_City',
+    'America/New_York',
+    'America/Phoenix',
+    'America/Santiago',
+    'America/Sao_Paulo',
+    'America/Toronto',
+    'America/Vancouver',
+    'Asia/Bangkok',
+    'Asia/Colombo',
+    'Asia/Dhaka',
+    'Asia/Dubai',
+    'Asia/Hong_Kong',
+    'Asia/Jakarta',
+    'Asia/Jerusalem',
+    'Asia/Karachi',
+    'Asia/Kolkata',
+    'Asia/Kuala_Lumpur',
+    'Asia/Manila',
+    'Asia/Riyadh',
+    'Asia/Seoul',
+    'Asia/Shanghai',
+    'Asia/Singapore',
+    'Asia/Taipei',
+    'Asia/Tokyo',
+    'Atlantic/Reykjavik',
+    'Australia/Melbourne',
+    'Australia/Perth',
+    'Australia/Sydney',
+    'Europe/Amsterdam',
+    'Europe/Athens',
+    'Europe/Berlin',
+    'Europe/Brussels',
+    'Europe/Dublin',
+    'Europe/Helsinki',
+    'Europe/Istanbul',
+    'Europe/Lisbon',
+    'Europe/London',
+    'Europe/Madrid',
+    'Europe/Paris',
+    'Europe/Rome',
+    'Europe/Stockholm',
+    'Europe/Vienna',
+    'Europe/Warsaw',
+    'Europe/Zurich',
+    'Pacific/Auckland',
+    'Pacific/Honolulu',
+  ];
+})();
+
 const COLOR_PRESETS = [
   '#2563eb', // Chatify Blue
   '#0d9488', // Teal
@@ -142,7 +215,11 @@ export function AdminSettingsPanel({
   // Workspace state
   const [workspace, setWorkspace] = useState<Workspace>(initialWorkspace);
   const [agents, setAgents] = useState<Agent[]>(initialAgents);
-  const [cannedResponses, setCannedResponses] = useState<CannedResponse[]>(initialCannedResponses);
+  const [cannedResponses, setCannedResponses] = useState<CannedResponse[]>(() =>
+    (initialCannedResponses || []).filter(
+      (c) => c.shortcut !== 'sla_guarantee' && c.shortcut !== '/sla_guarantee'
+    )
+  );
 
   // Status & Feedback
   const [statusMessage, setStatusMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
@@ -190,6 +267,39 @@ export function AdminSettingsPanel({
   const [previewDevice, setPreviewDevice] = useState<'desktop' | 'mobile'>('desktop');
   const [widgetVisibilityDevice, setWidgetVisibilityDevice] = useState<'all' | 'desktop' | 'mobile'>('all');
   const [showOnlineStatusBadge, setShowOnlineStatusBadge] = useState<boolean>(true);
+
+  const isWidgetDirty = useMemo(() => {
+    return (
+      brandColor !== (workspace.brand_color || '#2563eb') ||
+      logoUrl !== (workspace.logo_url || '') ||
+      showLauncherLogo !== (workspace.show_launcher_logo !== false) ||
+      widgetPosition !== (workspace.widget_position || 'right') ||
+      greetingTitle !== (workspace.greeting_title || 'Hi there 👋') ||
+      greetingMessage !== (workspace.greeting_message || "We're here to help! Send us a message and we'll reply shortly.") ||
+      helpTabLabel !== (workspace.help_center_tab_label || 'Help') ||
+      showHelpTab !== (workspace.show_help_tab !== false) ||
+      launcherOffsetBottom !== (workspace.launcher_offset_bottom ?? 20) ||
+      launcherOffsetSide !== (workspace.launcher_offset_side ?? 20) ||
+      widgetZIndex !== (workspace.widget_z_index ?? 2147483000) ||
+      enableProactiveWelcome !== (workspace.enable_proactive_welcome !== false) ||
+      proactiveDelaySeconds !== Math.max(8, workspace.proactive_delay_seconds ?? 8)
+    );
+  }, [
+    brandColor,
+    logoUrl,
+    showLauncherLogo,
+    widgetPosition,
+    greetingTitle,
+    greetingMessage,
+    helpTabLabel,
+    showHelpTab,
+    launcherOffsetBottom,
+    launcherOffsetSide,
+    widgetZIndex,
+    enableProactiveWelcome,
+    proactiveDelaySeconds,
+    workspace,
+  ]);
 
   const handleSaveWidget = async () => {
     setSaving(true);
@@ -260,6 +370,25 @@ export function AdminSettingsPanel({
   const [helpCenterLayout, setHelpCenterLayout] = useState<'grid-2' | 'grid-3' | 'grid-4' | 'list'>(
     (workspace as any).help_center_layout || 'grid-2'
   );
+
+  const isHelpCenterDirty = useMemo(() => {
+    return (
+      helpCenterTitle !== (workspace.help_center_title || '') ||
+      helpCenterSubtitle !== (workspace.help_center_subtitle || '') ||
+      helpCenterLogoUrl !== (workspace.help_center_logo_url || '') ||
+      helpCenterFooterText !== (workspace.help_center_footer_text || '') ||
+      helpCenterLayout !== ((workspace as any).help_center_layout || 'grid-2') ||
+      JSON.stringify(helpCenterHeaderLinks) !== JSON.stringify(workspace.help_center_header_links || [])
+    );
+  }, [
+    helpCenterTitle,
+    helpCenterSubtitle,
+    helpCenterLogoUrl,
+    helpCenterFooterText,
+    helpCenterLayout,
+    helpCenterHeaderLinks,
+    workspace,
+  ]);
   const [savingHelpCenter, setSavingHelpCenter] = useState(false);
   const [newLinkLabel, setNewLinkLabel] = useState('');
   const [newLinkUrl, setNewLinkUrl] = useState('');
@@ -338,6 +467,23 @@ export function AdminSettingsPanel({
   const [businessHours, setBusinessHours] = useState<BusinessHoursConfig>(
     workspace.business_hours || DEFAULT_SCHEDULE
   );
+  const [tzSearch, setTzSearch] = useState('');
+  const [tzDropdownOpen, setTzDropdownOpen] = useState(false);
+
+  const filteredTimezones = useMemo(() => {
+    if (!tzSearch.trim()) return ALL_TIMEZONES.slice(0, 100);
+    const q = tzSearch.toLowerCase().replace(/\s+/g, '_');
+    return ALL_TIMEZONES.filter(
+      (tz) =>
+        tz.toLowerCase().includes(q) ||
+        tz.toLowerCase().replace(/_/g, ' ').includes(tzSearch.toLowerCase())
+    );
+  }, [tzSearch]);
+
+  const isHoursDirty = useMemo(() => {
+    const orig = workspace.business_hours || DEFAULT_SCHEDULE;
+    return JSON.stringify(businessHours) !== JSON.stringify(orig);
+  }, [businessHours, workspace.business_hours]);
 
   const handleSaveBusinessHours = async () => {
     setSaving(true);
@@ -564,6 +710,11 @@ export function AdminSettingsPanel({
     workspace.auto_assignment || { enabled: true, max_conversations_per_agent: 5 }
   );
 
+  const isAutoAssignDirty = useMemo(() => {
+    const orig = workspace.auto_assignment || { enabled: true, max_conversations_per_agent: 5 };
+    return JSON.stringify(autoAssign) !== JSON.stringify(orig);
+  }, [autoAssign, workspace.auto_assignment]);
+
   const handleSaveAutoAssign = async () => {
     setSaving(true);
     try {
@@ -587,6 +738,7 @@ export function AdminSettingsPanel({
     enabled: true,
     auto_response_enabled: true,
     auto_response_delay_seconds: 20,
+    auto_pilot: false,
     suggested_replies_enabled: true,
     auto_tagging_enabled: true,
     summary_enabled: true,
@@ -598,6 +750,26 @@ export function AdminSettingsPanel({
     model: 'claude-3-5-sonnet-20241022',
     ...(workspace.ai_settings || {}),
   });
+
+  const isAiDirty = useMemo(() => {
+    const orig = {
+      enabled: true,
+      auto_response_enabled: true,
+      auto_response_delay_seconds: 20,
+      auto_pilot: false,
+      suggested_replies_enabled: true,
+      auto_tagging_enabled: true,
+      summary_enabled: true,
+      sentiment_enabled: true,
+      provider: 'anthropic',
+      api_key: '',
+      base_url: '',
+      anthropic_api_key: '',
+      model: 'claude-3-5-sonnet-20241022',
+      ...(workspace.ai_settings || {}),
+    };
+    return JSON.stringify(aiSettings) !== JSON.stringify(orig);
+  }, [aiSettings, workspace.ai_settings]);
 
   const [testingProvider, setTestingProvider] = useState(false);
   const [providerTest, setProviderTest] = useState<{
@@ -799,10 +971,41 @@ export function AdminSettingsPanel({
     <div
       className={
         embedded
-          ? 'w-full'
-          : 'flex-1 flex flex-col h-full bg-canvas overflow-y-auto'
+          ? 'w-full relative'
+          : 'flex-1 flex flex-col h-full bg-canvas overflow-y-auto relative'
       }
     >
+      {/* Toast Notification (Visible at top-right on save across all tabs) */}
+      {statusMessage && (
+        <div
+          role="status"
+          aria-live="polite"
+          className={cn(
+            'fixed top-5 right-5 z-[9999] px-4 py-2.5 rounded-xl text-xs font-semibold flex items-center gap-2.5 shadow-2xl border animate-rise transition-all backdrop-blur-md',
+            statusMessage.type === 'success'
+              ? 'bg-emerald-50/95 text-emerald-900 border-emerald-300 dark:bg-emerald-950/95 dark:text-emerald-100 dark:border-emerald-700'
+              : 'bg-rose-50/95 text-rose-900 border-rose-300 dark:bg-rose-950/95 dark:text-rose-100 dark:border-rose-700'
+          )}
+        >
+          {statusMessage.type === 'success' ? (
+            <div className="w-5 h-5 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0">
+              <Check className="w-3.5 h-3.5 stroke-[3]" />
+            </div>
+          ) : (
+            <div className="w-5 h-5 rounded-full bg-rose-500 text-white flex items-center justify-center shrink-0">
+              <AlertCircle className="w-3.5 h-3.5 stroke-[3]" />
+            </div>
+          )}
+          <span className="text-[13px]">{statusMessage.text}</span>
+          <button
+            type="button"
+            onClick={() => setStatusMessage(null)}
+            className="ml-1 text-ink-3 hover:text-ink p-0.5 rounded-md"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
       {!embedded && (
       <>
       {/* Header */}
@@ -853,7 +1056,7 @@ export function AdminSettingsPanel({
           { id: 'canned', label: 'Canned Replies', icon: MessageSquareText, badge: cannedResponses.length },
           { id: 'assignment', label: 'Auto-Assignment', icon: Sliders },
           { id: 'ai', label: 'AI assistant', icon: Sparkles },
-          { id: 'email', label: 'Email & Hostinger SMTP', icon: Mail },
+          { id: 'email', label: 'Email (SMTP)', icon: Mail },
           { id: 'snippet', label: 'Install Snippet', icon: Code },
         ].map((tab) => {
           const active = activeTab === tab.id;
@@ -925,23 +1128,6 @@ export function AdminSettingsPanel({
                     Customize brand colors, logo, floating launcher button &amp; greetings in real time.
                   </p>
                 </div>
-                <button
-                  onClick={handleSaveWidget}
-                  disabled={saving}
-                  className="btn btn-sm btn-primary gap-2 shadow-md font-bold px-4 py-2 shrink-0 text-[13px]"
-                >
-                  {saving ? (
-                    <>
-                      <RefreshCw className="w-4 h-4 animate-spin" />
-                      <span>Saving…</span>
-                    </>
-                  ) : (
-                    <>
-                      <Check className="w-4 h-4" />
-                      <span>Save All Changes</span>
-                    </>
-                  )}
-                </button>
               </div>
 
               {/* Step 1: Brand Color & Visual Theme */}
@@ -1512,16 +1698,17 @@ export function AdminSettingsPanel({
                 </div>
               </div>
 
-              {/* Bottom Sticky Save Bar */}
-              <div className="sticky bottom-6 z-10 card p-4.5 flex items-center justify-between bg-surface/95 backdrop-blur-md border-2 border-line-2 shadow-xl">
-                <div className="flex items-center gap-2.5 text-xs text-ink font-semibold">
-                  <Sparkles className="w-4 h-4 text-accent shrink-0" />
-                  <span>Changes apply to your website immediately after clicking save.</span>
+              {/* Slim Sticky Footer Bar */}
+              <div className="sticky bottom-0 z-20 px-6 py-3 border-t border-line bg-surface/95 backdrop-blur-sm flex items-center justify-between gap-4 shadow-sm -mx-6 md:-mx-8">
+                <div className="flex items-center gap-2 text-xs text-ink-2 truncate">
+                  <Sparkles className="w-3.5 h-3.5 text-accent shrink-0" />
+                  <span className="truncate">Changes apply to your website immediately after clicking save.</span>
                 </div>
                 <button
+                  type="button"
                   onClick={handleSaveWidget}
-                  disabled={saving}
-                  className="btn btn-sm btn-primary gap-2 shadow-md font-bold px-6 py-2.5 shrink-0 text-[13px]"
+                  disabled={!isWidgetDirty || saving}
+                  className="btn btn-sm btn-primary gap-2 shadow-xs font-semibold px-4 py-2 shrink-0 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {saving ? (
                     <>
@@ -1830,8 +2017,8 @@ export function AdminSettingsPanel({
                     </a>
                     <button
                       onClick={handleSaveHelpCenter}
-                      disabled={savingHelpCenter}
-                      className="btn btn-sm btn-primary gap-1.5 shadow-xs"
+                      disabled={!isHelpCenterDirty || savingHelpCenter}
+                      className="btn btn-sm btn-primary gap-1.5 shadow-xs disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {savingHelpCenter ? 'Saving…' : 'Save Changes'}
                     </button>
@@ -2235,8 +2422,8 @@ export function AdminSettingsPanel({
                   </button>
                   <button
                     onClick={handleSaveBusinessHours}
-                    disabled={saving}
-                    className="btn btn-sm btn-primary gap-1.5 shadow-xs"
+                    disabled={!isHoursDirty || saving}
+                    className="btn btn-sm btn-primary gap-1.5 shadow-xs disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {saving ? 'Saving…' : 'Save Schedule'}
                   </button>
@@ -2264,28 +2451,65 @@ export function AdminSettingsPanel({
                 </label>
               </div>
 
-              {/* Timezone Selector */}
-              <div className="flex items-center gap-4">
-                <label className="field-label mb-0 shrink-0">Timezone</label>
-                <select
-                  value={businessHours.timezone}
-                  onChange={(e) =>
-                    setBusinessHours({ ...businessHours, timezone: e.target.value })
-                  }
-                  className="input w-64 text-xs font-medium"
-                >
-                  <option value="UTC">UTC (Universal Coordinated Time)</option>
-                  <option value="America/New_York">Eastern Time (US & Canada)</option>
-                  <option value="America/Chicago">Central Time (US & Canada)</option>
-                  <option value="America/Denver">Mountain Time (US & Canada)</option>
-                  <option value="America/Los_Angeles">Pacific Time (US & Canada)</option>
-                  <option value="Europe/London">London (GMT / BST)</option>
-                  <option value="Europe/Paris">Paris, Berlin, Rome (CET)</option>
-                  <option value="Asia/Dubai">Dubai (GST)</option>
-                  <option value="Asia/Karachi">Karachi, Islamabad (PKT)</option>
-                  <option value="Asia/Tokyo">Tokyo, Osaka (JST)</option>
-                  <option value="Australia/Sydney">Sydney (AEST)</option>
-                </select>
+              {/* Timezone Selector with Full IANA Search */}
+              <div className="space-y-1.5 max-w-md">
+                <label className="field-label mb-0">Workspace Timezone (Full IANA List)</label>
+                <div className="relative">
+                  <div
+                    onClick={() => setTzDropdownOpen(!tzDropdownOpen)}
+                    className="input flex items-center justify-between cursor-pointer text-xs font-mono select-none"
+                  >
+                    <span className="truncate">{businessHours.timezone || 'UTC'}</span>
+                    <ChevronDown className={cn("w-4 h-4 text-ink-3 transition-transform", tzDropdownOpen && "rotate-180")} />
+                  </div>
+
+                  {tzDropdownOpen && (
+                    <div className="absolute left-0 top-full mt-1.5 w-full bg-surface border border-line rounded-xl shadow-xl z-30 p-2 space-y-2 animate-rise">
+                      <div className="relative">
+                        <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-3" />
+                        <input
+                          type="text"
+                          autoFocus
+                          placeholder="Search IANA timezone (e.g. New York, Karachi, London, Tokyo)…"
+                          value={tzSearch}
+                          onChange={(e) => setTzSearch(e.target.value)}
+                          className="input pl-8 py-1.5 text-xs w-full font-sans"
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                      </div>
+                      <div className="max-h-56 overflow-y-auto divide-y divide-line/40 text-xs font-mono">
+                        {filteredTimezones.length === 0 ? (
+                          <div className="p-3 text-center text-ink-3 font-sans">No matching timezone found</div>
+                        ) : (
+                          filteredTimezones.map((tz) => {
+                            const isSelected = businessHours.timezone === tz;
+                            return (
+                              <button
+                                key={tz}
+                                type="button"
+                                onClick={() => {
+                                  setBusinessHours({ ...businessHours, timezone: tz });
+                                  setTzDropdownOpen(false);
+                                  setTzSearch('');
+                                }}
+                                className={cn(
+                                  "w-full text-left px-2.5 py-1.5 rounded-lg flex items-center justify-between hover:bg-surface-2 transition-colors",
+                                  isSelected ? "bg-accent/10 text-accent font-semibold" : "text-ink"
+                                )}
+                              >
+                                <span>{tz.replace(/_/g, ' ')}</span>
+                                {isSelected && <Check className="w-3.5 h-3.5 text-accent" />}
+                              </button>
+                            );
+                          })
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+                <p className="text-[11px] text-ink-3">
+                  All active business hour evaluations run against this local timezone.
+                </p>
               </div>
 
               {/* 7 Days Schedule Table */}
@@ -2384,10 +2608,10 @@ export function AdminSettingsPanel({
                   return (
                     <div
                       key={agent.id}
-                      className="p-4 px-6 flex items-center justify-between hover:bg-surface-2/40 transition-colors"
+                      className="p-4 px-4 sm:px-6 flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 hover:bg-surface-2/40 transition-colors"
                     >
-                      <div className="flex items-center gap-3.5">
-                        <div className="relative">
+                      <div className="flex items-center gap-3.5 min-w-0">
+                        <div className="relative shrink-0">
                           <div className="w-10 h-10 rounded-full bg-accent/10 text-accent font-bold text-sm flex items-center justify-center">
                             {agent.name.slice(0, 2).toUpperCase()}
                           </div>
@@ -2401,25 +2625,25 @@ export function AdminSettingsPanel({
                             }`}
                           />
                         </div>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <span className="font-semibold text-[13.5px] text-ink">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-semibold text-[13.5px] text-ink break-words">
                               {agent.name}
                             </span>
                             {isSelf && (
-                              <span className="text-[10.5px] px-1.5 py-0.5 rounded bg-surface-2 text-ink-2 font-medium">
+                              <span className="text-[10.5px] px-1.5 py-0.5 rounded bg-surface-2 text-ink-2 font-medium shrink-0">
                                 You
                               </span>
                             )}
                           </div>
-                          <div className="text-[12px] text-ink-3">{agent.email}</div>
+                          <div className="text-[12px] text-ink-3 break-all">{agent.email}</div>
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-4">
+                      <div className="flex items-center gap-3 flex-wrap sm:shrink-0 self-start sm:self-auto pl-13 sm:pl-0">
                         {/* Role Selector */}
                         {isOwner ? (
-                          <span className="px-3 py-1 rounded-full bg-purple-500/10 text-purple-600 font-semibold text-xs flex items-center gap-1">
+                          <span className="px-3 py-1 rounded-full bg-purple-500/10 text-purple-600 font-semibold text-xs flex items-center gap-1 shrink-0">
                             <ShieldCheck className="w-3.5 h-3.5" />
                             Owner
                           </span>
@@ -2430,7 +2654,7 @@ export function AdminSettingsPanel({
                             onChange={(e) =>
                               handleUpdateRole(agent.id, e.target.value as 'admin' | 'agent')
                             }
-                            className="input py-1 text-xs font-semibold w-28"
+                            className="input py-1 text-xs font-semibold w-28 shrink-0"
                           >
                             <option value="agent">Agent</option>
                             <option value="admin">Admin</option>
@@ -2443,7 +2667,7 @@ export function AdminSettingsPanel({
                             type="button"
                             onClick={() => handleRemoveAgent(agent.id, agent.name)}
                             title="Remove agent"
-                            className="p-1.5 rounded-lg text-ink-3 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors"
+                            className="p-1.5 rounded-lg text-ink-3 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors shrink-0"
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
@@ -2740,8 +2964,8 @@ export function AdminSettingsPanel({
                 </div>
                 <button
                   onClick={handleSaveAutoAssign}
-                  disabled={saving}
-                  className="btn btn-sm btn-primary gap-1.5 shadow-xs"
+                  disabled={!isAutoAssignDirty || saving}
+                  className="btn btn-sm btn-primary gap-1.5 shadow-xs disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {saving ? 'Saving…' : 'Save Rules'}
                 </button>
@@ -2797,7 +3021,7 @@ export function AdminSettingsPanel({
         )}
 
         {/* ─────────────────────────────────────────────────────────────────── */}
-        {/* TAB 7: CLAUDE AI ASSISTANT */}
+        {/* TAB 7: AI ASSISTANT & KNOWLEDGE BASE AGENT */}
         {/* ─────────────────────────────────────────────────────────────────── */}
         {activeTab === 'ai' && (
           <div className="space-y-6 animate-rise">
@@ -2806,20 +3030,12 @@ export function AdminSettingsPanel({
                 <div>
                   <h3 className="text-[16px] font-semibold text-ink flex items-center gap-2">
                     <Sparkles className="w-5 h-5 text-accent" />
-                    AI assistant
+                    AI Assistant & Knowledge Base Agent
                   </h3>
                   <p className="text-[12.5px] text-ink-3 mt-0.5">
-                    Configure AI auto-first-responses, smart suggested replies, auto-tagging, sentiment analysis, and summaries.
+                    Unified AI support assistant and autonomous knowledge base agent across website live chat and omnichannel integrations.
                   </p>
                 </div>
-                <button
-                  onClick={handleSaveAISettings}
-                  disabled={saving}
-                  className="btn btn-sm btn-primary gap-1.5 shadow-xs"
-                >
-                  <Sparkles className="w-4 h-4" />
-                  <span>{saving ? 'Saving…' : 'Save AI Settings'}</span>
-                </button>
               </div>
 
               {/* Master Switch */}
@@ -2830,15 +3046,19 @@ export function AdminSettingsPanel({
                   </div>
                   <div>
                     <div className="text-[14px] font-semibold text-ink flex items-center gap-2">
-                      AI live support assistant
-                      {aiSettings.enabled && (
+                      Master AI Agent
+                      {aiSettings.enabled ? (
                         <span className="text-[10.5px] px-2 py-0.5 rounded-full bg-success-soft text-success font-bold">
                           ACTIVE
+                        </span>
+                      ) : (
+                        <span className="text-[10.5px] px-2 py-0.5 rounded-full bg-surface-3 text-ink-3 font-medium">
+                          DISABLED
                         </span>
                       )}
                     </div>
                     <p className="text-[12px] text-ink-3">
-                      Turns the assistant on for this workspace. With no API key it still answers from your help centre and team notes.
+                      Master toggle for this workspace. Formulates responses directly from your published help desk articles and notes.
                     </p>
                   </div>
                 </div>
@@ -2857,9 +3077,9 @@ export function AdminSettingsPanel({
               <div className="p-5 rounded-2xl border border-line bg-surface space-y-3">
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <h4 className="text-[13.5px] font-semibold text-ink">System prompt</h4>
+                    <h4 className="text-[13.5px] font-semibold text-ink">System Prompt & Agent Persona</h4>
                     <p className="text-[11.5px] text-ink-3">
-                      Who the assistant is and how it answers. Facts always come from your published help desk articles.
+                      Defines who the assistant is, its tone, and response constraints. Facts are always anchored in your published articles.
                     </p>
                   </div>
                   <span className="text-[10.5px] text-ink-3 font-mono shrink-0">
@@ -2869,18 +3089,18 @@ export function AdminSettingsPanel({
                 <textarea
                   value={aiSettings.system_prompt || ''}
                   onChange={(e) => setAiSettings({ ...aiSettings, system_prompt: e.target.value })}
-                  rows={14}
+                  rows={8}
                   placeholder="You are the support assistant for… Answer only from the knowledge base…"
                   className="w-full px-3 py-2.5 rounded-xl border border-line bg-surface-2 text-[12.5px] leading-relaxed font-mono text-ink resize-y focus:outline-none focus:ring-1 focus:ring-accent"
                 />
                 <p className="text-[11px] text-ink-3">
-                  Leave empty to use the built-in default. Used for website chat, WhatsApp, Messenger, Instagram and LinkedIn.
+                  Leave empty to use the built-in default. Applies to web widget, WhatsApp, Messenger, Instagram, and LinkedIn.
                 </p>
               </div>
 
-              {/* Feature Grid */}
+              {/* Automation Modes */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                {/* 1. Auto First-Response (RAG) */}
+                {/* 1. Auto First-Reply with Delay */}
                 <div className="p-5 rounded-2xl border border-line bg-surface space-y-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2.5">
@@ -2888,8 +3108,8 @@ export function AdminSettingsPanel({
                         <Zap className="w-4 h-4" />
                       </div>
                       <div>
-                        <h4 className="text-[13.5px] font-semibold text-ink">AI Auto-First-Response (RAG)</h4>
-                        <p className="text-[11.5px] text-ink-3">Answers customer questions using Knowledge Base articles</p>
+                        <h4 className="text-[13.5px] font-semibold text-ink">Auto First Reply</h4>
+                        <p className="text-[11.5px] text-ink-3">Answers incoming questions if no agent claims the chat</p>
                       </div>
                     </div>
                     <label className="relative inline-flex items-center cursor-pointer">
@@ -2905,14 +3125,14 @@ export function AdminSettingsPanel({
 
                   <div className="space-y-2 pt-2 border-t border-line">
                     <div className="flex items-center justify-between text-xs">
-                      <span className="text-ink-2 font-medium">Trigger delay (seconds unassigned):</span>
+                      <span className="text-ink-2 font-medium">Auto-reply delay (seconds unassigned):</span>
                       <span className="font-bold text-accent px-2 py-0.5 rounded bg-surface-2 border border-line">
                         {aiSettings.auto_response_delay_seconds}s
                       </span>
                     </div>
                     <input
                       type="range"
-                      min={10}
+                      min={5}
                       max={60}
                       step={5}
                       value={aiSettings.auto_response_delay_seconds}
@@ -2925,22 +3145,50 @@ export function AdminSettingsPanel({
                       className="w-full accent-accent cursor-pointer"
                     />
                     <p className="text-[11px] text-ink-3">
-                      If no human agent responds within this duration, the assistant checks documentation and answers.
+                      Waits this many seconds before consulting knowledge base articles to draft and send the first answer.
                     </p>
                   </div>
                 </div>
 
-                {/* 2. Suggested Replies */}
+                {/* 2. Full Autopilot */}
                 <div className="p-5 rounded-2xl border border-line bg-surface space-y-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2.5">
-                      <div className="w-8 h-8 rounded-lg bg-blue-500/10 text-blue-500 flex items-center justify-center">
-                        <MessageSquare className="w-4 h-4" />
+                      <div className="w-8 h-8 rounded-lg bg-purple-500/10 text-purple-500 flex items-center justify-center">
+                        <Sparkles className="w-4 h-4" />
                       </div>
                       <div>
-                        <h4 className="text-[13.5px] font-semibold text-ink">AI Suggested Replies</h4>
-                        <p className="text-[11.5px] text-ink-3">2-3 contextual response drafts for agents</p>
+                        <h4 className="text-[13.5px] font-semibold text-ink">Full Autopilot</h4>
+                        <p className="text-[11.5px] text-ink-3">Continuously answers follow-up visitor messages</p>
                       </div>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={aiSettings.auto_pilot ?? false}
+                        onChange={(e) => setAiSettings({ ...aiSettings, auto_pilot: e.target.checked })}
+                        className="sr-only peer"
+                      />
+                      <div className="w-9 h-5 bg-surface-3 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-accent"></div>
+                    </label>
+                  </div>
+
+                  <div className="space-y-2 pt-2 border-t border-line text-xs">
+                    <p className="text-[12px] text-ink-2 leading-relaxed">
+                      Operates the AI as an autonomous knowledge agent throughout conversation lifecycles. Automatically yields back to human agents when escalated or claimed.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Agent Copilot Enhancements */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-1">
+                {/* Suggested Replies */}
+                <div className="p-4 rounded-xl border border-line bg-surface space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <MessageSquare className="w-4 h-4 text-blue-500" />
+                      <span className="text-[13px] font-semibold text-ink">Suggested Replies</span>
                     </div>
                     <label className="relative inline-flex items-center cursor-pointer">
                       <input
@@ -2949,25 +3197,18 @@ export function AdminSettingsPanel({
                         onChange={(e) => setAiSettings({ ...aiSettings, suggested_replies_enabled: e.target.checked })}
                         className="sr-only peer"
                       />
-                      <div className="w-9 h-5 bg-surface-3 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-accent"></div>
+                      <div className="w-8 h-4 bg-surface-3 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[1px] after:left-[1px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3.5 after:w-3.5 after:transition-all peer-checked:bg-accent"></div>
                     </label>
                   </div>
-                  <p className="text-[11.5px] text-ink-3 leading-relaxed">
-                    Displays 2-3 interactive response suggestion pills above the chat composer that agents can click to insert with 1 tap.
-                  </p>
+                  <p className="text-[11px] text-ink-3">Clickable pills above composer for agents.</p>
                 </div>
 
-                {/* 3. Auto-Tagging */}
-                <div className="p-5 rounded-2xl border border-line bg-surface space-y-4">
+                {/* Auto-Tagging */}
+                <div className="p-4 rounded-xl border border-line bg-surface space-y-2">
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-500 flex items-center justify-center">
-                        <Check className="w-4 h-4" />
-                      </div>
-                      <div>
-                        <h4 className="text-[13.5px] font-semibold text-ink">Auto-Tagging & Categorization</h4>
-                        <p className="text-[11.5px] text-ink-3">Suggests #Billing, #Bug, #Refund, #VIP</p>
-                      </div>
+                    <div className="flex items-center gap-2">
+                      <Check className="w-4 h-4 text-emerald-500" />
+                      <span className="text-[13px] font-semibold text-ink">Auto-Tagging</span>
                     </div>
                     <label className="relative inline-flex items-center cursor-pointer">
                       <input
@@ -2976,58 +3217,30 @@ export function AdminSettingsPanel({
                         onChange={(e) => setAiSettings({ ...aiSettings, auto_tagging_enabled: e.target.checked })}
                         className="sr-only peer"
                       />
-                      <div className="w-9 h-5 bg-surface-3 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-accent"></div>
+                      <div className="w-8 h-4 bg-surface-3 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[1px] after:left-[1px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3.5 after:w-3.5 after:transition-all peer-checked:bg-accent"></div>
                     </label>
                   </div>
-                  <p className="text-[11.5px] text-ink-3 leading-relaxed">
-                    Extracts customer intent from incoming messages and applies tags automatically to simplify inbox triage.
-                  </p>
+                  <p className="text-[11px] text-ink-3">Categorizes threads by intent (#Billing, #Bug).</p>
                 </div>
 
-                {/* 4. Conversation Summary & Sentiment */}
-                <div className="p-5 rounded-2xl border border-line bg-surface space-y-4">
+                {/* Sentiment & Summary */}
+                <div className="p-4 rounded-xl border border-line bg-surface space-y-2">
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-8 h-8 rounded-lg bg-purple-500/10 text-purple-500 flex items-center justify-center">
-                        <Sparkles className="w-4 h-4" />
-                      </div>
-                      <div>
-                        <h4 className="text-[13.5px] font-semibold text-ink">Summary & Sentiment Badges</h4>
-                        <p className="text-[11.5px] text-ink-3">2-line summary for long threads + mood tags</p>
-                      </div>
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="w-4 h-4 text-purple-500" />
+                      <span className="text-[13px] font-semibold text-ink">Sentiment & Summary</span>
                     </div>
-                    <div className="flex items-center gap-3">
-                      <label className="relative inline-flex items-center cursor-pointer" title="Sentiment Analysis">
-                        <input
-                          type="checkbox"
-                          checked={aiSettings.sentiment_enabled}
-                          onChange={(e) => setAiSettings({ ...aiSettings, sentiment_enabled: e.target.checked })}
-                          className="sr-only peer"
-                        />
-                        <div className="w-9 h-5 bg-surface-3 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-accent"></div>
-                      </label>
-                    </div>
-                  </div>
-                  <div className="space-y-2 pt-1 border-t border-line text-xs">
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={aiSettings.summary_enabled}
-                        onChange={(e) => setAiSettings({ ...aiSettings, summary_enabled: e.target.checked })}
-                        className="rounded border-line text-accent focus:ring-accent"
-                      />
-                      <span className="text-ink-2 font-medium">Generate 2-line AI summary for threads &ge; 4 messages</span>
-                    </label>
-                    <label className="flex items-center gap-2 cursor-pointer">
+                    <label className="relative inline-flex items-center cursor-pointer">
                       <input
                         type="checkbox"
                         checked={aiSettings.sentiment_enabled}
-                        onChange={(e) => setAiSettings({ ...aiSettings, sentiment_enabled: e.target.checked })}
-                        className="rounded border-line text-accent focus:ring-accent"
+                        onChange={(e) => setAiSettings({ ...aiSettings, sentiment_enabled: e.target.checked, summary_enabled: e.target.checked })}
+                        className="sr-only peer"
                       />
-                      <span className="text-ink-2 font-medium">Flag conversations as Positive / Neutral / Negative</span>
+                      <div className="w-8 h-4 bg-surface-3 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[1px] after:left-[1px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3.5 after:w-3.5 after:transition-all peer-checked:bg-accent"></div>
                     </label>
                   </div>
+                  <p className="text-[11px] text-ink-3">Mood flags and quick summaries on long threads.</p>
                 </div>
               </div>
 
@@ -3152,15 +3365,6 @@ export function AdminSettingsPanel({
                         <Sparkles className="w-3.5 h-3.5" />
                         {testingProvider ? 'Testing…' : 'Test connection'}
                       </button>
-                      <button
-                        type="button"
-                        onClick={handleSaveAISettings}
-                        disabled={saving}
-                        className="btn btn-sm btn-primary gap-1.5 shadow-xs"
-                      >
-                        <Sparkles className="w-3.5 h-3.5" />
-                        <span>{saving ? 'Saving…' : 'Save AI Settings'}</span>
-                      </button>
                       {providerTest && (
                         <span
                           className={cn(
@@ -3184,6 +3388,32 @@ export function AdminSettingsPanel({
                     )}
                   </div>
                 </div>
+              </div>
+
+              {/* Slim Sticky Footer Bar */}
+              <div className="sticky bottom-0 z-20 px-6 py-3 border-t border-line bg-surface/95 backdrop-blur-sm flex items-center justify-between gap-4 shadow-sm -mx-6 md:-mx-8">
+                <div className="flex items-center gap-2 text-xs text-ink-2 truncate">
+                  <Sparkles className="w-3.5 h-3.5 text-accent shrink-0" />
+                  <span className="truncate">Changes to AI assistant settings take effect immediately.</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleSaveAISettings}
+                  disabled={!isAiDirty || saving}
+                  className="btn btn-sm btn-primary gap-2 shadow-xs font-semibold px-4 py-2 shrink-0 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {saving ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      <span>Saving…</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-3.5 h-3.5" />
+                      <span>Save AI Settings</span>
+                    </>
+                  )}
+                </button>
               </div>
             </div>
           </div>
