@@ -80,9 +80,27 @@ export async function generateMetadata({
     rawLogo ||
     (domain ? `https://www.google.com/s2/favicons?domain=${domain}&sz=128` : '/favicon.ico');
 
+  // Check if workspace has any published articles
+  const { count: publishedCount } = await supabase
+    .from('articles')
+    .select('id', { count: 'exact', head: true })
+    .eq('workspace_id', ws.id)
+    .eq('status', 'published');
+
+  const hasPublishedArticles = (publishedCount ?? 0) > 0;
+
   return {
-    title,
-    description,
+    title: hasPublishedArticles ? title : `${helpTitle} Help Center (Coming Soon)`,
+    description: hasPublishedArticles
+      ? description
+      : `Guides, troubleshooting steps and answers from the ${helpTitle} team are coming soon.`,
+    // If workspace has zero published articles, prevent search indexing
+    robots: hasPublishedArticles
+      ? undefined
+      : {
+          index: false,
+          follow: false,
+        },
     icons: {
       icon: [
         { url: faviconUrl },

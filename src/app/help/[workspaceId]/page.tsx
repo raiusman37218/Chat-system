@@ -18,6 +18,7 @@ import {
   Calendar,
   Clock,
   Sparkles,
+  Globe,
 } from 'lucide-react';
 import { Article, HelpSection, Workspace } from '@/types/database';
 import { createClient } from '@/lib/supabase/client';
@@ -389,7 +390,7 @@ function PublicHelpCenterContent() {
     >
       <HelpHeader workspace={workspace} onHome={() => setOpenCollection(null)} />
 
-      {/* Brand band: title + search, the only two things a visitor arrives for. */}
+      {/* Brand band: title + search (only shown when articles are published) */}
       <section className="bg-[#0b0b0f] px-4 sm:px-6 pt-10 pb-12 sm:pt-12 sm:pb-14">
         <div className="mx-auto max-w-3xl space-y-5">
           <div className="space-y-1.5">
@@ -399,36 +400,38 @@ function PublicHelpCenterContent() {
             <p className="text-[14px] text-white/50">
               {totalPublished > 0
                 ? `${totalPublished} ${totalPublished === 1 ? 'article' : 'articles'} from the ${title} team`
-                : `Answers from the ${title} team`}
+                : `Answers and resources from the ${title} team are on their way.`}
             </p>
           </div>
 
-          <div className="relative">
-            <Search className="w-[18px] h-[18px] text-white/40 absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none" />
-            <input
-              ref={searchRef}
-              type="search"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search for articles..."
-              aria-label="Search help articles"
-              className="w-full h-13 pl-11 pr-24 rounded-xl bg-white/[0.06] border border-white/12 text-[15px] text-white placeholder:text-white/35 outline-none transition-all focus:bg-white/[0.09] focus:border-white/25 [&::-webkit-search-cancel-button]:hidden"
-            />
-            {query ? (
-              <button
-                type="button"
-                onClick={() => setQuery('')}
-                aria-label="Clear search"
-                className="absolute right-3 top-1/2 -translate-y-1/2 w-7 h-7 grid place-items-center rounded-lg text-white/50 hover:text-white hover:bg-white/10 transition-colors"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            ) : (
-              <kbd className="absolute right-4 top-1/2 -translate-y-1/2 hidden sm:block px-1.5 py-0.5 rounded border border-white/15 text-[11px] font-medium text-white/40">
-                /
-              </kbd>
-            )}
-          </div>
+          {totalPublished > 0 && (
+            <div className="relative">
+              <Search className="w-[18px] h-[18px] text-white/40 absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <input
+                ref={searchRef}
+                type="search"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search for articles..."
+                aria-label="Search help articles"
+                className="w-full h-13 pl-11 pr-24 rounded-xl bg-white/[0.06] border border-white/12 text-[15px] text-white placeholder:text-white/35 outline-none transition-all focus:bg-white/[0.09] focus:border-white/25 [&::-webkit-search-cancel-button]:hidden"
+              />
+              {query ? (
+                <button
+                  type="button"
+                  onClick={() => setQuery('')}
+                  aria-label="Clear search"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 w-7 h-7 grid place-items-center rounded-lg text-white/50 hover:text-white hover:bg-white/10 transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              ) : (
+                <kbd className="absolute right-4 top-1/2 -translate-y-1/2 hidden sm:block px-1.5 py-0.5 rounded border border-white/15 text-[11px] font-medium text-white/40">
+                  /
+                </kbd>
+              )}
+            </div>
+          )}
         </div>
       </section>
 
@@ -443,7 +446,51 @@ function PublicHelpCenterContent() {
             : 'max-w-3xl'
         }`}
       >
-        {query.trim() ? (
+        {totalPublished === 0 ? (
+          <div className="max-w-xl mx-auto py-12 sm:py-16 text-center space-y-6 animate-rise">
+            <div className="w-16 h-16 rounded-3xl bg-accent-soft text-accent mx-auto flex items-center justify-center shadow-xs ring-1 ring-accent/20">
+              <Sparkles className="w-8 h-8 stroke-[1.75]" />
+            </div>
+            <div className="space-y-2">
+              <h2 className="text-[24px] sm:text-[28px] font-bold text-ink tracking-tight">
+                Help Center Coming Soon
+              </h2>
+              <p className="text-[14.5px] text-ink-3 max-w-md mx-auto leading-relaxed">
+                We&apos;re currently preparing helpful guides, FAQs, and step-by-step tutorials for {title}. Check back shortly!
+              </p>
+            </div>
+
+            <div className="pt-2 flex flex-wrap items-center justify-center gap-3">
+              <button
+                type="button"
+                onClick={openChat}
+                className="h-10 px-5 rounded-xl bg-accent text-white font-semibold text-[13px] inline-flex items-center gap-2 hover:opacity-95 shadow-xs transition-all cursor-pointer"
+              >
+                <MessageCircle className="w-4 h-4" />
+                <span>Chat with our team</span>
+              </button>
+
+              {workspace.website_url && (
+                <a
+                  href={workspace.website_url.startsWith('http') ? workspace.website_url : `https://${workspace.website_url}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="h-10 px-5 rounded-xl border border-line bg-surface hover:bg-surface-2 text-ink font-semibold text-[13px] inline-flex items-center gap-2 transition-all"
+                >
+                  <Globe className="w-4 h-4 text-ink-3" />
+                  <span>Visit website</span>
+                </a>
+              )}
+            </div>
+
+            <div className="pt-4">
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-surface-2 border border-line text-[11.5px] text-ink-3">
+                <Clock className="w-3.5 h-3.5 text-accent" />
+                <span>Articles are being prepared and will go live automatically once published.</span>
+              </div>
+            </div>
+          </div>
+        ) : query.trim() ? (
           <SearchResults
             query={query}
             results={results}

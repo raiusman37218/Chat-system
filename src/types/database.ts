@@ -341,7 +341,9 @@ export interface NavbarTriggerConfig {
   action: 'help' | 'messages' | 'redirect';
   auto_inject: boolean;
   style: 'navbar_link' | 'pill';
+  position?: 'start' | 'end';
   target_selector?: string;
+  dismissed_prompt?: boolean;
 }
 
 export interface PublicWorkspace {
@@ -366,6 +368,7 @@ export interface PublicWorkspace {
   help_center_footer_text: string | null;
   help_center_layout?: 'grid-2' | 'grid-3' | 'grid-4' | 'list' | null;
   navbar_trigger_config?: NavbarTriggerConfig | null;
+  slug_changes_count?: number | null;
   created_at: string;
 }
 
@@ -400,10 +403,15 @@ export interface Workspace {
   show_help_tab?: boolean | null;
   help_center_tab_icon?: string | null;
   slug?: string | null;
+  slug_changes_count?: number | null;
+  slug_changed_at?: string | null;
   custom_domain?: string | null;
   custom_domain_status?: 'pending' | 'verified' | 'failed' | null;
   custom_domain_verified_at?: string | null;
   custom_domain_verification_token?: string | null;
+  custom_domain_connected_at?: string | null;
+  custom_domain_last_checked_at?: string | null;
+  custom_domain_notification_sent?: string | null;
   help_center_title?: string | null;
   help_center_subtitle?: string | null;
   help_center_logo_url?: string | null;

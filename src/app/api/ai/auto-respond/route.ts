@@ -12,27 +12,15 @@ import { detectLanguage, translateToEnglish } from '@/lib/ai/translator';
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://vfjsaynnubxywdbevxtx.supabase.co';
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZmanNheW5udWJ4eXdkYmV2eHR4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgyNTA5MDEsImV4cCI6MjEwMzgyNjkwMX0.YyBCXMqwrOk5BRhQafYLFw8tiM5PC8lc8Yocodw9wf0';
 
+import { getWorkspaceHelpCenterUrl } from '@/lib/domain';
+
 /**
  * Where the customer can read the full article.
- *
- * A verified custom domain is the customer's own; otherwise the answer links
- * back to the platform path, which still works.
+ * Uses verified custom domain if live, otherwise platform help center subdomain.
  */
-function helpCenterUrlFor(ws: {
-  slug?: string | null;
-  custom_domain?: string | null;
-  custom_domain_status?: string | null;
-} | null): string | null {
+function helpCenterUrlFor(ws: any): string | null {
   if (!ws) return null;
-  if (ws.custom_domain && ws.custom_domain_status === 'verified') {
-    return `https://${ws.custom_domain}`;
-  }
-  const origin =
-    process.env.NEXT_PUBLIC_APP_URL ||
-    (process.env.VERCEL_PROJECT_PRODUCTION_URL
-      ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
-      : null);
-  return origin && ws.slug ? `${origin.replace(/\/$/, '')}/help/${ws.slug}` : null;
+  return getWorkspaceHelpCenterUrl(ws);
 }
 
 // The embeddable widget calls this after every visitor message, from the

@@ -28,6 +28,14 @@ export interface VercelDomainResult {
   /** True when the domain was already attached; treated as success. */
   alreadyExists?: boolean;
   error?: string;
+  code?: string;
+  verified?: boolean;
+  verification?: Array<{
+    type: string;
+    domain: string;
+    value: string;
+    reason: string;
+  }>;
 }
 
 function credentials() {
@@ -62,20 +70,37 @@ export async function addDomainToProject(
       }
     );
 
-    if (res.ok) return { configured: true, ok: true };
-
     const body = await res.json().catch(() => ({}));
+
+    if (res.ok) {
+      return {
+        configured: true,
+        ok: true,
+        verified: !!body?.verified,
+        verification: body?.verification || [],
+      };
+    }
+
     const code = body?.error?.code;
 
     // Re-saving the same domain must not read as a failure.
     if (code === 'domain_already_in_use' || code === 'domain_already_exists') {
-      return { configured: true, ok: true, alreadyExists: true };
+      const status = await getVercelDomainStatus(domain);
+      return {
+        configured: true,
+        ok: true,
+        alreadyExists: true,
+        verified: status.verified,
+        verification: status.verification || [],
+      };
     }
 
     return {
       configured: true,
       ok: false,
+      code,
       error: body?.error?.message || `Vercel returned HTTP ${res.status}`,
+      verification: body?.error?.verification || [],
     };
   } catch (err) {
     const e = err as { name?: string; message?: string };

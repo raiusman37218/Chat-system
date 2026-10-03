@@ -1031,6 +1031,22 @@ export default function ChatWidget({
                   {selectedArticle.content}
                 </div>
 
+                <div className="pt-2 pb-1">
+                  <a
+                    href={
+                      helpCenterPortalUrl
+                        ? `${helpCenterPortalUrl.replace(/\/$/, '')}/${selectedArticle.slug || selectedArticle.id}`
+                        : `/help/${config.workspaceId}/${selectedArticle.slug || selectedArticle.id}`
+                    }
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1.5 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline"
+                  >
+                    <span>Read the full article</span>
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </a>
+                </div>
+
                 {/* Helpful voting */}
                 <div className="pt-3 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between text-xs text-slate-500">
                   <span>Was this article helpful?</span>

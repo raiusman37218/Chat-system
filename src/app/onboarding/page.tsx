@@ -18,6 +18,7 @@ import { createWorkspaceAction } from '@/app/actions/admin';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { Logo } from '@/components/ui/Logo';
 import { cleanDomain, getDefaultSubdomain } from '@/lib/domain';
+import { formatWorkspaceSlug } from '@/lib/slug';
 
 const PRESET_COLORS = [
   { name: 'Electric Blue', hex: '#2e5bff' },
@@ -68,12 +69,8 @@ export default function OnboardingPage() {
         return;
       }
 
-      // Generate slug and default help subdomain
-      const baseSlug = (businessName || 'workspace')
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/(^-|-$)/g, '') || 'workspace';
-      const slug = `${baseSlug}-${Math.random().toString(36).substring(2, 6)}`;
+      // Generate clean workspace slug (uniqueness enforced by server action)
+      const slug = formatWorkspaceSlug(businessName || 'workspace') || 'workspace';
       const suggested = getDefaultSubdomain(websiteUrl);
       let customDomain =
         suggested && !suggested.includes('localhost') && !suggested.endsWith('.test')

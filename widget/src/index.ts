@@ -11,7 +11,9 @@ interface NavbarTriggerConfig {
   action: 'help' | 'messages' | 'redirect';
   auto_inject: boolean;
   style: 'navbar_link' | 'pill';
+  position?: 'start' | 'end';
   target_selector?: string;
+  dismissed_prompt?: boolean;
 }
 
 interface WidgetConfig {
@@ -31,6 +33,7 @@ interface WidgetConfig {
   welcomeText?: string;
   businessName?: string;
   customDomain?: string;
+  helpSlug?: string;
   navbarTriggerConfig?: NavbarTriggerConfig;
   apiUrl?: string;
   businessHours?: any;
@@ -340,8 +343,11 @@ class ChatifyWidget {
         if (data.help_center_tab_icon) {
           this.config.helpTabIcon = data.help_center_tab_icon;
         }
-        if (data.custom_domain) {
+        if (data.custom_domain && data.custom_domain_status === 'verified') {
           this.config.customDomain = data.custom_domain;
+        }
+        if (data.slug) {
+          this.config.helpSlug = data.slug;
         }
         if (data.navbar_trigger_config) {
           this.config.navbarTriggerConfig = data.navbar_trigger_config;
@@ -496,14 +502,19 @@ class ChatifyWidget {
 
       this.sections = uniqueSections;
 
-      if (!this.config.customDomain) {
+      if (!this.config.customDomain || !this.config.helpSlug) {
         const { data: ws } = await this.supabase
           .from('public_workspaces')
-          .select('custom_domain')
+          .select('custom_domain, custom_domain_status, slug')
           .eq('id', this.config.workspaceId)
           .maybeSingle();
-        if (ws?.custom_domain) {
-          this.config.customDomain = ws.custom_domain;
+        if (ws) {
+          if (ws.custom_domain && ws.custom_domain_status === 'verified') {
+            this.config.customDomain = ws.custom_domain;
+          }
+          if (ws.slug) {
+            this.config.helpSlug = ws.slug;
+          }
         }
       }
 
@@ -5796,266 +5807,327 @@ class ChatifyWidget {
   }
 
   /**
-   * Automatic Website Navbar Hooking & Injection:
-   * 1. Smart-hooks any matching links already present in host website navbar (e.g. "FAQ" or "Help")
-   * 2. If no matching link exists and auto_inject is enabled, creates a styled button and inserts into <nav>/<header>
-   * 3. Uses MutationObserver for resilience against React / Next.js SPA client-side navigations
+   * Website Navbar Button Auto-Injector (Zero-Code)
+   * Follows strict rules:
+   * 1. Always ADD a new link. Never change the href or click behaviour of an existing link on the host site.
+   *    Completely removed previous "auto-hook a link with the same name" behaviour.
+   * 2. If the nav already has a link whose href points to the workspace help center, do nothing.
+   * 3. Do not inject on the help center's own pages.
+   * 4. Insert into both the desktop menu and the mobile menu when both exist, once each.
+   *    Mark injected nodes with data-chatify-nav and never inject twice.
+   * 5. Re-check after client-side route changes with a MutationObserver that is throttled.
+   * 6. If no navigation is detected with confidence, do not inject.
+   * 7. If the workspace has zero published articles or the feature is off, remove any injected node.
    */
   private initNavbarAutoTrigger() {
+    if (typeof document === 'undefined' || typeof window === 'undefined') return;
+
     const navConfig = this.config.navbarTriggerConfig;
-    // 1. Must be OFF by default for every workspace and only run when the owner explicitly enables it.
+
+    // Helper to safely clean up any injected nodes
+    const removeInjectedNodes = () => {
+      document.querySelectorAll('[data-chatify-nav]').forEach((el) => el.remove());
+      // Also clean up any legacy IDs from previous widget versions
+      document.getElementById('chatifyNavTriggerBtn')?.remove();
+      document.getElementById('chatifyNavTriggerBtnMobile')?.remove();
+      // Remove any lingering hooked markers from prior sessions
+      document.querySelectorAll('[data-chatify-hooked]').forEach((el) => {
+        el.removeAttribute('data-chatify-hooked');
+        el.removeAttribute('data-chatify-help');
+      });
+    };
+
+    // 1. If feature is off or missing, remove any injected nodes
     if (!navConfig || navConfig.enabled !== true) {
-      document.getElementById('chatifyNavTriggerBtn')?.remove();
-      document.getElementById('chatifyNavTriggerBtnMobile')?.remove();
+      removeInjectedNodes();
       return;
     }
 
-    const action = navConfig.action || 'help';
-
-    // 4. If the workspace has zero published articles or Help tab is disabled, do nothing for help triggers
-    if ((action === 'help' || action === 'redirect') && (this.config.showHelpTab === false || this.faqs.length === 0)) {
-      document.getElementById('chatifyNavTriggerBtn')?.remove();
-      document.getElementById('chatifyNavTriggerBtnMobile')?.remove();
+    // 2. If the workspace has zero published articles, remove any injected nodes
+    const hasPublishedArticles = Array.isArray(this.faqs) && this.faqs.length > 0;
+    if (!hasPublishedArticles) {
+      removeInjectedNodes();
       return;
     }
 
-    const label = (navConfig.label || 'FAQ').trim();
+    // 3. Do not inject on the help center's own pages
+    const currentHost = window.location.hostname.toLowerCase();
+    const currentPath = window.location.pathname.toLowerCase();
+    const customDomain = (this.config.customDomain || '').toLowerCase().trim().replace(/^https?:\/\//, '').replace(/\/$/, '');
+    const helpSlug = (this.config.helpSlug || '').toLowerCase().trim();
+
+    if (
+      (customDomain && (currentHost === customDomain || currentHost === `www.${customDomain}` || currentHost.replace(/^www\./, '') === customDomain.replace(/^www\./, ''))) ||
+      currentHost.endsWith('chatifyhelp.com') ||
+      currentPath.startsWith('/help')
+    ) {
+      removeInjectedNodes();
+      return;
+    }
+
+    // Determine the resolved help center URL
+    let helpCenterUrl = '';
+    if (customDomain) {
+      helpCenterUrl = `https://${customDomain}`;
+    } else if (helpSlug) {
+      helpCenterUrl = `https://${helpSlug}.chatifyhelp.com`;
+    } else if (this.config.workspaceId) {
+      helpCenterUrl = `https://chatifyhelp.com/help/${this.config.workspaceId}`;
+    }
+
+    // 4. If the nav already has a link whose href points to the workspace help center, do nothing.
+    const allExistingNavLinks = Array.from(
+      document.querySelectorAll<HTMLAnchorElement>(
+        'header a, nav a, [role="navigation"] a, .navbar a, [class*="nav" i] a'
+      )
+    );
+
+    const alreadyHasHelpCenterLink = allExistingNavLinks.some((a) => {
+      if (a.hasAttribute('data-chatify-nav')) return false;
+      const href = (a.getAttribute('href') || '').toLowerCase().trim();
+      if (!href || href === '#' || href.startsWith('javascript:')) return false;
+      if (customDomain && href.includes(customDomain)) return true;
+      if (helpSlug && (href.includes(`/${helpSlug}`) || href.includes(`${helpSlug}.`))) return true;
+      if (this.config.workspaceId && href.includes(`/help/${this.config.workspaceId.toLowerCase()}`)) return true;
+      if (href.includes('chatifyhelp.com')) return true;
+      return false;
+    });
+
+    if (alreadyHasHelpCenterLink) {
+      removeInjectedNodes();
+      return;
+    }
+
+    const label = (navConfig.label || 'Help').trim();
     if (!label) return;
 
-    const labelLower = label.toLowerCase();
+    const action = navConfig.action || 'help';
+    const position = navConfig.position || 'end';
+    const style = navConfig.style || 'navbar_link';
 
-    const performAction = (e?: Event) => {
-      if (e) e.preventDefault();
-      if (action === 'messages') {
-        this.openMessages();
-      } else if (action === 'redirect') {
-        const domain = this.config.customDomain;
-        if (domain) {
-          window.open(`https://${domain}`, '_blank');
-        } else {
-          this.openHelp();
-        }
-      } else {
+    // Click handler for injected link
+    const handleLinkClick = (e: MouseEvent) => {
+      if (action === 'help') {
+        e.preventDefault();
         this.openHelp();
+      } else if (action === 'messages') {
+        e.preventDefault();
+        this.openMessages();
       }
+      // If action === 'redirect', default link navigation to href with target="_blank" proceeds
     };
 
-    const attachOrInject = () => {
-      if (typeof document === 'undefined') return;
+    // Helper to create the injected link (and optional li wrapper if container is ul/ol)
+    const createNavElement = (container: HTMLElement, isMobile: boolean): HTMLElement => {
+      const isList = container.tagName.toLowerCase() === 'ul' || container.tagName.toLowerCase() === 'ol';
+      const a = document.createElement('a');
+      a.textContent = label;
+      a.setAttribute('data-chatify-nav', isMobile ? 'mobile' : 'desktop');
 
-      // 2. Explicit CSS Selector Targeting ONLY:
-      // Never hijack existing links on host site named "Help" or "FAQ".
-      // Only a link the owner explicitly targets with a CSS selector may be hooked.
-      const targetSelector = navConfig.target_selector?.trim();
-      let targetedElementHooked = false;
+      if (action === 'redirect' && helpCenterUrl) {
+        a.href = helpCenterUrl;
+        a.target = '_blank';
+        a.rel = 'noopener noreferrer';
+      } else {
+        a.href = 'javascript:void(0)';
+      }
 
-      if (targetSelector) {
-        try {
-          const targetedElements = Array.from(document.querySelectorAll<HTMLElement>(targetSelector));
-          for (const el of targetedElements) {
-            if (
-              el.closest('#chatifyWidgetContainer') ||
-              el.id === 'chatifyNavTriggerBtn' ||
-              el.id === 'chatifyNavTriggerBtnMobile'
-            ) {
-              continue;
-            }
+      a.addEventListener('click', handleLinkClick);
 
-            const tagName = el.tagName.toLowerCase();
-            if (
-              tagName === 'a' ||
-              tagName === 'button' ||
-              el.getAttribute('role') === 'button' ||
-              el.getAttribute('role') === 'link'
-            ) {
-              if (!el.hasAttribute('data-chatify-hooked')) {
-                el.setAttribute('data-chatify-hooked', 'true');
-                el.setAttribute('data-chatify-help', 'true');
-                el.style.cursor = 'pointer';
-                el.addEventListener('click', (e) => performAction(e));
-              }
-              targetedElementHooked = true;
-            }
+      // Find an existing sibling link in the container to copy styles/classes
+      const siblingLink = container.querySelector<HTMLAnchorElement>('a:not([data-chatify-nav])');
+
+      if (style === 'pill') {
+        const bg = this.config.primaryColor || '#2563eb';
+        a.style.cssText = `
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          padding: ${isMobile ? '4px 12px' : '6px 16px'};
+          font-size: ${isMobile ? '13px' : '14px'};
+          font-weight: 600;
+          border-radius: 9999px;
+          background-color: ${bg};
+          color: #ffffff !important;
+          text-decoration: none;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+          white-space: nowrap;
+          line-height: 1.4;
+        `;
+        a.onmouseenter = () => { a.style.filter = 'brightness(1.1)'; };
+        a.onmouseleave = () => { a.style.filter = 'none'; };
+      } else {
+        // 'navbar_link' - match existing links
+        if (siblingLink) {
+          if (siblingLink.className) {
+            a.className = siblingLink.className;
           }
-        } catch (err) {
-          console.warn('[Chatify] Invalid target_selector:', targetSelector, err);
+          // Copy computed typography & layout styles for high fidelity
+          try {
+            const cs = window.getComputedStyle(siblingLink);
+            a.style.color = cs.color;
+            a.style.fontFamily = cs.fontFamily;
+            a.style.fontSize = cs.fontSize;
+            a.style.fontWeight = cs.fontWeight;
+            a.style.letterSpacing = cs.letterSpacing;
+            a.style.textTransform = cs.textTransform;
+            a.style.lineHeight = cs.lineHeight;
+            a.style.padding = cs.padding;
+            a.style.display = cs.display === 'inline' ? 'inline-block' : cs.display;
+            a.style.cursor = 'pointer';
+            a.style.textDecoration = 'none';
+          } catch {}
+        } else {
+          a.style.cssText = `
+            display: inline-flex;
+            align-items: center;
+            font-size: 14px;
+            font-weight: 500;
+            color: inherit;
+            text-decoration: none;
+            cursor: pointer;
+            padding: 6px 12px;
+          `;
         }
       }
 
-      // If an explicitly targeted link/button was hooked, remove any injected buttons and do not inject
-      if (targetedElementHooked) {
-        document.getElementById('chatifyNavTriggerBtn')?.remove();
-        document.getElementById('chatifyNavTriggerBtnMobile')?.remove();
-        return;
+      if (isList) {
+        const li = document.createElement('li');
+        li.setAttribute('data-chatify-nav', isMobile ? 'mobile' : 'desktop');
+        const siblingLi = container.querySelector<HTMLLIElement>('li:not([data-chatify-nav])');
+        if (siblingLi && siblingLi.className) {
+          li.className = siblingLi.className;
+        }
+        li.appendChild(a);
+        return li;
       }
 
-      // 3. Do not inject a duplicate button if already injected or if a similar one exists on the host site
-      if (document.getElementById('chatifyNavTriggerBtn')) return;
+      return a;
+    };
 
-      const existingNavItems = Array.from(
+    // Helper to find navigation containers
+    const findNavContainers = (): { desktop: HTMLElement | null; mobile: HTMLElement | null } => {
+      // 1. If user specified an explicit target selector, use that with highest priority
+      const explicitSelector = navConfig.target_selector?.trim();
+      if (explicitSelector) {
+        try {
+          const matched = document.querySelector<HTMLElement>(explicitSelector);
+          if (matched && !matched.closest('#chatifyWidgetContainer')) {
+            return { desktop: matched, mobile: null };
+          }
+        } catch {}
+      }
+
+      // 2. Detect main desktop navigation:
+      // "the <nav> or header list with the most top-level links"
+      const candidateElements = Array.from(
         document.querySelectorAll<HTMLElement>(
-          'header a, header button, nav a, nav button, [role="navigation"] a, [role="navigation"] button, .navbar a, .navbar button'
+          'header nav ul, header nav, nav ul, nav, [role="navigation"] ul, [role="navigation"], .navbar-nav, .navbar, [class*="nav" i] ul'
         )
-      );
-
-      const hasSimilarLink = existingNavItems.some((item) => {
-        if (
-          item.closest('#chatifyWidgetContainer') ||
-          item.id === 'chatifyNavTriggerBtn' ||
-          item.id === 'chatifyNavTriggerBtnMobile'
-        ) {
-          return false;
-        }
-        const text = (item.textContent || '').trim().toLowerCase();
-        const ariaLabel = (item.getAttribute('aria-label') || '').trim().toLowerCase();
-        return text === labelLower || ariaLabel === labelLower || item.getAttribute('data-chatify-help') === 'true';
+      ).filter((el) => {
+        if (el.closest('#chatifyWidgetContainer')) return false;
+        const style = window.getComputedStyle(el);
+        return style.display !== 'none' && style.visibility !== 'hidden';
       });
 
-      if (hasSimilarLink) {
-        // A similar button/link already exists on the host site navbar; do not inject duplicate
+      let bestDesktop: HTMLElement | null = null;
+      let maxScore = -1;
+
+      for (const el of candidateElements) {
+        const isList = el.tagName.toLowerCase() === 'ul' || el.tagName.toLowerCase() === 'ol';
+        let linkCount = 0;
+        if (isList) {
+          const directLis = Array.from(el.children).filter((c) => c.tagName.toLowerCase() === 'li');
+          linkCount = directLis.filter((li) => li.querySelector('a')).length;
+        } else {
+          linkCount = Array.from(el.querySelectorAll('a')).filter((a) => !a.closest('#chatifyWidgetContainer')).length;
+        }
+
+        if (linkCount < 2) continue;
+
+        let score = linkCount * 3;
+        const tag = el.tagName.toLowerCase();
+        if (tag === 'nav' || el.getAttribute('role') === 'navigation') score += 10;
+        if (el.closest('header')) score += 5;
+        if (el.closest('[class*="mobile" i]') || el.closest('[id*="mobile" i]')) {
+          score -= 20;
+        }
+
+        if (score > maxScore) {
+          maxScore = score;
+          bestDesktop = el;
+        }
+      }
+
+      // 3. Detect mobile navigation container if one exists
+      let bestMobile: HTMLElement | null = null;
+      const mobileCandidates = Array.from(
+        document.querySelectorAll<HTMLElement>(
+          '[class*="mobile" i] nav ul, [class*="mobile" i] nav, [id*="mobile" i] ul, [id*="mobile" i] nav, [class*="drawer" i] ul, [class*="drawer" i] nav, nav[class*="mobile" i]'
+        )
+      ).filter((el) => {
+        if (el.closest('#chatifyWidgetContainer')) return false;
+        if (el === bestDesktop || el.contains(bestDesktop!) || bestDesktop?.contains(el)) return false;
+        return true;
+      });
+
+      if (mobileCandidates.length > 0) {
+        bestMobile = mobileCandidates[0];
+      }
+
+      return { desktop: bestDesktop, mobile: bestMobile };
+    };
+
+    const inject = () => {
+      const { desktop, mobile } = findNavContainers();
+
+      // If no navigation is detected with confidence, do not inject
+      if (!desktop && !mobile) {
         return;
       }
 
-      // AUTO-INJECTION: Inject into desktop navbar and mobile header
-      if (navConfig.auto_inject !== false) {
-        // Find desktop navigation container
-        const selector =
-          targetSelector ||
-          'header nav ul, nav ul, header nav, nav, [role="navigation"] ul, [role="navigation"], .navbar-nav, .navbar';
-        const container = document.querySelector<HTMLElement>(selector);
-
-        if (container && !document.getElementById('chatifyNavTriggerBtn')) {
-          const isList = container.tagName.toLowerCase() === 'ul' || container.tagName.toLowerCase() === 'ol';
-
-          // Look for sibling link to mirror style and classes
-          const sibling = container.querySelector('a');
-
-          const btn = document.createElement('a');
-          btn.id = 'chatifyNavTriggerBtn';
-          btn.textContent = label;
-          btn.setAttribute('data-chatify-help', 'true');
-          btn.setAttribute('data-chatify-injected', 'true');
-
-          if (action === 'redirect' && this.config.customDomain) {
-            btn.href = `https://${this.config.customDomain}`;
-            btn.target = '_blank';
-          } else {
-            btn.href = 'javascript:void(0)';
-          }
-
-          if (navConfig.style === 'pill') {
-            btn.style.cssText = `
-              display: inline-flex;
-              align-items: center;
-              justify-content: center;
-              padding: 6px 16px;
-              font-size: 14px;
-              font-weight: 600;
-              border-radius: 9999px;
-              text-decoration: none;
-              cursor: pointer;
-              z-index: 10;
-              transition: all 0.2s ease;
-              background: ${this.config.primaryColor || '#480576'};
-              color: #ffffff;
-              border: 1px solid rgba(255,255,255,0.25);
-              box-shadow: 0 2px 8px rgba(0,0,0,0.25);
-              margin-left: 4px;
-            `;
-          } else {
-            // Auto-match nav link style
-            if (sibling && sibling.className) {
-              btn.className = sibling.className;
-              // Also clone sibling inline styles if any (e.g. min-width on Range4ex)
-              if (sibling.getAttribute('style')) {
-                btn.setAttribute('style', sibling.getAttribute('style') || '');
-              }
-              btn.style.cursor = 'pointer';
-              btn.style.zIndex = '10';
-            } else {
-              btn.style.cssText = `
-                display: inline-flex;
-                align-items: center;
-                justify-content: center;
-                padding: 6px 14px;
-                font-size: 14px;
-                font-weight: 500;
-                color: inherit;
-                text-decoration: none;
-                cursor: pointer;
-                z-index: 10;
-                transition: color 0.2s ease;
-              `;
-            }
-          }
-
-          btn.addEventListener('click', (e) => performAction(e));
-
-          if (isList) {
-            const li = document.createElement('li');
-            li.className = 'chatify-nav-item';
-            li.appendChild(btn);
-            container.appendChild(li);
-          } else {
-            container.appendChild(btn);
-          }
+      // Inject into desktop nav if not already injected
+      if (desktop && !document.querySelector('[data-chatify-nav="desktop"]')) {
+        const desktopEl = createNavElement(desktop, false);
+        if (position === 'start' && desktop.firstChild) {
+          desktop.insertBefore(desktopEl, desktop.firstChild);
+        } else {
+          desktop.appendChild(desktopEl);
         }
+      }
 
-        // 3. MOBILE ADAPTATION: If header has action area or hamburger, also inject mobile-friendly trigger
-        if (!document.getElementById('chatifyNavTriggerBtnMobile')) {
-          const mobileTriggerTarget = document.querySelector<HTMLElement>(
-            'header button.lg\\:hidden, header [aria-label*="Toggle" i], header [aria-label*="menu" i], header .flex.items-center.justify-end'
-          );
-          if (mobileTriggerTarget && mobileTriggerTarget.parentElement) {
-            const mBtn = document.createElement('a');
-            mBtn.id = 'chatifyNavTriggerBtnMobile';
-            mBtn.textContent = label;
-            mBtn.setAttribute('data-chatify-help', 'true');
-            mBtn.setAttribute('data-chatify-injected', 'true');
-            mBtn.className = 'chatify-mobile-nav-btn lg:hidden';
-            mBtn.style.cssText = `
-              display: inline-flex;
-              align-items: center;
-              justify-content: center;
-              padding: 4px 10px;
-              font-size: 12px;
-              font-weight: 600;
-              border-radius: 9999px;
-              background: ${this.config.primaryColor || '#480576'};
-              color: #ffffff;
-              text-decoration: none;
-              cursor: pointer;
-              margin-right: 4px;
-              white-space: nowrap;
-            `;
-            if (action === 'redirect' && this.config.customDomain) {
-              mBtn.href = `https://${this.config.customDomain}`;
-              mBtn.target = '_blank';
-            } else {
-              mBtn.href = 'javascript:void(0)';
-            }
-            mBtn.addEventListener('click', (e) => performAction(e));
-            mobileTriggerTarget.parentElement.insertBefore(mBtn, mobileTriggerTarget);
-          }
+      // Inject into mobile nav if exists and not already injected
+      if (mobile && !document.querySelector('[data-chatify-nav="mobile"]')) {
+        const mobileEl = createNavElement(mobile, true);
+        if (position === 'start' && mobile.firstChild) {
+          mobile.insertBefore(mobileEl, mobile.firstChild);
+        } else {
+          mobile.appendChild(mobileEl);
         }
       }
     };
 
-    // Run on initial load
-    attachOrInject();
+    // Run initial injection
+    inject();
 
-    // SPA Resilience: Observe DOM changes when user navigates pages in Next.js / React
-    if (typeof MutationObserver !== 'undefined' && typeof document !== 'undefined' && document.body) {
+    // Re-check after client-side route changes with a MutationObserver that is throttled
+    if (typeof MutationObserver !== 'undefined' && document.body) {
+      if ((this as any).__navObserver) {
+        (this as any).__navObserver.disconnect();
+      }
       let timer: any = null;
       const observer = new MutationObserver(() => {
         clearTimeout(timer);
         timer = setTimeout(() => {
-          if (!document.getElementById('chatifyNavTriggerBtn')) {
-            attachOrInject();
+          if (!document.querySelector('[data-chatify-nav]')) {
+            inject();
           }
         }, 300);
       });
       observer.observe(document.body, { childList: true, subtree: true });
+      (this as any).__navObserver = observer;
     }
   }
 }

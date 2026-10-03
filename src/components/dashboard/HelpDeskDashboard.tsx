@@ -91,6 +91,8 @@ import { Avatar } from '@/components/ui/Avatar';
 import { KnowledgePanel } from '@/components/dashboard/KnowledgePanel';
 import { Menu } from '@/components/ui/Menu';
 import { cn } from '@/lib/utils';
+import { NavbarPreviewModal } from '@/components/dashboard/NavbarPreviewModal';
+import { dismissNavbarPromptAction } from '@/app/actions/admin';
 
 interface HelpDeskDashboardProps {
   workspace: Workspace | null;
@@ -201,6 +203,23 @@ export function HelpDeskDashboard({
   useEffect(() => {
     setWorkspaceState(workspace);
   }, [workspace]);
+
+  // Website Navbar Button Auto-Injector Prompt & Modal State
+  const [isNavbarModalOpen, setIsNavbarModalOpen] = useState(false);
+  const [navbarPromptDismissed, setNavbarPromptDismissed] = useState(false);
+
+  const handleDismissNavbarPrompt = async () => {
+    setNavbarPromptDismissed(true);
+    if (!workspaceState?.id) return;
+    try {
+      const res = await dismissNavbarPromptAction(workspaceState.id);
+      if (res.workspace) {
+        setWorkspaceState(res.workspace);
+      }
+    } catch (err) {
+      console.error('[HelpDesk] Error dismissing navbar prompt:', err);
+    }
+  };
 
   // Status feedback toast
   const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
@@ -790,7 +809,7 @@ export function HelpDeskDashboard({
       {/* Domain Status Banner */}
       {workspace && (
         <div className="px-8 py-2 bg-surface-2/80 border-b border-line/60 flex items-center justify-between text-xs">
-          <div className="flex items-center gap-2 min-w-0">
+          <div className="flex items-center gap-2.5 min-w-0">
             <Globe className="w-3.5 h-3.5 text-accent shrink-0" />
             <span className="text-ink-3 shrink-0">Public URL:</span>
             <a
@@ -801,6 +820,10 @@ export function HelpDeskDashboard({
             >
               {getWorkspaceHelpCenterUrl(workspace)}
             </a>
+            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider shrink-0 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              Live
+            </span>
             {Boolean(workspace.custom_domain?.trim()) && (
               <span
                 className={cn(
@@ -813,20 +836,33 @@ export function HelpDeskDashboard({
                 )}
               >
                 {workspace.custom_domain_status === 'verified'
-                  ? 'Domain Verified'
+                  ? 'Custom Domain Verified'
                   : workspace.custom_domain_status === 'failed'
-                  ? 'DNS Check Failed'
-                  : 'DNS Pending'}
+                  ? 'Custom Domain DNS Failed'
+                  : 'Custom Domain DNS Pending'}
               </span>
             )}
           </div>
-          <button
-            onClick={handleCopyPublicHelpCenterLink}
-            className="text-ink-3 hover:text-ink font-medium text-[11.5px] flex items-center gap-1 transition-colors shrink-0 ml-4"
-          >
-            <Copy className="w-3 h-3" />
-            <span>Copy Link</span>
-          </button>
+          <div className="flex items-center gap-2 shrink-0 ml-4">
+            <button
+              onClick={handleCopyPublicHelpCenterLink}
+              className="text-ink-3 hover:text-ink font-medium text-[11.5px] flex items-center gap-1 transition-colors px-2 py-1 rounded-md hover:bg-surface-3"
+              title="Copy public URL"
+            >
+              <Copy className="w-3 h-3" />
+              <span>Copy</span>
+            </button>
+            <a
+              href={getWorkspaceHelpCenterUrl(workspace)}
+              target="_blank"
+              rel="noreferrer"
+              className="text-accent hover:text-accent/80 font-medium text-[11.5px] flex items-center gap-1 transition-colors px-2 py-1 rounded-md hover:bg-accent-soft"
+              title="Open public Help Center in new tab"
+            >
+              <ExternalLink className="w-3 h-3" />
+              <span>Open</span>
+            </a>
+          </div>
         </div>
       )}
 
@@ -869,6 +905,49 @@ export function HelpDeskDashboard({
           />
         ) : (
         <>
+        {/* Website Navbar Auto-Injector Callout Card */}
+        {metrics.publishedCount >= 1 &&
+          workspaceState?.navbar_trigger_config?.enabled !== true &&
+          !workspaceState?.navbar_trigger_config?.dismissed_prompt &&
+          !navbarPromptDismissed && (
+            <div className="p-4 sm:p-5 rounded-2xl border border-accent/40 bg-gradient-to-r from-accent/10 via-surface to-accent/5 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4 animate-in fade-in">
+              <div className="flex items-start sm:items-center gap-3.5">
+                <div className="w-10 h-10 rounded-xl bg-accent text-accent-ink flex items-center justify-center shrink-0 shadow-sm">
+                  <Sparkles className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-[15px] font-bold text-ink flex items-center gap-2">
+                    <span>Your Help Center is live. Add it to your website menu?</span>
+                    <span className="px-2 py-0.5 rounded text-[10.5px] font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                      Zero-Code
+                    </span>
+                  </h3>
+                  <p className="text-[12.5px] text-ink-3 mt-0.5 max-w-xl">
+                    Direct your website visitors to your documentation seamlessly without touching any code. Preview where the button appears and customize its style.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 shrink-0 self-end md:self-center">
+                <button
+                  type="button"
+                  onClick={handleDismissNavbarPrompt}
+                  className="btn btn-sm btn-ghost text-ink-3 hover:text-ink text-[12.5px]"
+                >
+                  Not now
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsNavbarModalOpen(true)}
+                  className="btn btn-sm btn-primary gap-1.5 shadow-sm text-[12.5px] font-semibold"
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>Preview and add</span>
+                </button>
+              </div>
+            </div>
+          )}
+
         {/* KPI Metrics Cards */}
         <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="p-4 rounded-xl border border-line bg-surface-2/60">
@@ -1534,6 +1613,20 @@ export function HelpDeskDashboard({
         </>
         )}
       </main>
+
+      {/* NAVBAR PREVIEW & SETUP MODAL */}
+      {isNavbarModalOpen && workspaceState && (
+        <NavbarPreviewModal
+          isOpen={isNavbarModalOpen}
+          onClose={() => setIsNavbarModalOpen(false)}
+          workspace={workspaceState}
+          onConfigSaved={(updatedWs) => {
+            setWorkspaceState(updatedWs);
+            showToast('Help button added to your website navbar! Changes are live.');
+          }}
+          showToast={showToast}
+        />
+      )}
 
       {/* ARTICLE EDITOR MODAL */}
       {isArticleModalOpen && (

@@ -3,14 +3,235 @@
 import dns, { Resolver } from 'node:dns/promises';
 import { createClient } from '@/lib/supabase/server';
 import { Workspace } from '@/types/database';
-import { cleanDomain, CNAME_TARGET, APEX_A_RECORD, splitDomain } from '@/lib/domain';
-import { addDomainToProject, removeDomainFromProject } from '@/lib/vercel';
+import {
+  cleanDomain,
+  CNAME_TARGET,
+  APEX_A_RECORD,
+  splitDomain,
+  HELP_BASE_DOMAIN,
+  validateCustomDomainInput,
+  getExpectedDnsRecords,
+  DnsProviderGuide,
+} from '@/lib/domain';
+import { detectDnsProvider } from '@/lib/dns-provider';
+import { sendDomainLiveEmail } from '@/lib/email/domain-notifications';
+import {
+  addDomainToProject,
+  removeDomainFromProject,
+  getVercelDomainStatus,
+  verifyVercelDomain,
+} from '@/lib/vercel';
 import { assertAdminUser } from '@/app/actions/admin';
+import { validateWorkspaceSlug } from '@/lib/slug';
 
 interface ActionResult<T = any> {
   success: boolean;
   data?: T;
   error?: string;
+}
+
+/**
+ * 1-Step Custom Domain Connection Flow:
+ * 1. Validates input (strips protocol/slashes, rejects apex domains, checks collisions).
+ * 2. Connects domain to Vercel project via Vercel Domains API.
+ * 3. Detects DNS provider from nameservers and generates tailored instructions.
+ * 4. Stores domain with 'pending' status and timestamps.
+ * 5. Returns provider instructions and exactly ONE CNAME record (plus TXT challenge only if Vercel requires it).
+ */
+export async function connectCustomDomainAction(
+  workspaceId: string,
+  rawDomain: string
+): Promise<
+  ActionResult<{
+    workspace: Workspace;
+    domain: string;
+    dnsProvider: DnsProviderGuide;
+    expectedRecords: ReturnType<typeof getExpectedDnsRecords>;
+    hostingReady?: boolean | null;
+    hostingError?: string;
+  }>
+> {
+  try {
+    await assertAdminUser(workspaceId);
+    const supabase = await createClient();
+
+    // 1. Input validation & sanitization
+    const validation = validateCustomDomainInput(rawDomain);
+    if (!validation.valid || !validation.domain) {
+      return {
+        success: false,
+        error: validation.error || 'Please enter a valid subdomain (e.g. help.yourcompany.com).',
+      };
+    }
+    const domain = validation.domain;
+
+    // 2. Cross-workspace collision check
+    const { data: existing } = await supabase
+      .from('workspaces')
+      .select('id, name')
+      .ilike('custom_domain', domain)
+      .neq('id', workspaceId)
+      .maybeSingle();
+
+    if (existing) {
+      return {
+        success: false,
+        error: `This domain is already registered to "${existing.name}". A domain can only be used by one workspace at a time.`,
+      };
+    }
+
+    // 3. Register domain on Vercel project
+    const vercel = await addDomainToProject(domain);
+    if (vercel.configured && !vercel.ok) {
+      console.warn('[domain] Vercel registration warning:', vercel.error);
+    }
+
+    // 4. Detect DNS provider from nameservers
+    const dnsProvider = await detectDnsProvider(domain);
+
+    // 5. Store pending domain in Supabase
+    const now = new Date().toISOString();
+    const token = `chatify_tok_${Math.random().toString(36).substring(2, 10)}${Date.now().toString(36)}`;
+
+    const { data: updated, error: updateErr } = await supabase
+      .from('workspaces')
+      .update({
+        custom_domain: domain,
+        custom_domain_status: 'pending',
+        custom_domain_verified_at: null,
+        custom_domain_verification_token: token,
+        custom_domain_connected_at: now,
+        custom_domain_last_checked_at: now,
+        custom_domain_notification_sent: null,
+      })
+      .eq('id', workspaceId)
+      .select()
+      .single();
+
+    if (updateErr || !updated) {
+      throw new Error(updateErr?.message || 'Failed to save custom domain.');
+    }
+
+    // 6. Generate DNS records (single CNAME by default, TXT challenge only if Vercel reported it)
+    const expectedRecords = getExpectedDnsRecords(updated as Workspace, {
+      vercelVerification: vercel.verification,
+    });
+
+    return {
+      success: true,
+      data: {
+        workspace: updated as Workspace,
+        domain,
+        dnsProvider,
+        expectedRecords,
+        hostingReady: vercel.configured ? vercel.ok : null,
+        hostingError: vercel.configured && !vercel.ok ? vercel.error : undefined,
+      },
+    };
+  } catch (err: any) {
+    console.error('Failed to connect custom domain:', err);
+    return { success: false, error: err.message || 'Failed to connect custom domain.' };
+  }
+}
+
+/**
+ * Retrieves the DNS provider guide and expected records for a workspace's current domain.
+ */
+export async function getCustomDomainGuideAction(
+  workspaceId: string
+): Promise<
+  ActionResult<{
+    domain: string;
+    status: string;
+    dnsProvider: DnsProviderGuide;
+    expectedRecords: ReturnType<typeof getExpectedDnsRecords>;
+    isVerified: boolean;
+  }>
+> {
+  try {
+    const supabase = await createClient();
+    const { data: ws, error } = await supabase
+      .from('workspaces')
+      .select('id, custom_domain, custom_domain_status, custom_domain_verification_token, website_url')
+      .eq('id', workspaceId)
+      .single();
+
+    if (error || !ws || !ws.custom_domain) {
+      return { success: false, error: 'No custom domain configured.' };
+    }
+
+    const domain = cleanDomain(ws.custom_domain);
+    const [dnsProvider, vercelStatus] = await Promise.all([
+      detectDnsProvider(domain),
+      getVercelDomainStatus(domain),
+    ]);
+
+    const expectedRecords = getExpectedDnsRecords(ws as Workspace, {
+      vercelVerification: vercelStatus.verification,
+    });
+
+    return {
+      success: true,
+      data: {
+        domain,
+        status: ws.custom_domain_status || 'pending',
+        dnsProvider,
+        expectedRecords,
+        isVerified: ws.custom_domain_status === 'verified',
+      },
+    };
+  } catch (err: any) {
+    return { success: false, error: err.message || 'Failed to fetch domain guide.' };
+  }
+}
+
+/**
+ * Configure or update a workspace's custom domain for its public Help Center (compatibility wrapper).
+ */
+export async function updateWorkspaceDomainAction(
+  workspaceId: string,
+  rawDomain: string
+): Promise<
+  ActionResult<{
+    workspace: Workspace;
+    token: string;
+    hostingReady?: boolean | null;
+    hostingError?: string;
+  }>
+> {
+  const res = await connectCustomDomainAction(workspaceId, rawDomain);
+  if (!res.success || !res.data) {
+    return { success: false, error: res.error };
+  }
+  return {
+    success: true,
+    data: {
+      workspace: res.data.workspace,
+      token: res.data.workspace.custom_domain_verification_token || '',
+      hostingReady: res.data.hostingReady,
+      hostingError: res.data.hostingError,
+    },
+  };
+}
+
+/**
+ * Recognises the hosting provider's own CNAME targets.
+ *
+ * Vercel no longer hands every project the same `cname.vercel-dns.com`; each
+ * domain gets its own target on a numbered zone, e.g.
+ * `bd746ae204036aab.vercel-dns-017.com`. Matching only the literal
+ * `.vercel-dns.com` suffix rejected those as "not this platform" — a false
+ * negative for anyone who copied the value Vercel actually showed them.
+ */
+function isHostingTarget(target: string): boolean {
+  const t = target.toLowerCase();
+  return (
+    /\.vercel-dns(-\d+)?\.com$/.test(t) ||
+    t.endsWith('.vercel.app') ||
+    t.endsWith('.vercel-dns.com') ||
+    t.includes('chatify') ||
+    t.includes('range4ex')
+  );
 }
 
 /** Reliable DNS lookup helpers with authoritative public DNS fallback */
@@ -56,102 +277,6 @@ async function lookupA(domain: string): Promise<string[]> {
   }
 }
 
-/**
- * Configure or update a workspace's custom domain for its public Help Center.
- */
-export async function updateWorkspaceDomainAction(
-  workspaceId: string,
-  rawDomain: string
-): Promise<
-  ActionResult<{
-    workspace: Workspace;
-    token: string;
-    /** null when the platform has no Vercel credentials configured. */
-    hostingReady?: boolean | null;
-    hostingError?: string;
-  }>
-> {
-  try {
-    await assertAdminUser(workspaceId);
-    const supabase = await createClient();
-
-    const domain = cleanDomain(rawDomain);
-    if (!domain) {
-      return { success: false, error: 'Please provide a valid domain (e.g. support.mycompany.com)' };
-    }
-
-    // Check if domain is already claimed by another workspace
-    const { data: existing } = await supabase
-      .from('workspaces')
-      .select('id, name')
-      .ilike('custom_domain', domain)
-      .neq('id', workspaceId)
-      .maybeSingle();
-
-    if (existing) {
-      return { success: false, error: `This domain is already registered to "${existing.name}".` };
-    }
-
-    // Generate or preserve token
-    const verificationToken = `chatify_tok_${Math.random().toString(36).substring(2, 10)}${Date.now().toString(36)}`;
-
-    const { data: updated, error } = await supabase
-      .from('workspaces')
-      .update({
-        custom_domain: domain,
-        custom_domain_status: 'pending',
-        custom_domain_verified_at: null,
-        custom_domain_verification_token: verificationToken,
-      })
-      .eq('id', workspaceId)
-      .select()
-      .single();
-
-    if (error) throw new Error(error.message);
-
-    // Attach the hostname to the hosting project straight away. Without this
-    // Vercel has no certificate for it, and the customer sees a TLS warning
-    // even with perfect DNS. Failing here is not fatal: DNS still has to
-    // propagate, and verification will report what is still missing.
-    const vercel = await addDomainToProject(domain);
-    if (vercel.configured && !vercel.ok) {
-      console.warn('[domain] Vercel registration failed:', vercel.error);
-    }
-
-    return {
-      success: true,
-      data: {
-        workspace: updated as Workspace,
-        token: verificationToken,
-        hostingReady: vercel.configured ? vercel.ok : null,
-        hostingError: vercel.configured && !vercel.ok ? vercel.error : undefined,
-      },
-    };
-  } catch (err: any) {
-    console.error('Failed to update workspace domain:', err);
-    return { success: false, error: err.message || 'Failed to update domain' };
-  }
-}
-
-/**
- * Recognises the hosting provider's own CNAME targets.
- *
- * Vercel no longer hands every project the same `cname.vercel-dns.com`; each
- * domain gets its own target on a numbered zone, e.g.
- * `bd746ae204036aab.vercel-dns-017.com`. Matching only the literal
- * `.vercel-dns.com` suffix rejected those as "not this platform" — a false
- * negative for anyone who copied the value Vercel actually showed them.
- */
-function isHostingTarget(target: string): boolean {
-  const t = target.toLowerCase();
-  return (
-    /\.vercel-dns(-\d+)?\.com$/.test(t) ||
-    t.endsWith('.vercel.app') ||
-    t.endsWith('.vercel-dns.com') ||
-    t.includes('chatify') ||
-    t.includes('range4ex')
-  );
-}
 
 /**
  * Perform live DNS verification check (TXT record or CNAME record) for a workspace.
@@ -245,7 +370,7 @@ export async function verifyWorkspaceDomainAction(
       foundCname = cnameRecords[0] || null;
       dnsResolves = dnsResolves || cnameRecords.length > 0;
       const expected = CNAME_TARGET.toLowerCase().replace(/\.$/, '');
-      cnameVerified = cnameRecords.some((target) => {
+      cnameVerified = cnameRecords.some((target: string) => {
         const t = target.toLowerCase().replace(/\.$/, '');
         return t === expected || isHostingTarget(t);
       });
@@ -340,11 +465,14 @@ export async function verifyWorkspaceDomainAction(
     const isVerified = dnsOk || reachable;
 
     if (isVerified) {
+      const now = new Date().toISOString();
       await supabase
         .from('workspaces')
         .update({
           custom_domain_status: 'verified',
-          custom_domain_verified_at: new Date().toISOString(),
+          custom_domain_verified_at: now,
+          custom_domain_last_checked_at: now,
+          custom_domain_notification_sent: 'live',
         })
         .eq('id', workspaceId);
 
@@ -352,6 +480,13 @@ export async function verifyWorkspaceDomainAction(
       const vercel = await addDomainToProject(domain);
       if (vercel.configured && !vercel.ok) {
         console.warn('[domain] Vercel auto-registration notice:', vercel.error);
+      }
+
+      // Send live notification email if not already sent
+      if (ws.custom_domain_notification_sent !== 'live') {
+        sendDomainLiveEmail({ workspace: ws as Workspace, domain }).catch((err) =>
+          console.error('[Domain Live Email Error]:', err)
+        );
       }
 
       const liveNotice = reachable
@@ -369,7 +504,10 @@ export async function verifyWorkspaceDomainAction(
     } else if (servedBySomeoneElse) {
       await supabase
         .from('workspaces')
-        .update({ custom_domain_status: 'pending' })
+        .update({
+          custom_domain_status: 'pending',
+          custom_domain_last_checked_at: new Date().toISOString(),
+        })
         .eq('id', workspaceId);
 
       return {
@@ -384,7 +522,8 @@ export async function verifyWorkspaceDomainAction(
       await supabase
         .from('workspaces')
         .update({
-          custom_domain_status: 'failed',
+          custom_domain_status: 'pending',
+          custom_domain_last_checked_at: new Date().toISOString(),
         })
         .eq('id', workspaceId);
 
@@ -441,6 +580,9 @@ export async function removeWorkspaceDomainAction(
         custom_domain_status: null,
         custom_domain_verified_at: null,
         custom_domain_verification_token: null,
+        custom_domain_connected_at: null,
+        custom_domain_last_checked_at: null,
+        custom_domain_notification_sent: null,
       })
       .eq('id', workspaceId);
 
@@ -455,5 +597,152 @@ export async function removeWorkspaceDomainAction(
     return { success: true };
   } catch (err: any) {
     return { success: false, error: err.message || 'Failed to remove domain' };
+  }
+}
+
+/**
+ * Checks whether a proposed workspace subdomain slug is available and valid.
+ */
+export async function checkWorkspaceSlugAvailabilityAction(
+  workspaceId: string,
+  rawSlug: string
+): Promise<{ available: boolean; error?: string; formattedSlug: string }> {
+  try {
+    const { valid, error, formattedSlug } = validateWorkspaceSlug(rawSlug);
+    if (!valid || !formattedSlug) {
+      return { available: false, error: error || 'Invalid slug format', formattedSlug };
+    }
+
+    const supabase = await createClient();
+    const { data: existing } = await supabase
+      .from('workspaces')
+      .select('id, name')
+      .ilike('slug', formattedSlug)
+      .neq('id', workspaceId)
+      .maybeSingle();
+
+    if (existing) {
+      return {
+        available: false,
+        error: `"${formattedSlug}" is already taken by another workspace.`,
+        formattedSlug,
+      };
+    }
+
+    return { available: true, formattedSlug };
+  } catch (err: any) {
+    return { available: false, error: err.message || 'Error checking slug availability', formattedSlug: rawSlug };
+  }
+}
+
+/**
+ * Allows the workspace owner to edit their ready-made subdomain slug once.
+ */
+export async function updateWorkspaceSlugAction(
+  workspaceId: string,
+  rawSlug: string
+): Promise<ActionResult<{ workspace: Workspace; slug: string }>> {
+  try {
+    const { user, agent } = await assertAdminUser(workspaceId);
+    if (agent.role !== 'owner') {
+      return { success: false, error: 'Only the workspace owner can customize the subdomain slug.' };
+    }
+
+    const supabase = await createClient();
+    const { data: ws, error: fetchErr } = await supabase
+      .from('workspaces')
+      .select('*')
+      .eq('id', workspaceId)
+      .single();
+
+    if (fetchErr || !ws) {
+      return { success: false, error: 'Workspace not found.' };
+    }
+
+    if ((ws.slug_changes_count ?? 0) >= 1) {
+      return {
+        success: false,
+        error: 'The workspace slug can only be customized once. It has already been customized.',
+      };
+    }
+
+    const { valid, error: valErr, formattedSlug } = validateWorkspaceSlug(rawSlug);
+    if (!valid || !formattedSlug) {
+      return { success: false, error: valErr || 'Invalid slug format.' };
+    }
+
+    // If identical to current slug, nothing changed
+    if (ws.slug === formattedSlug) {
+      return { success: true, data: { workspace: ws as Workspace, slug: formattedSlug } };
+    }
+
+    // Check uniqueness
+    const { data: conflict } = await supabase
+      .from('workspaces')
+      .select('id')
+      .ilike('slug', formattedSlug)
+      .neq('id', workspaceId)
+      .maybeSingle();
+
+    if (conflict) {
+      return { success: false, error: `The slug "${formattedSlug}" is already taken by another workspace.` };
+    }
+
+    const { data: updated, error: updateErr } = await supabase
+      .from('workspaces')
+      .update({
+        slug: formattedSlug,
+        slug_changes_count: (ws.slug_changes_count ?? 0) + 1,
+        slug_changed_at: new Date().toISOString(),
+      })
+      .eq('id', workspaceId)
+      .select()
+      .single();
+
+    if (updateErr || !updated) {
+      return { success: false, error: updateErr?.message || 'Failed to update workspace slug.' };
+    }
+
+    return {
+      success: true,
+      data: {
+        workspace: updated as Workspace,
+        slug: formattedSlug,
+      },
+    };
+  } catch (err: any) {
+    return { success: false, error: err.message || 'Failed to update workspace slug.' };
+  }
+}
+
+/**
+ * Registers the platform help center base domain and wildcard domain (*.HELP_BASE_DOMAIN)
+ * on the Vercel hosting project.
+ */
+export async function registerHelpBaseDomainAction(): Promise<
+  ActionResult<{ wildcard: any; apex: any }>
+> {
+  try {
+    if (!HELP_BASE_DOMAIN) {
+      return { success: false, error: 'HELP_BASE_DOMAIN environment variable is not defined.' };
+    }
+
+    const base = HELP_BASE_DOMAIN.trim().toLowerCase();
+    const wildcardDomain = `*.${base}`;
+
+    const [wildcardRes, apexRes] = await Promise.all([
+      addDomainToProject(wildcardDomain),
+      addDomainToProject(base),
+    ]);
+
+    return {
+      success: true,
+      data: {
+        wildcard: wildcardRes,
+        apex: apexRes,
+      },
+    };
+  } catch (err: any) {
+    return { success: false, error: err.message || 'Failed to register base domain.' };
   }
 }

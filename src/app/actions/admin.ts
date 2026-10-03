@@ -12,6 +12,7 @@ import {
   NavbarTriggerConfig,
   SMTPSettingsConfig,
 } from '@/types/database';
+import { generateUniqueWorkspaceSlug } from '@/lib/slug';
 
 /**
  * Ensures the requesting user is authenticated, has 'admin' or 'owner' role,
@@ -616,6 +617,35 @@ export async function updateNavbarTriggerConfigAction(
   return { success: true, workspace: updated as Workspace };
 }
 
+export async function dismissNavbarPromptAction(workspaceId: string) {
+  await assertAdminUser(workspaceId);
+  const supabase = await createClient();
+
+  const { data: ws } = await supabase
+    .from('workspaces')
+    .select('navbar_trigger_config')
+    .eq('id', workspaceId)
+    .single();
+
+  const current = (ws?.navbar_trigger_config || {}) as NavbarTriggerConfig;
+  const updatedConfig: NavbarTriggerConfig = {
+    ...current,
+    dismissed_prompt: true,
+  };
+
+  const { data: updated, error } = await supabase
+    .from('workspaces')
+    .update({
+      navbar_trigger_config: updatedConfig,
+    })
+    .eq('id', workspaceId)
+    .select()
+    .single();
+
+  if (error) throw new Error(error.message);
+  return { success: true, workspace: updated as Workspace };
+}
+
 /**
  * SECTION 9: Hostinger / Custom SMTP Settings & 5-minute unread email alerts
  */
@@ -675,7 +705,13 @@ export async function createWorkspaceAction(input: {
     throw new Error('Unauthorized: Authentication required.');
   }
 
-  // 1. Insert Workspace
+  // 1. Generate clean, unique slug from workspace name
+  const slug = await generateUniqueWorkspaceSlug(
+    supabase,
+    input.slug || input.businessName
+  );
+
+  // 2. Insert Workspace
   const { data: ws, error: wsError } = await supabase
     .from('workspaces')
     .insert({
@@ -685,7 +721,9 @@ export async function createWorkspaceAction(input: {
       greeting_title: input.greetingTitle,
       greeting_message: input.greetingMessage,
       owner_id: user.id,
-      slug: input.slug,
+      slug,
+      slug_changes_count: 0,
+      slug_changed_at: null,
       custom_domain: input.customDomain || null,
       custom_domain_status: input.customDomain ? 'pending' : null,
       custom_domain_verification_token: input.customDomain ? input.verificationToken : null,

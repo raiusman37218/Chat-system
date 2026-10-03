@@ -3,6 +3,7 @@
 import { cookies } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 import { Workspace, Agent, SuperAdminAuditLog } from '@/types/database';
+import { generateUniqueWorkspaceSlug } from '@/lib/slug';
 
 export interface CompanyMetricItem {
   id: string;
@@ -179,6 +180,8 @@ export async function createCompanyAction(data: {
   const { user, agent } = await assertSuperAdmin();
   const supabase = await createClient();
 
+  const slug = await generateUniqueWorkspaceSlug(supabase, data.name.trim());
+
   const { data: newWs, error } = await supabase
     .from('workspaces')
     .insert({
@@ -188,6 +191,9 @@ export async function createCompanyAction(data: {
       greeting_title: data.greeting_title?.trim() || 'Welcome to Support! 👋',
       greeting_message: data.greeting_message?.trim() || 'How can our team help you today?',
       owner_id: user.id,
+      slug,
+      slug_changes_count: 0,
+      slug_changed_at: null,
       widget_position: 'right',
       help_center_tab_label: 'Help Center',
       show_help_tab: true,
