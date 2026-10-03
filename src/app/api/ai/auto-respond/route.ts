@@ -6,7 +6,7 @@ import {
   executeHandoverToHuman,
 } from '@/lib/ai/anthropic';
 import { dispatchOutboundMessage } from '@/lib/channels/dispatcher';
-import { providerConfigFrom, warmHelpIndex } from '@/lib/ai/help-answer';
+import { providerConfigFrom, warmHelpIndex, wantsHuman } from '@/lib/ai/help-answer';
 import { detectLanguage, translateToEnglish } from '@/lib/ai/translator';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://vfjsaynnubxywdbevxtx.supabase.co';
@@ -102,13 +102,13 @@ export async function POST(req: NextRequest) {
         .single(),
       supabase
         .from('conversations')
-        .select('id, workspace_id, status, ai_mode, channel, channel_metadata, visitor:visitors(name)')
+        .select('id, workspace_id, status, closed_at, ai_mode, channel, channel_metadata, visitor:visitors(name)')
         .eq('id', conversation_id)
         .single(),
       // Only the recent end of the thread is ever used below.
       supabase
         .from('messages')
-        .select('id, sender_type, content, is_internal, created_at, metadata, reply_to_message_id')
+        .select('id, sender_type, sender_id, content, is_internal, created_at, metadata, reply_to_message_id')
         .eq('conversation_id', conversation_id)
         .order('created_at', { ascending: false })
         .limit(40),
@@ -136,7 +136,7 @@ export async function POST(req: NextRequest) {
       if (!visitorMsg) {
         const { data: specificMsg } = await supabase
           .from('messages')
-          .select('id, sender_type, content, is_internal, created_at, metadata, reply_to_message_id')
+          .select('id, sender_type, sender_id, content, is_internal, created_at, metadata, reply_to_message_id')
           .eq('id', requested_message_id)
           .eq('conversation_id', conversation_id)
           .maybeSingle();
@@ -258,14 +258,58 @@ export async function POST(req: NextRequest) {
       return json({ replied: false, reason: 'AI auto-first-response disabled' });
     }
 
-    if (!conv || (conv.workspace_id && conv.workspace_id !== workspace_id) || conv.status === 'closed') {
-      return json({ replied: false, reason: 'Conversation not open' });
+    if (!conv || (conv.workspace_id && conv.workspace_id !== workspace_id)) {
+      return json({ replied: false, reason: 'Conversation not found or workspace mismatch' });
     }
 
-    // A handover sets ai_mode to 'disabled'; once a person owns the thread the
-    // assistant stays out of it.
-    if (conv.ai_mode === 'disabled') {
-      return json({ replied: false, reason: 'AI disabled on this conversation' });
+    // Handover Rule 3: "When a human replies, the bot stays silent until the conversation is resolved or the agent turns autopilot back on."
+    // If the conversation was previously resolved/closed, reopen it so the bot can help with new questions.
+    if (conv.status === 'closed') {
+      await supabase
+        .from('conversations')
+        .update({
+          status: 'open',
+          ai_mode: 'autopilot',
+          closed_at: null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', conversation_id);
+      conv.status = 'open';
+      conv.ai_mode = 'autopilot';
+    }
+
+    // Check if a human agent has replied in this conversation
+    const humanAgentReplies = msgs.filter(
+      (m) => m.sender_type === 'agent' && !m.is_internal && m.sender_id != null
+    );
+    const lastHumanReply =
+      humanAgentReplies.length > 0
+        ? humanAgentReplies.sort((a, b) => Date.parse(a.created_at) - Date.parse(b.created_at))[
+            humanAgentReplies.length - 1
+          ]
+        : null;
+
+    const autopilotEnabledAt = (conv.channel_metadata as any)?.autopilot_enabled_at;
+    const isAutopilotTurnedOnAfterHuman =
+      autopilotEnabledAt &&
+      lastHumanReply &&
+      Date.parse(autopilotEnabledAt) > Date.parse(lastHumanReply.created_at);
+
+    const hasHumanRepliedAndActive =
+      Boolean(lastHumanReply) &&
+      !isAutopilotTurnedOnAfterHuman &&
+      (!conv.closed_at || (lastHumanReply ? Date.parse(lastHumanReply.created_at) > Date.parse(conv.closed_at) : false));
+
+    // "wants_human: confirm the handover to the visitor and notify agents. This must work even after a previous handover."
+    const isAskingForHuman = wantsHuman(visitorMsg.content);
+
+    if ((hasHumanRepliedAndActive || conv.ai_mode === 'disabled') && !isAskingForHuman) {
+      return json({
+        replied: false,
+        reason: hasHumanRepliedAndActive
+          ? 'Human agent has replied. Bot stays silent until resolved or autopilot is turned back on.'
+          : 'AI disabled on this conversation',
+      });
     }
 
     const burstContext = msgs
@@ -290,7 +334,7 @@ export async function POST(req: NextRequest) {
           typeof m.content === 'string' &&
           m.content.trim()
       )
-      .slice(-10)
+      .slice(-8)
       .map((m) => ({
         role: (m.sender_type === 'visitor' ? 'user' : 'assistant') as
           | 'user'
@@ -407,6 +451,9 @@ export async function POST(req: NextRequest) {
         visitorMessageId: targetVisitorMsgId,
         reason: result.handoverReason || 'Inquiry not covered in Help Desk documentation.',
         channel: conv.channel || 'web',
+        disableAi: result.disableAi ?? true,
+        internalNote: result.internalNote,
+        priority: result.priority || 'high',
       });
     }
 

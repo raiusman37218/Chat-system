@@ -155,11 +155,15 @@ export interface AnswerRequest {
   /** Where the help centre lives, so the answer can link to the full article. */
   helpCenterUrl?: string | null;
   chunks?: RetrievedChunk[];
+  belowThreshold?: boolean;
+  queryEmbedding?: number[] | null;
+  intent?: string;
   providerConfig?: ProviderConfig | null;
 }
 
 /**
  * Logs a question the help centre could not answer.
+ * If an embedding is provided, groups near-duplicate gaps semantically via pgvector.
  *
  * Deliberately fire-and-forget and deliberately silent on failure: a customer
  * waiting on a reply must not wait on analytics, and a broken log must not
@@ -169,23 +173,40 @@ export async function recordUnanswered(
   workspaceId: string,
   question: string,
   reason: string,
-  conversationId?: string | null
+  conversationId?: string | null,
+  embedding?: number[] | null
 ): Promise<void> {
   try {
     const supabase = serviceClient();
-    await supabase.rpc('fn_record_unanswered_question', {
-      p_workspace_id: workspaceId,
-      p_question: question.slice(0, 1000),
-      p_reason: reason,
-      p_conversation_id: conversationId ?? null,
-    });
+    if (embedding && embedding.length > 0) {
+      await supabase.rpc('fn_record_unanswered_question_semantic', {
+        p_workspace_id: workspaceId,
+        p_question: question.slice(0, 1000),
+        p_embedding: embedding,
+        p_reason: reason,
+        p_conversation_id: conversationId ?? null,
+        p_similarity_threshold: 0.82,
+      });
+    } else {
+      await supabase.rpc('fn_record_unanswered_question', {
+        p_workspace_id: workspaceId,
+        p_question: question.slice(0, 1000),
+        p_reason: reason,
+        p_conversation_id: conversationId ?? null,
+      });
+    }
   } catch {
     /* never let bookkeeping affect the reply */
   }
 }
 
-const recordGap = (req: AnswerRequest, reason: string) =>
-  recordUnanswered(req.workspaceId, req.message, reason, req.conversationId);
+const recordGap = (req: AnswerRequest, reason: string) => {
+  // Handover Rule 4: Only log a knowledge gap for intent "question" with no answer.
+  if (req.intent && req.intent !== 'question') {
+    return Promise.resolve();
+  }
+  return recordUnanswered(req.workspaceId, req.message, reason, req.conversationId, req.queryEmbedding);
+};
 
 export async function answerFromHelpCenter(
   req: AnswerRequest
@@ -202,35 +223,55 @@ export async function answerFromHelpCenter(
     };
   }
 
-  // If semantic retrieval provided high-scoring chunks, use the top chunk
+  // Never send an article when similarity is below threshold
+  if (req.belowThreshold) {
+    void recordGap(req, 'below threshold');
+    return {
+      text: null,
+      confidence: 'none',
+      article: null,
+      reason: 'semantic similarity below threshold',
+      alternatives: [],
+    };
+  }
+
+  // If semantic retrieval provided chunks:
+  // Show the single best article ONLY when similarity is high; otherwise return null ("not sure" reply)
   if (req.chunks && req.chunks.length > 0) {
     const topChunk = req.chunks[0];
-    if (topChunk.combined_score >= 0.35 || topChunk.similarity >= 0.55 || topChunk.keyword_score >= 0.5) {
-      const cleanContent = topChunk.content.replace(/^Article:\s*.*?\nSection:\s*.*?\n\n/i, '').trim();
+    const isHighSimilarity =
+      topChunk.similarity >= 0.65 || topChunk.combined_score >= 0.55;
+
+    if (isHighSimilarity) {
+      const cleanContent = topChunk.content
+        .replace(/^Article:\s*.*?\nSection:\s*.*?\n\n/i, '')
+        .trim();
       const link = req.helpCenterUrl
         ? `${req.helpCenterUrl.replace(/\/$/, '')}/${topChunk.article_slug || topChunk.article_id}`
         : null;
 
-      const heading = `### ${topChunk.article_title}\n\n`;
-      const confidence: Confidence = topChunk.combined_score >= 0.5 || topChunk.similarity >= 0.65 ? 'high' : 'medium';
-      const opening = confidence === 'high' ? '' : `I think this is what you're after — tell me if you meant something else.\n\n`;
+      // Output plain text or simple markdown: bold title, no "###" headings
+      const heading = `**${topChunk.article_title}**\n\n`;
       const body = cleanContent.replace(/^\s*•\s+/gm, '- ').replace(/\n{3,}/g, '\n\n');
-      const citation = link ? `\n\n[Read the full article](${link})` : '';
+      const citation = link ? `\n\n[Read more](${link})` : '';
 
       return {
-        text: `${heading}${opening}${body}${citation}`,
+        text: `${heading}${body}${citation}`,
         source: 'article',
-        confidence,
+        confidence: 'high',
         article: { id: topChunk.article_id, title: topChunk.article_title, slug: topChunk.article_slug },
-        reason: `semantic hybrid match (score: ${topChunk.combined_score.toFixed(2)})`,
-        alternatives: req.chunks
-          .slice(1, 3)
-          .filter((c) => c.article_id !== topChunk.article_id)
-          .map((c) => ({
-            id: c.article_id,
-            title: c.article_title,
-            slug: c.article_slug,
-          })),
+        reason: `semantic hybrid high match (score: ${topChunk.combined_score.toFixed(2)}, similarity: ${topChunk.similarity.toFixed(2)})`,
+        alternatives: [], // Single best article only
+      };
+    } else {
+      // Similarity is not high -> refuse to show article, fall back to "not sure" reply
+      void recordGap(req, `similarity not high enough for no-api fallback (${topChunk.similarity.toFixed(2)})`);
+      return {
+        text: null,
+        confidence: 'none',
+        article: null,
+        reason: 'similarity not high enough for fallback',
+        alternatives: [],
       };
     }
   }
@@ -239,12 +280,9 @@ export async function answerFromHelpCenter(
   const hits = search(index, req.message, { history: req.history, limit: 4 });
   const verdict = assess(hits, req.message);
 
-  if (verdict.confidence === 'none' || !verdict.hit) {
-    // The questions nothing answers are the articles worth writing next.
-    // Previously the conversation was handed to a person and the question
-    // itself was thrown away, so the same gap was rediscovered every week.
+  // In no-API fallback, only show single best article when confidence is high
+  if (verdict.confidence !== 'high' || !verdict.hit) {
     void recordGap(req, verdict.reason);
-
     return {
       text: null,
       confidence: 'none',
@@ -277,27 +315,15 @@ export async function answerFromHelpCenter(
   }
 
   const isNote = article.id.startsWith('note:');
-
-  // A note lives nowhere a customer can visit, so it never gets a link.
   const link =
     !isNote && req.helpCenterUrl
       ? `${req.helpCenterUrl.replace(/\/$/, '')}/${article.slug || article.id}`
       : null;
 
-  // A confident answer is stated plainly. A partial one says so, because a
-  // hedge the customer can see beats a wrong answer they cannot.
-  // Chat replies render as Markdown: a heading naming the topic, the passage
-  // with its bullets as a real list, and a link to the full article.
-  const heading = isNote ? '' : `### ${article.title}\n\n`;
-  const opening =
-    verdict.confidence === 'high'
-      ? ''
-      : `I think this is what you're after — tell me if you meant something else.\n\n`;
+  // Simple markdown: bold title, no "###" headings
+  const heading = isNote ? '' : `**${article.title}**\n\n`;
   const body = passage
     .replace(/^\s*•\s+/gm, '- ')
-    // A chat bubble cannot show a table: separator rows go, and each data row
-    // becomes a bullet ("1st Withdrawal: 80% · 20%").
-    // [ \t] rather than \s: \s also eats the newline and joins rows together.
     .replace(/^[ \t]*\|?[ \t]*:?-{2,}.*$/gm, '')
     .replace(/^[ \t]*\|(.+)\|[ \t]*$/gm, (_row, cells: string) => {
       const [first, ...rest] = cells.split('|').map((c) => c.trim());
@@ -305,29 +331,15 @@ export async function answerFromHelpCenter(
     })
     .replace(/\n{3,}/g, '\n\n');
 
-  const citation = link
-    ? `\n\n[Read the full article](${link})`
-    : '';
+  const citation = link ? `\n\n[Read more](${link})` : '';
 
   return {
-    text: `${heading}${opening}${body}${citation}`,
+    text: `${heading}${body}${citation}`,
     source: isNote ? 'note' : 'article',
-    confidence: verdict.confidence,
+    confidence: 'high',
     article: { id: article.id, title: article.title, slug: article.slug },
     reason: verdict.reason,
-    alternatives: hits
-      .slice(1, 3)
-      // Suggesting "see also: <internal note title>" would leak the existence
-      // and wording of private knowledge.
-      .filter((h) => !h.article.id.startsWith('note:'))
-      // Only near-ties are worth offering. At a looser threshold a question
-      // about account types was answered with a suggestion about leverage.
-      .filter((h) => h.score > verdict.hit!.score * 0.72)
-      .map((h) => ({
-        id: h.article.id,
-        title: h.article.title,
-        slug: h.article.slug,
-      })),
+    alternatives: [],
   };
 }
 
@@ -358,8 +370,9 @@ export async function buildModelContext(
     recentMessages?: { sender_type?: string; role?: string; content?: string }[];
     limit?: number;
     providerConfig?: ProviderConfig | null;
+    helpCenterUrl?: string | null;
   } = {}
-): Promise<ModelContext & { rewrittenQuery?: string; chunks?: RetrievedChunk[] }> {
+): Promise<ModelContext & { rewrittenQuery?: string; queryEmbedding?: number[] | null; chunks?: RetrievedChunk[]; belowThreshold?: boolean }> {
   // 1. Primary: Semantic Retrieval with pgvector & query rewriting
   try {
     const messages = options.recentMessages || options.turns || (options.history || []).map((h) => ({ role: 'user', content: h }));
@@ -369,35 +382,32 @@ export async function buildModelContext(
       recentMessages: messages,
       providerConfig: options.providerConfig,
       limit: options.limit ?? 6,
+      helpCenterUrl: options.helpCenterUrl,
     });
 
-    if (semantic.chunks.length > 0 && semantic.text.trim()) {
-      return {
-        text: semantic.text,
-        used: semantic.used,
-        rewrittenQuery: semantic.rewrittenQuery,
-        chunks: semantic.chunks,
-      };
-    }
+    return {
+      text: semantic.text,
+      used: semantic.used,
+      rewrittenQuery: semantic.rewrittenQuery,
+      queryEmbedding: semantic.queryEmbedding,
+      chunks: semantic.chunks,
+      belowThreshold: semantic.belowThreshold,
+    };
   } catch (err) {
     console.warn('[Semantic Retrieval] buildModelContext fallback to keyword index:', err);
   }
 
-  // 2. Fallback to keyword index if no semantic chunks found
+  // 2. Fallback to keyword index only if semantic retrieval threw an unexpected error
   const index = await loadIndex(workspaceId);
   const hits = search(index, question, {
     history: options.history,
     limit: options.limit ?? 4,
   });
 
-  // Only what plausibly relates. Padding the prompt with the rest of the help
-  // centre invites the model to answer from whatever it finds there.
+  // Only what plausibly relates
   const relevant = hits.filter((h) => h.score >= 1);
-  if (relevant.length === 0) return { text: '', used: [] };
+  if (relevant.length === 0) return { text: '', used: [], belowThreshold: true };
 
-  // Every character in the prompt adds to how long the model takes to start
-  // answering. The best match keeps most of its article; the rest contribute
-  // only the part that matches the question.
   const budgets = [MODEL_CONTEXT_TOP_CHARS, ...Array(relevant.length).fill(MODEL_CONTEXT_OTHER_CHARS)];
 
   const used: ModelContext['used'] = [];
@@ -406,14 +416,11 @@ export async function buildModelContext(
     const isNote = a.id.startsWith('note:');
     used.push({ id: a.id, title: a.title, source: isNote ? 'note' : 'article' });
 
-    const label = isNote
-      ? `${a.title} (internal team knowledge)`
-      : a.sectionName
-      ? `${a.title} — ${a.sectionName}`
-      : a.title;
+    const articleUrl =
+      !isNote && options.helpCenterUrl
+        ? `${options.helpCenterUrl.replace(/\/$/, '')}/${a.slug || a.id}`
+        : null;
 
-    // Short articles go in whole — the model is better than a heuristic at
-    // finding the relevant line. Long ones are cut to their matching passages.
     const body =
       a.content.length <= budgets[i]
         ? a.content
@@ -421,10 +428,20 @@ export async function buildModelContext(
             history: options.history,
             maxChars: budgets[i],
           });
-    return `## ${label}\n${a.summary ? `${a.summary}\n` : ''}${body}`;
+
+    const lines = [
+      `[CHUNK ${i + 1}]`,
+      `Article: ${a.title}`,
+      `Section: ${a.sectionName || 'General'}`,
+    ];
+    if (articleUrl) {
+      lines.push(`Article URL: ${articleUrl}`);
+    }
+    lines.push('', a.summary ? `${a.summary}\n\n${body}` : body);
+    return lines.join('\n');
   });
 
-  return { text: blocks.join('\n\n---\n\n'), used };
+  return { text: blocks.join('\n\n---\n\n'), used, belowThreshold: false };
 }
 
 

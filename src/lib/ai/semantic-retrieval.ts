@@ -500,7 +500,7 @@ export async function rewriteVisitorMessageToEnglishQuery({
       maxTokens: 400,
       temperature: 0.1,
       reasoning: 'fast',
-      timeoutMs: 8000,
+      timeoutMs: 12000,
     });
 
     const rewritten = (res.text || '').trim().replace(/^["']|["']$/g, '');
@@ -551,7 +551,8 @@ export async function hybridSearchWorkspaceChunks({
  * 1. Rewrites visitor query into standalone English query using last 6 messages.
  * 2. Embeds the query.
  * 3. Retrieves top 6 chunks via hybrid search.
- * 4. Assembles Markdown context block and citation sources.
+ * 4. Filters out chunks below similarity threshold so unrelated articles are never sent.
+ * 5. Assembles clean context blocks with article URLs for the model.
  */
 export async function buildSemanticModelContext({
   workspaceId,
@@ -559,17 +560,21 @@ export async function buildSemanticModelContext({
   recentMessages = [],
   providerConfig,
   limit = 6,
+  helpCenterUrl,
 }: {
   workspaceId: string;
   visitorMessage: string;
   recentMessages?: { sender_type?: string; role?: string; content?: string }[];
   providerConfig?: ProviderConfig | null;
   limit?: number;
+  helpCenterUrl?: string | null;
 }): Promise<{
   text: string;
   used: { id: string; title: string; source: 'article' }[];
   rewrittenQuery: string;
+  queryEmbedding?: number[] | null;
   chunks: RetrievedChunk[];
+  belowThreshold: boolean;
 }> {
   // 1. Rewrite query into standalone English
   const rewrittenQuery = await rewriteVisitorMessageToEnglishQuery({
@@ -596,29 +601,49 @@ export async function buildSemanticModelContext({
   });
 
   if (!chunks.length) {
-    return { text: '', used: [], rewrittenQuery, chunks: [] };
+    return { text: '', used: [], rewrittenQuery, queryEmbedding, chunks: [], belowThreshold: true };
   }
 
-  // 4. Assemble context Markdown blocks
+  // 4. Threshold check: if top match is below threshold, refuse to pass unrelated articles
+  const topChunk = chunks[0];
+  const isBelowThreshold =
+    topChunk.similarity < 0.42 && topChunk.keyword_score < 0.20 && topChunk.combined_score < 0.38;
+
+  if (isBelowThreshold) {
+    return { text: '', used: [], rewrittenQuery, queryEmbedding, chunks: [], belowThreshold: true };
+  }
+
+  // 5. Assemble context blocks with article URLs (no "###" or "##" headings)
   const usedMap = new Map<string, { id: string; title: string; source: 'article' }>();
-  const blocks = chunks.map((c) => {
+  const blocks = chunks.map((c, idx) => {
     usedMap.set(c.article_id, {
       id: c.article_id,
       title: c.article_title,
       source: 'article',
     });
 
-    const header = c.section_name
-      ? `## ${c.article_title} — ${c.section_name}`
-      : `## ${c.article_title}`;
+    const articlePath = c.article_slug || c.article_id;
+    const articleUrl = helpCenterUrl ? `${helpCenterUrl.replace(/\/$/, '')}/${articlePath}` : null;
+    const cleanContent = c.content.replace(/^Article:\s*.*?\nSection:\s*.*?\n\n/i, '').trim();
 
-    return `${header}\n\n${c.content}`;
+    const lines = [
+      `[CHUNK ${idx + 1}]`,
+      `Article: ${c.article_title}`,
+      `Section: ${c.section_name || 'General'}`,
+    ];
+    if (articleUrl) {
+      lines.push(`Article URL: ${articleUrl}`);
+    }
+    lines.push('', cleanContent);
+    return lines.join('\n');
   });
 
   return {
     text: blocks.join('\n\n---\n\n'),
     used: Array.from(usedMap.values()),
     rewrittenQuery,
+    queryEmbedding,
     chunks,
+    belowThreshold: false,
   };
 }

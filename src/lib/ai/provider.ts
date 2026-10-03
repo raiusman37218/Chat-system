@@ -281,7 +281,9 @@ async function openAiChat(
  */
 function googleFastThinking(model: string): Record<string, unknown> {
   const m = model.toLowerCase();
-  if (/^gemini-[3-9]/.test(m)) return { thinkingConfig: { thinkingLevel: 'minimal' } };
+  if (/^gemini-[3-9]/.test(m)) {
+    return { thinkingConfig: { thinkingBudget: 0 } };
+  }
   if (m.startsWith('gemini-2.5')) {
     return { thinkingConfig: { thinkingBudget: m.includes('pro') ? 128 : 0 } };
   }
@@ -327,7 +329,7 @@ async function googleChat(
         .join('') ?? '';
     return { text: text.trim(), provider: 'google', model };
   } catch (err) {
-    if (err instanceof ProviderError && (err.status === 429 || err.status === 404)) {
+    if (err instanceof ProviderError && (err.status === 429 || err.status === 404 || err.status === 503 || err.status === 500)) {
       if (model !== 'gemini-3.8-flash' && model !== 'gemini-3.1-flash-lite') {
         console.warn(`[ai] google ${model} failed with ${err.status}, retrying with gemini-3.8-flash`);
         return googleChat(apiKey, 'gemini-3.8-flash', req, timeoutMs);

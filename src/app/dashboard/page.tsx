@@ -814,13 +814,45 @@ export default function DashboardPage() {
       throw error;
     }
 
-    await supabase
-      .from('conversations')
-      .update({
-        updated_at: new Date().toISOString(),
-        ...(isFirstAgentReply ? { assigned_agent_id: currentAgent.id } : {}),
-      })
-      .eq('id', targetId);
+    if (!isInternal) {
+      const now = new Date().toISOString();
+      await supabase
+        .from('conversations')
+        .update({
+          updated_at: now,
+          ai_mode: 'disabled',
+          channel_metadata: {
+            ...((target?.channel_metadata as Record<string, any>) || {}),
+            last_human_reply_at: now,
+          },
+          ...(isFirstAgentReply ? { assigned_agent_id: currentAgent.id } : {}),
+        })
+        .eq('id', targetId);
+
+      setConversations((prev) =>
+        prev.map((c) =>
+          c.id === targetId
+            ? {
+                ...c,
+                ai_mode: 'disabled',
+                channel_metadata: {
+                  ...((c.channel_metadata as Record<string, any>) || {}),
+                  last_human_reply_at: now,
+                },
+                ...(isFirstAgentReply ? { assigned_agent_id: currentAgent.id } : {}),
+              }
+            : c
+        )
+      );
+    } else {
+      await supabase
+        .from('conversations')
+        .update({
+          updated_at: new Date().toISOString(),
+          ...(isFirstAgentReply ? { assigned_agent_id: currentAgent.id } : {}),
+        })
+        .eq('id', targetId);
+    }
   };
 
   const handleEditMessage = async (messageId: string, newContent: string) => {
@@ -1200,14 +1232,25 @@ export default function DashboardPage() {
                 aiAnswering={isAiAnswering(activeConversation, currentWorkspace)}
                 onToggleAiMode={async (mode) => {
                   if (!selectedConversationId) return;
+                  const now = new Date().toISOString();
+                  const metaUpdate = {
+                    ...((activeConversation?.channel_metadata as Record<string, any>) || {}),
+                    ...(mode === 'autopilot' ? { autopilot_enabled_at: now } : {}),
+                  };
                   await supabase
                     .from('conversations')
-                    .update({ ai_mode: mode, updated_at: new Date().toISOString() })
+                    .update({
+                      ai_mode: mode,
+                      updated_at: now,
+                      channel_metadata: metaUpdate,
+                    })
                     .eq('id', selectedConversationId);
 
                   setConversations((prev) =>
                     prev.map((c) =>
-                      c.id === selectedConversationId ? { ...c, ai_mode: mode } : c
+                      c.id === selectedConversationId
+                        ? { ...c, ai_mode: mode, channel_metadata: metaUpdate }
+                        : c
                     )
                   );
                 }}
