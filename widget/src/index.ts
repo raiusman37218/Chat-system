@@ -136,6 +136,23 @@ class ChatifyWidget {
 
   private audioCtx: AudioContext | null = null;
 
+  // Conversation UX state
+  private botTyping: boolean = false;
+  private agentTyping: boolean = false;
+  private agentTypingTimer: ReturnType<typeof setTimeout> | null = null;
+  private realtimeChannel: any = null;
+  private typingChannel: any = null;
+  private forceNewConversation: boolean = false;
+  private previousConversations: Array<{
+    id: string;
+    status: string;
+    created_at: string;
+    updated_at: string;
+    csat_rating?: number | null;
+    unread_count?: number;
+    last_message?: { content?: string; sender_type?: string; attachment_url?: string | null; created_at?: string } | null;
+  }> = [];
+
   private isImageAttachment(url: string | null | undefined): boolean {
     if (!url) return false;
     if (url.includes('cloudinary.com') && (url.includes('/image/upload/') || !url.includes('/raw/upload/'))) {
@@ -203,6 +220,7 @@ class ChatifyWidget {
       } catch {}
 
       this.initProactiveWelcome();
+      this.loadPreviousConversations();
     });
   }
 
@@ -1095,7 +1113,13 @@ class ChatifyWidget {
   private subscribeToRealtime() {
     if (!this.conversationId) return;
 
-    this.supabase
+    if (this.realtimeChannel) {
+      try { this.supabase.removeChannel(this.realtimeChannel); } catch {}
+      this.realtimeChannel = null;
+    }
+    this.subscribeToTyping();
+
+    this.realtimeChannel = this.supabase
       .channel(`chatify-widget-${this.conversationId}`)
       .on(
         'postgres_changes',
@@ -1126,6 +1150,11 @@ class ChatifyWidget {
             return;
           }
 
+          if (newMsg.sender_type !== 'visitor') {
+            // The reply has landed: whoever was typing is done.
+            this.botTyping = false;
+            this.agentTyping = false;
+          }
           this.messages.push(newMsg);
           this.renderMessages();
 
@@ -1277,10 +1306,21 @@ class ChatifyWidget {
     if (this.conversationId) return this.conversationId;
 
     const suffix = this.config.workspaceId ? `_${this.config.workspaceId.slice(0, 8)}` : '';
-    let { data, error } = await this.supabase.rpc('fn_get_or_create_conversation', {
-      p_visitor_id: this.visitorId,
-      p_workspace_id: this.config.workspaceId || null,
-    });
+    let data: any = null;
+    let error: any = null;
+    if (this.forceNewConversation) {
+      // "Start a new conversation": skip get-or-create, which could hand back
+      // the conversation that was just closed.
+      error = new Error('forced new conversation');
+    } else {
+      const res = await this.supabase.rpc('fn_get_or_create_conversation', {
+        p_visitor_id: this.visitorId,
+        p_workspace_id: this.config.workspaceId || null,
+      });
+      data = res.data;
+      error = res.error;
+    }
+    this.forceNewConversation = false;
 
     if (error || !data) {
       console.warn('[Chatify] fn_get_or_create_conversation fallback:', error);
@@ -1389,6 +1429,9 @@ class ChatifyWidget {
     // Every visitor message gets a chance at an AI reply. The route decides
     // whether the assistant is on for this conversation, and skips it when not.
     if (this.config.workspaceId) {
+      // Show the typing indicator only if the reply takes a moment, so a
+      // skipped (human-handled) conversation does not flash it.
+      const typingTimer = setTimeout(() => this.setBotTyping(true), 700);
       fetch(`${this.config.apiUrl || ''}/api/ai/auto-respond`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1397,8 +1440,136 @@ class ChatifyWidget {
           workspace_id: this.config.workspaceId,
           message_id: data?.id,
         }),
-      }).catch(() => {});
+      })
+        .catch(() => {})
+        .finally(() => {
+          clearTimeout(typingTimer);
+          this.setBotTyping(false);
+        });
     }
+  }
+
+  private setBotTyping(value: boolean) {
+    if (this.botTyping === value) return;
+    this.botTyping = value;
+    this.renderMessages();
+  }
+
+  /** Agents broadcast a 'typing' event on the conversation's channel. */
+  private subscribeToTyping() {
+    if (this.typingChannel) {
+      try { this.supabase.removeChannel(this.typingChannel); } catch {}
+      this.typingChannel = null;
+    }
+    if (!this.conversationId) return;
+    this.typingChannel = this.supabase
+      .channel(`chatify-typing-${this.conversationId}`)
+      .on('broadcast', { event: 'typing' }, (payload: any) => {
+        if (payload?.payload?.sender === 'visitor') return;
+        this.agentTyping = true;
+        if (this.agentTypingTimer) clearTimeout(this.agentTypingTimer);
+        this.agentTypingTimer = setTimeout(() => {
+          this.agentTyping = false;
+          this.renderMessages();
+        }, 4000);
+        this.renderMessages();
+      })
+      .subscribe();
+  }
+
+  /** Closed conversation: forget it locally so the next message opens a fresh one. */
+  private startNewConversation() {
+    const suffix = this.config.workspaceId ? `_${this.config.workspaceId.slice(0, 8)}` : '';
+    if (this.realtimeChannel) {
+      try { this.supabase.removeChannel(this.realtimeChannel); } catch {}
+      this.realtimeChannel = null;
+    }
+    this.conversationId = null;
+    this.conversationStatus = 'open';
+    this.forceNewConversation = true;
+    this.csatRated = false;
+    this.messages = [];
+    this.unreadCount = 0;
+    this.botTyping = false;
+    this.agentTyping = false;
+    try { localStorage.removeItem(`chatify_conversation_id${suffix}`); } catch {}
+    this.subscribeToTyping();
+    this.updateUnreadBadge();
+    this.renderMessages();
+    this.loadPreviousConversations();
+    setTimeout(() => {
+      (this.shadow?.getElementById('chatifyTextarea') as HTMLTextAreaElement | null)?.focus();
+    }, 100);
+  }
+
+  // Previous conversations (Home tab)
+  private async loadPreviousConversations() {
+    if (!this.visitorId) return;
+    try {
+      const { data } = await this.supabase.rpc('fn_get_visitor_conversations', {
+        p_visitor_id: this.visitorId,
+        p_workspace_id: this.config.workspaceId || null,
+      });
+      this.previousConversations = Array.isArray(data) ? data : [];
+    } catch {}
+    this.renderPreviousConversations();
+  }
+
+  private renderPreviousConversations() {
+    const card = this.shadow?.getElementById('cardPrevConvs') as HTMLElement | null;
+    const list = this.shadow?.getElementById('prevConvsList') as HTMLElement | null;
+    if (!card || !list) return;
+
+    const items = this.previousConversations
+      .filter((c) => c.id !== this.conversationId && c.last_message)
+      .slice(0, 5);
+    if (items.length === 0) {
+      card.style.display = 'none';
+      return;
+    }
+    card.style.display = 'block';
+
+    list.innerHTML = items
+      .map((c) => {
+        const raw = (c.last_message?.content || '')
+          .replace(/^#{1,6}\s+/gm, '')
+          .replace(/\*\*|__|`/g, '')
+          .replace(/\s+/g, ' ')
+          .trim();
+        const snippet = raw || (c.last_message?.attachment_url ? 'Sent a picture' : 'Conversation');
+        const when = this.formatRelativeTime(new Date(c.updated_at || c.created_at));
+        const closed = c.status === 'closed';
+        return `<button type="button" class="chatify-prev-item" data-id="${this.escapeHTML(c.id)}">` +
+          `<span class="chatify-prev-text"><span class="chatify-prev-snippet">${this.escapeHTML(
+            snippet.length > 70 ? snippet.slice(0, 70) + '…' : snippet
+          )}</span>` +
+          `<span class="chatify-prev-meta">${this.escapeHTML(when)} · ${closed ? 'Closed' : 'Open'}</span></span>` +
+          `<span class="chatify-prev-chevron">›</span></button>`;
+      })
+      .join('');
+
+    list.querySelectorAll('.chatify-prev-item').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        this.openPreviousConversation((btn as HTMLElement).getAttribute('data-id') || '');
+      });
+    });
+  }
+
+  private async openPreviousConversation(id: string) {
+    if (!id) return;
+    const conv = this.previousConversations.find((c) => c.id === id);
+    const suffix = this.config.workspaceId ? `_${this.config.workspaceId.slice(0, 8)}` : '';
+    this.conversationId = id;
+    this.conversationStatus = conv?.status || 'open';
+    this.csatRated = Boolean(conv?.csat_rating);
+    this.messages = [];
+    this.botTyping = false;
+    this.agentTyping = false;
+    try { localStorage.setItem(`chatify_conversation_id${suffix}`, id); } catch {}
+    this.subscribeToRealtime();
+    this.switchTab('messages');
+    await this.loadMessageHistory();
+    this.renderPreviousConversations();
   }
 
   // Post-chat CSAT Rating
@@ -1605,6 +1776,12 @@ class ChatifyWidget {
                 <polyline points="12 5 19 12 12 19"></polyline>
               </svg>
             </button>
+          </div>
+
+          <!-- Previous conversations (shown only when the visitor has others) -->
+          <div class="chatify-card chatify-card-prev" id="cardPrevConvs" style="display: none;">
+            <div class="chatify-section-title">Previous conversations</div>
+            <div class="chatify-prev-list" id="prevConvsList"></div>
           </div>
 
           <!-- Help Center Quick Search (shown only when workspace has published articles) -->
@@ -2927,6 +3104,86 @@ class ChatifyWidget {
         color: var(--w-on-brand);
         user-select: none;
       }
+
+      .chatify-system-line {
+        align-self: center;
+        text-align: center;
+        max-width: 88%;
+        margin: 8px auto;
+        padding: 8px 12px;
+        font-size: 12px;
+        line-height: 1.5;
+        color: var(--w-ink-2);
+        background: var(--w-surface-2);
+        border: 1px solid var(--w-line);
+        border-radius: 12px;
+      }
+
+      .chatify-closed-notice {
+        align-self: center;
+        margin: 14px auto 6px;
+        font-size: 12.5px;
+        font-weight: 600;
+        color: var(--w-ink-2);
+        text-align: center;
+      }
+
+      .chatify-new-conversation-btn {
+        align-self: center;
+        margin: 10px auto 14px;
+        padding: 10px 18px;
+        border: none;
+        border-radius: 999px;
+        background: var(--w-brand);
+        color: var(--w-on-brand);
+        font-size: 13px;
+        font-weight: 600;
+      }
+
+      .chatify-typing {
+        display: inline-flex !important;
+        align-items: center;
+        gap: 4px;
+        padding: 12px 14px !important;
+      }
+
+      .chatify-typing span {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--w-ink-3);
+        animation: w-typing 1.2s infinite ease-in-out;
+      }
+
+      .chatify-typing span:nth-child(2) { animation-delay: .15s; }
+      .chatify-typing span:nth-child(3) { animation-delay: .3s; }
+
+      @keyframes w-typing {
+        0%, 60%, 100% { transform: translateY(0); opacity: .4; }
+        30% { transform: translateY(-4px); opacity: 1; }
+      }
+
+      .chatify-prev-list { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
+
+      .chatify-prev-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        width: 100%;
+        padding: 10px 12px;
+        text-align: left;
+        background: var(--w-surface-2);
+        border: 1px solid var(--w-line);
+        border-radius: 12px;
+        color: var(--w-ink);
+      }
+
+      .chatify-prev-item:hover { background: var(--w-surface-3); }
+      .chatify-prev-text { display: flex; flex-direction: column; min-width: 0; gap: 2px; }
+      .chatify-prev-snippet { font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .chatify-prev-meta { font-size: 11.5px; color: var(--w-ink-3); }
+      .chatify-prev-chevron { font-size: 18px; color: var(--w-ink-3); }
 
       @media (max-width: 480px) {
         .chatify-window {
@@ -4737,6 +4994,18 @@ class ChatifyWidget {
       // Security: never render internal notes to visitor!
       if (msg.is_internal) return;
 
+      // System event: the bot handed this over to the team.
+      if ((msg as any).metadata?.system_event === 'handover') {
+        const line = document.createElement('div');
+        line.className = 'chatify-system-line';
+        const email = (this.visitorEmail || '').trim();
+        line.innerHTML =
+          this.escapeHTML("We've passed this to our team. We usually reply within 10–15 minutes.") +
+          (email ? ' ' + this.escapeHTML(`We'll also email you at ${email}.`) : '');
+        body.appendChild(line);
+        return;
+      }
+
       const isVisitor = msg.sender_type === 'visitor';
       const timeStr = new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
@@ -4812,6 +5081,14 @@ class ChatifyWidget {
       body.appendChild(row);
     });
 
+    const isClosed = this.conversationStatus === 'closed';
+    if (isClosed) {
+      const closedNotice = document.createElement('div');
+      closedNotice.className = 'chatify-closed-notice';
+      closedNotice.textContent = 'This conversation was closed';
+      body.appendChild(closedNotice);
+    }
+
     // If conversation is closed, render CSAT Satisfaction Rating Box
     if (this.conversationStatus === 'closed' && !this.csatRated) {
       const csatCard = document.createElement('div');
@@ -4839,6 +5116,23 @@ class ChatifyWidget {
       thankYou.style.cssText = 'text-align:center; padding:12px; font-size:12.5px; color:var(--w-success); font-weight:600;';
       thankYou.textContent = '✓ Thank you for rating our support!';
       body.appendChild(thankYou);
+    }
+
+    if (isClosed) {
+      const newBtn = document.createElement('button');
+      newBtn.type = 'button';
+      newBtn.className = 'chatify-new-conversation-btn';
+      newBtn.textContent = 'Start a new conversation';
+      newBtn.addEventListener('click', () => this.startNewConversation());
+      body.appendChild(newBtn);
+    }
+
+    if (this.botTyping || this.agentTyping) {
+      const typingRow = document.createElement('div');
+      typingRow.className = 'chatify-message-row';
+      typingRow.innerHTML =
+        '<div class="chatify-msg-agent chatify-typing" aria-label="Typing"><span></span><span></span><span></span></div>';
+      body.appendChild(typingRow);
     }
 
     body.scrollTop = body.scrollHeight;
@@ -4921,6 +5215,7 @@ class ChatifyWidget {
       if (this.isOpen) {
         this.hideMessagePopup(false);
         win.style.display = 'flex';
+        this.loadPreviousConversations();
         openIcon.style.display = 'none';
         closeIcon.style.display = 'block';
 

@@ -535,6 +535,22 @@ export async function executeHandoverToHuman({
       throw insertErr;
     }
 
+    // 2b. Visitor-visible system event. The widget turns it into
+    // "We've passed this to our team. We usually reply within … We'll also
+    // email you at …" using the reply time and the visitor's own email.
+    if (channel === 'web') {
+      await supabase.from('messages').insert({
+        conversation_id: conversationId,
+        sender_type: 'ai',
+        content: "We've passed this to our team.",
+        is_internal: false,
+        metadata: {
+          system_event: 'handover',
+          handover_for_message_id: visitorMessageId || null,
+        },
+      });
+    }
+
     // 3. Attempt auto-assignment to available human agent
     const { data: ws } = await supabase
       .from('workspaces')

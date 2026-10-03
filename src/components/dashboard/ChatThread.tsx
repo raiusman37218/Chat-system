@@ -513,9 +513,30 @@ export function ChatThread({
     };
   }, [showTagPicker]);
 
+  const typingSignalRef = React.useRef<{ convId: string; channel: any; last: number } | null>(null);
+
+  // Lets the visitor's widget show "typing…". Throttled; never for internal notes.
+  const sendTypingSignal = () => {
+    if (!conversation?.id) return;
+    const now = Date.now();
+    let state = typingSignalRef.current;
+    if (!state || state.convId !== conversation.id) {
+      const supabase = createClient();
+      if (state) supabase.removeChannel(state.channel);
+      const channel = supabase.channel(`chatify-typing-${conversation.id}`);
+      channel.subscribe();
+      state = { convId: conversation.id, channel, last: 0 };
+      typingSignalRef.current = state;
+    }
+    if (now - state.last < 2500) return;
+    state.last = now;
+    state.channel.send({ type: 'broadcast', event: 'typing', payload: { sender: 'agent' } });
+  };
+
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const val = e.target.value;
     setInputText(val);
+    if (composerMode !== 'internal' && val.trim()) sendTypingSignal();
 
     // Typing '/' or '#' opens the saved-reply palette.
     if (val.endsWith('/') || val.endsWith('#')) {
