@@ -1366,6 +1366,50 @@ class ChatifyWidget {
 
     this.shadow = this.container.attachShadow({ mode: 'open' });
 
+    // 1. Stop keyboard events that originate inside the widget from reaching the host page
+    ['keydown', 'keyup', 'keypress'].forEach((eventType) => {
+      this.shadow?.addEventListener(eventType, (e: Event) => {
+        e.stopPropagation();
+      });
+      this.container?.addEventListener(eventType, (e: Event) => {
+        e.stopPropagation();
+      });
+    });
+
+    // 2. Pressing Escape inside the widget closes the emoji picker first, then the widget
+    this.shadow.addEventListener('keydown', (e: Event) => {
+      const ke = e as KeyboardEvent;
+      if (ke.key === 'Escape') {
+        const picker = this.shadow?.getElementById('chatifyEmojiPicker');
+        const isEmojiOpen = Boolean(
+          picker &&
+          picker.style.display !== 'none' &&
+          picker.style.display !== ''
+        );
+
+        if (isEmojiOpen) {
+          ke.preventDefault();
+          this.closeEmojiPicker();
+          const textarea = this.shadow?.getElementById('chatifyTextarea') as HTMLTextAreaElement | null;
+          textarea?.focus();
+          return;
+        }
+
+        const lightbox = this.shadow?.getElementById('chatifyImageLightbox');
+        const isLightboxOpen = Boolean(lightbox && lightbox.style.display === 'flex');
+        if (isLightboxOpen) {
+          ke.preventDefault();
+          this.closeLightbox();
+          return;
+        }
+
+        if (this.isOpen) {
+          ke.preventDefault();
+          this.close();
+        }
+      }
+    });
+
     const style = document.createElement('style');
     style.id = 'chatify-theme-style';
     style.textContent = this.generateCSS();
@@ -1863,10 +1907,18 @@ class ChatifyWidget {
     });
 
     sendBtn?.addEventListener('click', () => this.handleSendMessage());
+
+    textarea?.addEventListener('input', () => {
+      this.adjustTextareaHeight();
+    });
+
     textarea?.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
         this.handleSendMessage();
+      } else if (e.key === 'Enter' && e.shiftKey) {
+        // Shift+Enter adds a new line; trigger auto-grow on next tick
+        setTimeout(() => this.adjustTextareaHeight(), 0);
       }
     });
 
@@ -1986,6 +2038,36 @@ class ChatifyWidget {
     });
   }
 
+  private adjustTextareaHeight() {
+    const textarea = this.shadow?.getElementById('chatifyTextarea') as HTMLTextAreaElement | null;
+    if (!textarea) return;
+
+    // Reset height temporarily so scrollHeight reflects true content size
+    textarea.style.height = 'auto';
+
+    const computed = window.getComputedStyle(textarea);
+    const lh = parseFloat(computed.lineHeight) || 19.6;
+    const pt = parseFloat(computed.paddingTop) || 11;
+    const pb = parseFloat(computed.paddingBottom) || 11;
+    const bt = parseFloat(computed.borderTopWidth) || 1;
+    const bb = parseFloat(computed.borderBottomWidth) || 1;
+    const offset = pt + pb + bt + bb;
+
+    const minH = Math.round(lh * 1 + offset);
+    const maxH = Math.round(lh * 5 + offset);
+
+    const scrollH = textarea.scrollHeight;
+
+    if (scrollH > maxH) {
+      textarea.style.height = `${maxH}px`;
+      textarea.style.overflowY = 'auto';
+    } else {
+      const targetH = Math.max(minH, scrollH);
+      textarea.style.height = `${targetH}px`;
+      textarea.style.overflowY = 'hidden';
+    }
+  }
+
   private insertEmoji(emoji: string) {
     const textarea = this.shadow?.getElementById('chatifyTextarea') as HTMLTextAreaElement | null;
     if (!textarea) return;
@@ -1994,6 +2076,7 @@ class ChatifyWidget {
     const val = textarea.value;
     textarea.value = val.substring(0, start) + emoji + val.substring(end);
     textarea.selectionStart = textarea.selectionEnd = start + emoji.length;
+    this.adjustTextareaHeight();
     textarea.focus();
     this.closeEmojiPicker();
   }
@@ -2044,6 +2127,7 @@ class ChatifyWidget {
       this.updateUnreadBadge();
       this.markMessagesAsRead();
       this.scrollToBottom(false);
+      this.adjustTextareaHeight();
       setTimeout(() => {
         (this.shadow?.getElementById('chatifyTextarea') as HTMLTextAreaElement | null)?.focus();
       }, 100);
@@ -3646,8 +3730,10 @@ class ChatifyWidget {
 
       .chatify-textarea {
         flex: 1;
-        min-height: 42px;
-        max-height: 120px;
+        box-sizing: border-box;
+        height: 44px;
+        min-height: 44px;
+        max-height: 122px;
         padding: 11px 13px;
         border-radius: var(--w-r-md);
         border: 1px solid var(--w-line-2);
@@ -3657,6 +3743,7 @@ class ChatifyWidget {
         line-height: 1.45;
         resize: none;
         outline: none;
+        overflow-y: hidden;
         transition: border-color .16s var(--w-ease), box-shadow .16s var(--w-ease);
       }
 
@@ -4507,6 +4594,7 @@ class ChatifyWidget {
     }
 
     textarea.value = '';
+    this.adjustTextareaHeight();
     this.clearPendingAttachment();
 
     await this.sendMessage(text, attachmentUrl || undefined);
@@ -4717,6 +4805,7 @@ class ChatifyWidget {
           this.updateUnreadBadge();
           this.markMessagesAsRead();
           this.scrollToBottom(false);
+          this.adjustTextareaHeight();
           setTimeout(() => {
             (this.shadow?.getElementById('chatifyTextarea') as HTMLTextAreaElement | null)?.focus();
           }, 100);
@@ -4727,6 +4816,7 @@ class ChatifyWidget {
         win.style.display = 'none';
         openIcon.style.display = 'block';
         closeIcon.style.display = 'none';
+        this.closeEmojiPicker();
         this.updateUnreadBadge();
       }
     }

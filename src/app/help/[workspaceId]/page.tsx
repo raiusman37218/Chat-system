@@ -298,9 +298,38 @@ function PublicHelpCenterContent() {
   // "/" focuses search from anywhere, Escape clears it, arrows walk results.
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      const el = document.activeElement;
-      const typing =
-        el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement;
+      // Ignore shortcut when typing in input, textarea, or contenteditable
+      // (including inside any shadow root via event.composedPath())
+      const path = typeof e.composedPath === 'function' ? e.composedPath() : [];
+      const isTypingInPath = path.some((node) => {
+        if (!node || !(node instanceof Element)) return false;
+        const tag = node.tagName.toUpperCase();
+        if (tag === 'INPUT' || tag === 'TEXTAREA') return true;
+        if ((node as HTMLElement).isContentEditable) return true;
+        const ce = node.getAttribute('contenteditable');
+        return ce !== null && ce !== 'false';
+      });
+
+      const active = document.activeElement;
+      let isTypingActive = false;
+      if (active) {
+        if (active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement) {
+          isTypingActive = true;
+        } else if ((active as HTMLElement).isContentEditable) {
+          isTypingActive = true;
+        } else if (active.shadowRoot && active.shadowRoot.activeElement) {
+          const sActive = active.shadowRoot.activeElement;
+          if (
+            sActive instanceof HTMLInputElement ||
+            sActive instanceof HTMLTextAreaElement ||
+            (sActive as HTMLElement).isContentEditable
+          ) {
+            isTypingActive = true;
+          }
+        }
+      }
+
+      const typing = isTypingInPath || isTypingActive;
 
       if (e.key === '/' && !typing) {
         e.preventDefault();
