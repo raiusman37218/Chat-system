@@ -37,6 +37,7 @@ import {
   AdminSettingsPanel,
   type AdminTab,
 } from '@/components/admin/AdminSettingsPanel';
+import { createClient } from '@/lib/supabase/client';
 
 export type SectionId =
   | 'widget'
@@ -339,6 +340,127 @@ const SETTING_GROUPS: SettingGroup[] = [
     ],
   },
 ];
+
+function AutoCloseSettingsCard({
+  workspace,
+  onWorkspaceUpdated,
+}: {
+  workspace: Workspace | null;
+  onWorkspaceUpdated?: (ws: Workspace) => void;
+}) {
+  const [days, setDays] = useState<number>(
+    workspace?.auto_close_days ?? 7
+  );
+  const [isSaving, setIsSaving] = useState(false);
+  const [isRunningNow, setIsRunningNow] = useState(false);
+  const [statusMsg, setStatusMsg] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!workspace?.id) return;
+    setIsSaving(true);
+    setStatusMsg(null);
+    try {
+      const supabase = createClient();
+      const { error } = await supabase
+        .from('workspaces')
+        .update({ auto_close_days: days })
+        .eq('id', workspace.id);
+
+      if (error) throw error;
+      onWorkspaceUpdated?.({ ...workspace, auto_close_days: days });
+      setStatusMsg({ text: 'Auto-close rule updated successfully.', type: 'success' });
+      setTimeout(() => setStatusMsg(null), 3500);
+    } catch (err: any) {
+      setStatusMsg({ text: err.message || 'Failed to save rule.', type: 'error' });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleRunNow = async () => {
+    if (!workspace?.id || isRunningNow) return;
+    setIsRunningNow(true);
+    setStatusMsg(null);
+    try {
+      const res = await fetch('/api/conversations/auto-close', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ workspace_id: workspace.id, days }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setStatusMsg({
+          text: `Auto-close check complete: ${data.closed_count} inactive conversation(s) resolved.`,
+          type: 'success',
+        });
+      } else {
+        throw new Error(data.error || 'Failed to run auto-close');
+      }
+    } catch (err: any) {
+      setStatusMsg({ text: err.message || 'Auto-close run failed.', type: 'error' });
+    } finally {
+      setIsRunningNow(false);
+    }
+  };
+
+  return (
+    <div className="p-4 rounded-2xl border border-line bg-surface-2 space-y-3.5">
+      <form onSubmit={handleSave} className="flex flex-wrap items-center gap-3">
+        <label className="text-[12.5px] font-medium text-ink flex items-center gap-2">
+          <span>Resolve conversations inactive for</span>
+          <input
+            type="number"
+            min={1}
+            max={365}
+            value={days}
+            onChange={(e) => setDays(Math.max(1, parseInt(e.target.value) || 1))}
+            className="input input-sm w-20 text-center font-bold text-[13px] bg-surface border-line"
+          />
+          <span>days (default: 7)</span>
+        </label>
+
+        <div className="flex items-center gap-2 ml-auto">
+          <button
+            type="submit"
+            disabled={isSaving}
+            className="btn btn-sm btn-primary shadow-xs"
+          >
+            {isSaving ? 'Saving…' : 'Save Rule'}
+          </button>
+          <button
+            type="button"
+            onClick={handleRunNow}
+            disabled={isRunningNow}
+            className="btn btn-sm btn-secondary gap-1.5 shadow-xs"
+            title="Scan and resolve stale conversations immediately"
+          >
+            <Clock className={cn('w-3.5 h-3.5', isRunningNow && 'animate-spin text-accent')} />
+            <span>{isRunningNow ? 'Running…' : 'Run Rule Now'}</span>
+          </button>
+        </div>
+      </form>
+
+      {statusMsg && (
+        <div
+          className={cn(
+            'p-2.5 rounded-xl text-[12px] font-medium flex items-center gap-2 animate-in fade-in duration-150',
+            statusMsg.type === 'success'
+              ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
+              : 'bg-danger/10 text-danger border border-danger/20'
+          )}
+        >
+          {statusMsg.type === 'success' ? (
+            <CheckCircle2 className="w-4 h-4 shrink-0" />
+          ) : (
+            <AlertCircle className="w-4 h-4 shrink-0" />
+          )}
+          <span>{statusMsg.text}</span>
+        </div>
+      )}
+    </div>
+  );
+}
 
 interface SettingsHubProps {
   workspace: Workspace | null;
@@ -806,6 +928,19 @@ export function SettingsHub({
                       Configure round-robin and agent routing for incoming chats
                     </p>
                     {renderAdmin('assignment')}
+                  </div>
+                  <div className="pt-2 border-t border-line">
+                    <h3 className="text-[14px] font-semibold text-ink mb-1 flex items-center gap-2">
+                      <Clock className="w-4 h-4 text-accent" />
+                      Auto-Close Inactivity Rule
+                    </h3>
+                    <p className="text-[12px] text-ink-3 mb-4">
+                      Automatically resolve open conversations that have had no customer or agent activity for a specified period.
+                    </p>
+                    <AutoCloseSettingsCard
+                      workspace={workspace}
+                      onWorkspaceUpdated={onWorkspaceUpdated}
+                    />
                   </div>
                 </div>
               )}

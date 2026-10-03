@@ -218,16 +218,23 @@ export async function generateHelpDeskResponseWithHandover({
       incomingMessage
     );
 
-  // 1. Prepare conversation turns: Send the last 8 messages of the conversation to the LLM
+  // 1. Prepare conversation turns: Support up to 15 recent messages (including agent replies & internal notes)
   const priorTurns = (turns && turns.length
     ? turns
-    : (history || []).slice(0, 7).reverse().map((h) => ({ role: 'user' as const, content: h }))
-  ).slice(-7);
+    : (history || []).slice(0, 14).reverse().map((h) => ({ role: 'user' as const, content: h }))
+  ).slice(-14);
 
   const conversationMessages = [
     ...priorTurns,
     { role: 'user' as const, content: incomingMessage },
-  ].slice(-8);
+  ].slice(-15);
+
+  const hasHumanReplied = (turns || []).some(
+    (t) =>
+      t.content.includes('[Human Agent]') ||
+      t.content.includes('[Agent]') ||
+      t.content.includes('[Internal Team Note]')
+  );
 
   // 2. Intent step before retrieval: Classify message into one of 7 intents
   const intentResult = await classifyVisitorIntent({
@@ -245,16 +252,21 @@ export async function generateHelpDeskResponseWithHandover({
   });
 
   if (direct) {
-    return {
-      replyText: direct.replyText,
-      shouldHandover: direct.shouldHandover,
-      handoverReason: direct.handoverReason,
-      canAnswerFromDocs: false,
-      intent: intentResult.intent,
-      internalNote: direct.createInternalNote,
-      disableAi: direct.shouldHandover, // only disable AI if explicit human or account issue
-      priority: direct.setPriorityHigh ? 'high' : 'normal',
-    };
+    // If a human has already replied, do not trigger handover lines or repeats
+    if (hasHumanReplied && direct.shouldHandover) {
+      // Proceed to docs retrieval instead of repeating a handover line
+    } else {
+      return {
+        replyText: direct.replyText,
+        shouldHandover: direct.shouldHandover,
+        handoverReason: direct.handoverReason,
+        canAnswerFromDocs: false,
+        intent: intentResult.intent,
+        internalNote: direct.createInternalNote,
+        disableAi: direct.shouldHandover, // only disable AI if explicit human or account issue
+        priority: direct.setPriorityHigh ? 'high' : 'normal',
+      };
+    }
   }
 
   // 3. For intent 'question' (or general question complaints), proceed to semantic retrieval
@@ -414,15 +426,17 @@ export async function generateHelpDeskResponseWithHandover({
     );
   }
 
-  const baseReply = getFallbackNotSureReply(langCode, incomingMessage, cleanName);
+  const baseReply = hasHumanReplied
+    ? `I have reviewed our help documentation, but could not locate specific details regarding "${incomingMessage}".`
+    : getFallbackNotSureReply(langCode, incomingMessage, cleanName);
   const fullReply = complaintApology
-    ? `${complaintApology} ${baseReply} ${replyTimeNotice}`
-    : `${baseReply} ${replyTimeNotice}`;
+    ? `${complaintApology} ${baseReply} ${hasHumanReplied ? '' : replyTimeNotice}`
+    : `${baseReply} ${hasHumanReplied ? '' : replyTimeNotice}`;
 
   return {
-    replyText: fullReply,
-    shouldHandover: true,
-    handoverReason: 'Question not found in documentation.',
+    replyText: fullReply.trim(),
+    shouldHandover: !hasHumanReplied,
+    handoverReason: hasHumanReplied ? undefined : 'Question not found in documentation.',
     canAnswerFromDocs: false,
     intent: intentResult.intent,
     disableAi: false, // Handover Rule 1: A failed answer must NOT turn the bot off!
@@ -732,8 +746,16 @@ Line 2: Status / resolution [status].`;
   return `Customer inquired about: "${lastVisitor.slice(0, 60)}..."\n${hasAgentReply ? 'Agent replied with instructions. Awaiting customer follow-up.' : 'Awaiting agent first response.'}`;
 }
 
+export interface SentimentResult {
+  sentiment: 'positive' | 'neutral' | 'negative';
+  confidence: number;
+}
+
 /**
  * 5. Visitor Sentiment Analysis (Positive / Neutral / Negative)
+ * Computed from the visitor's last 5 messages.
+ * Marks Negative when messages contain insults, complaints or repeated "waiting" messages.
+ * Returns confidence score so low-confidence badges can be hidden.
  */
 export async function analyzeVisitorSentiment({
   messages,
@@ -741,15 +763,49 @@ export async function analyzeVisitorSentiment({
 }: {
   messages: Array<{ sender_type: string; content: string }>;
   providerConfig?: ProviderConfig | null;
-}): Promise<'positive' | 'neutral' | 'negative'> {
-  const visitorText = messages
+}): Promise<SentimentResult> {
+  const visitorMsgs = messages
     .filter((m) => m.sender_type === 'visitor')
-    .map((m) => m.content)
-    .join(' ');
+    .slice(-5);
 
-  if (visitorText) {
-    {
-      const prompt = `Analyze the sentiment of this customer's messages:
+  if (visitorMsgs.length === 0) {
+    return { sentiment: 'neutral', confidence: 0 };
+  }
+
+  // 1. Insults
+  const insultRegex = /\b(stupid|idiot|moron|dumb|useless|scam|scammer|clowns?|pathetic|trash|garbage|bullshit|bull crap|worst|incompetent|terrible|sucks?|horrible|wtf|damn|fucking?)\b/i;
+
+  // 2. Complaints
+  const complaintRegex = /\b(broken|not working|doesn'?t work|won'?t work|failed|fail|failure|charge|billing issue|overcharg(ed|ing)|unacceptable|refund|cancel|disappointed|bad experience|horrible service|rip off|ripoff|fix this|frustrated|angry|fraud|poor service|awful)\b/i;
+
+  // 3. Repeated "waiting" messages
+  const waitingRegex = /\b(still waiting|waiting|wait|anyone (here|there|alive)|hello\?+|any update\?*|are you there|reply please|respond please|no response|how long|ignoring me|nobody answers)\b/i;
+
+  const hasInsult = visitorMsgs.some((m) => insultRegex.test(m.content));
+  const hasComplaint = visitorMsgs.some((m) => complaintRegex.test(m.content));
+  const waitingMessagesCount = visitorMsgs.filter((m) => waitingRegex.test(m.content)).length;
+  const singleMsgRepeatedWait = visitorMsgs.some((m) => {
+    const matches = m.content.match(/\b(waiting|wait|hello\?|anyone there|reply)\b/gi);
+    return matches && matches.length >= 2;
+  });
+  const hasRepeatedWaiting = waitingMessagesCount >= 2 || singleMsgRepeatedWait;
+
+  if (hasInsult || hasComplaint || hasRepeatedWaiting) {
+    return { sentiment: 'negative', confidence: 0.95 };
+  }
+
+  // 4. Check positive cues
+  const positiveRegex = /\b(thank|thanks|thank you|great|awesome|helpful|love it|good job|perfect|resolved|amazing|excellent|wonderful|appreciate)\b/i;
+  const positiveCount = visitorMsgs.filter((m) => positiveRegex.test(m.content)).length;
+  if (positiveCount >= 1) {
+    return { sentiment: 'positive', confidence: 0.85 };
+  }
+
+  // 5. LLM classification if providerConfig is available
+  const visitorText = visitorMsgs.map((m) => m.content).join(' ');
+  if (visitorText && providerConfig) {
+    try {
+      const prompt = `Analyze the sentiment of this customer's last messages:
 "${visitorText}"
 
 Classify into exactly one word: "positive", "neutral", or "negative".
@@ -757,30 +813,19 @@ Output ONLY the single classification word.`;
 
       const answer = await askModel(
         providerConfig,
-        'You classify sentiment. Reply with one word.',
+        'You classify customer sentiment. Reply with one word: positive, neutral, or negative.',
         prompt,
         16
       );
       if (answer) {
         const text = answer.toLowerCase().trim();
-        if (text.includes('pos')) return 'positive';
-        if (text.includes('neg')) return 'negative';
-        if (text.includes('neu')) return 'neutral';
-        // Anything else is not a classification; fall through to the heuristic
-        // rather than recording "neutral" for a garbled reply.
+        if (text.includes('neg')) return { sentiment: 'negative', confidence: 0.85 };
+        if (text.includes('pos')) return { sentiment: 'positive', confidence: 0.85 };
+        if (text.includes('neu')) return { sentiment: 'neutral', confidence: 0.4 };
       }
-    }
+    } catch (err) {}
   }
 
-  // Heuristic sentiment analysis
-  const text = visitorText.toLowerCase();
-  const positiveWords = ['thank', 'thanks', 'great', 'awesome', 'helpful', 'love', 'good', 'perfect', 'resolved', 'amazing'];
-  const negativeWords = ['terrible', 'bad', 'angry', 'awful', 'frustrated', 'broken', 'worst', 'scam', 'horrible', 'refund immediately', 'waste'];
-
-  const posCount = positiveWords.filter((w) => text.includes(w)).length;
-  const negCount = negativeWords.filter((w) => text.includes(w)).length;
-
-  if (negCount > posCount) return 'negative';
-  if (posCount > 0) return 'positive';
-  return 'neutral';
+  // Default to neutral with low confidence so badge stays hidden
+  return { sentiment: 'neutral', confidence: 0.4 };
 }

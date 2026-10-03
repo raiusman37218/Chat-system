@@ -306,21 +306,59 @@ export default function ChatWidget({
     if (!visitorId) return;
 
     async function loadConversation() {
-      const { data: conv } = await supabase
+      // 1. Try to find an open conversation first for this visitorId
+      let query = supabase
         .from('conversations')
         .select('id, status')
         .eq('visitor_id', visitorId)
-        .order('updated_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
+        .order('updated_at', { ascending: false });
 
-      if (conv) {
-        setConversationId(conv.id);
+      if (config.workspaceId) {
+        query = query.eq('workspace_id', config.workspaceId);
+      }
+
+      const { data: convs } = await query.limit(5);
+      let chosenConv = (convs as any[])?.find((c: any) => c.status === 'open') || convs?.[0];
+
+      // If no conversation found by visitorId, check by saved email if available
+      if (!chosenConv) {
+        let savedEmail = '';
+        try {
+          savedEmail = localStorage.getItem('chatify_visitor_email') || '';
+        } catch {}
+
+        if (savedEmail) {
+          let vQuery = supabase
+            .from('visitors')
+            .select('id')
+            .eq('email', savedEmail.trim().toLowerCase());
+          if (config.workspaceId) {
+            vQuery = vQuery.eq('workspace_id', config.workspaceId);
+          }
+          const { data: matchedVisitors } = await vQuery;
+          if (matchedVisitors && matchedVisitors.length > 0) {
+            const vIds = (matchedVisitors as Array<{ id: string }>).map((v) => v.id);
+            let emailQuery = supabase
+              .from('conversations')
+              .select('id, status')
+              .in('visitor_id', vIds)
+              .order('updated_at', { ascending: false });
+            if (config.workspaceId) {
+              emailQuery = emailQuery.eq('workspace_id', config.workspaceId);
+            }
+            const { data: emailConvs } = await emailQuery.limit(5);
+            chosenConv = (emailConvs as any[])?.find((c: any) => c.status === 'open') || emailConvs?.[0];
+          }
+        }
+      }
+
+      if (chosenConv) {
+        setConversationId(chosenConv.id);
 
         const { data: msgs } = await supabase
           .from('messages')
           .select('*')
-          .eq('conversation_id', conv.id)
+          .eq('conversation_id', chosenConv.id)
           .or('is_internal.is.null,is_internal.eq.false')
           .order('created_at', { ascending: true });
 
@@ -509,10 +547,65 @@ export default function ChatWidget({
     }
   };
 
-  // Create Conversation if not exists
+  // Create or reuse Conversation if open one exists
   const ensureConversation = async (): Promise<string> => {
     if (conversationId) return conversationId;
 
+    // 1. Check if visitorId already has an open conversation
+    let openQuery = supabase
+      .from('conversations')
+      .select('id, status')
+      .eq('visitor_id', visitorId)
+      .eq('status', 'open')
+      .order('updated_at', { ascending: false })
+      .limit(1);
+
+    if (config.workspaceId) {
+      openQuery = openQuery.eq('workspace_id', config.workspaceId);
+    }
+
+    const { data: openConv } = await openQuery.maybeSingle();
+    if (openConv) {
+      setConversationId(openConv.id);
+      return openConv.id;
+    }
+
+    // 2. Check if visitor email matches another visitor record with an open conversation
+    const cleanEmail = (visitorEmail || '').trim().toLowerCase();
+    if (cleanEmail) {
+      let vQuery = supabase
+        .from('visitors')
+        .select('id')
+        .eq('email', cleanEmail);
+
+      if (config.workspaceId) {
+        vQuery = vQuery.eq('workspace_id', config.workspaceId);
+      }
+
+      const { data: matchedVisitors } = await vQuery;
+      if (matchedVisitors && matchedVisitors.length > 0) {
+        const vIds = (matchedVisitors as Array<{ id: string }>).map((v) => v.id);
+        let emailOpenQuery = supabase
+          .from('conversations')
+          .select('id, status')
+          .in('visitor_id', vIds)
+          .eq('status', 'open')
+          .order('updated_at', { ascending: false })
+          .limit(1);
+
+        if (config.workspaceId) {
+          emailOpenQuery = emailOpenQuery.eq('workspace_id', config.workspaceId);
+        }
+
+        const { data: emailOpenConv } = await emailOpenQuery.maybeSingle();
+        if (emailOpenConv) {
+          setConversationId(emailOpenConv.id);
+          return emailOpenConv.id;
+        }
+      }
+    }
+
+    // 3. No open conversation exists: create a new one
     const { data: newConv, error } = await supabase
       .from('conversations')
       .insert({

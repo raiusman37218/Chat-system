@@ -38,10 +38,12 @@ import {
 } from 'lucide-react';
 import {
   Agent,
+  CannedResponse,
   Conversation,
   ConversationPriority,
   ConversationStatus,
   Message,
+  Workspace,
 } from '@/types/database';
 import { formatTime, formatTimeAgo, cn } from '@/lib/utils';
 import { sound } from '@/lib/sound';
@@ -95,6 +97,9 @@ interface ChatThreadProps {
   onBack?: () => void;
   onToggleDetailsSidebar?: () => void;
   isDetailsSidebarOpen?: boolean;
+  onMerged?: (targetId: string) => Promise<void> | void;
+  cannedResponses?: CannedResponse[];
+  workspace?: Workspace | null;
 }
 
 interface CannedItem {
@@ -102,14 +107,6 @@ interface CannedItem {
   title: string;
   content: string;
 }
-
-const DEFAULT_MACROS: CannedItem[] = [
-  { shortcut: 'hello', title: 'Warm greeting', content: 'Hello! Welcome to our support desk. How can I help you today?' },
-  { shortcut: 'pricing', title: 'Pricing overview', content: 'Our plans start at $29/mo with unlimited chats. You can view all features on our pricing page!' },
-  { shortcut: 'wait', title: 'Investigating', content: 'Thank you for your patience! I am looking into your inquiry right now and will update you in just a moment.' },
-  { shortcut: 'solved', title: 'Issue resolved', content: 'I have resolved this issue for you! Please let me know if there is anything else I can assist with today.' },
-  { shortcut: 'refund', title: 'Refund policy', content: 'We offer a 100% money-back guarantee within 14 days of purchase. Would you like me to process that for you?' },
-];
 
 type ThreadAction = "" | "snooze" | "merge" | "auto-assign" | "ai";
 
@@ -164,6 +161,9 @@ export function ChatThread({
   onBack,
   onToggleDetailsSidebar,
   isDetailsSidebarOpen = true,
+  onMerged,
+  cannedResponses,
+  workspace,
 }: ChatThreadProps) {
   const [inputText, setInputText] = useState('');
   const composerRef = useRef<HTMLDivElement>(null);
@@ -173,6 +173,7 @@ export function ChatThread({
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
   const [isSending, setIsSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
+  const [noteErrorToast, setNoteErrorToast] = useState<string | null>(null);
   const [composerMode, setComposerMode] = useState<'reply' | 'internal'>('reply');
   const [showMacros, setShowMacros] = useState(false);
   const [macroSearch, setMacroSearch] = useState('');
@@ -184,7 +185,7 @@ export function ChatThread({
   const [collisionAgents, setCollisionAgents] = useState<
     { id: string; name: string; avatar_url?: string }[]
   >([]);
-  const [dbMacros, setDbMacros] = useState<CannedItem[]>([]);
+  const [dbMacros, setDbMacros] = useState<CannedResponse[]>([]);
 
   // Features State: Auto-Translation (Bidirectional English <-> Customer Language)
   const [targetLanguage, setTargetLanguage] = useState<string>('en');
@@ -381,24 +382,20 @@ export function ChatThread({
     };
   }, [conversation.id, currentAgent?.id, currentAgent?.name, currentAgent?.avatar_url]);
 
-  // 2. Fetch Canned Responses from Database
+  // 2. Fetch Canned Responses from Database if not provided via props
   useEffect(() => {
+    if (cannedResponses && cannedResponses.length > 0) return;
     const supabase = createClient();
-    supabase
-      .from('canned_responses')
-      .select('*')
-      .then(({ data }: any) => {
-        if (data && data.length > 0) {
-          setDbMacros(
-            data.map((d: any) => ({
-              shortcut: d.shortcut.replace(/^[/]/, ''),
-              title: d.title || d.shortcut,
-              content: d.content,
-            }))
-          );
-        }
-      });
-  }, []);
+    let query = supabase.from('canned_responses').select('*');
+    if (conversation.workspace_id) {
+      query = query.or(`workspace_id.eq.${conversation.workspace_id},workspace_id.is.null`);
+    }
+    query.then(({ data }: any) => {
+      if (data && data.length > 0) {
+        setDbMacros(data as CannedResponse[]);
+      }
+    });
+  }, [cannedResponses, conversation.workspace_id]);
 
   const scrollToBottom = useCallback((smooth = false) => {
     const scroll = () => {
@@ -538,10 +535,13 @@ export function ChatThread({
     setInputText(val);
     if (composerMode !== 'internal' && val.trim()) sendTypingSignal();
 
-    // Typing '/' or '#' opens the saved-reply palette.
-    if (val.endsWith('/') || val.endsWith('#')) {
+    // Typing '/' opens the saved-reply palette. Use one notation everywhere: "/shortcut"
+    const slashMatch = val.match(/\/([a-zA-Z0-9_-]*)$/);
+    if (slashMatch) {
       setShowMacros(true);
-      setMacroSearch('');
+      setMacroSearch(slashMatch[1]);
+    } else if (showMacros && !val.includes('/')) {
+      setShowMacros(false);
     }
 
     // Typing '@' in internal note mode opens teammate mentions palette
@@ -626,18 +626,33 @@ export function ChatThread({
     }
   };
 
-  // 3. Open Merge Modal and fetch other conversations from visitor
+  // 3. Open Merge Modal and fetch other conversations from visitor (by visitor_id and email)
   const handleOpenMergeModal = async () => {
     setShowMergeModal(true);
     setSelectedMergeId('');
     try {
       const supabase = createClient();
+      const vid = conversation.visitor_id;
+      const email = conversation.visitor?.email?.trim().toLowerCase();
+      let visitorIds = [vid].filter(Boolean) as string[];
+
+      if (email) {
+        const { data: matchedVisitors } = await supabase
+          .from('visitors')
+          .select('id')
+          .eq('email', email);
+        if (matchedVisitors) {
+          const ids = (matchedVisitors as Array<{ id: string }>).map((v) => v.id);
+          visitorIds = Array.from(new Set([...visitorIds, ...ids]));
+        }
+      }
+
       const { data } = await supabase
         .from('conversations')
         .select('id, status, created_at, updated_at, tags')
-        .eq('visitor_id', conversation.visitor_id)
+        .in('visitor_id', visitorIds)
         .neq('id', conversation.id)
-        .order('created_at', { ascending: false });
+        .order('updated_at', { ascending: false });
 
       setMergeCandidates((data as Conversation[]) || []);
     } catch (err) {
@@ -662,7 +677,11 @@ export function ChatThread({
       const data = await res.json();
       if (data.success) {
         setShowMergeModal(false);
-        window.location.reload();
+        if (onMerged) {
+          await onMerged(conversation.id);
+        } else {
+          window.location.reload();
+        }
       }
     } catch (err) {
       console.error('Merge execution failed:', err);
@@ -963,9 +982,17 @@ export function ChatThread({
       // The quote is part of the draft: dropping it on failure would send a
       // bare message on retry, answering nothing in particular.
       setInputText(text);
-      setSendError(
-        err instanceof Error ? err.message : 'Could not send. Try again.'
-      );
+      const errMsg =
+        err instanceof Error
+          ? err.message
+          : isInternal
+          ? 'Failed to save internal note. Please try again.'
+          : 'Could not send. Try again.';
+      setSendError(errMsg);
+      if (isInternal) {
+        setNoteErrorToast(errMsg);
+        setTimeout(() => setNoteErrorToast(null), 6000);
+      }
     } finally {
       setIsSending(false);
       setIsTranslating(false);
@@ -981,6 +1008,7 @@ export function ChatThread({
     setAiDrafting(true);
 
     try {
+      const recentMessages = messages.slice(-15);
       const lastVisitorMsg = [...messages]
         .reverse()
         .find((m) => m.sender_type === 'visitor');
@@ -992,6 +1020,7 @@ export function ChatThread({
           conversation_id: conversation.id,
           workspace_id: conversation.workspace_id,
           incoming_message: lastVisitorMsg?.content || '',
+          recent_messages: recentMessages,
           visitor: conversation.visitor,
           channel: conversation.channel || 'web',
         }),
@@ -1051,7 +1080,7 @@ export function ChatThread({
 
   const insertMacro = (macro: CannedItem) => {
     setInputText((prev) => {
-      const cleaned = prev.replace(/[/|#][a-zA-Z0-9_-]*$/, '');
+      const cleaned = prev.replace(/\/([a-zA-Z0-9_-]*)$/, '');
       return cleaned
         ? `${cleaned}${cleaned.endsWith(' ') ? '' : ' '}${macro.content}`
         : macro.content;
@@ -1109,27 +1138,36 @@ export function ChatThread({
   const isInternalMode = composerMode === 'internal';
   const replyLocked = aiAnswering && !isInternalMode;
 
-  const filteredMacros = useMemo(() => {
-    const combined = [...dbMacros];
-    DEFAULT_MACROS.forEach((dm) => {
-      if (
-        !combined.some(
-          (m) => m.shortcut.toLowerCase() === dm.shortcut.toLowerCase()
-        )
-      ) {
-        combined.push(dm);
-      }
-    });
+  const workspaceMacros = useMemo(() => {
+    const list = cannedResponses && cannedResponses.length > 0 ? cannedResponses : dbMacros;
+    return list
+      .filter((c) => {
+        // Workspace check: if canned response has a workspace_id, must match this workspace
+        if (c.workspace_id && conversation.workspace_id && c.workspace_id !== conversation.workspace_id) {
+          return false;
+        }
+        // Team replies are for all agents (agent_id is null/undefined)
+        if (!c.agent_id) return true;
+        // Personal replies are only for this agent
+        return c.agent_id === currentAgent?.id;
+      })
+      .map((c) => ({
+        shortcut: c.shortcut.replace(/^\/+/, ''),
+        title: c.title || c.shortcut,
+        content: c.content,
+      }));
+  }, [cannedResponses, dbMacros, conversation.workspace_id, currentAgent?.id]);
 
-    const q = macroSearch.toLowerCase();
-    if (!q) return combined;
-    return combined.filter(
+  const filteredMacros = useMemo(() => {
+    const q = macroSearch.replace(/^\/+/, '').toLowerCase().trim();
+    if (!q) return workspaceMacros;
+    return workspaceMacros.filter(
       (m) =>
         m.shortcut.toLowerCase().includes(q) ||
         m.title.toLowerCase().includes(q) ||
         m.content.toLowerCase().includes(q)
     );
-  }, [dbMacros, macroSearch]);
+  }, [workspaceMacros, macroSearch]);
 
   const assignOptions = useMemo(
     () => [
@@ -1209,25 +1247,25 @@ export function ChatThread({
         <div
           key={msg.id}
           id={`msg-${msg.id}`}
-          className="rounded-xl border border-warn-line bg-warn-soft px-4 py-3 group/note relative"
+          className="rounded-xl border border-amber-300/80 dark:border-amber-600/40 bg-amber-500/10 dark:bg-amber-950/40 px-4 py-3 group/note relative shadow-xs"
         >
           <div className="flex items-center justify-between gap-3 mb-1.5">
-            <span className="inline-flex items-center gap-1.5 text-[11.5px] font-semibold text-warn">
-              <Lock className="w-3.5 h-3.5" />
+            <span className="inline-flex items-center gap-1.5 text-[11.5px] font-semibold text-amber-800 dark:text-amber-200">
+              <Lock className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
               Internal note · {msg.agent?.name || 'Teammate'}
             </span>
             <div className="flex items-center gap-2">
-              <span className="text-[11px] text-warn/70 tabular-nums">
+              <span className="text-[11px] text-amber-700/70 dark:text-amber-300/70 tabular-nums">
                 {formatTime(msg.created_at)}
               </span>
               {msg.metadata?.is_edited && (
-                <span className="text-[10px] text-warn/70 italic">(edited)</span>
+                <span className="text-[10px] text-amber-700/70 dark:text-amber-300/70 italic">(edited)</span>
               )}
               <button
                 type="button"
                 title="Edit note"
                 onClick={() => startEditing(msg)}
-                className="opacity-0 group-hover/note:opacity-100 text-warn/70 hover:text-warn transition-opacity p-0.5 cursor-pointer"
+                className="opacity-0 group-hover/note:opacity-100 text-amber-700/70 hover:text-amber-800 dark:text-amber-300/70 dark:hover:text-amber-200 transition-opacity p-0.5 cursor-pointer"
               >
                 <Pencil className="w-3 h-3" />
               </button>
@@ -1235,7 +1273,7 @@ export function ChatThread({
                 type="button"
                 title="Delete note"
                 onClick={() => setDeleteConfirmMsg(msg)}
-                className="opacity-0 group-hover/note:opacity-100 text-warn/70 hover:text-danger transition-opacity p-0.5 cursor-pointer"
+                className="opacity-0 group-hover/note:opacity-100 text-amber-700/70 hover:text-danger dark:text-amber-300/70 transition-opacity p-0.5 cursor-pointer"
               >
                 <Trash2 className="w-3 h-3" />
               </button>
@@ -1257,11 +1295,11 @@ export function ChatThread({
                 }}
                 autoFocus
                 rows={3}
-                className="w-full rounded-lg bg-surface border border-warn-line p-2 text-[13.5px] text-ink focus:outline-none focus:ring-1 focus:ring-warn resize-none"
+                className="w-full rounded-lg bg-surface border border-amber-300/80 p-2 text-[13.5px] text-ink focus:outline-none focus:ring-1 focus:ring-amber-500 resize-none"
                 placeholder="Edit internal note..."
               />
               <div className="mt-1.5 flex items-center justify-between gap-2 text-[11px]">
-                <span className="text-warn/80 text-[10px]">Esc to cancel • Enter to save</span>
+                <span className="text-amber-700/80 dark:text-amber-300/80 text-[10px]">Esc to cancel • Enter to save</span>
                 <div className="flex items-center gap-1.5">
                   <button
                     type="button"
@@ -1275,7 +1313,7 @@ export function ChatThread({
                     type="button"
                     onClick={() => handleSaveEdit(msg.id)}
                     disabled={isSavingEdit || !editingContent.trim()}
-                    className="px-2.5 py-0.5 rounded bg-warn text-white font-medium hover:bg-warn/90 transition-colors flex items-center gap-1 shadow-xs disabled:opacity-50 cursor-pointer"
+                    className="px-2.5 py-0.5 rounded bg-amber-600 text-white font-medium hover:bg-amber-700 transition-colors flex items-center gap-1 shadow-xs disabled:opacity-50 cursor-pointer"
                   >
                     {isSavingEdit ? (
                       <>
@@ -1293,12 +1331,12 @@ export function ChatThread({
               </div>
             </div>
           ) : (
-            <p className="whitespace-pre-wrap text-[13.5px] leading-relaxed text-ink">
+            <p className="whitespace-pre-wrap text-[13.5px] leading-relaxed text-amber-950 dark:text-amber-100">
               {msg.content}
             </p>
           )}
-          <p className="mt-2 text-[11px] text-warn/80">
-            Only visible to your team — never sent to the visitor.
+          <p className="mt-2 text-[11px] text-amber-700/80 dark:text-amber-400/80 font-medium">
+            🔒 Only visible to your team — never sent to the visitor.
           </p>
         </div>
       );
@@ -1339,6 +1377,7 @@ export function ChatThread({
             <QuotedMessage
               quoted={messageById.get(msg.reply_to_message_id) || null}
               visitorName={displayName}
+              currentAgentId={currentAgent?.id}
               onJump={() => jumpToMessage(msg.reply_to_message_id!)}
               tone={isAgent ? 'out' : 'in'}
             />
@@ -1397,7 +1436,7 @@ export function ChatThread({
             {isAI && (
               <span className="flex items-center gap-1 mb-1 text-[10.5px] font-bold uppercase tracking-wide text-accent">
                 <Sparkles className="w-3 h-3" />
-                Chatify bot
+                AI
               </span>
             )}
             {msg.attachment_url && (
@@ -1715,9 +1754,11 @@ export function ChatThread({
     ? {
         who:
           replyTo.sender_type === 'agent'
-            ? replyTo.agent?.name || 'You'
+            ? replyTo.sender_id === currentAgent?.id
+              ? 'You'
+              : replyTo.agent?.name || 'Agent'
             : replyTo.sender_type === 'ai'
-            ? 'Chatify bot'
+            ? 'AI'
             : displayName,
         text: replyTo.content,
       }
@@ -1776,9 +1817,11 @@ export function ChatThread({
                 );
               })()}
 
-              {/* Sentiment badge */}
+              {/* Sentiment badge: Hide when confidence is low (< 0.7) */}
               {(conversation.sentiment === 'positive' ||
-                conversation.sentiment === 'negative') && (
+                conversation.sentiment === 'negative') &&
+               (conversation.channel_metadata?.sentiment_confidence === undefined ||
+                conversation.channel_metadata?.sentiment_confidence >= 0.7) && (
                 <span
                   className={cn(
                     'pill shrink-0 text-[10px] py-0 px-1.5 h-4',
@@ -1786,7 +1829,11 @@ export function ChatThread({
                       ? 'pill-success'
                       : 'pill-danger'
                   )}
-                  title={`Visitor tone: ${conversation.sentiment}`}
+                  title={`Visitor tone: ${conversation.sentiment}${
+                    conversation.channel_metadata?.sentiment_confidence
+                      ? ` (${Math.round(conversation.channel_metadata.sentiment_confidence * 100)}% confidence)`
+                      : ''
+                  }`}
                 >
                   {conversation.sentiment === 'positive' ? (
                     <Smile className="w-2.5 h-2.5" />
@@ -1941,7 +1988,7 @@ export function ChatThread({
               },
               {
                 value: "merge",
-                label: "Merge conversation",
+                label: "Merge with another conversation from this visitor",
                 description: "Combine with another thread from this visitor",
               },
               {
@@ -2016,30 +2063,48 @@ export function ChatThread({
         </div>
 
         {/* Interactive AI Autopilot Toggle Pill */}
-        {onToggleAiMode && (
-          <button
-            type="button"
-            onClick={() =>
-              onToggleAiMode(
-                conversation.ai_mode === 'disabled' ? 'autopilot' : 'disabled'
-              )
-            }
-            className={cn(
-              'pill shrink-0 transition-all cursor-pointer inline-flex items-center gap-1.5 text-[11px]',
-              conversation.ai_mode !== 'disabled'
-                ? 'pill-accent font-bold shadow-xs'
-                : 'pill-neutral hover:bg-surface-3'
-            )}
-            title={
-              conversation.ai_mode !== 'disabled'
-                ? 'AI Autopilot is ON (click to pause)'
-                : 'AI Autopilot is OFF (click to activate)'
-            }
-          >
-            <Bot className="w-3 h-3 text-accent" />
-            <span>{conversation.ai_mode !== 'disabled' ? 'AI Autopilot' : 'Autopilot Off'}</span>
-          </button>
-        )}
+        {onToggleAiMode && (() => {
+          const isFullAutopilot = conversation.ai_mode === 'autopilot';
+          const isWorkspaceFirstReplyOn = Boolean(
+            workspace?.ai_settings?.enabled !== false &&
+            (workspace?.ai_settings?.auto_response_enabled ?? true)
+          );
+
+          return (
+            <button
+              type="button"
+              onClick={() =>
+                onToggleAiMode(
+                  isFullAutopilot ? 'disabled' : 'autopilot'
+                )
+              }
+              className={cn(
+                'pill shrink-0 transition-all cursor-pointer inline-flex items-center gap-1.5 text-[11px]',
+                isFullAutopilot
+                  ? 'pill-accent font-bold shadow-xs'
+                  : isWorkspaceFirstReplyOn
+                  ? 'bg-accent/15 text-accent border border-accent/30 font-medium'
+                  : 'pill-neutral hover:bg-surface-3'
+              )}
+              title={
+                isFullAutopilot
+                  ? 'Full Autopilot is ON for this conversation (click to pause)'
+                  : isWorkspaceFirstReplyOn
+                  ? 'Workspace AI first reply is ON (click to turn on full Autopilot)'
+                  : 'AI Autopilot is OFF (click to activate)'
+              }
+            >
+              <Bot className={cn('w-3 h-3', isFullAutopilot || isWorkspaceFirstReplyOn ? 'text-accent' : 'text-ink-3')} />
+              <span>
+                {isFullAutopilot
+                  ? 'Autopilot'
+                  : isWorkspaceFirstReplyOn
+                  ? 'AI first reply: on'
+                  : 'Autopilot Off'}
+              </span>
+            </button>
+          );
+        })()}
 
         {conversation.status === "snoozed" && conversation.snoozed_until && (
           <span className="pill pill-warn shrink-0">
@@ -2180,42 +2245,64 @@ export function ChatThread({
 
       {/* ── Composer ── */}
       <div className="shrink-0 px-5 py-3.5 border-t border-line bg-surface relative">
+        {/* Floating Error Toast for Note Saving Failure */}
+        {noteErrorToast && (
+          <div
+            role="alert"
+            className="absolute bottom-[calc(100%+8px)] left-5 right-5 z-50 rounded-xl bg-danger text-white shadow-xl p-3 flex items-center justify-between gap-2.5 animate-pop"
+          >
+            <div className="flex items-center gap-2 min-w-0">
+              <AlertTriangle className="w-4 h-4 shrink-0 text-white" />
+              <span className="text-[12px] font-medium leading-snug">{noteErrorToast}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setNoteErrorToast(null)}
+              className="text-white/80 hover:text-white p-1 rounded-md hover:bg-white/20 transition-colors shrink-0 cursor-pointer"
+              title="Dismiss"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
+
         {showMacros && (
           <div className="absolute bottom-[calc(100%-4px)] left-5 right-5 z-50 rounded-xl border border-line bg-surface shadow-xl p-2.5 animate-pop">
             <div className="flex items-center justify-between mb-2 px-1">
               <span className="eyebrow flex items-center gap-1.5">
-                <Zap className="w-3 h-3" />
-                Saved replies
+                <Zap className="w-3 h-3 text-accent" />
+                Saved Quick Replies
               </span>
               <span className="text-[11px] text-ink-3">
-                Type <span className="kbd">/</span> or <span className="kbd">#</span> to open
+                Type <span className="kbd font-mono">/</span> to open
               </span>
             </div>
 
             <input
               type="text"
-              placeholder="Search replies…"
+              placeholder="Search replies by /shortcut or title…"
               value={macroSearch}
               onChange={(e) => setMacroSearch(e.target.value)}
-              className="input input-sm mb-2"
+              className="input input-sm mb-2 font-mono text-xs"
               autoFocus
             />
 
             <div className="max-h-56 overflow-y-auto space-y-0.5">
               {filteredMacros.length === 0 ? (
-                <p className="py-4 text-center text-[12.5px] text-ink-3">
-                  No matching replies
+                <p className="py-4 text-center text-[12px] text-ink-3">
+                  No matching replies. Add them in Settings &gt; Saved Quick Replies.
                 </p>
               ) : (
                 filteredMacros.map((macro) => (
                   <button
                     key={macro.shortcut}
+                    type="button"
                     onClick={() => insertMacro(macro)}
-                    className="w-full text-left px-2.5 py-2 rounded-lg hover:bg-surface-3 transition-colors group"
+                    className="w-full text-left px-2.5 py-2 rounded-lg hover:bg-surface-3 transition-colors group cursor-pointer"
                   >
                     <div className="flex items-baseline justify-between gap-2">
-                      <span className="text-[12.5px] font-semibold text-ink group-hover:text-accent transition-colors">
-                        #{macro.shortcut}
+                      <span className="text-[12.5px] font-semibold font-mono text-accent group-hover:text-accent-hover transition-colors">
+                        /{macro.shortcut}
                       </span>
                       <span className="text-[11px] text-ink-3 shrink-0">
                         {macro.title}
@@ -3144,20 +3231,24 @@ export function ChatThread({
 function QuotedMessage({
   quoted,
   visitorName,
+  currentAgentId,
   onJump,
   tone,
 }: {
   quoted: Message | null;
   visitorName: string;
+  currentAgentId?: string;
   onJump: () => void;
   tone: 'in' | 'out';
 }) {
   const who = !quoted
     ? ''
     : quoted.sender_type === 'agent'
-    ? quoted.agent?.name || 'Agent'
+    ? quoted.sender_id === currentAgentId
+      ? 'You'
+      : quoted.agent?.name || 'Agent'
     : quoted.sender_type === 'ai'
-    ? 'Chatify bot'
+    ? 'AI'
     : visitorName;
 
   return (

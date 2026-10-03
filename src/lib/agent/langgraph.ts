@@ -22,6 +22,13 @@ export interface LangGraphTriggerParams {
   conversationId: string;
   workspaceId: string;
   incomingMessage: string;
+  recentMessages?: Array<{
+    id?: string;
+    sender_type: string;
+    content: string;
+    is_internal?: boolean;
+    created_at?: string;
+  }>;
   sender: {
     name?: string | null;
     email?: string | null;
@@ -335,7 +342,7 @@ async function insertAndDispatchReply(
  */
 export async function generateLangGraphDraft(params: LangGraphTriggerParams): Promise<string | null> {
   const supabase = getSupabase();
-  const { conversationId, workspaceId, incomingMessage, sender } = params;
+  const { conversationId, workspaceId, incomingMessage, sender, recentMessages } = params;
 
   try {
     const { data: workspace } = await supabase
@@ -350,6 +357,44 @@ export async function generateLangGraphDraft(params: LangGraphTriggerParams): Pr
       .eq('workspace_id', workspaceId)
       .maybeSingle();
 
+    // Fetch the last 15 messages (including agent replies and internal notes) if not provided
+    let thread = recentMessages;
+    if (!thread || thread.length === 0) {
+      const { data: dbMessages } = await supabase
+        .from('messages')
+        .select('id, sender_type, content, is_internal, created_at')
+        .eq('conversation_id', conversationId)
+        .order('created_at', { ascending: false })
+        .limit(15);
+      if (dbMessages && dbMessages.length > 0) {
+        thread = [...dbMessages].reverse();
+      } else {
+        thread = [];
+      }
+    }
+
+    const hasAgentReplied = thread.some(
+      (m) => m.sender_type === 'agent' && !m.is_internal
+    );
+
+    // Format all turns including agent replies and internal notes
+    const turns = thread.map((m) => {
+      const role: 'user' | 'assistant' = m.sender_type === 'visitor' ? 'user' : 'assistant';
+      let content = m.content;
+      if (m.is_internal) {
+        content = `[Internal Team Note]: ${m.content}`;
+      } else if (m.sender_type === 'agent') {
+        content = `[Human Agent]: ${m.content}`;
+      } else if (m.sender_type === 'ai') {
+        content = `[AI Assistant]: ${m.content}`;
+      }
+      return { role, content };
+    });
+
+    const copilotSystemPrompt = hasAgentReplied
+      ? 'You are an AI Copilot assisting a human support agent. A human support agent has already actively replied in this thread. Do NOT repeat handover or escalation lines (such as "I will connect you to a human" or "a team member will be with you"). Do NOT greet the customer as if this is the start of the chat. Directly provide the helpful, accurate answer or solution to the visitor\'s latest question for the human agent to review and send.'
+      : (integration?.langgraph_system_prompt || null);
+
     if (!integration || !integration.langgraph_webhook_url) {
       // Use built-in Help Desk Knowledge Base RAG for suggested draft
       const draft = await generateAutoFirstResponse({
@@ -357,25 +402,15 @@ export async function generateLangGraphDraft(params: LangGraphTriggerParams): Pr
         conversationId,
         incomingMessage,
         visitorName: sender.name || undefined,
-        // The workspace's model provider — not langgraph_api_key, which is
-        // the bearer token for the customer's own agent endpoint and means
-        // nothing to a model API.
         providerConfig: providerConfigFrom(workspace?.ai_settings),
-        systemPrompt: integration?.langgraph_system_prompt || null,
+        systemPrompt: copilotSystemPrompt,
+        turns,
       });
       return draft || `Hi ${sender.name || 'there'}! Thank you for reaching out. How can I assist you with your request today?`;
     }
 
-    const { data: historyMessages } = await supabase
-      .from('messages')
-      .select('sender_type, content, created_at')
-      .eq('conversation_id', conversationId)
-      .eq('is_internal', false)
-      .order('created_at', { ascending: true })
-      .limit(10);
-
-    const history = (historyMessages || []).map((m) => ({
-      role: m.sender_type === 'visitor' ? 'user' : 'assistant',
+    const history = turns.map((m) => ({
+      role: m.role,
       content: m.content,
     }));
 
@@ -392,6 +427,7 @@ export async function generateLangGraphDraft(params: LangGraphTriggerParams): Pr
         visitor: sender,
         mode: 'suggestion',
         current_message: incomingMessage,
+        has_agent_replied: hasAgentReplied,
         history,
       }),
     });

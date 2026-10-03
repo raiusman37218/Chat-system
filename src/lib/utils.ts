@@ -83,3 +83,42 @@ export function sendBrowserNotification(
     }
   }
 }
+
+/**
+ * Strips markdown symbols from text so previews render cleanly as plain text.
+ */
+export function stripMarkdown(markdown: string | null | undefined): string {
+  if (!markdown) return '';
+  return markdown
+    // Images: ![alt](url) -> alt
+    .replace(/!\[([^\]]*)\]\([^)]*\)/g, '$1')
+    // Links: [anchor](url) -> anchor
+    .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
+    // Headers: # Title
+    .replace(/^#{1,6}\s+/gm, '')
+    // Bold / italic: ***text***, **text**, *text*, ___text___, __text__, _text_
+    .replace(/(\*\*|__)(.*?)\1/g, '$2')
+    .replace(/(\*|_)(.*?)\1/g, '$2')
+    // Strikethrough: ~~text~~
+    .replace(/~~(.*?)~~/g, '$1')
+    // Fenced code blocks: ```code```
+    .replace(/```[\s\S]*?```/g, (match) => {
+      const lines = match.replace(/^```[^\n]*\n?/, '').replace(/\n?```$/, '');
+      return lines.trim();
+    })
+    // Inline code: `code`
+    .replace(/`([^`]+)`/g, '$1')
+    // Blockquotes: > quote
+    .replace(/^\s*>\s+/gm, '')
+    // Unordered lists: * item, - item, + item
+    .replace(/^\s*[-*+]\s+/gm, '')
+    // Ordered lists: 1. item
+    .replace(/^\s*\d+\.\s+/gm, '')
+    // Horizontal rules: ---, ***, ___
+    .replace(/^[-*_]{3,}\s*$/gm, '')
+    // HTML tags: <tag> -> ''
+    .replace(/<[^>]*>/g, '')
+    // Collapse consecutive newlines & spaces to a single space
+    .replace(/\s+/g, ' ')
+    .trim();
+}

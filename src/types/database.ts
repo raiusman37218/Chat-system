@@ -222,6 +222,7 @@ export interface BusinessHoursConfig {
 export interface AutoAssignmentConfig {
   enabled: boolean;
   max_conversations_per_agent: number;
+  auto_close_inactive_days?: number;
 }
 
 export interface AISettingsConfig {
@@ -405,6 +406,7 @@ export interface Workspace {
   widget_z_index?: number | null;
   enable_proactive_welcome?: boolean | null;
   proactive_delay_seconds?: number | null;
+  auto_close_days?: number | null;
   created_at: string;
 }
 

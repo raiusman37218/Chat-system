@@ -141,22 +141,44 @@ export function VisitorDetailsSidebar({
     };
   }, [visitor]);
 
-  // 2. Fetch Past Conversation History for this Visitor
+  // 2. Fetch Other Conversation History for this Visitor (by visitor_id and email)
   useEffect(() => {
     const vid = visitor?.id || conversation.visitor_id;
-    if (!vid) return;
+    const email = (visitor?.email || liveVisitor?.email)?.trim().toLowerCase();
+    if (!vid && !email) return;
 
     const supabase = createClient();
-    supabase
-      .from('conversations')
-      .select('id, status, priority, created_at, updated_at')
-      .eq('visitor_id', vid)
-      .neq('id', conversation.id)
-      .order('created_at', { ascending: false })
-      .then(({ data }: any) => {
-        if (data) setPastConversations(data as Conversation[]);
-      });
-  }, [visitor?.id, conversation.id, conversation.visitor_id]);
+
+    async function loadVisitorConversations() {
+      let visitorIds = [vid].filter(Boolean) as string[];
+
+      if (email) {
+        const { data: matchedVisitors } = await supabase
+          .from('visitors')
+          .select('id')
+          .eq('email', email);
+        if (matchedVisitors) {
+          const ids = (matchedVisitors as Array<{ id: string }>).map((v) => v.id);
+          visitorIds = Array.from(new Set([...visitorIds, ...ids]));
+        }
+      }
+
+      if (visitorIds.length === 0) return;
+
+      const { data } = await supabase
+        .from('conversations')
+        .select('id, status, priority, created_at, updated_at')
+        .in('visitor_id', visitorIds)
+        .neq('id', conversation.id)
+        .order('updated_at', { ascending: false });
+
+      if (data) {
+        setPastConversations(data as Conversation[]);
+      }
+    }
+
+    loadVisitorConversations();
+  }, [visitor?.id, visitor?.email, liveVisitor?.email, conversation.id, conversation.visitor_id]);
 
   // Tag Handlers
   const handleToggleTag = (tag: string) => {
@@ -488,42 +510,53 @@ export function VisitorDetailsSidebar({
           </div>
         </Section>
 
-        {/* ── 5. Past Conversation History ── */}
-        <Section title="Past Conversations">
-          <div className="p-2 space-y-1 max-h-40 overflow-y-auto">
-            {pastConversations.length === 0 ? (
-              <p className="text-[11.5px] text-ink-3 px-2 py-1">
-                No previous conversations recorded
-              </p>
-            ) : (
-              pastConversations.map((past) => (
-                <button
-                  key={past.id}
-                  onClick={() => onSelectConversation?.(past.id)}
-                  className="w-full text-left p-2 rounded-lg hover:bg-surface-3 transition-colors flex items-center justify-between gap-2 group"
-                >
-                  <div className="min-w-0">
-                    <span className="font-mono text-[11px] text-ink font-semibold block">
-                      #{past.id.slice(0, 8)}
-                    </span>
-                    <span className="text-[10.5px] text-ink-3">
-                      {formatTimeAgo(past.created_at)}
-                    </span>
-                  </div>
-                  <span
-                    className={cn(
-                      'text-[10px] uppercase font-bold px-1.5 py-0.5 rounded',
-                      past.status === 'closed'
-                        ? 'bg-slate-200/80 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
-                        : past.status === 'snoozed'
-                        ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
-                        : 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
-                    )}
+        {/* ── 5. Other Conversations from this Visitor ── */}
+        <Section
+          title="Other Conversations"
+          action={
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-surface-3 text-ink-2 border border-line">
+              {pastConversations.length}
+            </span>
+          }
+        >
+          <div className="p-2 space-y-1.5 max-h-52 overflow-y-auto">
+            <p className="text-[11px] font-medium text-ink-3 px-1.5 pt-0.5">
+              {pastConversations.length === 0
+                ? 'No other conversations from this visitor'
+                : `${pastConversations.length} other conversation${pastConversations.length === 1 ? '' : 's'} from this visitor`}
+            </p>
+
+            {pastConversations.length > 0 && (
+              <div className="space-y-1 pt-1">
+                {pastConversations.map((past) => (
+                  <button
+                    key={past.id}
+                    onClick={() => onSelectConversation?.(past.id)}
+                    className="w-full text-left p-2 rounded-lg hover:bg-surface-3 transition-colors flex items-center justify-between gap-2 group cursor-pointer border border-transparent hover:border-line/60"
                   >
-                    {past.status}
-                  </span>
-                </button>
-              ))
+                    <div className="min-w-0">
+                      <span className="font-mono text-[11px] text-ink font-semibold block">
+                        #{past.id.slice(0, 8)}
+                      </span>
+                      <span className="text-[10.5px] text-ink-3">
+                        {formatTimeAgo(past.updated_at || past.created_at)}
+                      </span>
+                    </div>
+                    <span
+                      className={cn(
+                        'text-[10px] uppercase font-bold px-1.5 py-0.5 rounded',
+                        past.status === 'closed'
+                          ? 'bg-slate-200/80 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
+                          : past.status === 'snoozed'
+                          ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
+                          : 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
+                      )}
+                    >
+                      {past.status}
+                    </span>
+                  </button>
+                ))}
+              </div>
             )}
           </div>
         </Section>

@@ -48,16 +48,23 @@ export async function POST(req: NextRequest) {
     const updates: Record<string, any> = {};
 
     let sentiment = conv.sentiment || 'neutral';
+    let sentimentConfidence = (conv.channel_metadata as any)?.sentiment_confidence ?? 0;
     let summary = conv.summary || null;
     let tags = conv.tags || [];
 
     // A. Sentiment Analysis (if enabled)
     if (!aiSettings || aiSettings.sentiment_enabled) {
-      sentiment = await analyzeVisitorSentiment({
+      const sentimentResult = await analyzeVisitorSentiment({
         messages: msgList,
         providerConfig,
       });
+      sentimentConfidence = sentimentResult.confidence;
+      sentiment = sentimentResult.confidence >= 0.7 ? sentimentResult.sentiment : 'neutral';
       updates.sentiment = sentiment;
+      updates.channel_metadata = {
+        ...((conv.channel_metadata as Record<string, any>) || {}),
+        sentiment_confidence: sentimentResult.confidence,
+      };
     }
 
     // B. Auto-Tagging (if enabled)

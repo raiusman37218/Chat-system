@@ -3,17 +3,21 @@
 import React, { useMemo, useState, useRef, useEffect, useCallback, memo } from 'react';
 import {
   Search,
-  Clock,
   Star,
   X,
-  Tag as TagIcon,
   Sparkles,
   SlidersHorizontal,
   Check,
   CheckCheck,
   ArrowUpDown,
   RefreshCw,
-  Zap,
+  UserPlus,
+  CheckCircle2,
+  ShieldAlert,
+  Loader2,
+  CheckSquare,
+  Square,
+  Users,
 } from 'lucide-react';
 import {
   Conversation,
@@ -21,7 +25,7 @@ import {
   ChannelType,
   Agent,
 } from '@/types/database';
-import { formatTimeAgo, cn } from '@/lib/utils';
+import { formatTimeAgo, cn, stripMarkdown } from '@/lib/utils';
 import { Avatar } from '@/components/ui/Avatar';
 import { ChannelBadge } from '@/components/ui/ChannelBadge';
 import { CountryFlag } from '@/components/ui/BrandIcon';
@@ -29,8 +33,7 @@ import { parseLocation } from '@/lib/visitor-meta';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ConversationListSkeleton } from '@/components/ui/Skeleton';
 
-export type InboxQueue = 'all' | 'waiting' | 'unassigned' | 'mine';
-export type StatusView = 'open' | 'snoozed' | 'closed';
+export type StatusTab = 'open' | 'waiting' | 'mine' | 'unassigned' | 'resolved' | 'all';
 export type SortOption = 'newest' | 'waiting' | 'unread' | 'priority';
 
 export interface ConversationListProps {
@@ -38,11 +41,20 @@ export interface ConversationListProps {
   selectedConversationId: string | null;
   onSelectConversation: (id: string) => void;
   currentAgent?: Agent | null;
+  agentsList?: Agent[];
   statusFilter?: ConversationStatus | 'all';
   loading?: boolean;
   isRefreshing?: boolean;
   onRefresh?: () => void;
   lastSynced?: Date;
+  // Infinite scroll (pages of 30)
+  hasMore?: boolean;
+  loadingMore?: boolean;
+  onLoadMore?: () => void;
+  // Bulk actions
+  onBulkResolve?: (ids: string[]) => Promise<void>;
+  onBulkAssign?: (ids: string[], agentId: string | null) => Promise<void>;
+  onBulkMarkSpam?: (ids: string[]) => Promise<void>;
 }
 
 const CHANNELS: { value: ChannelType | 'all'; label: string }[] = [
@@ -55,11 +67,20 @@ const CHANNELS: { value: ChannelType | 'all'; label: string }[] = [
 ];
 
 const SORT_LABELS: Record<SortOption, { label: string; desc: string }> = {
-  newest: { label: 'Newest Activity', desc: 'Latest message on top' },
+  newest: { label: 'Newest Activity', desc: 'Latest activity on top' },
   waiting: { label: 'Needs Reply First', desc: 'Waiting customers on top' },
   unread: { label: 'Unread First', desc: 'Unread messages on top' },
   priority: { label: 'Urgent & High', desc: 'Urgent priority on top' },
 };
+
+const STATUS_TABS: { id: StatusTab; label: string }[] = [
+  { id: 'open', label: 'Open' },
+  { id: 'waiting', label: 'Waiting' },
+  { id: 'mine', label: 'Mine' },
+  { id: 'unassigned', label: 'Unassigned' },
+  { id: 'resolved', label: 'Resolved' },
+  { id: 'all', label: 'All' },
+];
 
 function displayNameFor(conv: Conversation) {
   return (
@@ -73,6 +94,9 @@ function displayNameFor(conv: Conversation) {
 }
 
 function getLastActivityTime(conv: Conversation): number {
+  if (conv.updated_at) {
+    return new Date(conv.updated_at).getTime();
+  }
   if (conv.last_message?.created_at) {
     return new Date(conv.last_message.created_at).getTime();
   }
@@ -101,6 +125,9 @@ interface ConversationItemProps {
   isSelected: boolean;
   onSelect: (id: string) => void;
   currentAgent?: Agent | null;
+  isSelectionMode?: boolean;
+  isChecked?: boolean;
+  onToggleCheck?: (id: string) => void;
 }
 
 const ConversationItem = memo(function ConversationItem({
@@ -108,6 +135,9 @@ const ConversationItem = memo(function ConversationItem({
   isSelected,
   onSelect,
   currentAgent,
+  isSelectionMode = false,
+  isChecked = false,
+  onToggleCheck,
 }: ConversationItemProps) {
   const online = isVisitorOnline(
     conv.visitor?.last_seen || conv.visitor?.last_seen_at,
@@ -120,6 +150,7 @@ const ConversationItem = memo(function ConversationItem({
   const isWaiting = isWaitingOnAgent(conv);
   const isUrgent = conv.priority === 'urgent';
   const isHigh = conv.priority === 'high';
+  const isResolved = conv.status === 'closed';
   const activityTime = getLastActivityTime(conv);
   const place = useMemo(
     () =>
@@ -135,22 +166,88 @@ const ConversationItem = memo(function ConversationItem({
     ]
   );
 
+  // Requirement 6: Render last-message preview as plain text (strip markdown symbols)
+  const rawPreview =
+    conv.last_message?.metadata?.translation?.english_text ||
+    conv.last_message?.metadata?.english_translation ||
+    conv.last_message?.metadata?.translation?.original_english ||
+    conv.last_message?.metadata?.original_english ||
+    conv.last_message?.content ||
+    (conv.last_message?.attachment_url
+      ? '📎 Attachment'
+      : 'Conversation started');
+  const previewText = stripMarkdown(rawPreview);
+
+  // Requirement 7: One consistent sender label:
+  // - the agent's name for humans
+  // - "AI" for the bot
+  // - "You" only for the logged-in agent
+  const senderLabel = useMemo(() => {
+    if (fromAgent) {
+      if (conv.last_message?.sender_id === currentAgent?.id) {
+        return 'You';
+      }
+      return conv.last_message?.agent?.name || conv.agent?.name || 'Agent';
+    }
+    if (fromAi) {
+      return 'AI';
+    }
+    return null;
+  }, [fromAgent, fromAi, conv.last_message, conv.agent, currentAgent?.id]);
+
   return (
-    <button
-      onClick={() => onSelect(conv.id)}
+    <div
+      onClick={() => {
+        if (isSelectionMode && onToggleCheck) {
+          onToggleCheck(conv.id);
+        } else {
+          onSelect(conv.id);
+        }
+      }}
       data-selected={isSelected}
       className={cn(
-        'w-full text-left p-2.5 rounded-xl transition-all duration-150 flex items-start gap-2.5 relative border cursor-pointer group select-none outline-none',
+        'w-full text-left p-2.5 rounded-xl transition-all duration-150 flex items-start gap-2 relative border cursor-pointer group select-none outline-none',
         isSelected
           ? 'bg-accent/[0.08] dark:bg-accent/15 border-accent/40 shadow-xs ring-1 ring-accent/25'
           : hasUnread
           ? 'bg-surface border-line-2 hover:bg-surface-2 hover:border-line-2 shadow-xs'
-          : 'bg-surface border-line/60 hover:bg-surface-2/60 hover:border-line shadow-xs'
+          : 'bg-surface border-line/60 hover:bg-surface-2/60 hover:border-line shadow-xs',
+        isChecked && 'ring-1 ring-accent/40 bg-accent/[0.05]'
       )}
     >
       {/* Active Left Indicator Bar */}
       {isSelected && (
         <span className="absolute left-0 top-2.5 bottom-2.5 w-1 rounded-r-full bg-accent shadow-[0_0_8px_rgba(46,91,255,0.4)]" />
+      )}
+
+      {/* Bulk Checkbox */}
+      {(isSelectionMode || isChecked) ? (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggleCheck?.(conv.id);
+          }}
+          className={cn(
+            'shrink-0 mt-1.5 w-4 h-4 rounded border flex items-center justify-center transition-colors',
+            isChecked
+              ? 'bg-accent border-accent text-accent-ink'
+              : 'border-line-2 bg-surface hover:border-accent'
+          )}
+          aria-label={isChecked ? 'Deselect conversation' : 'Select conversation'}
+        >
+          {isChecked && <Check className="w-3 h-3 stroke-[3]" />}
+        </button>
+      ) : (
+        <div
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggleCheck?.(conv.id);
+          }}
+          className="shrink-0 mt-1.5 opacity-0 group-hover:opacity-60 hover:!opacity-100 transition-opacity"
+        >
+          <div className="w-4 h-4 rounded border border-line-2 bg-surface flex items-center justify-center" />
+        </div>
       )}
 
       {/* Avatar (w-9 h-9) */}
@@ -204,7 +301,7 @@ const ConversationItem = memo(function ConversationItem({
           </span>
         </div>
 
-        {/* Middle Line: Last Message Preview */}
+        {/* Middle Line: Last Message Preview (Plain text with consistent sender label) */}
         <p
           className={cn(
             'text-[11.5px] truncate mt-1 leading-snug',
@@ -224,34 +321,30 @@ const ConversationItem = memo(function ConversationItem({
                   <Check className="w-3 h-3 text-ink-3/70 stroke-[2]" />
                 )}
               </span>
-              <span>
-                {conv.last_message?.sender_id === currentAgent?.id
-                  ? 'You'
-                  : conv.last_message?.agent?.name?.split(' ')[0] || conv.agent?.name?.split(' ')[0] || 'Agent'}
-                :
-              </span>
+              <span>{senderLabel}:</span>
             </span>
           ) : fromAi ? (
             <span className="text-purple-600 dark:text-purple-400 font-medium inline-flex items-center gap-0.5 mr-1">
               <Sparkles className="w-2.5 h-2.5" />
-              <span>Bot:</span>
+              <span>AI:</span>
             </span>
           ) : null}
-          {conv.last_message?.metadata?.translation?.english_text ||
-            conv.last_message?.metadata?.english_translation ||
-            conv.last_message?.metadata?.translation?.original_english ||
-            conv.last_message?.metadata?.original_english ||
-            conv.last_message?.content ||
-            (conv.last_message?.attachment_url
-              ? '📎 Attachment'
-              : 'Conversation started')}
+          {previewText}
         </p>
 
         {/* Bottom Line: Meta Badges */}
         <div className="flex items-center justify-between gap-1.5 mt-1.5">
           <div className="flex items-center gap-1 flex-wrap min-w-0">
+            {/* Resolved Badge */}
+            {isResolved && (
+              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[9px] font-semibold rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                <Check className="w-2.5 h-2.5 stroke-[2.5]" />
+                Resolved
+              </span>
+            )}
+
             {/* Waiting for reply pill */}
-            {isWaiting && (
+            {isWaiting && !isResolved && (
               <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[9.5px] font-semibold rounded-md bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
                 <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
                 Waiting
@@ -326,7 +419,7 @@ const ConversationItem = memo(function ConversationItem({
           )}
         </div>
       </div>
-    </button>
+    </div>
   );
 });
 
@@ -335,21 +428,37 @@ export function ConversationList({
   selectedConversationId,
   onSelectConversation,
   currentAgent,
+  agentsList = [],
   loading = false,
   isRefreshing = false,
   onRefresh,
   lastSynced,
+  hasMore = false,
+  loadingMore = false,
+  onLoadMore,
+  onBulkResolve,
+  onBulkAssign,
+  onBulkMarkSpam,
 }: ConversationListProps) {
-  const [activeQueue, setActiveQueue] = useState<InboxQueue>('all');
-  const [statusView, setStatusView] = useState<StatusView>('open');
+  // Requirement 2: Status tabs: Open, Waiting, Mine, Unassigned, Resolved, All
+  const [activeTab, setActiveTab] = useState<StatusTab>('open');
   const [sortBy, setSortBy] = useState<SortOption>('newest');
   const [searchQuery, setSearchQuery] = useState('');
   const [channelFilter, setChannelFilter] = useState<ChannelType | 'all'>('all');
   const [selectedTagFilter, setSelectedTagFilter] = useState<string | 'all'>('all');
   const [showFilters, setShowFilters] = useState(false);
+
+  // Requirement 3: Bulk selection state
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [isAssignMenuOpen, setIsAssignMenuOpen] = useState(false);
+  const [isBulkOperating, setIsBulkOperating] = useState(false);
+
   const searchInputRef = useRef<HTMLInputElement>(null);
   const filterRef = useRef<HTMLDivElement>(null);
+  const assignMenuRef = useRef<HTMLDivElement>(null);
   const listContainerRef = useRef<HTMLDivElement>(null);
+  const sentinelRef = useRef<HTMLDivElement>(null);
 
   // Focus search bar on Ctrl+K or Cmd+K
   useEffect(() => {
@@ -366,46 +475,45 @@ export function ConversationList({
 
   // Close filter popover on outside click
   useEffect(() => {
-    if (!showFilters) return;
+    if (!showFilters && !isAssignMenuOpen) return;
     const onDown = (e: MouseEvent) => {
-      if (!filterRef.current?.contains(e.target as Node)) setShowFilters(false);
+      if (showFilters && !filterRef.current?.contains(e.target as Node)) {
+        setShowFilters(false);
+      }
+      if (isAssignMenuOpen && !assignMenuRef.current?.contains(e.target as Node)) {
+        setIsAssignMenuOpen(false);
+      }
     };
     document.addEventListener('mousedown', onDown);
     return () => document.removeEventListener('mousedown', onDown);
-  }, [showFilters]);
+  }, [showFilters, isAssignMenuOpen]);
 
-  /** True when conversation matches current status view (open, snoozed, closed) */
-  const inStatusView = useCallback((c: Conversation, view: StatusView) => {
-    const isClosed = c.status === 'closed';
-    const isSnoozed = c.status === 'snoozed';
-    if (view === 'closed') return isClosed;
-    if (view === 'snoozed') return isSnoozed;
-    return !isClosed && !isSnoozed;
-  }, []);
-
-  // Queue counts scoped to current status view
+  // Requirement 2: Tab counts
   const counts = useMemo(() => {
-    let all = 0;
+    let open = 0;
     let waiting = 0;
-    let unassigned = 0;
     let mine = 0;
-    let snoozed = 0;
-    let closed = 0;
+    let unassigned = 0;
+    let resolved = 0;
+    let all = 0;
 
     conversations.forEach((c) => {
-      if (c.status === 'snoozed') snoozed++;
-      if (c.status === 'closed') closed++;
-      if (!inStatusView(c, statusView)) return;
-
-      const agentId = c.assigned_agent_id || c.agent_id;
       all++;
-      if (isWaitingOnAgent(c)) waiting++;
-      if (!agentId) unassigned++;
-      if (currentAgent?.id && agentId === currentAgent.id) mine++;
+      const isClosed = c.status === 'closed';
+      const agentId = c.assigned_agent_id || c.agent_id;
+
+      if (isClosed) {
+        resolved++;
+      } else {
+        open++;
+        if (isWaitingOnAgent(c)) waiting++;
+        if (currentAgent?.id && agentId === currentAgent.id) mine++;
+        if (!agentId) unassigned++;
+      }
     });
 
-    return { all, waiting, unassigned, mine, snoozed, closed };
-  }, [conversations, currentAgent?.id, statusView, inStatusView]);
+    return { open, waiting, mine, unassigned, resolved, all };
+  }, [conversations, currentAgent?.id]);
 
   // Extract distinct tags
   const availableTags = useMemo(() => {
@@ -420,21 +528,22 @@ export function ConversationList({
   const filteredAndSorted = useMemo(() => {
     const list = conversations.filter((conv) => {
       const agentId = conv.assigned_agent_id || conv.agent_id;
+      const isClosed = conv.status === 'closed';
 
-      // 1. Status view
-      if (!inStatusView(conv, statusView)) return false;
+      // 1. Status Tabs Filter
+      if (activeTab === 'open' && isClosed) return false;
+      if (activeTab === 'waiting' && (isClosed || !isWaitingOnAgent(conv))) return false;
+      if (activeTab === 'mine' && (isClosed || agentId !== currentAgent?.id)) return false;
+      if (activeTab === 'unassigned' && (isClosed || !!agentId)) return false;
+      if (activeTab === 'resolved' && !isClosed) return false;
+      // activeTab === 'all' includes all conversations
 
-      // 2. Queue
-      if (activeQueue === 'waiting' && !isWaitingOnAgent(conv)) return false;
-      if (activeQueue === 'unassigned' && agentId) return false;
-      if (activeQueue === 'mine' && agentId !== currentAgent?.id) return false;
-
-      // 3. Channel
+      // 2. Channel Filter
       if (channelFilter !== 'all' && (conv.channel || 'web') !== channelFilter) {
         return false;
       }
 
-      // 4. Tag
+      // 3. Tag Filter
       if (
         selectedTagFilter !== 'all' &&
         (!conv.tags || !conv.tags.includes(selectedTagFilter))
@@ -442,7 +551,7 @@ export function ConversationList({
         return false;
       }
 
-      // 5. Search query
+      // 4. Search query
       const q = searchQuery.trim().toLowerCase();
       if (!q) return true;
 
@@ -482,20 +591,111 @@ export function ConversationList({
         return timeB - timeA;
       }
 
-      // Default: newest
+      // Default: newest activity on top
       return timeB - timeA;
     });
   }, [
     conversations,
-    activeQueue,
-    statusView,
+    activeTab,
     sortBy,
     channelFilter,
     selectedTagFilter,
     searchQuery,
     currentAgent?.id,
-    inStatusView,
   ]);
+
+  // Requirement 1: Infinite Scroll Intersection Observer on sentinel
+  useEffect(() => {
+    if (!hasMore || loadingMore || !onLoadMore) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          onLoadMore();
+        }
+      },
+      {
+        root: listContainerRef.current,
+        rootMargin: '200px',
+        threshold: 0.05,
+      }
+    );
+
+    if (sentinelRef.current) {
+      observer.observe(sentinelRef.current);
+    }
+
+    return () => observer.disconnect();
+  }, [hasMore, loadingMore, onLoadMore]);
+
+  // Infinite Scroll scroll position threshold fallback
+  const handleScroll = useCallback(
+    (e: React.UIEvent<HTMLDivElement>) => {
+      if (!hasMore || loadingMore || !onLoadMore) return;
+      const target = e.currentTarget;
+      if (target.scrollHeight - target.scrollTop - target.clientHeight < 250) {
+        onLoadMore();
+      }
+    },
+    [hasMore, loadingMore, onLoadMore]
+  );
+
+  // Bulk Selection Handlers
+  const handleToggleCheck = useCallback((id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  }, []);
+
+  const handleSelectAll = () => {
+    if (selectedIds.size === filteredAndSorted.length && filteredAndSorted.length > 0) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filteredAndSorted.map((c) => c.id)));
+    }
+  };
+
+  const handleBulkResolveClick = async () => {
+    if (selectedIds.size === 0 || !onBulkResolve) return;
+    setIsBulkOperating(true);
+    try {
+      await onBulkResolve(Array.from(selectedIds));
+      setSelectedIds(new Set());
+      setIsSelectionMode(false);
+    } finally {
+      setIsBulkOperating(false);
+    }
+  };
+
+  const handleBulkAssignClick = async (agentId: string | null) => {
+    if (selectedIds.size === 0 || !onBulkAssign) return;
+    setIsBulkOperating(true);
+    try {
+      await onBulkAssign(Array.from(selectedIds), agentId);
+      setSelectedIds(new Set());
+      setIsSelectionMode(false);
+      setIsAssignMenuOpen(false);
+    } finally {
+      setIsBulkOperating(false);
+    }
+  };
+
+  const handleBulkMarkSpamClick = async () => {
+    if (selectedIds.size === 0 || !onBulkMarkSpam) return;
+    setIsBulkOperating(true);
+    try {
+      await onBulkMarkSpam(Array.from(selectedIds));
+      setSelectedIds(new Set());
+      setIsSelectionMode(false);
+    } finally {
+      setIsBulkOperating(false);
+    }
+  };
 
   // Keyboard navigation for moving between conversations (ArrowUp / ArrowDown / J / K)
   useEffect(() => {
@@ -545,26 +745,15 @@ export function ConversationList({
   const hasActiveFilters =
     channelFilter !== 'all' ||
     selectedTagFilter !== 'all' ||
-    statusView !== 'open' ||
     sortBy !== 'newest';
 
-  const queueTabs: { id: InboxQueue; label: string; count: number }[] = [
-    { id: 'all', label: 'All', count: counts.all },
-    { id: 'waiting', label: 'Waiting', count: counts.waiting },
-    { id: 'unassigned', label: 'Unassigned', count: counts.unassigned },
-    { id: 'mine', label: 'Mine', count: counts.mine },
-  ];
-
-  const statusViews: { id: StatusView; label: string; count?: number }[] = [
-    { id: 'open', label: 'Open' },
-    { id: 'snoozed', label: 'Snoozed', count: counts.snoozed },
-    { id: 'closed', label: 'Closed', count: counts.closed },
-  ];
+  const isAllFilteredSelected =
+    filteredAndSorted.length > 0 && selectedIds.size === filteredAndSorted.length;
 
   return (
-    <div className="w-full h-screen flex flex-col border-r border-line bg-surface select-none">
+    <div className="w-full h-screen flex flex-col border-r border-line bg-surface select-none relative">
       {/* 1. Header Toolbar */}
-      <div className="p-3 border-b border-line/80 space-y-2.5 bg-surface/80 backdrop-blur-xs">
+      <div className="p-3 border-b border-line/80 space-y-2 bg-surface/80 backdrop-blur-xs">
         <div className="flex items-center justify-between gap-2 px-0.5">
           <div className="flex items-center gap-2">
             <h2 className="text-[14.5px] font-bold tracking-tight text-ink">
@@ -576,6 +765,28 @@ export function ConversationList({
           </div>
 
           <div className="flex items-center gap-1.5">
+            {/* Bulk select toggle */}
+            <button
+              onClick={() => {
+                if (isSelectionMode) {
+                  setIsSelectionMode(false);
+                  setSelectedIds(new Set());
+                } else {
+                  setIsSelectionMode(true);
+                }
+              }}
+              title={isSelectionMode ? 'Cancel bulk select' : 'Bulk select conversations'}
+              className={cn(
+                'h-7 px-2 rounded-lg text-[11px] font-semibold flex items-center gap-1 transition-all border',
+                isSelectionMode || selectedIds.size > 0
+                  ? 'border-accent bg-accent/10 text-accent font-bold'
+                  : 'border-line/70 bg-surface-2 text-ink-3 hover:text-ink hover:bg-surface-3'
+              )}
+            >
+              <CheckSquare className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Select</span>
+            </button>
+
             {/* Sync / Refresh Button */}
             {onRefresh && (
               <button
@@ -608,7 +819,7 @@ export function ConversationList({
               )}
             >
               <ArrowUpDown className="w-2.5 h-2.5" />
-              <span className="truncate max-w-[90px]">{SORT_LABELS[sortBy].label}</span>
+              <span className="truncate max-w-[85px]">{SORT_LABELS[sortBy].label}</span>
             </button>
 
             {/* Filter Popover Trigger */}
@@ -649,32 +860,6 @@ export function ConversationList({
                           )}
                         >
                           <div className="leading-tight">{SORT_LABELS[key].label}</div>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Status Selector */}
-                  <div className="mb-3 pt-2.5 border-t border-line">
-                    <div className="text-[10px] font-bold text-ink-3 uppercase tracking-wider mb-1.5">
-                      Status View
-                    </div>
-                    <div className="flex flex-wrap gap-1.5">
-                      {statusViews.map((v) => (
-                        <button
-                          key={v.id}
-                          onClick={() => setStatusView(v.id)}
-                          className={cn(
-                            'px-2.5 h-6.5 rounded-lg text-[11px] font-semibold transition-all inline-flex items-center gap-1.5',
-                            statusView === v.id
-                              ? 'bg-ink text-ink-inv shadow-xs'
-                              : 'bg-surface-2 text-ink-2 hover:bg-surface-3 border border-line/60'
-                          )}
-                        >
-                          {v.label}
-                          {v.count ? (
-                            <span className="tabular-nums text-[10px] opacity-75">{v.count}</span>
-                          ) : null}
                         </button>
                       ))}
                     </div>
@@ -744,13 +929,12 @@ export function ConversationList({
                       <button
                         onClick={() => {
                           setSortBy('newest');
-                          setStatusView('open');
                           setChannelFilter('all');
                           setSelectedTagFilter('all');
                         }}
                         className="text-[11px] font-semibold text-accent hover:underline"
                       >
-                        Reset all filters
+                        Reset filters
                       </button>
                     </div>
                   )}
@@ -786,35 +970,41 @@ export function ConversationList({
           )}
         </div>
 
-        {/* 3. Queue Tabs Segmented Navigation */}
-        <div className="flex items-center p-1 rounded-xl bg-surface-2 border border-line/70">
-          {queueTabs.map((tab) => {
-            const active = activeQueue === tab.id;
+        {/* 3. Requirement 2: Status Tabs: Open, Waiting, Mine, Unassigned, Resolved, All */}
+        <div className="flex items-center gap-1 overflow-x-auto p-1 rounded-xl bg-surface-2 border border-line/70 scrollbar-none">
+          {STATUS_TABS.map((tab) => {
+            const active = activeTab === tab.id;
+            const count = counts[tab.id];
             return (
               <button
                 key={tab.id}
-                onClick={() => setActiveQueue(tab.id)}
-                title={`${tab.label} (${tab.count})`}
+                onClick={() => {
+                  setActiveTab(tab.id);
+                  if (selectedIds.size > 0) setSelectedIds(new Set());
+                }}
+                title={`${tab.label} (${count})`}
                 className={cn(
-                  'h-6.5 px-2 rounded-lg text-[11px] font-medium transition-all flex items-center justify-center gap-1 flex-1',
+                  'h-6 px-2 rounded-lg text-[10.5px] font-medium transition-all flex items-center justify-center gap-1 shrink-0',
                   active
                     ? 'bg-surface text-ink shadow-xs border border-line/60 font-bold'
                     : 'text-ink-3 hover:text-ink'
                 )}
               >
                 <span>{tab.label}</span>
-                {tab.count > 0 && (
+                {count > 0 && (
                   <span
                     className={cn(
-                      'tabular-nums text-[9.5px] px-1.5 py-0.2 rounded-full font-bold',
+                      'tabular-nums text-[9px] px-1 py-0.1 rounded-full font-bold',
                       active
                         ? tab.id === 'waiting'
                           ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
+                          : tab.id === 'resolved'
+                          ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
                           : 'bg-accent/10 text-accent'
                         : 'bg-surface-3 text-ink-3'
                     )}
                   >
-                    {tab.count}
+                    {count}
                   </span>
                 )}
               </button>
@@ -823,9 +1013,112 @@ export function ConversationList({
         </div>
       </div>
 
-      {/* 4. Conversations List Canvas */}
+      {/* Requirement 3: Bulk Actions Toolbar (Sticky when items selected) */}
+      {(selectedIds.size > 0 || isSelectionMode) && (
+        <div className="p-2 border-b border-accent/30 bg-accent/[0.06] dark:bg-accent/15 flex items-center justify-between gap-2 z-20 animate-in fade-in slide-in-from-top-2 duration-150">
+          <div className="flex items-center gap-2 min-w-0">
+            <button
+              onClick={handleSelectAll}
+              title={isAllFilteredSelected ? 'Deselect all' : 'Select all visible'}
+              className="w-4 h-4 rounded border border-accent bg-surface flex items-center justify-center text-accent shrink-0"
+            >
+              {isAllFilteredSelected ? (
+                <Check className="w-3 h-3 stroke-[3]" />
+              ) : selectedIds.size > 0 ? (
+                <div className="w-2 h-2 bg-accent rounded-xs" />
+              ) : null}
+            </button>
+            <span className="text-[11.5px] font-bold text-ink truncate">
+              {selectedIds.size} selected
+            </span>
+          </div>
+
+          <div className="flex items-center gap-1.5 shrink-0">
+            {/* Resolve bulk */}
+            {onBulkResolve && (
+              <button
+                disabled={selectedIds.size === 0 || isBulkOperating}
+                onClick={handleBulkResolveClick}
+                className="btn btn-xs btn-primary gap-1 shadow-xs"
+                title="Resolve selected conversations"
+              >
+                <CheckCircle2 className="w-3 h-3" />
+                <span>Resolve</span>
+              </button>
+            )}
+
+            {/* Assign bulk */}
+            {onBulkAssign && (
+              <div ref={assignMenuRef} className="relative">
+                <button
+                  disabled={selectedIds.size === 0 || isBulkOperating}
+                  onClick={() => setIsAssignMenuOpen((v) => !v)}
+                  className="btn btn-xs btn-secondary gap-1"
+                  title="Assign selected conversations to agent"
+                >
+                  <UserPlus className="w-3 h-3" />
+                  <span>Assign</span>
+                </button>
+
+                {isAssignMenuOpen && (
+                  <div className="absolute right-0 top-[calc(100%+4px)] z-50 w-48 p-1.5 rounded-xl border border-line bg-surface shadow-xl text-left animate-pop">
+                    <div className="px-2 py-1 text-[10px] font-bold text-ink-3 uppercase tracking-wider">
+                      Assign to teammate
+                    </div>
+                    <button
+                      onClick={() => handleBulkAssignClick(null)}
+                      className="w-full text-left px-2 py-1.5 rounded-lg text-[11px] font-medium text-ink-2 hover:bg-surface-2 transition-colors flex items-center gap-2"
+                    >
+                      <Users className="w-3 h-3 text-ink-3" />
+                      <span>Unassign</span>
+                    </button>
+                    {agentsList.map((ag) => (
+                      <button
+                        key={ag.id}
+                        onClick={() => handleBulkAssignClick(ag.id)}
+                        className="w-full text-left px-2 py-1.5 rounded-lg text-[11px] font-medium text-ink hover:bg-surface-2 transition-colors flex items-center gap-2"
+                      >
+                        <Avatar name={ag.name} seed={ag.id} size="xs" />
+                        <span className="truncate">{ag.name}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Mark as spam bulk */}
+            {onBulkMarkSpam && (
+              <button
+                disabled={selectedIds.size === 0 || isBulkOperating}
+                onClick={handleBulkMarkSpamClick}
+                className="btn btn-xs btn-secondary text-red-600 dark:text-red-400 hover:bg-red-500/10 border-red-500/20 gap-1"
+                title="Mark selected as spam and close"
+              >
+                <ShieldAlert className="w-3 h-3" />
+                <span className="hidden sm:inline">Spam</span>
+              </button>
+            )}
+
+            {/* Cancel Selection */}
+            <button
+              onClick={() => {
+                setSelectedIds(new Set());
+                setIsSelectionMode(false);
+              }}
+              title="Clear selection"
+              className="p-1 rounded-md text-ink-3 hover:text-ink hover:bg-surface-3 transition-colors"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 4. Conversations List Canvas (Infinite Scroll in pages of 30) */}
       <div
         ref={listContainerRef}
+        onScroll={handleScroll}
         className="flex-1 overflow-y-auto px-2 py-2 space-y-1 scrollbar-thin"
       >
         {loading ? (
@@ -844,15 +1137,13 @@ export function ConversationList({
               <EmptyState
                 type="no-conversations"
                 title={
-                  statusView === 'closed'
-                    ? 'No closed conversations'
-                    : statusView === 'snoozed'
-                    ? 'No snoozed conversations'
-                    : activeQueue === 'waiting'
+                  activeTab === 'resolved'
+                    ? 'No resolved conversations'
+                    : activeTab === 'waiting'
                     ? 'No waiting customers'
-                    : activeQueue === 'unassigned'
+                    : activeTab === 'unassigned'
                     ? 'Nothing unassigned'
-                    : activeQueue === 'mine'
+                    : activeTab === 'mine'
                     ? 'Nothing assigned to you'
                     : 'Inbox zero'
                 }
@@ -864,7 +1155,6 @@ export function ConversationList({
                 actionLabel={hasActiveFilters ? 'Reset Filters' : undefined}
                 onAction={() => {
                   setSortBy('newest');
-                  setStatusView('open');
                   setChannelFilter('all');
                   setSelectedTagFilter('all');
                 }}
@@ -872,15 +1162,31 @@ export function ConversationList({
             )}
           </div>
         ) : (
-          filteredAndSorted.map((conv) => (
-            <ConversationItem
-              key={conv.id}
-              conversation={conv}
-              isSelected={conv.id === selectedConversationId}
-              onSelect={onSelectConversation}
-              currentAgent={currentAgent}
-            />
-          ))
+          <>
+            {filteredAndSorted.map((conv) => (
+              <ConversationItem
+                key={conv.id}
+                conversation={conv}
+                isSelected={conv.id === selectedConversationId}
+                onSelect={onSelectConversation}
+                currentAgent={currentAgent}
+                isSelectionMode={isSelectionMode}
+                isChecked={selectedIds.has(conv.id)}
+                onToggleCheck={handleToggleCheck}
+              />
+            ))}
+
+            {/* Infinite Scroll Sentinel element */}
+            <div ref={sentinelRef} className="h-4 w-full pointer-events-none" />
+
+            {/* Loading more indicator */}
+            {loadingMore && (
+              <div className="py-2.5 flex items-center justify-center gap-2 text-ink-3 text-[11px] font-medium animate-pulse">
+                <Loader2 className="w-3.5 h-3.5 animate-spin text-accent" />
+                <span>Loading more conversations…</span>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>

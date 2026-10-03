@@ -53,11 +53,15 @@ export default function DashboardPage() {
   // and the Settings hub.
   const [activeView, setActiveView] = useState<View>('inbox');
 
-  // Conversations & Messages
+  // Conversations & Messages (Pages of 30)
+  const PAGE_SIZE = 30;
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [lastSynced, setLastSynced] = useState<Date>(new Date());
   const [isMessagesLoading, setIsMessagesLoading] = useState(false);
   const messagesCacheRef = useRef<Record<string, Message[]>>({});
@@ -227,6 +231,16 @@ export default function DashboardPage() {
       await refreshConversations(workspace.id);
       await refreshVisitors(workspace.id);
 
+      // Trigger auto-close rule for stale inactive conversations
+      try {
+        const autoCloseDays = (workspace?.auto_assignment as any)?.auto_close_inactive_days || workspace?.auto_close_days || 7;
+        fetch('/api/conversations/auto-close', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ workspace_id: workspace.id, days: autoCloseDays }),
+        }).catch(() => {});
+      } catch (e) {}
+
       // Fetch canned responses
       const { data: cannedList } = await supabase
         .from('canned_responses')
@@ -316,103 +330,223 @@ export default function DashboardPage() {
     );
   }, [supabase]);
 
-  // 3. Refresh Conversations (Manual refresh only, preserves active chat without resetting)
-  const refreshConversations = useCallback(async (wsId?: string) => {
-    const targetWsId = wsId || currentWorkspaceIdRef.current;
-    setIsRefreshing(true);
-    try {
-      let query = supabase
-        .from('conversations')
-        .select(`
-          *,
-          visitor:visitors(*),
-          agent:agents(*)
-        `)
-        .order('updated_at', { ascending: false });
-
-      if (targetWsId) {
-        query = query.eq('workspace_id', targetWsId);
+  // 3. Fetch/Refresh Conversations (Pages of 30, ordered by updated_at)
+  const refreshConversations = useCallback(
+    async (wsId?: string, pageNum: number = 0, isAppend: boolean = false) => {
+      const targetWsId = wsId || currentWorkspaceIdRef.current;
+      if (isAppend) {
+        setLoadingMore(true);
+      } else {
+        setIsRefreshing(true);
       }
+      try {
+        let query = supabase
+          .from('conversations')
+          .select(`
+            *,
+            visitor:visitors(*),
+            agent:agents(*)
+          `)
+          .order('updated_at', { ascending: false })
+          .range(pageNum * PAGE_SIZE, (pageNum + 1) * PAGE_SIZE - 1);
 
-      const { data: convData, error } = await query;
-      if (error) {
-        console.error('Failed to fetch conversations:', error);
-        return;
-      }
+        if (targetWsId) {
+          query = query.eq('workspace_id', targetWsId);
+        }
 
-      if (!convData || convData.length === 0) {
+        const { data: convData, error } = await query;
+        if (error) {
+          console.error('Failed to fetch conversations:', error);
+          return;
+        }
+
+        const fetchedConvs = (convData as any[]) || [];
+        if (fetchedConvs.length < PAGE_SIZE) {
+          setHasMore(false);
+        } else {
+          setHasMore(true);
+        }
+
+        if (fetchedConvs.length === 0 && !isAppend) {
+          setConversations([]);
+          setLastSynced(new Date());
+          return;
+        }
+
+        const convIds = fetchedConvs.map((c: any) => c.id);
+
+        // In parallel: Batch fetch unread visitor messages and latest messages in 2 queries
+        let unreadCountMap: Record<string, number> = {};
+        let latestMessageMap: Record<string, Message> = {};
+
+        if (convIds.length > 0) {
+          const [unreadRes, recentMsgsRes] = await Promise.all([
+            supabase
+              .from('messages')
+              .select('conversation_id')
+              .in('conversation_id', convIds)
+              .eq('sender_type', 'visitor')
+              .is('read_at', null),
+            supabase
+              .from('messages')
+              .select('*')
+              .in('conversation_id', convIds)
+              .order('created_at', { ascending: false }),
+          ]);
+
+          if (unreadRes.data) {
+            for (const row of unreadRes.data) {
+              unreadCountMap[row.conversation_id] = (unreadCountMap[row.conversation_id] || 0) + 1;
+            }
+          }
+
+          if (recentMsgsRes.data) {
+            for (const msg of recentMsgsRes.data) {
+              if (!latestMessageMap[msg.conversation_id]) {
+                latestMessageMap[msg.conversation_id] = msg as Message;
+              }
+            }
+          }
+        }
+
+        const enrichedConversations: Conversation[] = fetchedConvs.map((c: any) => {
+          const isCurrentlySelected = selectedConversationIdRef.current === c.id;
+          return {
+            ...c,
+            last_message: latestMessageMap[c.id] || null,
+            unread_count: isCurrentlySelected ? 0 : (unreadCountMap[c.id] || 0),
+          };
+        });
+
+        if (isAppend) {
+          setPage(pageNum);
+          setConversations((prev) => {
+            const existingIds = new Set(prev.map((c) => c.id));
+            const newItems = enrichedConversations.filter((c) => !existingIds.has(c.id));
+            return [...prev, ...newItems];
+          });
+        } else {
+          setPage(0);
+          // Preserve currently active conversation so chat never drops or backs out
+          setConversations((prev) => {
+            const currentSelectedId = selectedConversationIdRef.current;
+            if (currentSelectedId) {
+              const existingCurrent = prev.find((c) => c.id === currentSelectedId);
+              if (existingCurrent && !enrichedConversations.some((c) => c.id === currentSelectedId)) {
+                enrichedConversations.unshift(existingCurrent);
+              }
+            }
+            return enrichedConversations;
+          });
+
+          if (!selectedConversationIdRef.current && enrichedConversations.length > 0) {
+            setSelectedConversationId(enrichedConversations[0].id);
+          } else if (selectedConversationIdRef.current) {
+            loadMessages(selectedConversationIdRef.current);
+          }
+        }
         setLastSynced(new Date());
-        return;
+      } catch (err) {
+        console.error('Failed to refresh conversations:', err);
+      } finally {
+        setIsRefreshing(false);
+        setLoadingMore(false);
+      }
+    },
+    [supabase, loadMessages]
+  );
+
+  // Infinite Scroll: Load Next Page of 30
+  const handleLoadMore = useCallback(() => {
+    if (loadingMore || !hasMore) return;
+    refreshConversations(undefined, page + 1, true);
+  }, [loadingMore, hasMore, page, refreshConversations]);
+
+  // Bulk Action 1: Resolve Selected Conversations
+  const handleBulkResolve = useCallback(
+    async (ids: string[]) => {
+      if (ids.length === 0) return;
+      const nowIso = new Date().toISOString();
+      await supabase
+        .from('conversations')
+        .update({ status: 'closed', closed_at: nowIso, updated_at: nowIso })
+        .in('id', ids);
+
+      setConversations((prev) =>
+        prev.map((c) => (ids.includes(c.id) ? { ...c, status: 'closed', closed_at: nowIso } : c))
+      );
+    },
+    [supabase]
+  );
+
+  // Bulk Action 2: Assign Selected Conversations to Agent
+  const handleBulkAssign = useCallback(
+    async (ids: string[], agentId: string | null) => {
+      if (ids.length === 0) return;
+      const nowIso = new Date().toISOString();
+      const assignedAgent = allAgents.find((a) => a.id === agentId) || null;
+      await supabase
+        .from('conversations')
+        .update({
+          assigned_agent_id: agentId,
+          agent_id: agentId,
+          updated_at: nowIso,
+        })
+        .in('id', ids);
+
+      setConversations((prev) =>
+        prev.map((c) =>
+          ids.includes(c.id)
+            ? {
+                ...c,
+                assigned_agent_id: agentId,
+                agent_id: agentId,
+                agent: assignedAgent || undefined,
+                updated_at: nowIso,
+              }
+            : c
+        )
+      );
+    },
+    [supabase, allAgents]
+  );
+
+  // Bulk Action 3: Mark Selected Conversations as Spam
+  const handleBulkMarkSpam = useCallback(
+    async (ids: string[]) => {
+      if (ids.length === 0) return;
+      const nowIso = new Date().toISOString();
+      for (const id of ids) {
+        const conv = conversations.find((c) => c.id === id);
+        const curTags = conv?.tags || [];
+        const updatedTags = curTags.includes('Spam') ? curTags : [...curTags, 'Spam'];
+        await supabase
+          .from('conversations')
+          .update({
+            status: 'closed',
+            closed_at: nowIso,
+            tags: updatedTags,
+            updated_at: nowIso,
+          })
+          .eq('id', id);
       }
 
-      const convIds = convData.map((c: any) => c.id);
-
-      // In parallel: Batch fetch unread visitor messages and latest messages in just 2 queries
-      const [unreadRes, recentMsgsRes] = await Promise.all([
-        supabase
-          .from('messages')
-          .select('conversation_id')
-          .in('conversation_id', convIds)
-          .eq('sender_type', 'visitor')
-          .is('read_at', null),
-        supabase
-          .from('messages')
-          .select('*')
-          .in('conversation_id', convIds)
-          .order('created_at', { ascending: false }),
-      ]);
-
-      // Calculate unread counts per conversation in O(1) memory
-      const unreadCountMap: Record<string, number> = {};
-      if (unreadRes.data) {
-        for (const row of unreadRes.data) {
-          unreadCountMap[row.conversation_id] = (unreadCountMap[row.conversation_id] || 0) + 1;
-        }
-      }
-
-      // Map latest message per conversation
-      const latestMessageMap: Record<string, Message> = {};
-      if (recentMsgsRes.data) {
-        for (const msg of recentMsgsRes.data) {
-          if (!latestMessageMap[msg.conversation_id]) {
-            latestMessageMap[msg.conversation_id] = msg as Message;
-          }
-        }
-      }
-
-      const enrichedConversations: Conversation[] = convData.map((c: any) => {
-        const isCurrentlySelected = selectedConversationIdRef.current === c.id;
-        return {
-          ...c,
-          last_message: latestMessageMap[c.id] || null,
-          unread_count: isCurrentlySelected ? 0 : (unreadCountMap[c.id] || 0),
-        };
-      });
-
-      // Preserve currently active conversation so chat never drops or backs out
-      setConversations((prev) => {
-        const currentSelectedId = selectedConversationIdRef.current;
-        if (currentSelectedId) {
-          const existingCurrent = prev.find((c) => c.id === currentSelectedId);
-          if (existingCurrent && !enrichedConversations.some((c) => c.id === currentSelectedId)) {
-            enrichedConversations.unshift(existingCurrent);
-          }
-        }
-        return enrichedConversations;
-      });
-      setLastSynced(new Date());
-
-      if (!selectedConversationIdRef.current && enrichedConversations.length > 0) {
-        setSelectedConversationId(enrichedConversations[0].id);
-      } else if (selectedConversationIdRef.current) {
-        loadMessages(selectedConversationIdRef.current);
-      }
-    } catch (err) {
-      console.error('Failed to refresh conversations:', err);
-    } finally {
-      setIsRefreshing(false);
-    }
-  }, [supabase, loadMessages]);
+      setConversations((prev) =>
+        prev.map((c) =>
+          ids.includes(c.id)
+            ? {
+                ...c,
+                status: 'closed',
+                closed_at: nowIso,
+                tags: c.tags?.includes('Spam') ? c.tags : [...(c.tags || []), 'Spam'],
+                updated_at: nowIso,
+              }
+            : c
+        )
+      );
+    },
+    [supabase, conversations]
+  );
 
   // 4. Refresh Visitors
   const refreshVisitors = async (wsId?: string) => {
@@ -796,22 +930,34 @@ export default function DashboardPage() {
       );
     }
 
-    const { error } = await supabase.from('messages').insert({
-      conversation_id: targetId,
-      sender_type: 'agent',
-      sender_id: currentAgent.id,
-      content: content || (attachmentUrl ? 'Sent an attachment' : ''),
-      is_internal: isInternal,
-      ...(metadata ? { metadata } : {}),
-      ...(attachmentUrl ? { attachment_url: attachmentUrl } : {}),
-      // Omitted rather than set to null when there is no quote, so the insert
-      // still works against a database that has not run the migration yet.
-      ...(replyToId ? { reply_to_message_id: replyToId } : {}),
-    });
+    const { data: insertedMsg, error } = await supabase
+      .from('messages')
+      .insert({
+        conversation_id: targetId,
+        sender_type: 'agent',
+        sender_id: currentAgent.id,
+        content: content || (attachmentUrl ? 'Sent an attachment' : ''),
+        is_internal: isInternal,
+        ...(metadata ? { metadata } : {}),
+        ...(attachmentUrl ? { attachment_url: attachmentUrl } : {}),
+        // Omitted rather than set to null when there is no quote, so the insert
+        // still works against a database that has not run the migration yet.
+        ...(replyToId ? { reply_to_message_id: replyToId } : {}),
+      })
+      .select('*, agent:agents(*)')
+      .single();
 
     if (error) {
       console.error('Error sending message:', error);
       throw error;
+    }
+
+    // Immediately display the note/reply in the thread without waiting for realtime latency
+    if (insertedMsg && insertedMsg.conversation_id === selectedConversationIdRef.current) {
+      setMessages((prev) => {
+        if (prev.some((m) => m.id === insertedMsg.id)) return prev;
+        return [...prev, insertedMsg as Message];
+      });
     }
 
     if (!isInternal) {
@@ -1198,10 +1344,17 @@ export default function DashboardPage() {
               selectedConversationId={selectedConversationId}
               onSelectConversation={setSelectedConversationId}
               currentAgent={currentAgent}
+              agentsList={allAgents}
               loading={loading}
               isRefreshing={isRefreshing}
               onRefresh={() => refreshConversations()}
               lastSynced={lastSynced}
+              hasMore={hasMore}
+              loadingMore={loadingMore}
+              onLoadMore={handleLoadMore}
+              onBulkResolve={handleBulkResolve}
+              onBulkAssign={handleBulkAssign}
+              onBulkMarkSpam={handleBulkMarkSpam}
             />
           </div>
 
@@ -1219,6 +1372,8 @@ export default function DashboardPage() {
                 loading={isMessagesLoading}
                 currentAgent={currentAgent}
                 agentsList={allAgents}
+                cannedResponses={cannedResponses}
+                workspace={currentWorkspace}
                 onSendMessage={handleSendMessage}
                 onEditMessage={handleEditMessage}
                 onDeleteMessage={handleDeleteMessage}
@@ -1229,6 +1384,12 @@ export default function DashboardPage() {
                 onBack={() => setSelectedConversationId(null)}
                 isDetailsSidebarOpen={isDetailsSidebarOpen}
                 onToggleDetailsSidebar={() => setIsDetailsSidebarOpen((prev) => !prev)}
+                onMerged={async () => {
+                  await refreshConversations();
+                  if (selectedConversationId) {
+                    await loadMessages(selectedConversationId);
+                  }
+                }}
                 aiAnswering={isAiAnswering(activeConversation, currentWorkspace)}
                 onToggleAiMode={async (mode) => {
                   if (!selectedConversationId) return;
