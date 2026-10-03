@@ -62,6 +62,9 @@ import {
   ArrowUp,
   ArrowDown,
   GripVertical,
+  ChevronLeft,
+  ChevronRight,
+  RefreshCw,
 } from 'lucide-react';
 import { Agent, Article, HelpSection, Workspace } from '@/types/database';
 import { EmojiPickerPopover } from '@/components/dashboard/EmojiPickerPopover';
@@ -76,11 +79,14 @@ import {
   updateArticleAction,
   deleteArticleAction,
   reorderArticlesAction,
+  reorderHelpSectionsAction,
+  migrateHelpDeskArticlesAction,
   toggleArticleStatusAction,
   updateHelpTabSettingsAction,
   searchArticleBodiesAction,
   getArticleAction,
 } from '@/app/actions/helpdesk';
+import { generateSlug } from '@/lib/slug';
 import { Avatar } from '@/components/ui/Avatar';
 import { KnowledgePanel } from '@/components/dashboard/KnowledgePanel';
 import { Menu } from '@/components/ui/Menu';
@@ -127,23 +133,41 @@ export function SectionIconPreview({
   );
 }
 
-export const SECTION_ICON_GROUPS = [
+export const GENERIC_ICON_GROUPS = [
   {
-    name: 'Trading & Finance',
-    icons: ['📈', '💳', '💵', '📊', '🪙', '📉', '🏦', '💹'],
-  },
-  {
-    name: 'Security & Rules',
-    icons: ['🛡️', '🔒', '⚖️', '🔑', '📜', '🔏', '🪪', '⚠️'],
+    name: 'General & Support',
+    icons: ['📚', '📄', '📁', '💬', '❓', '🎯', '👤', '🎧'],
   },
   {
     name: 'Tech & Platform',
     icons: ['🚀', '⚡', '⚙️', '💡', '📱', '🌐', '💻', '🔧'],
   },
   {
-    name: 'General & Support',
-    icons: ['📚', '📄', '📁', '💬', '❓', '🎯', '👤', '🎧'],
+    name: 'Security & Rules',
+    icons: ['🛡️', '🔒', '⚖️', '🔑', '📜', '🔏', '🪪', '⚠️'],
   },
+];
+
+export const TRADING_ICON_GROUP = {
+  name: 'Trading & Finance',
+  icons: ['📈', '💳', '💵', '📊', '🪙', '📉', '🏦', '💹'],
+};
+
+export function isTradingWorkspace(workspace?: Workspace | null): boolean {
+  if (!workspace?.industry) return false;
+  const ind = workspace.industry.toLowerCase().trim();
+  return ['trading', 'prop_firm', 'prop-firm', 'finance', 'fintech'].includes(ind);
+}
+
+export function getSectionIconGroups(workspace?: Workspace | null) {
+  return isTradingWorkspace(workspace)
+    ? [TRADING_ICON_GROUP, ...GENERIC_ICON_GROUPS]
+    : GENERIC_ICON_GROUPS;
+}
+
+export const SECTION_ICON_GROUPS = [
+  TRADING_ICON_GROUP,
+  ...GENERIC_ICON_GROUPS,
 ];
 
 export function HelpDeskDashboard({
@@ -266,6 +290,8 @@ export function HelpDeskDashboard({
     onArticlesCountChange?.(metrics.totalArticles);
   }, [metrics.totalArticles, onArticlesCountChange]);
 
+  const [isMigrating, setIsMigrating] = useState(false);
+
   // Section pills count what the list currently holds, for the same reason.
   const sectionCounts = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -275,8 +301,15 @@ export function HelpDeskDashboard({
     return counts;
   }, [articles]);
 
+  const uncategorisedArticles = useMemo(() => {
+    const validSecIds = new Set(sections.map((s) => s.id));
+    return articles.filter((a) => !a.section_id || !validSecIds.has(a.section_id));
+  }, [articles, sections]);
+
+  const uncategorisedCount = uncategorisedArticles.length;
+
   const activeSection = useMemo(() => {
-    if (selectedSectionId === 'all') return null;
+    if (selectedSectionId === 'all' || selectedSectionId === 'uncategorised') return null;
     return sections.find((s) => s.id === selectedSectionId) || null;
   }, [sections, selectedSectionId]);
 
@@ -288,20 +321,13 @@ export function HelpDeskDashboard({
     setSectionToDelete(sec);
   };
 
-  const handleConfirmDeleteSection = async () => {
+  const handleConfirmDeleteSection = async (moveToSectionId: string | null) => {
     if (!workspace?.id || !sectionToDelete) return;
     setIsDeletingSection(true);
     try {
-      await deleteHelpSectionAction(workspace.id, sectionToDelete.id);
+      await deleteHelpSectionAction(workspace.id, sectionToDelete.id, moveToSectionId);
 
-      setSections((prev) => prev.filter((s) => s.id !== sectionToDelete.id));
-      setArticles((prev) =>
-        prev.map((art) =>
-          art.section_id === sectionToDelete.id
-            ? { ...art, section_id: null, section: null }
-            : art
-        )
-      );
+      await loadHelpDeskData();
 
       if (selectedSectionId === sectionToDelete.id) {
         setSelectedSectionId('all');
@@ -313,6 +339,23 @@ export function HelpDeskDashboard({
       showToast(err.message || 'Failed to delete section', 'error');
     } finally {
       setIsDeletingSection(false);
+    }
+  };
+
+  const handleRunMigration = async () => {
+    if (!workspace?.id) return;
+    setIsMigrating(true);
+    try {
+      const res = await migrateHelpDeskArticlesAction(workspace.id);
+      showToast(
+        `Migration complete! Organized ${res.migratedCount} article(s) across ${res.createdSectionsCount} section(s). All articles now belong to sections.`
+      );
+      await loadHelpDeskData();
+      setSelectedSectionId('all');
+    } catch (err: any) {
+      showToast(err.message || 'Failed to migrate articles', 'error');
+    } finally {
+      setIsMigrating(false);
     }
   };
 
@@ -386,8 +429,13 @@ export function HelpDeskDashboard({
 
   // Filtered Articles
   const filteredArticles = useMemo(() => {
+    const validSecIds = new Set(sections.map((s) => s.id));
     const list = articles.filter((art) => {
-      if (selectedSectionId !== 'all' && art.section_id !== selectedSectionId) {
+      if (selectedSectionId === 'uncategorised') {
+        if (art.section_id && validSecIds.has(art.section_id)) {
+          return false;
+        }
+      } else if (selectedSectionId !== 'all' && art.section_id !== selectedSectionId) {
         return false;
       }
       if (selectedStatus !== 'all' && art.status !== selectedStatus) {
@@ -405,7 +453,7 @@ export function HelpDeskDashboard({
       return true;
     });
 
-    if (selectedSectionId !== 'all') {
+    if (selectedSectionId !== 'all' && selectedSectionId !== 'uncategorised') {
       // Sort in the exact sequence as it appears on the public Help Center
       list.sort((a, b) => {
         const ao = a.order_index ?? 0;
@@ -416,7 +464,7 @@ export function HelpDeskDashboard({
     }
 
     return list;
-  }, [articles, selectedSectionId, selectedStatus, searchQuery, bodyMatchIds]);
+  }, [articles, selectedSectionId, selectedStatus, searchQuery, bodyMatchIds, sections]);
 
   const handleToggleStatus = async (article: Article) => {
     if (!workspace?.id) return;
@@ -709,6 +757,27 @@ export function HelpDeskDashboard({
                 <span className="text-[11px] opacity-80">({articles.length})</span>
               </button>
 
+              {/* Uncategorised (N) Chip */}
+              {uncategorisedCount > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setSelectedSectionId('uncategorised')}
+                  className={cn(
+                    'h-8 px-3 rounded-lg text-[12.5px] font-medium transition-all whitespace-nowrap flex items-center gap-1.5 border',
+                    selectedSectionId === 'uncategorised'
+                      ? 'bg-amber-500 text-white border-transparent shadow-xs font-semibold'
+                      : 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30 hover:bg-amber-500/20'
+                  )}
+                  title="Articles without a section or with legacy category"
+                >
+                  <AlertCircle className="w-3.5 h-3.5" />
+                  <span>Uncategorised</span>
+                  <span className="text-[11px] font-bold px-1.5 py-0.2 rounded-full bg-amber-500/20 text-inherit">
+                    {uncategorisedCount}
+                  </span>
+                </button>
+              )}
+
               {sections.map((sec, idx) => {
                 const isSelected = selectedSectionId === sec.id;
                 return (
@@ -727,7 +796,7 @@ export function HelpDeskDashboard({
                       className="h-full pl-3 pr-2 flex items-center gap-1.5 cursor-pointer"
                     >
                       <span className="font-mono text-[10px] font-bold opacity-75">
-                        #{String(sec.order_index && sec.order_index > 0 ? sec.order_index : idx + 1).padStart(2, '0')}
+                        #{String(idx + 1).padStart(2, '0')}
                       </span>
                       <span>{sec.icon || '📚'}</span>
                       <span className="max-w-[130px] truncate">{sec.name}</span>
@@ -813,7 +882,7 @@ export function HelpDeskDashboard({
                 <div className="min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="font-mono text-[10.5px] font-bold px-1.5 py-0.5 rounded-md bg-surface border border-line text-ink-3">
-                      Section #{String(activeSection.order_index && activeSection.order_index > 0 ? activeSection.order_index : 1).padStart(2, '0')}
+                      Section #{String(sections.findIndex((s) => s.id === activeSection.id) + 1).padStart(2, '0')}
                     </span>
                     <h2 className="text-[15px] font-bold text-ink truncate">{activeSection.name}</h2>
                     <span className="text-[11.5px] font-medium px-2 py-0.5 rounded-full bg-accent/10 text-accent border border-accent/20">
@@ -879,6 +948,41 @@ export function HelpDeskDashboard({
                   title="View all sections"
                 >
                   <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Uncategorised Articles Banner */}
+          {selectedSectionId === 'uncategorised' && (
+            <div className="p-3.5 sm:p-4 rounded-xl border border-amber-500/30 bg-amber-500/5 backdrop-blur-xs flex flex-col md:flex-row md:items-center justify-between gap-3.5 animate-in fade-in">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 flex items-center justify-center text-[18px] shrink-0">
+                  <AlertCircle className="w-5 h-5" />
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h2 className="text-[15px] font-bold text-ink">Uncategorised Articles</h2>
+                    <span className="text-[11.5px] font-medium px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30">
+                      {uncategorisedCount} {uncategorisedCount === 1 ? 'article' : 'articles'}
+                    </span>
+                  </div>
+                  <p className="text-[12px] text-ink-3 mt-0.5">
+                    These articles have no section or point to a legacy category. Run the automatic migration to create or match sections from their categories.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 shrink-0 self-start md:self-auto flex-wrap">
+                <button
+                  type="button"
+                  disabled={isMigrating}
+                  onClick={handleRunMigration}
+                  className="h-8 px-3.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-[12px] font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs disabled:opacity-50"
+                  title="Automatically match or create sections from legacy categories"
+                >
+                  <Sparkles className={cn('w-3.5 h-3.5', isMigrating && 'animate-spin')} />
+                  <span>{isMigrating ? 'Migrating...' : 'Organize & Migrate All'}</span>
                 </button>
               </div>
             </div>
@@ -957,6 +1061,7 @@ export function HelpDeskDashboard({
                 return (
                   <div
                     key={article.id}
+                    id={`article-item-${article.id}`}
                     className="p-4.5 hover:bg-surface-2/50 transition-all flex flex-col md:flex-row items-start md:items-center justify-between gap-4 group"
                   >
                     <div className="min-w-0 flex-1 space-y-1.5">
@@ -1144,7 +1249,31 @@ export function HelpDeskDashboard({
             setIsArticleModalOpen(false);
             setEditingArticle(null);
             showToast(`Article "${savedArticle.title}" saved successfully!`);
+            // Ensure filters do not hide the newly saved/updated article
+            if (selectedStatus !== 'all' && selectedStatus !== savedArticle.status) {
+              setSelectedStatus('all');
+            }
+            if (searchQuery.trim()) {
+              setSearchQuery('');
+            }
+            if (
+              selectedSectionId !== 'all' &&
+              savedArticle.section_id &&
+              selectedSectionId !== savedArticle.section_id
+            ) {
+              setSelectedSectionId(savedArticle.section_id);
+            }
             loadHelpDeskData();
+            setTimeout(() => {
+              const el = document.getElementById(`article-item-${savedArticle.id}`);
+              if (el) {
+                el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                el.classList.add('ring-2', 'ring-accent', 'bg-accent/10');
+                setTimeout(() => {
+                  el.classList.remove('ring-2', 'ring-accent', 'bg-accent/10');
+                }, 3000);
+              }
+            }, 350);
           }}
         />
       )}
@@ -1152,9 +1281,13 @@ export function HelpDeskDashboard({
       {/* SECTIONS MANAGER MODAL */}
       {isSectionModalOpen && (
         <SectionsManagerModal
+          workspace={workspace}
           workspaceId={workspace?.id || ''}
           sections={sections}
+          articleCounts={sectionCounts}
           initialEditingSection={editingSection}
+          uncategorisedCount={uncategorisedCount}
+          onRunMigration={handleRunMigration}
           onClose={() => {
             setIsSectionModalOpen(false);
             setEditingSection(null);
@@ -1162,12 +1295,17 @@ export function HelpDeskDashboard({
           onSectionsChanged={() => {
             loadHelpDeskData();
           }}
+          onDeleteRequest={(sec) => {
+            setIsSectionModalOpen(false);
+            setSectionToDelete(sec);
+          }}
         />
       )}
 
       {/* QUICK RENAME SECTION MODAL */}
       {sectionToRename && (
         <QuickRenameSectionModal
+          workspace={workspace}
           workspaceId={workspace?.id || ''}
           section={sectionToRename}
           onClose={() => setSectionToRename(null)}
@@ -1183,6 +1321,7 @@ export function HelpDeskDashboard({
       {sectionToDelete && (
         <DeleteSectionConfirmModal
           section={sectionToDelete}
+          sections={sections}
           articleCount={sectionCounts[sectionToDelete.id] || 0}
           isDeleting={isDeletingSection}
           onClose={() => setSectionToDelete(null)}
@@ -1238,9 +1377,144 @@ interface ArticleEditorModalProps {
 }
 
 // ============================================================================
-// ARTICLE BLUEPRINTS (Quick Start Professional Templates)
+// ARTICLE BLUEPRINTS (Generic Default Templates + Industry Specific)
 // ============================================================================
-const ARTICLE_BLUEPRINTS = [
+export const GENERIC_BLUEPRINTS = [
+  {
+    id: 'faq',
+    label: '❓ FAQ',
+    name: 'Frequently Asked Questions',
+    desc: 'Structured Q&A format for common questions and answers',
+    content: `# ❓ Frequently Asked Questions
+
+Find quick answers to common questions about our platform and services.
+
+### Q: How do I get started?
+Sign up for an account, verify your email, and follow our quick setup guide to configure your workspace.
+
+### Q: Where can I manage my account details?
+You can update your personal information, email address, and security preferences directly in your Account Settings.
+
+### Q: What payment methods are supported?
+We accept major credit cards (Visa, MasterCard, American Express), bank transfers, and standard online payment providers.
+
+> [!NOTE]
+> Have a question that isn't answered here? Reach out to our 24/7 support team via live chat.`,
+  },
+  {
+    id: 'step-guide',
+    label: '📋 Step Guide',
+    name: 'Step-by-Step Tutorial',
+    desc: 'Actionable walkthrough with prerequisites, numbered steps & tips',
+    content: `# 📋 Step-by-Step Guide
+
+A clear walkthrough explaining how to complete this task successfully.
+
+> [!NOTE]
+> Before you begin, ensure you have your account credentials and necessary permissions ready.
+
+## 1. Prerequisites
+- [ ] Active verified account
+- [ ] Access to the workspace dashboard
+- [ ] Administrator or manager role
+
+## 2. Step-by-Step Instructions
+1. Navigate to your **Settings** panel from the sidebar navigation.
+2. Select the **Configuration** tab and review the available options.
+3. Apply your preferred settings and click **Save Changes**.
+
+> [!TIP]
+> Configuration changes take effect immediately across all connected apps.
+
+## 3. Common Troubleshooting
+- **Settings not saving?** Verify that all required fields are filled out.
+- **Missing options?** Check that your role has administrative privileges.
+
+---
+*Still need help? Reach out to our 24/7 support team via live chat.*`,
+  },
+  {
+    id: 'policy',
+    label: '📜 Policy',
+    name: 'Standard Policy & Rules',
+    desc: 'Compliance criteria, usage rules, and guidelines',
+    content: `# 📜 Standard Policy & Terms
+
+This policy outlines the guidelines, requirements, and compliance rules applicable to all users.
+
+> [!IMPORTANT]
+> All users must adhere to these policies to maintain account standing.
+
+## General Guidelines
+- Maintain account security by using strong passwords and multi-factor authentication (MFA).
+- Keep contact and billing information accurate and up to date.
+- Comply with all local and international terms of service.
+
+## Account Status & Compliance
+- **Good Standing**: Accounts adhering to standard terms and usage guidelines.
+- **Under Review**: Accounts undergoing routine security or identity verification.
+- **Suspended**: Accounts involved in prohibited behavior or terms violations.
+
+> [!WARNING]
+> Repeated violations of platform rules will lead to permanent account deactivation.`,
+  },
+  {
+    id: 'troubleshooting',
+    label: '🛠️ Troubleshooting',
+    name: 'Troubleshooting Guide',
+    desc: 'Error symptoms, root causes, and verified fix steps',
+    content: `# 🛠️ Troubleshooting & Fix Guide
+
+Quick solutions for unexpected errors or issues you might encounter.
+
+> [!IMPORTANT]
+> Always make sure you are running the latest browser version before proceeding.
+
+## Symptoms & Fixes
+
+### Issue: Unable to log in or session expired
+1. **Clear cache and cookies**: Clear your browser browsing data or open a private/incognito window.
+2. **Password reset**: Click the "Forgot Password" link on the login page to receive a reset email.
+3. **Check connection**: Ensure your network is active and disable any conflicting VPNs.
+
+### Issue: Changes not appearing on the dashboard
+1. Perform a hard refresh (\`Ctrl + F5\` or \`Cmd + Shift + R\`).
+2. Verify that your recent edits were saved with a success confirmation toast.
+
+> [!TIP]
+> If the issue persists, contact our support team with your browser version and error screenshot.`,
+  },
+  {
+    id: 'comparison',
+    label: '📊 Comparison',
+    name: 'Feature & Plan Comparison',
+    desc: 'Side-by-side comparison table, tier matrix, and recommendations',
+    content: `# 📊 Plan & Feature Comparison
+
+Compare available plans and features to choose the right fit for your team.
+
+## Overview Matrix
+
+| Feature | Starter Plan | Pro Plan | Enterprise |
+|:---|:---|:---|:---|
+| Team Members | Up to 3 | Up to 15 | Unlimited |
+| Storage | 5 GB | 50 GB | 1 TB |
+| Response Time | 24 Hours | 4 Hours | Instant / 1 Hour |
+| Custom Domain | - | Included | Included |
+| Dedicated Manager | - | - | Included |
+
+## Choosing the Right Option
+- **Starter**: Best for individual creators and early-stage projects.
+- **Pro**: Ideal for growing businesses needing team collaboration and custom branding.
+- **Enterprise**: Built for organizations requiring SLA guarantees and advanced compliance.
+
+> [!CTA]
+> **Ready to upgrade?**
+> *Visit your billing settings to switch plans anytime with prorated billing.*`,
+  },
+];
+
+export const PROPFIRM_BLUEPRINTS = [
   {
     id: 'aquafunded-split',
     label: '🏆 Profit Split & Payouts',
@@ -1336,113 +1610,16 @@ No, there is no arbitrary max lot limit. You can trade any position size that fi
 > **Ready to test your trading skills?**
 > [button:Start Evaluation Challenge](https://www.aquafunded.com/#Evaluations)`,
   },
-  {
-    id: 'step-guide',
-    label: '📋 Step Guide',
-    name: 'Step-by-Step Tutorial',
-    desc: 'Actionable walkthrough with prerequisites, step numbers & callouts',
-    content: `# 📋 Step-by-Step Guide Title
-
-A clear, concise walkthrough explaining how to achieve this goal.
-
-> [!NOTE]
-> Before you begin, ensure you have your account credentials and required permissions ready.
-
-## 1. Prerequisites
-- [ ] Active verified account
-- [ ] Required client credentials
-- [ ] Access to the client portal
-
-## 2. Step-by-Step Instructions
-1. Navigate to your **Dashboard** and open the configuration menu.
-2. Under the general settings, locate the **Options** panel.
-3. Review your preferences and click **Save Changes**.
-
-> [!TIP]
-> Changes usually take effect within 60 seconds across all connected devices.
-
-## 3. Common Troubleshooting
-- **Option not showing?** Make sure you are logged in with administrator privileges.
-- **Save button disabled?** Verify all required fields are filled out.
-
----
-*Still need help? Reach out to our 24/7 support team via live chat.*`,
-  },
-  {
-    id: 'faq',
-    label: '❓ FAQ',
-    name: 'Frequently Asked Questions',
-    desc: 'Structured Q&A format for common customer queries',
-    content: `# ❓ Frequently Asked Questions
-
-Find quick answers to the most common questions regarding our services and policies.
-
-### Q: How long does verification take?
-Verification is typically processed automatically within **5 to 15 minutes**. In rare cases requiring manual review, it may take up to 24 hours.
-
-### Q: What payment and payout options are supported?
-We support all major payment providers including:
-- Credit / Debit Cards (Visa, MasterCard, Amex)
-- Bank Wire Transfer
-- Crypto (USDT, BTC)
-
-> [!NOTE]
-> All transactions are encrypted and processed through PCI-DSS compliant gateways.
-
-### Q: Can I update my account email address?
-Yes. You can edit your contact information at any time from your Account Settings tab.`,
-  },
-  {
-    id: 'rules-table',
-    label: '📊 Rules & Plans',
-    name: 'Rules & Plan Matrix',
-    desc: 'Comparison table, requirements matrix, and best practices',
-    content: `# 📊 Policy & Plan Guidelines
-
-Detailed criteria and rules applicable to all active accounts and evaluations.
-
-> [!WARNING]
-> Violating maximum drawdown limits will result in automatic rule breaches.
-
-## Rule Summary Matrix
-
-| Rule / Requirement | Standard Plan | Pro Plan | VIP Enterprise |
-|:---|:---|:---|:---|
-| Minimum Active Days | 5 Days | 3 Days | 0 Days |
-| Maximum Daily Loss | 5% | 5% | 6% |
-| Maximum Overall Loss | 10% | 12% | 14% |
-| Profit Split | 80% | 85% | 90% |
-
-## Key Best Practices
-- Always use a stop-loss order on open positions.
-- Keep your total risk per trade below **1-2%**.
-- Avoid holding oversized positions through major high-impact economic news releases.`,
-  },
-  {
-    id: 'troubleshooting',
-    label: '🛠️ Troubleshooting',
-    name: 'Troubleshooting Guide',
-    desc: 'Error symptoms, root causes, and verified fix steps',
-    content: `# 🛠️ Troubleshooting & Fix Guide
-
-Quick solutions for unexpected errors or issues you might encounter.
-
-> [!IMPORTANT]
-> Always make sure you are running the latest browser version before proceeding.
-
-## Symptoms
-- Connection timed out when attempting to log in.
-- Data on the dashboard is not refreshing in real time.
-
-## Solution Steps
-1. **Clear browser cache**: Press \`Ctrl + Shift + R\` (\`Cmd + Shift + R\` on Mac) for a hard reload.
-2. **Check network status**: Disable any active VPN or proxy connections that might interfere.
-3. **Verify server status**: Check our public status page for any scheduled maintenance.
-
-> [!TIP]
-> If the problem persists, try accessing through an incognito window or contact support.`,
-  },
 ];
+
+export function getArticleBlueprints(workspace?: Workspace | null) {
+  if (isTradingWorkspace(workspace)) {
+    return [...GENERIC_BLUEPRINTS, ...PROPFIRM_BLUEPRINTS];
+  }
+  return GENERIC_BLUEPRINTS;
+}
+
+export const ARTICLE_BLUEPRINTS = GENERIC_BLUEPRINTS;
 
 // ============================================================================
 // ARTICLE EDITOR MODAL COMPONENT (with live markdown toolbar & preview)
@@ -1464,9 +1641,23 @@ function ArticleEditorModal({
   onClose,
   onSaved,
 }: ArticleEditorModalProps) {
+  const isTradingIndustry = isTradingWorkspace(workspace);
+  const visibleBlueprints = useMemo(() => getArticleBlueprints(workspace), [workspace]);
+  const blueprintsScrollRef = React.useRef<HTMLDivElement>(null);
+
+  const scrollBlueprints = (direction: 'left' | 'right') => {
+    if (blueprintsScrollRef.current) {
+      blueprintsScrollRef.current.scrollBy({
+        left: direction === 'left' ? -220 : 220,
+        behavior: 'smooth',
+      });
+    }
+  };
+
   const [title, setTitle] = useState(article?.title || '');
   const [slug, setSlug] = useState(article?.slug || '');
-  const [isSlugCustom, setIsSlugCustom] = useState(Boolean(article?.slug));
+  // For existing articles, preserve the established slug so title edits never overwrite it
+  const [isSlugCustom, setIsSlugCustom] = useState(Boolean(article?.id || article?.slug));
   const [sectionId, setSectionId] = useState<string>(article?.section_id || sections[0]?.id || '');
   const [orderIndex, setOrderIndex] = useState<number>(article?.order_index ?? 0);
   const [summary, setSummary] = useState(article?.summary || '');
@@ -1478,11 +1669,22 @@ function ArticleEditorModal({
     Boolean(article?.id) && article?.content === undefined
   );
   const [bodyError, setBodyError] = useState<string | null>(null);
-  const [status, setStatus] = useState<'published' | 'draft'>(article?.status || 'published');
+  // Requirement 1: Default status for a new article is Draft
+  const [status, setStatus] = useState<'published' | 'draft'>(article?.status || 'draft');
   const [viewMode, setViewMode] = useState<'write' | 'split' | 'preview'>('split');
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // Requirement 3: Inline validation errors
+  const [titleError, setTitleError] = useState<string | null>(null);
+  const [contentError, setContentError] = useState<string | null>(null);
+
+  // Requirement 6: Autosave draft every 20 seconds and warn before closing with unsaved changes
+  const [currentArticleId, setCurrentArticleId] = useState<string | null>(article?.id || null);
+  const [autosaveStatus, setAutosaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [lastAutosavedAt, setLastAutosavedAt] = useState<Date | null>(null);
+  const lastSavedSnapshotRef = React.useRef<string>('');
 
   const [showContentEmojiPicker, setShowContentEmojiPicker] = useState(false);
   const [showTitleEmojiPicker, setShowTitleEmojiPicker] = useState(false);
@@ -1516,20 +1718,166 @@ function ArticleEditorModal({
     };
   }, [article?.id, article?.content, workspaceId]);
 
+  // Snapshot initialization once body loading completes
+  useEffect(() => {
+    if (!bodyLoading) {
+      lastSavedSnapshotRef.current = JSON.stringify({
+        title: (article?.title || '').trim(),
+        content: (content || '').trim(),
+        sectionId: article?.section_id || sections[0]?.id || '',
+        orderIndex: article?.order_index ?? 0,
+        summary: (article?.summary || '').trim(),
+        slug: (article?.slug || '').trim(),
+        status: article?.status || 'draft',
+      });
+    }
+  }, [bodyLoading]);
+
+  // Track if there are unsaved changes
+  const hasUnsavedChanges = useMemo(() => {
+    if (bodyLoading) return false;
+    const current = JSON.stringify({
+      title: title.trim(),
+      content: content.trim(),
+      sectionId: sectionId || '',
+      orderIndex: orderIndex || 0,
+      summary: summary.trim(),
+      slug: slug.trim(),
+      status,
+    });
+    return current !== lastSavedSnapshotRef.current;
+  }, [bodyLoading, title, content, sectionId, orderIndex, summary, slug, status]);
+
+  // Warn before closing with unsaved changes
+  const handleSafeClose = () => {
+    if (hasUnsavedChanges) {
+      const confirmed = window.confirm(
+        'You have unsaved changes in this article. Are you sure you want to discard them and exit?'
+      );
+      if (!confirmed) return;
+    }
+    onClose();
+  };
+
+  // Warn on page unload if dirty
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (hasUnsavedChanges) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [hasUnsavedChanges]);
+
+  // Close with Esc key (with unsaved changes check)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        handleSafeClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [hasUnsavedChanges]);
+
+  // Requirement 6: Autosave draft every 20 seconds
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      if (
+        !hasUnsavedChanges ||
+        !title.trim() ||
+        bodyLoading ||
+        saving ||
+        autosaveStatus === 'saving'
+      ) {
+        return;
+      }
+      setAutosaveStatus('saving');
+      try {
+        const targetId = currentArticleId || article?.id;
+        if (targetId) {
+          const res = await updateArticleAction(workspaceId, targetId, {
+            title,
+            slug: slug.trim() || undefined,
+            section_id: sectionId || null,
+            summary,
+            content,
+            status: 'draft', // Autosave always saves as draft
+            order_index: orderIndex,
+          });
+          if (res.article) {
+            lastSavedSnapshotRef.current = JSON.stringify({
+              title: title.trim(),
+              content: content.trim(),
+              sectionId: sectionId || '',
+              orderIndex: orderIndex || 0,
+              summary: summary.trim(),
+              slug: slug.trim(),
+              status,
+            });
+            setLastAutosavedAt(new Date());
+            setAutosaveStatus('saved');
+          }
+        } else {
+          const res = await createArticleAction(workspaceId, {
+            title,
+            slug: slug.trim() || undefined,
+            section_id: sectionId || null,
+            summary,
+            content,
+            status: 'draft',
+            order_index: orderIndex > 0 ? orderIndex : undefined,
+          });
+          if (res.article) {
+            setCurrentArticleId(res.article.id);
+            setSlug(res.article.slug || '');
+            setIsSlugCustom(true);
+            lastSavedSnapshotRef.current = JSON.stringify({
+              title: title.trim(),
+              content: content.trim(),
+              sectionId: sectionId || '',
+              orderIndex: orderIndex || 0,
+              summary: summary.trim(),
+              slug: (res.article.slug || slug).trim(),
+              status,
+            });
+            setLastAutosavedAt(new Date());
+            setAutosaveStatus('saved');
+          }
+        }
+      } catch (e) {
+        console.error('Autosave draft failed:', e);
+        setAutosaveStatus('error');
+      }
+    }, 20000);
+
+    return () => clearInterval(interval);
+  }, [
+    hasUnsavedChanges,
+    title,
+    content,
+    sectionId,
+    orderIndex,
+    summary,
+    slug,
+    status,
+    bodyLoading,
+    saving,
+    autosaveStatus,
+    currentArticleId,
+    article?.id,
+    workspaceId,
+  ]);
+
   const textareaRef = React.useRef<HTMLTextAreaElement>(null);
 
-  // Auto-generate slug when title changes (unless admin custom-edited the slug)
+  // Auto-generate slug when title changes (only on brand new draft before slug is customized/saved)
   const handleTitleChange = (newTitle: string) => {
     setTitle(newTitle);
-    if (!isSlugCustom) {
-      const generated = newTitle
-        .toLowerCase()
-        .trim()
-        .replace(/[^a-z0-9\s-]/g, '')
-        .replace(/\s+/g, '-')
-        .replace(/-+/g, '-')
-        .slice(0, 80);
-      setSlug(generated);
+    if (!isSlugCustom && !currentArticleId && !article?.id) {
+      setSlug(generateSlug(newTitle));
     }
   };
 
@@ -1953,20 +2301,42 @@ function ArticleEditorModal({
       setErrorMsg(`${bodyError} Close and reopen the article before saving.`);
       return;
     }
+
+    // Requirement 3: Validate title required, body required for publishing
+    let hasValidationError = false;
     if (!title.trim()) {
-      setErrorMsg('Please enter an article title.');
-      return;
+      setTitleError('Title is required.');
+      hasValidationError = true;
+    } else {
+      setTitleError(null);
     }
-    if (!content.trim()) {
-      setErrorMsg('Please write article content.');
-      return;
+
+    if (status === 'published' && !content.trim()) {
+      setContentError('Article content is required before publishing.');
+      hasValidationError = true;
+    } else {
+      setContentError(null);
+    }
+
+    if (hasValidationError) return;
+
+    // Requirement 2: Ask for confirmation before publishing
+    if (status === 'published') {
+      const isUpdatingPublished = article?.status === 'published';
+      const confirmed = window.confirm(
+        isUpdatingPublished
+          ? 'Are you sure you want to update this published article? Changes will immediately go live on your Help Center.'
+          : 'Are you sure you want to publish this article live? It will immediately be accessible on your public Help Center.'
+      );
+      if (!confirmed) return;
     }
 
     setSaving(true);
     setErrorMsg(null);
     try {
-      if (article?.id) {
-        const res = await updateArticleAction(workspaceId, article.id, {
+      const targetId = currentArticleId || article?.id;
+      if (targetId) {
+        const res = await updateArticleAction(workspaceId, targetId, {
           title,
           slug: slug.trim() || undefined,
           section_id: sectionId || null,
@@ -1975,7 +2345,18 @@ function ArticleEditorModal({
           status,
           order_index: orderIndex,
         });
-        if (res.article) onSaved(res.article);
+        if (res.article) {
+          lastSavedSnapshotRef.current = JSON.stringify({
+            title: title.trim(),
+            content: content.trim(),
+            sectionId: sectionId || '',
+            orderIndex: orderIndex || 0,
+            summary: summary.trim(),
+            slug: slug.trim(),
+            status,
+          });
+          onSaved(res.article);
+        }
       } else {
         const res = await createArticleAction(workspaceId, {
           title,
@@ -1986,7 +2367,21 @@ function ArticleEditorModal({
           status,
           order_index: orderIndex > 0 ? orderIndex : undefined,
         });
-        if (res.article) onSaved(res.article);
+        if (res.article) {
+          setCurrentArticleId(res.article.id);
+          setSlug(res.article.slug || '');
+          setIsSlugCustom(true);
+          lastSavedSnapshotRef.current = JSON.stringify({
+            title: title.trim(),
+            content: content.trim(),
+            sectionId: sectionId || '',
+            orderIndex: orderIndex || 0,
+            summary: summary.trim(),
+            slug: (res.article.slug || slug).trim(),
+            status,
+          });
+          onSaved(res.article);
+        }
       }
     } catch (err: any) {
       setErrorMsg(err.message || 'Failed to save article');
@@ -2116,8 +2511,8 @@ function ArticleEditorModal({
             {/* Close Button */}
             <button
               type="button"
-              onClick={onClose}
-              className="w-8 h-8 rounded-lg hover:bg-surface-3 flex items-center justify-center text-ink-3 hover:text-ink transition-colors ml-1"
+              onClick={handleSafeClose}
+              className="w-8 h-8 rounded-lg hover:bg-surface-3 flex items-center justify-center text-ink-3 hover:text-ink transition-colors ml-1 cursor-pointer"
             >
               <X className="w-4 h-4" />
             </button>
@@ -2135,69 +2530,94 @@ function ArticleEditorModal({
             </div>
           )}
 
-          {/* Title & Section Row */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
-            <div className="md:col-span-2 space-y-1">
-              <div className="flex items-center justify-between">
-                <label className="text-[12px] font-semibold text-ink">Article Title</label>
-                <div className="relative">
-                  <button
-                    type="button"
-                    onClick={() => setShowTitleEmojiPicker((prev) => !prev)}
-                    className="text-[11px] text-accent hover:underline flex items-center gap-1 font-medium"
-                  >
-                    <Smile className="w-3.5 h-3.5" />
-                    <span>Insert Emoji</span>
-                  </button>
-                  {showTitleEmojiPicker && (
-                    <div className="absolute right-0 top-6 z-50">
-                      <EmojiPickerPopover
-                        onSelect={(em) => handleTitleChange(title ? `${title} ${em}` : `${em} `)}
-                        onClose={() => setShowTitleEmojiPicker(false)}
-                      />
-                    </div>
-                  )}
-                </div>
+          {/* Row 1: Article Title on its own row */}
+          <div className="space-y-1">
+            <div className="flex items-center justify-between">
+              <label className="text-[12px] font-semibold text-ink">
+                Article Title <span className="text-rose-500">*</span>
+              </label>
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setShowTitleEmojiPicker((prev) => !prev)}
+                  className="text-[11px] text-accent hover:underline flex items-center gap-1 font-medium cursor-pointer"
+                >
+                  <Smile className="w-3.5 h-3.5" />
+                  <span>Insert Emoji</span>
+                </button>
+                {showTitleEmojiPicker && (
+                  <div className="absolute right-0 top-6 z-50">
+                    <EmojiPickerPopover
+                      onSelect={(em) => {
+                        handleTitleChange(title ? `${title} ${em}` : `${em} `);
+                        if (titleError) setTitleError(null);
+                      }}
+                      onClose={() => setShowTitleEmojiPicker(false)}
+                    />
+                  </div>
+                )}
               </div>
-              <input
-                type="text"
-                value={title}
-                onChange={(e) => handleTitleChange(e.target.value)}
-                placeholder="e.g. 🚀 How to pass evaluation challenge guidelines"
-                className="w-full h-10 px-3.5 rounded-xl border border-line bg-surface text-[14px] text-ink focus:outline-none focus:border-accent font-medium shadow-2xs"
-              />
+            </div>
+            <input
+              type="text"
+              value={title}
+              onChange={(e) => {
+                handleTitleChange(e.target.value);
+                if (titleError) setTitleError(null);
+              }}
+              placeholder={
+                isTradingIndustry
+                  ? 'e.g. 🚀 How to pass evaluation challenge guidelines'
+                  : 'e.g. 🚀 How to get started with your account'
+              }
+              className={cn(
+                'w-full h-9.5 px-3.5 rounded-xl border bg-surface text-[14px] text-ink focus:outline-none font-medium shadow-2xs transition-colors',
+                titleError
+                  ? 'border-rose-500 focus:border-rose-500 bg-rose-500/5'
+                  : 'border-line focus:border-accent'
+              )}
+            />
+            {titleError && (
+              <p className="text-[12px] font-medium text-rose-500 flex items-center gap-1 mt-1">
+                <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                <span>{titleError}</span>
+              </p>
+            )}
+          </div>
+
+          {/* Row 2: Section and Order side by side below Title */}
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+            <div className="sm:col-span-3 space-y-1">
+              <label className="text-[12px] font-semibold text-ink">Section / Collection</label>
+              <select
+                value={sectionId}
+                onChange={(e) => setSectionId(e.target.value)}
+                className="w-full h-9 px-3 rounded-xl border border-line bg-surface text-[13px] text-ink focus:outline-none focus:border-accent font-medium shadow-2xs"
+              >
+                <option value="">(No Section - General)</option>
+                {sections.map((sec, idx) => (
+                  <option key={sec.id} value={sec.id}>
+                    #{String(sec.order_index && sec.order_index > 0 ? sec.order_index : idx + 1).padStart(2, '0')} {sec.icon} {sec.name}
+                  </option>
+                ))}
+              </select>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-              <div className="sm:col-span-3 space-y-1">
-                <label className="text-[12px] font-semibold text-ink">Section / Collection</label>
-                <select
-                  value={sectionId}
-                  onChange={(e) => setSectionId(e.target.value)}
-                  className="w-full h-10 px-3 rounded-xl border border-line bg-surface text-[13px] text-ink focus:outline-none focus:border-accent font-medium shadow-2xs"
-                >
-                  <option value="">(No Section - General)</option>
-                  {sections.map((sec, idx) => (
-                    <option key={sec.id} value={sec.id}>
-                      #{String(sec.order_index && sec.order_index > 0 ? sec.order_index : idx + 1).padStart(2, '0')} {sec.icon} {sec.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="sm:col-span-1 space-y-1">
-                <label className="text-[12px] font-semibold text-ink" title="Order position on help.business.com (lower numbers appear first)">
-                  Order # in Section
-                </label>
-                <input
-                  type="number"
-                  min={1}
-                  value={orderIndex > 0 ? orderIndex : ''}
-                  onChange={(e) => setOrderIndex(Math.max(0, parseInt(e.target.value, 10) || 0))}
-                  placeholder="Auto"
-                  className="w-full h-10 px-3 rounded-xl border border-line bg-surface text-[13px] font-mono text-ink focus:outline-none focus:border-accent font-medium shadow-2xs"
-                />
-              </div>
+            <div className="sm:col-span-1 space-y-1">
+              <label
+                className="text-[12px] font-semibold text-ink"
+                title="Order position on help center (Auto puts the article last in section)"
+              >
+                Order # in Section
+              </label>
+              <input
+                type="number"
+                min={1}
+                value={orderIndex > 0 ? orderIndex : ''}
+                onChange={(e) => setOrderIndex(Math.max(0, parseInt(e.target.value, 10) || 0))}
+                placeholder="Auto"
+                className="w-full h-9 px-3 rounded-xl border border-line bg-surface text-[13px] font-mono text-ink focus:outline-none focus:border-accent font-medium shadow-2xs"
+              />
             </div>
           </div>
 
@@ -2215,12 +2635,12 @@ function ArticleEditorModal({
               maxLength={220}
               onChange={(e) => setSummary(e.target.value)}
               placeholder="Brief summary explaining what customer learns from this guide..."
-              className="w-full h-9.5 px-3.5 rounded-xl border border-line bg-surface text-[13px] text-ink focus:outline-none focus:border-accent shadow-2xs"
+              className="w-full h-8.5 px-3 rounded-xl border border-line bg-surface text-[12.5px] text-ink focus:outline-none focus:border-accent shadow-2xs"
             />
           </div>
 
           {/* Custom Slug & Live URL Preview Banner */}
-          <div className="p-3 rounded-xl bg-surface-2/60 border border-line/70 space-y-2">
+          <div className="p-2.5 rounded-xl bg-surface-2/60 border border-line/70 space-y-2">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
               {/* Publishing Status Radio */}
               <div className="flex items-center gap-4">
@@ -2232,7 +2652,7 @@ function ArticleEditorModal({
                     value="published"
                     checked={status === 'published'}
                     onChange={() => setStatus('published')}
-                    className="text-accent"
+                    className="text-accent cursor-pointer"
                   />
                   <span className="font-semibold text-emerald-600 dark:text-emerald-400">
                     Published (Live)
@@ -2245,7 +2665,7 @@ function ArticleEditorModal({
                     value="draft"
                     checked={status === 'draft'}
                     onChange={() => setStatus('draft')}
-                    className="text-accent"
+                    className="text-accent cursor-pointer"
                   />
                   <span className="font-medium text-amber-600 dark:text-amber-400">
                     Draft (Private)
@@ -2258,13 +2678,13 @@ function ArticleEditorModal({
                 <div className="flex items-center gap-1.5 bg-surface px-2.5 py-1 rounded-lg border border-line font-mono text-[11px] text-ink-2">
                   <Globe className="w-3.5 h-3.5 text-accent shrink-0" />
                   <span className="text-ink-3 hidden md:inline">URL:</span>
-                  <span className="text-ink font-semibold truncate max-w-[220px] sm:max-w-xs">
+                  <span className="text-ink font-semibold truncate max-w-[200px] sm:max-w-xs">
                     /{slug || 'article-slug'}
                   </span>
                   <button
                     type="button"
                     onClick={() => setIsSlugCustom(!isSlugCustom)}
-                    className="ml-1 text-ink-3 hover:text-ink"
+                    className="ml-1 text-ink-3 hover:text-ink cursor-pointer"
                     title={isSlugCustom ? 'Custom slug unlocked' : 'Auto-generating slug from title'}
                   >
                     {isSlugCustom ? <Unlock className="w-3 h-3 text-accent" /> : <Lock className="w-3 h-3" />}
@@ -2274,7 +2694,7 @@ function ArticleEditorModal({
                 <button
                   type="button"
                   onClick={handleCopyPublicUrl}
-                  className="h-7 px-2.5 rounded-lg border border-line bg-surface hover:bg-surface-3 text-[11px] font-medium text-ink flex items-center gap-1 transition-colors"
+                  className="h-7 px-2.5 rounded-lg border border-line bg-surface hover:bg-surface-3 text-[11px] font-medium text-ink flex items-center gap-1 transition-colors cursor-pointer"
                   title="Copy full article link"
                 >
                   {copiedLink ? (
@@ -2307,55 +2727,92 @@ function ArticleEditorModal({
 
             {/* Custom Slug Input (if unlocked) */}
             {isSlugCustom && (
-              <div className="flex items-center gap-2 pt-1 border-t border-line/40">
-                <span className="text-[11.5px] text-ink-3 font-medium">Custom URL Slug:</span>
-                <input
-                  type="text"
-                  value={slug}
-                  onChange={(e) => setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
-                  placeholder="custom-article-slug"
-                  className="h-7 px-2 rounded-md border border-line bg-surface text-[12px] font-mono text-ink flex-1 max-w-sm focus:outline-none focus:border-accent"
-                />
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsSlugCustom(false);
-                    handleTitleChange(title);
-                  }}
-                  className="text-[11px] text-accent hover:underline flex items-center gap-1"
-                >
-                  <RotateCcw className="w-3 h-3" />
-                  <span>Reset to Title</span>
-                </button>
+              <div className="flex flex-col gap-1 pt-1.5 border-t border-line/40">
+                <div className="flex items-center gap-2">
+                  <span className="text-[11.5px] text-ink-3 font-medium">Custom URL Slug:</span>
+                  <input
+                    type="text"
+                    value={slug}
+                    onChange={(e) => setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
+                    onBlur={(e) => setSlug(generateSlug(e.target.value))}
+                    placeholder="custom-article-slug"
+                    className="h-7 px-2 rounded-md border border-line bg-surface text-[12px] font-mono text-ink flex-1 max-w-sm focus:outline-none focus:border-accent"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSlug(generateSlug(title));
+                    }}
+                    className="text-[11px] text-accent hover:underline flex items-center gap-1 cursor-pointer"
+                    title="Generate slug from current title"
+                  >
+                    <RotateCcw className="w-3 h-3" />
+                    <span>Reset to Title</span>
+                  </button>
+                </div>
+                <span className="text-[10.5px] text-ink-3">
+                  Changing the slug preserves the old URL and automatically redirects visitors to the new one.
+                </span>
               </div>
             )}
           </div>
 
           {/* ─────────────────────────────────────────────────────────────
-              3. INSTANT BLUEPRINTS (Quick-Start Templates)
+              3. INSTANT BLUEPRINTS (Scrollable with Arrow Controls)
               ───────────────────────────────────────────────────────────── */}
-          <div className="flex items-center gap-2 overflow-x-auto pb-1">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-ink-3 flex items-center gap-1 shrink-0">
-              <Sparkles className="w-3 h-3 text-accent" />
-              <span>Blueprints:</span>
-            </span>
-            {ARTICLE_BLUEPRINTS.map((bp) => (
-              <button
-                key={bp.id}
-                type="button"
-                onClick={() => handleApplyBlueprint(bp.content)}
-                className="h-7 px-2.5 rounded-lg border border-line/80 bg-surface hover:border-accent hover:bg-accent-soft/40 text-[11.5px] font-medium text-ink hover:text-accent transition-all whitespace-nowrap shadow-2xs flex items-center gap-1"
-                title={bp.desc}
-              >
-                <span>{bp.label}</span>
-              </button>
-            ))}
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => scrollBlueprints('left')}
+              className="h-7 w-7 rounded-lg border border-line bg-surface hover:bg-surface-2 flex items-center justify-center text-ink-3 hover:text-ink shrink-0 transition-colors shadow-2xs cursor-pointer"
+              title="Scroll blueprints left"
+              aria-label="Scroll blueprints left"
+            >
+              <ChevronLeft className="w-3.5 h-3.5" />
+            </button>
+
+            <div
+              ref={blueprintsScrollRef}
+              className="flex items-center gap-2 overflow-x-auto py-0.5 flex-1 scroll-smooth scrollbar-none"
+              style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+            >
+              <span className="text-[11px] font-bold uppercase tracking-wider text-ink-3 flex items-center gap-1 shrink-0">
+                <Sparkles className="w-3 h-3 text-accent" />
+                <span>Blueprints:</span>
+              </span>
+              {visibleBlueprints.map((bp) => (
+                <button
+                  key={bp.id}
+                  type="button"
+                  onClick={() => handleApplyBlueprint(bp.content)}
+                  className="h-7 px-2.5 rounded-lg border border-line/80 bg-surface hover:border-accent hover:bg-accent-soft/40 text-[11.5px] font-medium text-ink hover:text-accent transition-all whitespace-nowrap shadow-2xs flex items-center gap-1 shrink-0 cursor-pointer"
+                  title={bp.desc}
+                >
+                  <span>{bp.label}</span>
+                </button>
+              ))}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => scrollBlueprints('right')}
+              className="h-7 w-7 rounded-lg border border-line bg-surface hover:bg-surface-2 flex items-center justify-center text-ink-3 hover:text-ink shrink-0 transition-colors shadow-2xs cursor-pointer"
+              title="Scroll blueprints right"
+              aria-label="Scroll blueprints right"
+            >
+              <ChevronRight className="w-3.5 h-3.5" />
+            </button>
           </div>
 
           {/* ─────────────────────────────────────────────────────────────
               4. EDITOR WRAPPER (TOOLBAR + TEXTAREA + SPLIT VIEW)
               ───────────────────────────────────────────────────────────── */}
-          <div className="border border-line rounded-xl overflow-hidden shadow-xs focus-within:border-accent transition-colors">
+          <div
+            className={cn(
+              'border rounded-xl overflow-hidden shadow-xs transition-colors',
+              contentError ? 'border-rose-500 focus-within:border-rose-500' : 'border-line focus-within:border-accent'
+            )}
+          >
             {/* Rich Formatting Toolbar */}
             <div className="flex items-center gap-1 px-3 py-2 bg-surface-2 border-b border-line flex-wrap text-ink-2">
               {/* Headings */}
@@ -2651,7 +3108,10 @@ function ArticleEditorModal({
                     rows={isFullscreen ? 26 : 16}
                     value={content}
                     disabled={bodyLoading || Boolean(bodyError)}
-                    onChange={(e) => setContent(e.target.value)}
+                    onChange={(e) => {
+                      setContent(e.target.value);
+                      if (contentError) setContentError(null);
+                    }}
                     onKeyDown={handleKeyDown}
                     placeholder="Write your article content here...
 
@@ -2695,12 +3155,19 @@ Tip:
               )}
             </div>
           </div>
+
+          {contentError && (
+            <p className="text-[12px] font-medium text-rose-500 flex items-center gap-1 mt-1">
+              <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+              <span>{contentError}</span>
+            </p>
+          )}
         </div>
 
         {/* ─────────────────────────────────────────────────────────────
             5. MODAL FOOTER WITH LIVE METRICS & 1-CLICK SAVE
             ───────────────────────────────────────────────────────────── */}
-        <div className="px-5 py-3.5 border-t border-line flex items-center justify-between bg-surface-2/50 shrink-0">
+        <div className="px-5 py-3 border-t border-line flex items-center justify-between bg-surface-2/50 shrink-0">
           <div className="flex items-center gap-3 text-[12px] text-ink-3">
             <span className="font-medium">
               <strong className="text-ink font-semibold">{stats.words}</strong> words
@@ -2712,25 +3179,52 @@ Tip:
             <span>•</span>
             <span>~{stats.readMinutes} min read</span>
             <span className="hidden sm:inline">•</span>
-            <span className="hidden sm:inline text-ink-3">Press ⌘/Ctrl+Enter to save</span>
+            {autosaveStatus === 'saving' && (
+              <span className="flex items-center gap-1 text-[11.5px] text-accent font-medium">
+                <RefreshCw className="w-3 h-3 animate-spin" />
+                <span>Autosaving draft...</span>
+              </span>
+            )}
+            {autosaveStatus === 'saved' && lastAutosavedAt && !hasUnsavedChanges && (
+              <span className="flex items-center gap-1 text-[11.5px] text-emerald-600 dark:text-emerald-400 font-medium">
+                <Check className="w-3 h-3" />
+                <span>Draft autosaved at {lastAutosavedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+              </span>
+            )}
+            {hasUnsavedChanges && autosaveStatus !== 'saving' && (
+              <span className="text-[11.5px] text-amber-600 dark:text-amber-400 font-medium">
+                Unsaved changes
+              </span>
+            )}
+            {!hasUnsavedChanges && autosaveStatus !== 'saving' && !lastAutosavedAt && (
+              <span className="hidden sm:inline text-ink-3">Press ⌘/Ctrl+Enter to save</span>
+            )}
           </div>
 
           <div className="flex items-center gap-2.5">
             <button
               type="button"
-              onClick={onClose}
-              className="h-9 px-4 rounded-xl border border-line bg-surface hover:bg-surface-2 text-ink text-[12.5px] font-medium transition-colors"
+              onClick={handleSafeClose}
+              className="h-9 px-4 rounded-xl border border-line bg-surface hover:bg-surface-2 text-ink text-[12.5px] font-medium transition-colors cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="button"
-              disabled={saving}
+              disabled={saving || bodyLoading}
               onClick={handleSave}
-              className="btn btn-primary h-9 px-5 text-[12.5px] font-semibold gap-1.5 shadow-sm"
+              className="btn btn-primary h-9 px-5 text-[12.5px] font-semibold gap-1.5 shadow-sm cursor-pointer"
             >
               <Sparkles className="w-3.5 h-3.5" />
-              <span>{saving ? 'Saving...' : article ? 'Update Article' : 'Publish Article'}</span>
+              <span>
+                {status === 'published'
+                  ? saving
+                    ? 'Publishing...'
+                    : 'Publish article'
+                  : saving
+                  ? 'Saving draft...'
+                  : 'Save draft'}
+              </span>
             </button>
           </div>
         </div>
@@ -3167,6 +3661,7 @@ function ReorderArticlesModal({
 // QUICK RENAME / EDIT SECTION MODAL
 // ============================================================================
 interface QuickRenameSectionModalProps {
+  workspace?: Workspace | null;
   workspaceId: string;
   section: HelpSection;
   onClose: () => void;
@@ -3175,12 +3670,14 @@ interface QuickRenameSectionModalProps {
 }
 
 function QuickRenameSectionModal({
+  workspace,
   workspaceId,
   section,
   onClose,
   onUpdated,
   onDeleteRequest,
 }: QuickRenameSectionModalProps) {
+  const iconGroups = useMemo(() => getSectionIconGroups(workspace), [workspace]);
   const [name, setName] = useState(section.name);
   const [description, setDescription] = useState(section.description || '');
   const [icon, setIcon] = useState(section.icon || '📚');
@@ -3194,6 +3691,8 @@ function QuickRenameSectionModal({
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [saving, setSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  const [nameError, setNameError] = useState<string | null>(null);
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -3215,17 +3714,17 @@ function QuickRenameSectionModal({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) {
-      setErrorMsg('Section name is required');
+      setNameError('Section name cannot be empty. Please enter a valid name.');
       return;
     }
     setSaving(true);
     setErrorMsg(null);
+    setNameError(null);
     try {
       const res = await updateHelpSectionAction(workspaceId, section.id, {
         name: name.trim(),
         description: description.trim(),
         icon: icon.trim() || '📚',
-        order_index: orderIndex,
       });
       if (res.section) {
         onUpdated(res.section);
@@ -3245,7 +3744,7 @@ function QuickRenameSectionModal({
           <div>
             <h2 className="text-[16px] font-bold text-ink">Rename Section</h2>
             <p className="text-[11.5px] text-ink-3">
-              Change section name, display order, or custom logo.
+              Change section name, description, or custom icon.
             </p>
           </div>
           <button
@@ -3274,9 +3773,6 @@ function QuickRenameSectionModal({
             />
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
-                <span className="font-mono text-[11px] font-bold px-1.5 py-0.5 rounded bg-surface border border-line text-ink-3 shrink-0">
-                  #{String(orderIndex > 0 ? orderIndex : 1).padStart(2, '0')}
-                </span>
                 <span className="text-[14px] font-bold text-ink truncate">
                   {name.trim() || 'Section Name'}
                 </span>
@@ -3290,35 +3786,33 @@ function QuickRenameSectionModal({
             </span>
           </div>
 
-          {/* Name & Order */}
-          <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-            <div className="sm:col-span-3">
-              <label className="text-[11.5px] font-semibold text-ink-2 block mb-1">
-                Section Name <span className="text-rose-500">*</span>
-              </label>
-              <input
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="e.g. Account Management, Rules, Payouts"
-                required
-                className="w-full h-9 px-3 rounded-lg border border-line bg-surface text-[13px] text-ink focus:outline-none focus:border-accent"
-                autoFocus
-              />
-            </div>
-            <div className="sm:col-span-1">
-              <label className="text-[11.5px] font-semibold text-ink-2 block mb-1" title="Order Index">
-                Section #
-              </label>
-              <input
-                type="number"
-                min={1}
-                value={orderIndex || ''}
-                onChange={(e) => setOrderIndex(Math.max(1, parseInt(e.target.value, 10) || 1))}
-                placeholder="1, 2, 3..."
-                className="w-full h-9 px-3 rounded-lg border border-line bg-surface text-[13px] font-mono text-ink focus:outline-none focus:border-accent"
-              />
-            </div>
+          {/* Name */}
+          <div>
+            <label className="text-[11.5px] font-semibold text-ink-2 block mb-1">
+              Section Name <span className="text-rose-500">*</span>
+            </label>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => {
+                setName(e.target.value);
+                if (nameError) setNameError(null);
+              }}
+              placeholder="e.g. Account Management, Rules, Payouts"
+              className={cn(
+                'w-full h-9 px-3 rounded-lg border bg-surface text-[13px] text-ink focus:outline-none transition-colors',
+                nameError
+                  ? 'border-rose-500 focus:border-rose-500 bg-rose-500/5'
+                  : 'border-line focus:border-accent'
+              )}
+              autoFocus
+            />
+            {nameError && (
+              <p className="text-[11.5px] text-rose-500 font-medium flex items-center gap-1 mt-1">
+                <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                <span>{nameError}</span>
+              </p>
+            )}
           </div>
 
           {/* Description */}
@@ -3396,7 +3890,7 @@ function QuickRenameSectionModal({
                 </div>
 
                 <div className="space-y-1.5 pt-1">
-                  {SECTION_ICON_GROUPS.map((grp) => (
+                  {iconGroups.map((grp) => (
                     <div key={grp.name} className="flex items-center gap-1.5 flex-wrap">
                       <span className="text-[10px] text-ink-3 w-28 shrink-0 font-medium">
                         {grp.name}:
@@ -3484,19 +3978,29 @@ function QuickRenameSectionModal({
 // ============================================================================
 interface DeleteSectionConfirmModalProps {
   section: HelpSection;
+  sections: HelpSection[];
   articleCount: number;
   isDeleting: boolean;
   onClose: () => void;
-  onConfirm: () => Promise<void>;
+  onConfirm: (moveToSectionId: string | null) => Promise<void>;
 }
 
 function DeleteSectionConfirmModal({
   section,
+  sections,
   articleCount,
   isDeleting,
   onClose,
   onConfirm,
 }: DeleteSectionConfirmModalProps) {
+  const availableSections = useMemo(
+    () => sections.filter((s) => s.id !== section.id),
+    [sections, section.id]
+  );
+  const [destinationSectionId, setDestinationSectionId] = useState<string>(
+    availableSections[0]?.id || ''
+  );
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in">
       <div className="bg-surface border border-line rounded-2xl shadow-2xl max-w-md w-full overflow-hidden animate-in zoom-in-95">
@@ -3513,20 +4017,46 @@ function DeleteSectionConfirmModal({
             </div>
           </div>
 
-          <div className="p-3 rounded-xl border border-line bg-surface-2/60 space-y-2">
+          <div className="p-3.5 rounded-xl border border-line bg-surface-2/60 space-y-3">
             <div className="flex items-center justify-between text-[12px]">
               <span className="text-ink-3">Articles in this section:</span>
-              <span className="font-bold text-ink">{articleCount}</span>
+              <span className="font-bold text-ink px-2 py-0.5 rounded bg-surface border border-line">
+                {articleCount} {articleCount === 1 ? 'article' : 'articles'}
+              </span>
             </div>
-            <p className="text-[11.5px] text-ink-3 leading-relaxed">
-              {articleCount > 0 ? (
-                <span>
-                  Articles will <strong className="text-ink">NOT</strong> be deleted. Their section assignment will be cleared and they will remain accessible in your Help Center as general articles.
-                </span>
+
+            {articleCount > 0 ? (
+              availableSections.length > 0 ? (
+                <div className="space-y-2 pt-2 border-t border-line/60">
+                  <label className="text-[12px] font-semibold text-ink flex items-center gap-1">
+                    <span>Move articles to:</span>
+                    <span className="text-rose-500">*</span>
+                  </label>
+                  <select
+                    value={destinationSectionId}
+                    onChange={(e) => setDestinationSectionId(e.target.value)}
+                    className="w-full h-8.5 px-2.5 rounded-lg border border-line bg-surface text-[12.5px] text-ink focus:outline-none focus:border-accent cursor-pointer"
+                  >
+                    {availableSections.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.icon || '📚'} {s.name}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-[11.5px] text-ink-3 leading-relaxed">
+                    All {articleCount} articles will be moved into this section before deletion. Articles will never be left pointing to a deleted section.
+                  </p>
+                </div>
               ) : (
-                <span>This section has no articles and will be safely removed.</span>
-              )}
-            </p>
+                <p className="text-[11.5px] text-amber-600 dark:text-amber-400 leading-relaxed pt-1 border-t border-line/60">
+                  This is the only section in your workspace. Deleting it will leave these {articleCount} articles in <strong>Uncategorised</strong>.
+                </p>
+              )
+            ) : (
+              <p className="text-[11.5px] text-ink-3 leading-relaxed">
+                This section has no articles and will be safely removed.
+              </p>
+            )}
           </div>
 
           <div className="flex items-center justify-end gap-2.5 pt-2">
@@ -3540,12 +4070,27 @@ function DeleteSectionConfirmModal({
             </button>
             <button
               type="button"
-              disabled={isDeleting}
-              onClick={onConfirm}
+              disabled={
+                isDeleting ||
+                (articleCount > 0 && availableSections.length > 0 && !destinationSectionId)
+              }
+              onClick={() =>
+                onConfirm(
+                  articleCount > 0 && availableSections.length > 0
+                    ? destinationSectionId
+                    : null
+                )
+              }
               className="h-8 px-4 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-[12.5px] font-semibold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
             >
               <Trash2 className="w-3.5 h-3.5" />
-              <span>{isDeleting ? 'Deleting...' : 'Delete Section'}</span>
+              <span>
+                {isDeleting
+                  ? 'Deleting...'
+                  : articleCount > 0 && availableSections.length > 0
+                  ? 'Move & Delete Section'
+                  : 'Delete Section'}
+              </span>
             </button>
           </div>
         </div>
@@ -3558,25 +4103,53 @@ function DeleteSectionConfirmModal({
 // SECTIONS MANAGER MODAL COMPONENT
 // ============================================================================
 interface SectionsManagerModalProps {
+  workspace?: Workspace | null;
   workspaceId: string;
   sections: HelpSection[];
+  articleCounts: Record<string, number>;
   initialEditingSection?: HelpSection | null;
+  uncategorisedCount?: number;
+  onRunMigration?: () => Promise<void>;
   onClose: () => void;
   onSectionsChanged: () => void;
+  onDeleteRequest: (section: HelpSection) => void;
 }
 
 function SectionsManagerModal({
+  workspace,
   workspaceId,
   sections,
+  articleCounts,
   initialEditingSection,
+  uncategorisedCount = 0,
+  onRunMigration,
   onClose,
   onSectionsChanged,
+  onDeleteRequest,
 }: SectionsManagerModalProps) {
-  const [sectionList, setSectionList] = useState<HelpSection[]>(sections);
+  const iconGroups = useMemo(() => getSectionIconGroups(workspace), [workspace]);
+  const [sectionList, setSectionList] = useState<HelpSection[]>(() => {
+    return [...sections].sort((a, b) => {
+      const ao = a.order_index ?? 0;
+      const bo = b.order_index ?? 0;
+      if (ao !== bo) return ao - bo;
+      return new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime();
+    });
+  });
+
   const [editingSec, setEditingSec] = useState<HelpSection | null>(null);
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+  const [isReordering, setIsReordering] = useState(false);
 
   useEffect(() => {
-    setSectionList(sections);
+    const sorted = [...sections].sort((a, b) => {
+      const ao = a.order_index ?? 0;
+      const bo = b.order_index ?? 0;
+      if (ao !== bo) return ao - bo;
+      return new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime();
+    });
+    setSectionList(sorted);
   }, [sections]);
 
   useEffect(() => {
@@ -3585,21 +4158,12 @@ function SectionsManagerModal({
     }
   }, [initialEditingSection]);
 
-  const sortedSectionList = useMemo(() => {
-    return [...sectionList].sort((a, b) => {
-      const ao = a.order_index ?? 0;
-      const bo = b.order_index ?? 0;
-      if (ao !== bo) return ao - bo;
-      return new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime();
-    });
-  }, [sectionList]);
-
   const [name, setName] = useState('');
+  const [nameError, setNameError] = useState<string | null>(null);
   const [description, setDescription] = useState('');
   const [icon, setIcon] = useState('📚');
   const [iconTab, setIconTab] = useState<'presets' | 'custom'>('presets');
   const [uploadingIcon, setUploadingIcon] = useState(false);
-  const [orderIndex, setOrderIndex] = useState(sections.length + 1);
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [showSectionEmojiPicker, setShowSectionEmojiPicker] = useState(false);
@@ -3607,9 +4171,9 @@ function SectionsManagerModal({
   const handleStartEdit = (sec: HelpSection) => {
     setEditingSec(sec);
     setName(sec.name);
+    setNameError(null);
     setDescription(sec.description || '');
     setIcon(sec.icon || '📚');
-    setOrderIndex(sec.order_index ?? 0);
     if (sec.icon && (sec.icon.startsWith('http') || sec.icon.startsWith('/'))) {
       setIconTab('custom');
     } else {
@@ -3620,10 +4184,11 @@ function SectionsManagerModal({
   const handleResetForm = () => {
     setEditingSec(null);
     setName('');
+    setNameError(null);
     setDescription('');
     setIcon('📚');
     setIconTab('presets');
-    setOrderIndex(sectionList.length + 1);
+    setErrorMsg(null);
   };
 
   const handleUploadIcon = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -3651,19 +4216,19 @@ function SectionsManagerModal({
   const handleSaveSection = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) {
-      setErrorMsg('Section name is required');
+      setNameError('Section name cannot be empty. Please enter a section name.');
       return;
     }
 
     setSubmitting(true);
     setErrorMsg(null);
+    setNameError(null);
     try {
       if (editingSec?.id) {
         const res = await updateHelpSectionAction(workspaceId, editingSec.id, {
-          name,
-          description,
-          icon,
-          order_index: orderIndex,
+          name: name.trim(),
+          description: description.trim(),
+          icon: icon.trim() || '📚',
         });
         if (res.section) {
           setSectionList((prev) =>
@@ -3672,10 +4237,9 @@ function SectionsManagerModal({
         }
       } else {
         const res = await createHelpSectionAction(workspaceId, {
-          name,
-          description,
-          icon,
-          order_index: orderIndex,
+          name: name.trim(),
+          description: description.trim(),
+          icon: icon.trim() || '📚',
         });
         if (res.section) {
           setSectionList((prev) => [...prev, res.section]);
@@ -3690,19 +4254,68 @@ function SectionsManagerModal({
     }
   };
 
-  const handleDeleteSection = async (secId: string, secName: string) => {
-    if (!confirm(`Delete section "${secName}"? Articles in this section will be unassigned.`)) {
-      return;
-    }
-
+  const handleReorder = async (newList: HelpSection[]) => {
+    setSectionList(newList);
+    setIsReordering(true);
     try {
-      await deleteHelpSectionAction(workspaceId, secId);
-      setSectionList((prev) => prev.filter((s) => s.id !== secId));
+      await reorderHelpSectionsAction(
+        workspaceId,
+        newList.map((s) => s.id)
+      );
       onSectionsChanged();
     } catch (err: any) {
-      alert(err.message || 'Failed to delete section');
+      setErrorMsg(err.message || 'Failed to save section order');
+    } finally {
+      setIsReordering(false);
     }
   };
+
+  const handleMoveItem = (fromIndex: number, direction: 'up' | 'down') => {
+    const toIndex = direction === 'up' ? fromIndex - 1 : fromIndex + 1;
+    if (toIndex < 0 || toIndex >= sectionList.length) return;
+    const copy = [...sectionList];
+    const [moved] = copy.splice(fromIndex, 1);
+    copy.splice(toIndex, 0, moved);
+    handleReorder(copy);
+  };
+
+  const handleDragStart = (e: React.DragEvent, index: number) => {
+    setDraggedIndex(index);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', index.toString());
+  };
+
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (dragOverIndex !== index) {
+      setDragOverIndex(index);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent, dropIndex: number) => {
+    e.preventDefault();
+    if (draggedIndex === null || draggedIndex === dropIndex) {
+      setDraggedIndex(null);
+      setDragOverIndex(null);
+      return;
+    }
+    const copy = [...sectionList];
+    const [moved] = copy.splice(draggedIndex, 1);
+    copy.splice(dropIndex, 0, moved);
+    setDraggedIndex(null);
+    setDragOverIndex(null);
+    handleReorder(copy);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedIndex(null);
+    setDragOverIndex(null);
+  };
+
+  const activePositionNum = editingSec
+    ? sectionList.findIndex((s) => s.id === editingSec.id) + 1 || 1
+    : sectionList.length + 1;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in">
@@ -3712,7 +4325,7 @@ function SectionsManagerModal({
           <div>
             <h2 className="text-[16px] font-bold text-ink">Manage Help Sections</h2>
             <p className="text-[11.5px] text-ink-3">
-              Categories &amp; custom section icons/logos for your Help Center.
+              Drag to reorder, customize icons, edit descriptions, or organize articles.
             </p>
           </div>
           <button
@@ -3725,6 +4338,30 @@ function SectionsManagerModal({
 
         {/* Content */}
         <div className="p-6 overflow-y-auto flex-1 space-y-6">
+          {/* Uncategorised Notice Banner */}
+          {uncategorisedCount > 0 && (
+            <div className="p-3.5 rounded-xl border border-amber-500/30 bg-amber-500/10 flex items-center justify-between gap-3 text-[12px]">
+              <div className="flex items-center gap-2.5 text-amber-800 dark:text-amber-300 min-w-0">
+                <AlertCircle className="w-4 h-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                <span className="truncate">
+                  <strong>{uncategorisedCount} uncategorised {uncategorisedCount === 1 ? 'article' : 'articles'}</strong> need section assignment.
+                </span>
+              </div>
+              {onRunMigration && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onRunMigration();
+                    onClose();
+                  }}
+                  className="px-2.5 py-1 rounded-md bg-amber-600 hover:bg-amber-700 text-white text-[11.5px] font-semibold shrink-0 cursor-pointer transition-colors shadow-2xs"
+                >
+                  Migrate All
+                </button>
+              )}
+            </div>
+          )}
+
           {/* Create / Edit Form */}
           <form onSubmit={handleSaveSection} className="p-4 rounded-xl border border-line bg-surface-2/60 space-y-3.5">
             <div className="flex items-center justify-between">
@@ -3756,7 +4393,7 @@ function SectionsManagerModal({
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
                   <span className="font-mono text-[11px] font-bold px-1.5 py-0.5 rounded bg-surface-2 border border-line text-ink-3 shrink-0">
-                    #{String(orderIndex > 0 ? orderIndex : (sectionList.length + 1)).padStart(2, '0')}
+                    #{String(activePositionNum).padStart(2, '0')}
                   </span>
                   <div className="text-[14px] font-bold text-ink truncate">
                     {name.trim() || 'Section Title Preview'}
@@ -3766,41 +4403,44 @@ function SectionsManagerModal({
                   {description.trim() || 'Short description preview will appear here'}
                 </div>
               </div>
-              <span className="text-[10.5px] font-medium px-2 py-0.5 rounded bg-surface-2 border border-line text-ink-3">
+              <span className="text-[10.5px] font-medium px-2 py-0.5 rounded bg-surface-2 border border-line text-ink-3 shrink-0">
                 Live Preview
               </span>
             </div>
 
             {/* Section Name & Description */}
-            <div className="space-y-2">
-              <div className="grid grid-cols-1 sm:grid-cols-4 gap-2.5">
-                <div className="sm:col-span-3">
-                  <label className="text-[11px] font-semibold text-ink-2">Section Name</label>
-                  <input
-                    type="text"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="e.g. Account Types, Withdrawals, Risk Limits"
-                    className="w-full h-8 px-3 rounded-lg border border-line bg-surface text-[12.5px] text-ink focus:outline-none focus:border-accent"
-                  />
-                </div>
-                <div className="sm:col-span-1">
-                  <label className="text-[11px] font-semibold text-ink-2" title="Display Order Number">
-                    Section #
-                  </label>
-                  <input
-                    type="number"
-                    min={1}
-                    value={orderIndex || ''}
-                    onChange={(e) => setOrderIndex(Math.max(0, parseInt(e.target.value, 10) || 0))}
-                    placeholder="1, 2, 3..."
-                    className="w-full h-8 px-3 rounded-lg border border-line bg-surface text-[12.5px] font-mono text-ink focus:outline-none focus:border-accent"
-                  />
-                </div>
+            <div className="space-y-2.5">
+              <div>
+                <label className="text-[11px] font-semibold text-ink-2 block mb-1">
+                  Section Name <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={name}
+                  onChange={(e) => {
+                    setName(e.target.value);
+                    if (nameError) setNameError(null);
+                  }}
+                  placeholder="e.g. Account Types, Withdrawals, Risk Limits"
+                  className={cn(
+                    'w-full h-8 px-3 rounded-lg border bg-surface text-[12.5px] text-ink focus:outline-none transition-colors',
+                    nameError
+                      ? 'border-rose-500 focus:border-rose-500 bg-rose-500/5'
+                      : 'border-line focus:border-accent'
+                  )}
+                />
+                {nameError && (
+                  <p className="text-[11.5px] text-rose-500 font-medium flex items-center gap-1 mt-1">
+                    <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                    <span>{nameError}</span>
+                  </p>
+                )}
               </div>
 
               <div>
-                <label className="text-[11px] font-semibold text-ink-2">Short Description</label>
+                <label className="text-[11px] font-semibold text-ink-2 block mb-1">
+                  Short Description (Optional)
+                </label>
                 <input
                   type="text"
                   value={description}
@@ -3873,7 +4513,7 @@ function SectionsManagerModal({
 
                   {/* Categorized Icon Presets */}
                   <div className="space-y-1.5 pt-1">
-                    {SECTION_ICON_GROUPS.map((grp) => (
+                    {iconGroups.map((grp) => (
                       <div key={grp.name} className="flex items-center gap-1.5 flex-wrap">
                         <span className="text-[10px] text-ink-3 w-28 shrink-0 font-medium">
                           {grp.name}:
@@ -3935,26 +4575,74 @@ function SectionsManagerModal({
             </button>
           </form>
 
-          {/* Current Sections List */}
+          {/* Current Sections List with Drag-to-Reorder */}
           <div className="space-y-2">
-            <span className="text-[12px] font-semibold text-ink uppercase tracking-wider">
-              Existing Sections ({sortedSectionList.length})
-            </span>
+            <div className="flex items-center justify-between">
+              <span className="text-[12px] font-semibold text-ink uppercase tracking-wider">
+                Existing Sections ({sectionList.length})
+              </span>
+              <span className="text-[11px] text-ink-3">
+                Drag handle or use arrows to reorder
+              </span>
+            </div>
 
-            {sortedSectionList.length === 0 ? (
+            {sectionList.length === 0 ? (
               <p className="text-[12px] text-ink-3 italic">No sections created yet.</p>
             ) : (
               <div className="border border-line rounded-xl divide-y divide-line/80 overflow-hidden bg-surface">
-                {sortedSectionList.map((sec, idx) => {
-                  const displayNum = String(
-                    sec.order_index && sec.order_index > 0 ? sec.order_index : idx + 1
-                  ).padStart(2, '0');
+                {sectionList.map((sec, idx) => {
+                  const displayNum = String(idx + 1).padStart(2, '0');
+                  const isFirst = idx === 0;
+                  const isLast = idx === sectionList.length - 1;
+                  const isBeingDragged = draggedIndex === idx;
+                  const isDropTarget = dragOverIndex === idx && draggedIndex !== idx;
+
                   return (
                     <div
                       key={sec.id}
-                      className="p-3 flex items-center justify-between gap-3 hover:bg-surface-2/50 transition-colors"
+                      draggable={!editingSec && !isReordering}
+                      onDragStart={(e) => handleDragStart(e, idx)}
+                      onDragOver={(e) => handleDragOver(e, idx)}
+                      onDrop={(e) => handleDrop(e, idx)}
+                      onDragEnd={handleDragEnd}
+                      className={cn(
+                        'p-3 flex items-center justify-between gap-3 transition-all select-none',
+                        isBeingDragged && 'opacity-40 bg-surface-3',
+                        isDropTarget && 'bg-accent/10 border-t-2 border-accent',
+                        !isBeingDragged && !isDropTarget && 'hover:bg-surface-2/50'
+                      )}
                     >
-                      <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                        {/* Drag Handle & Arrow controls */}
+                        <div className="flex items-center gap-0.5 shrink-0">
+                          <div
+                            className="p-1 rounded hover:bg-surface-3 text-ink-3/40 hover:text-ink cursor-grab active:cursor-grabbing transition-colors"
+                            title="Drag to reorder"
+                          >
+                            <GripVertical className="w-4 h-4" />
+                          </div>
+                          <div className="flex flex-col">
+                            <button
+                              type="button"
+                              disabled={isFirst || isReordering}
+                              onClick={() => handleMoveItem(idx, 'up')}
+                              className="w-4 h-3.5 flex items-center justify-center text-ink-3 hover:text-ink disabled:opacity-20 cursor-pointer disabled:cursor-not-allowed"
+                              title="Move up"
+                            >
+                              <ArrowUp className="w-3 h-3" />
+                            </button>
+                            <button
+                              type="button"
+                              disabled={isLast || isReordering}
+                              onClick={() => handleMoveItem(idx, 'down')}
+                              className="w-4 h-3.5 flex items-center justify-center text-ink-3 hover:text-ink disabled:opacity-20 cursor-pointer disabled:cursor-not-allowed"
+                              title="Move down"
+                            >
+                              <ArrowDown className="w-3 h-3" />
+                            </button>
+                          </div>
+                        </div>
+
                         <span className="font-mono text-[11px] font-bold px-1.5 py-0.5 rounded bg-surface-2 border border-line text-ink-3 shrink-0">
                           #{displayNum}
                         </span>
@@ -3963,10 +4651,15 @@ function SectionsManagerModal({
                           className="w-8 h-8 rounded-lg text-[16px]"
                           imgClassName="w-5 h-5"
                         />
-                        <div className="min-w-0">
-                          <div className="text-[13px] font-semibold text-ink truncate">{sec.name}</div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="text-[13px] font-semibold text-ink truncate">{sec.name}</span>
+                            <span className="text-[10.5px] font-medium px-2 py-0.2 rounded-full bg-surface-2 border border-line text-ink-3 shrink-0">
+                              {articleCounts[sec.id] || 0} {articleCounts[sec.id] === 1 ? 'article' : 'articles'}
+                            </span>
+                          </div>
                           {sec.description && (
-                            <div className="text-[11.5px] text-ink-3 truncate">{sec.description}</div>
+                            <div className="text-[11.5px] text-ink-3 truncate mt-0.5">{sec.description}</div>
                           )}
                         </div>
                       </div>
@@ -3976,15 +4669,15 @@ function SectionsManagerModal({
                           type="button"
                           onClick={() => handleStartEdit(sec)}
                           className="h-7 px-2.5 rounded-lg border border-line bg-surface hover:bg-surface-2 text-ink text-[11.5px] font-medium flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
-                          title="Rename or edit section"
+                          title="Edit section name, description, and icon"
                         >
                           <Edit2 className="w-3 h-3 text-accent" />
-                          <span>Rename</span>
+                          <span>Edit</span>
                         </button>
 
                         <button
                           type="button"
-                          onClick={() => handleDeleteSection(sec.id, sec.name)}
+                          onClick={() => onDeleteRequest(sec)}
                           className="h-7 px-2.5 rounded-lg border border-rose-500/20 bg-rose-500/5 hover:bg-rose-500/15 text-rose-600 dark:text-rose-400 text-[11.5px] font-medium flex items-center gap-1.5 transition-colors cursor-pointer"
                           title="Delete section"
                         >

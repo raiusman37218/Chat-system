@@ -36,9 +36,26 @@ export async function GET(request: NextRequest) {
         .eq('workspace_id', workspaceId)
         .eq('status', 'published');
 
-      const { data: article, error: artErr } = isArtUuid
+      let { data: article, error: artErr } = isArtUuid
         ? await artQuery.or(`id.eq.${cleanArticleId},slug.eq.${cleanArticleId}`).maybeSingle()
         : await artQuery.ilike('slug', cleanArticleId).maybeSingle();
+
+      if (!article && !isArtUuid) {
+        const { data: redir } = await supabase
+          .from('article_slug_redirects')
+          .select('article_id')
+          .eq('workspace_id', workspaceId)
+          .ilike('old_slug', cleanArticleId)
+          .maybeSingle();
+
+        if (redir?.article_id) {
+          const { data: targetArt } = await artQuery.eq('id', redir.article_id).maybeSingle();
+          if (targetArt) {
+            article = targetArt;
+            artErr = null;
+          }
+        }
+      }
 
       if (artErr || !article) {
         return NextResponse.json({ error: 'Article not found' }, { status: 404 });

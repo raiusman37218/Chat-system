@@ -56,16 +56,37 @@ export async function generateMetadata({
         .eq('status', 'published')
         .maybeSingle();
 
-  const helpTitle = (ws as any).help_center_title || ws.name;
-  if (!article) return { title: `${helpTitle} Help Center` };
+  let finalArticle = article;
+  if (!finalArticle && !isUuid(cleanArticleId)) {
+    const { data: redir } = await supabase
+      .from('article_slug_redirects')
+      .select('article_id')
+      .eq('workspace_id', ws.id)
+      .ilike('old_slug', cleanArticleId)
+      .maybeSingle();
 
-  const title = `${article.title} — ${helpTitle} Help Center`;
+    if (redir?.article_id) {
+      const { data: redirectedArt } = await supabase
+        .from('articles')
+        .select('id, slug, title, summary')
+        .eq('id', redir.article_id)
+        .eq('workspace_id', ws.id)
+        .eq('status', 'published')
+        .maybeSingle();
+      finalArticle = redirectedArt;
+    }
+  }
+
+  const helpTitle = (ws as any).help_center_title || ws.name;
+  if (!finalArticle) return { title: `${helpTitle} Help Center` };
+
+  const title = `${finalArticle.title} — ${helpTitle} Help Center`;
   const description =
-    article.summary || `Help article from the ${helpTitle} team.`;
+    finalArticle.summary || `Help article from the ${helpTitle} team.`;
 
   // See the parent layout: one article, two reachable URLs, one canonical.
   const h = await headers();
-  const canonical = getWorkspaceHelpCenterUrl(ws as any, article, {
+  const canonical = getWorkspaceHelpCenterUrl(ws as any, finalArticle, {
     host: h.get('x-forwarded-host') || h.get('host'),
   });
 
@@ -135,10 +156,74 @@ export async function generateMetadata({
   };
 }
 
-export default function HelpArticleLayout({
+import { redirect } from 'next/navigation';
+
+export default async function HelpArticleLayout({
   children,
+  params,
 }: {
   children: React.ReactNode;
+  params: Promise<{ workspaceId: string; articleId: string }>;
 }) {
+  const { workspaceId, articleId } = await params;
+  const isUuid = (v: string) =>
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
+
+  const cleanArticleId = decodeURIComponent(articleId).trim();
+
+  // If this is a slug (not a UUID), check if it's an old redirected slug
+  if (!isUuid(cleanArticleId)) {
+    const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+    const { data: ws } = isUuid(workspaceId)
+      ? await supabase
+          .from('public_workspaces')
+          .select('id, name, slug, custom_domain, custom_domain_status')
+          .eq('id', workspaceId)
+          .maybeSingle()
+      : await supabase
+          .from('public_workspaces')
+          .select('id, name, slug, custom_domain, custom_domain_status')
+          .or(`slug.eq.${workspaceId},custom_domain.eq.${workspaceId}`)
+          .maybeSingle();
+
+    if (ws) {
+      // Check if current article exists with this slug
+      const { data: currentArt } = await supabase
+        .from('articles')
+        .select('id, slug')
+        .eq('workspace_id', ws.id)
+        .ilike('slug', cleanArticleId)
+        .eq('status', 'published')
+        .maybeSingle();
+
+      // If no published article currently has this slug, check article_slug_redirects
+      if (!currentArt) {
+        const { data: redir } = await supabase
+          .from('article_slug_redirects')
+          .select('article_id')
+          .eq('workspace_id', ws.id)
+          .ilike('old_slug', cleanArticleId)
+          .maybeSingle();
+
+        if (redir?.article_id) {
+          const { data: targetArt } = await supabase
+            .from('articles')
+            .select('id, slug')
+            .eq('id', redir.article_id)
+            .eq('status', 'published')
+            .maybeSingle();
+
+          if (targetArt) {
+            const h = await headers();
+            const destination = getWorkspaceHelpCenterUrl(ws as any, targetArt, {
+              host: h.get('x-forwarded-host') || h.get('host'),
+            });
+            redirect(destination);
+          }
+        }
+      }
+    }
+  }
+
   return children;
 }

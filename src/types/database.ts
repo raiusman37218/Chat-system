@@ -297,6 +297,14 @@ export interface ArticleFeedback {
   created_at: string;
 }
 
+export interface ArticleSlugRedirect {
+  id: string;
+  workspace_id: string;
+  article_id: string;
+  old_slug: string;
+  created_at: string;
+}
+
 export interface ArticleChunk {
   id: string;
   workspace_id: string;
@@ -407,6 +415,7 @@ export interface Workspace {
   enable_proactive_welcome?: boolean | null;
   proactive_delay_seconds?: number | null;
   auto_close_days?: number | null;
+  industry?: string | null;
   created_at: string;
 }
 

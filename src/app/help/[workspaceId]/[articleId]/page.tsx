@@ -111,6 +111,25 @@ export default function ArticleDetailPage() {
           const { data } = await base().ilike('slug', artKey).maybeSingle();
           art = (data as Article) || null;
 
+          // If not found by current slug, check article_slug_redirects table
+          let wasRedirected = false;
+          if (!art) {
+            const { data: redir } = await supabase
+              .from('article_slug_redirects')
+              .select('article_id')
+              .eq('workspace_id', ws.id)
+              .ilike('old_slug', artKey)
+              .maybeSingle();
+
+            if (redir?.article_id) {
+              const { data: targetArt } = await base()
+                .eq('id', redir.article_id)
+                .maybeSingle();
+              art = (targetArt as Article) || null;
+              if (art) wasRedirected = true;
+            }
+          }
+
           // An article renamed after someone shared its link still has to
           // resolve, so fall back to matching the words in the old slug.
           if (!art) {
@@ -119,6 +138,14 @@ export default function ArticleDetailPage() {
               .limit(1)
               .maybeSingle();
             art = (byTitle as Article) || null;
+            if (art) wasRedirected = true;
+          }
+
+          if (cancelled) return;
+          // If the article was found via redirect or old slug fallback, update browser URL
+          if (art && (wasRedirected || (art.slug && art.slug.toLowerCase() !== artKey.toLowerCase()))) {
+            const cleanUrl = getWorkspaceHelpCenterUrl(ws as Workspace, art);
+            window.history.replaceState(null, '', cleanUrl);
           }
         }
 
