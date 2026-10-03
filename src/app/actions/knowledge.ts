@@ -35,6 +35,7 @@ export interface UnansweredQuestion {
   last_conversation_id: string | null;
   first_asked_at: string;
   last_asked_at: string;
+  embedding?: number[] | null;
 }
 
 async function assertAgent(workspaceId: string) {

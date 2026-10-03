@@ -427,9 +427,18 @@ export function HelpDeskDashboard({
     }
   };
 
-  // Filtered Articles
+  // Filtered Articles: group by section in section order, then by article order
   const filteredArticles = useMemo(() => {
     const validSecIds = new Set(sections.map((s) => s.id));
+    const sortedSectionsList = [...sections].sort(
+      (a, b) => (a.order_index ?? 0) - (b.order_index ?? 0)
+    );
+    const sectionOrderMap = new Map<string, number>();
+    sortedSectionsList.forEach((s, idx) => {
+      sectionOrderMap.set(s.id, idx);
+    });
+    const UNCATEGORISED_ORDER = 999999;
+
     const list = articles.filter((art) => {
       if (selectedSectionId === 'uncategorised') {
         if (art.section_id && validSecIds.has(art.section_id)) {
@@ -453,18 +462,193 @@ export function HelpDeskDashboard({
       return true;
     });
 
-    if (selectedSectionId !== 'all' && selectedSectionId !== 'uncategorised') {
-      // Sort in the exact sequence as it appears on the public Help Center
-      list.sort((a, b) => {
+    // Sort by section in section order, then by article order
+    list.sort((a, b) => {
+      const secA =
+        a.section_id && sectionOrderMap.has(a.section_id)
+          ? sectionOrderMap.get(a.section_id)!
+          : UNCATEGORISED_ORDER;
+      const secB =
+        b.section_id && sectionOrderMap.has(b.section_id)
+          ? sectionOrderMap.get(b.section_id)!
+          : UNCATEGORISED_ORDER;
+      if (secA !== secB) return secA - secB;
+
+      const ao = a.order_index ?? 0;
+      const bo = b.order_index ?? 0;
+      if (ao !== bo) return ao - bo;
+
+      return new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime();
+    });
+
+    return list;
+  }, [articles, selectedSectionId, selectedStatus, searchQuery, bodyMatchIds, sections]);
+
+  // Pagination for articles list: 25 per page
+  const [articlePage, setArticlePage] = useState(1);
+  const ARTICLES_PER_PAGE = 25;
+  const totalArticlePages = Math.max(1, Math.ceil(filteredArticles.length / ARTICLES_PER_PAGE));
+
+  useEffect(() => {
+    setArticlePage(1);
+  }, [searchQuery, selectedStatus, selectedSectionId]);
+
+  useEffect(() => {
+    if (articlePage > totalArticlePages) {
+      setArticlePage(totalArticlePages);
+    }
+  }, [totalArticlePages, articlePage]);
+
+  const paginatedArticles = useMemo(() => {
+    const start = (articlePage - 1) * ARTICLES_PER_PAGE;
+    return filteredArticles.slice(start, start + ARTICLES_PER_PAGE);
+  }, [filteredArticles, articlePage]);
+
+  // Group paginated articles by section
+  const articleGroups = useMemo(() => {
+    const validSecIds = new Set(sections.map((s) => s.id));
+    const sortedSectionsList = [...sections].sort(
+      (a, b) => (a.order_index ?? 0) - (b.order_index ?? 0)
+    );
+    const groups: {
+      sectionId: string | null;
+      section: HelpSection | null;
+      isUncategorised: boolean;
+      articles: Article[];
+    }[] = [];
+
+    const map = new Map<string | null, Article[]>();
+    for (const art of paginatedArticles) {
+      const secId = art.section_id && validSecIds.has(art.section_id) ? art.section_id : null;
+      if (!map.has(secId)) {
+        map.set(secId, []);
+      }
+      map.get(secId)!.push(art);
+    }
+
+    for (const sec of sortedSectionsList) {
+      if (map.has(sec.id)) {
+        groups.push({
+          sectionId: sec.id,
+          section: sec,
+          isUncategorised: false,
+          articles: map.get(sec.id)!,
+        });
+      }
+    }
+
+    if (map.has(null)) {
+      groups.push({
+        sectionId: null,
+        section: null,
+        isUncategorised: true,
+        articles: map.get(null)!,
+      });
+    }
+
+    return groups;
+  }, [paginatedArticles, sections]);
+
+  // Drag to reorder inside section
+  const [draggedArticleId, setDraggedArticleId] = useState<string | null>(null);
+  const [dragOverArticleId, setDragOverArticleId] = useState<string | null>(null);
+
+  const handleDragStart = (e: React.DragEvent, article: Article) => {
+    e.dataTransfer.setData('text/plain', article.id);
+    e.dataTransfer.effectAllowed = 'move';
+    setDraggedArticleId(article.id);
+  };
+
+  const handleDragOver = (e: React.DragEvent, targetArticle: Article) => {
+    if (!draggedArticleId || draggedArticleId === targetArticle.id) return;
+    const dragged = articles.find((a) => a.id === draggedArticleId);
+    if (!dragged) return;
+
+    const validSecIds = new Set(sections.map((s) => s.id));
+    const draggedSecId =
+      dragged.section_id && validSecIds.has(dragged.section_id) ? dragged.section_id : null;
+    const targetSecId =
+      targetArticle.section_id && validSecIds.has(targetArticle.section_id)
+        ? targetArticle.section_id
+        : null;
+
+    if (draggedSecId !== targetSecId) return;
+
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (dragOverArticleId !== targetArticle.id) {
+      setDragOverArticleId(targetArticle.id);
+    }
+  };
+
+  const handleDragLeave = () => {
+    setDragOverArticleId(null);
+  };
+
+  const handleDrop = async (e: React.DragEvent, targetArticle: Article) => {
+    e.preventDefault();
+    setDragOverArticleId(null);
+    const draggedId = draggedArticleId || e.dataTransfer.getData('text/plain');
+    setDraggedArticleId(null);
+
+    if (!draggedId || draggedId === targetArticle.id || !workspace?.id) return;
+
+    const dragged = articles.find((a) => a.id === draggedId);
+    if (!dragged) return;
+
+    const validSecIds = new Set(sections.map((s) => s.id));
+    const draggedSecId =
+      dragged.section_id && validSecIds.has(dragged.section_id) ? dragged.section_id : null;
+    const targetSecId =
+      targetArticle.section_id && validSecIds.has(targetArticle.section_id)
+        ? targetArticle.section_id
+        : null;
+
+    if (draggedSecId !== targetSecId) {
+      showToast('Can only reorder articles inside the same section', 'error');
+      return;
+    }
+
+    const sectionArticles = articles
+      .filter((a) => {
+        const aSecId = a.section_id && validSecIds.has(a.section_id) ? a.section_id : null;
+        return aSecId === targetSecId;
+      })
+      .sort((a, b) => {
         const ao = a.order_index ?? 0;
         const bo = b.order_index ?? 0;
         if (ao !== bo) return ao - bo;
         return new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime();
       });
-    }
 
-    return list;
-  }, [articles, selectedSectionId, selectedStatus, searchQuery, bodyMatchIds, sections]);
+    const draggedIdx = sectionArticles.findIndex((a) => a.id === draggedId);
+    const targetIdx = sectionArticles.findIndex((a) => a.id === targetArticle.id);
+    if (draggedIdx === -1 || targetIdx === -1) return;
+
+    const reordered = [...sectionArticles];
+    const [removed] = reordered.splice(draggedIdx, 1);
+    reordered.splice(targetIdx, 0, removed);
+
+    const updates = reordered.map((item, idx) => ({
+      id: item.id,
+      order_index: idx + 1,
+    }));
+
+    setArticles((prev) =>
+      prev.map((art) => {
+        const up = updates.find((u) => u.id === art.id);
+        return up ? { ...art, order_index: up.order_index } : art;
+      })
+    );
+
+    try {
+      await reorderArticlesAction(workspace.id, updates);
+      showToast('Article reordered successfully!');
+    } catch (err: any) {
+      showToast(err.message || 'Failed to reorder article', 'error');
+      loadHelpDeskData();
+    }
+  };
 
   const handleToggleStatus = async (article: Article) => {
     if (!workspace?.id) return;
@@ -617,7 +801,7 @@ export function HelpDeskDashboard({
             >
               {getWorkspaceHelpCenterUrl(workspace)}
             </a>
-            {workspace.custom_domain && (
+            {Boolean(workspace.custom_domain?.trim()) && (
               <span
                 className={cn(
                   'px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider shrink-0',
@@ -696,7 +880,9 @@ export function HelpDeskDashboard({
             <div className="text-[11.5px] text-ink-3 mt-1 flex items-center gap-2">
               <span className="text-emerald-500 font-medium">{metrics.publishedCount} published</span>
               <span>•</span>
-              <span className="text-amber-500 font-medium">{metrics.draftCount} drafts</span>
+              <span className="text-amber-500 font-medium">
+                {metrics.draftCount} {metrics.draftCount === 1 ? 'draft' : 'drafts'}
+              </span>
             </div>
           </div>
 
@@ -742,8 +928,8 @@ export function HelpDeskDashboard({
 
         {/* Section Navigation Tabs & Pills */}
         <section className="space-y-3">
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex items-center gap-2 overflow-x-auto pb-1 max-w-full">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2 overflow-x-auto pb-1 min-w-0 flex-1 scrollbar-none">
               <button
                 onClick={() => setSelectedSectionId('all')}
                 className={cn(
@@ -841,32 +1027,33 @@ export function HelpDeskDashboard({
                   </div>
                 );
               })}
+            </div>
 
-              <div className="flex items-center gap-1.5 shrink-0">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setEditingSection(null);
-                    setIsSectionModalOpen(true);
-                  }}
-                  className="h-8 px-2.5 rounded-lg border border-dashed border-line text-[12px] text-ink-3 hover:text-accent hover:border-accent flex items-center gap-1 transition-all whitespace-nowrap cursor-pointer"
-                >
-                  <Plus className="w-3 h-3" />
-                  <span>Add Section</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setEditingSection(null);
-                    setIsSectionModalOpen(true);
-                  }}
-                  className="h-8 px-2.5 rounded-lg bg-surface-2 hover:bg-surface-3 text-[12px] text-ink-2 hover:text-ink flex items-center gap-1.5 transition-all whitespace-nowrap cursor-pointer border border-line/60"
-                  title="Manage all sections (reorder, rename, delete, custom icons)"
-                >
-                  <Settings className="w-3 h-3 text-ink-3" />
-                  <span>Manage Sections</span>
-                </button>
-              </div>
+            {/* Fixed buttons next to the section chips */}
+            <div className="flex items-center gap-1.5 shrink-0 pl-2 border-l border-line/60">
+              <button
+                type="button"
+                onClick={() => {
+                  setEditingSection(null);
+                  setIsSectionModalOpen(true);
+                }}
+                className="h-8 px-2.5 rounded-lg border border-dashed border-line text-[12px] text-ink-3 hover:text-accent hover:border-accent flex items-center gap-1 transition-all whitespace-nowrap cursor-pointer"
+              >
+                <Plus className="w-3 h-3" />
+                <span>Add Section</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setEditingSection(null);
+                  setIsSectionModalOpen(true);
+                }}
+                className="h-8 px-2.5 rounded-lg bg-surface-2 hover:bg-surface-3 text-[12px] text-ink-2 hover:text-ink flex items-center gap-1.5 transition-all whitespace-nowrap cursor-pointer border border-line/60"
+                title="Manage all sections (reorder, rename, delete, custom icons)"
+              >
+                <Settings className="w-3 h-3 text-ink-3" />
+                <span>Manage Sections</span>
+              </button>
             </div>
           </div>
 
@@ -1055,178 +1242,292 @@ export function HelpDeskDashboard({
               </button>
             </div>
           ) : (
-            <div className="border border-line rounded-xl overflow-hidden bg-surface divide-y divide-line/80 shadow-xs">
-              {filteredArticles.map((article) => {
-                const isPublished = article.status === 'published';
+            <div className="space-y-5">
+              {articleGroups.map((group) => {
+                const groupTitle = group.section ? group.section.name : 'Uncategorised';
+                const groupIcon = group.section ? group.section.icon || '📚' : null;
+                const groupDesc = group.section?.description;
+                const totalCount = group.section ? (sectionCounts[group.section.id] || group.articles.length) : group.articles.length;
+
                 return (
                   <div
-                    key={article.id}
-                    id={`article-item-${article.id}`}
-                    className="p-4.5 hover:bg-surface-2/50 transition-all flex flex-col md:flex-row items-start md:items-center justify-between gap-4 group"
+                    key={group.sectionId || 'uncategorised'}
+                    className="border border-line rounded-xl overflow-hidden bg-surface shadow-xs"
                   >
-                    <div className="min-w-0 flex-1 space-y-1.5">
-                      <div className="flex items-center gap-2.5 flex-wrap">
-                        <span
-                          className={cn(
-                            'inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold',
-                            isPublished
-                              ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
-                              : 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20'
-                          )}
-                        >
-                          <span
-                            className={cn(
-                              'w-1.5 h-1.5 rounded-full',
-                              isPublished ? 'bg-emerald-500' : 'bg-amber-500'
-                            )}
-                          />
-                          {isPublished ? 'Published' : 'Draft'}
-                        </span>
-
-                        {/* Article Order within Section */}
-                        {selectedSectionId !== 'all' ? (
-                          <div
-                            className="flex items-center gap-1 bg-surface-2/90 border border-line rounded-md px-2 py-0.5"
-                            title="Display position on help.business.com"
-                          >
-                            <span className="font-mono text-[11px] font-bold text-accent">
-                              #{String(article.order_index && article.order_index > 0 ? article.order_index : filteredArticles.indexOf(article) + 1).padStart(2, '0')}
-                            </span>
-                            <div className="flex items-center gap-0.5 border-l border-line/80 pl-1 ml-0.5">
-                              <button
-                                type="button"
-                                disabled={filteredArticles.indexOf(article) === 0}
-                                onClick={() => handleQuickMoveArticle(article, 'up')}
-                                className="w-4.5 h-4.5 rounded hover:bg-surface flex items-center justify-center text-ink-3 hover:text-ink disabled:opacity-25 transition-colors cursor-pointer"
-                                title="Move article up in order"
-                              >
-                                <ArrowUp className="w-3 h-3" />
-                              </button>
-                              <button
-                                type="button"
-                                disabled={filteredArticles.indexOf(article) === filteredArticles.length - 1}
-                                onClick={() => handleQuickMoveArticle(article, 'down')}
-                                className="w-4.5 h-4.5 rounded hover:bg-surface flex items-center justify-center text-ink-3 hover:text-ink disabled:opacity-25 transition-colors cursor-pointer"
-                                title="Move article down in order"
-                              >
-                                <ArrowDown className="w-3 h-3" />
-                              </button>
-                            </div>
-                          </div>
-                        ) : article.order_index && article.order_index > 0 ? (
-                          <span
-                            className="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded bg-surface-2 border border-line text-ink-3"
-                            title="Display order position"
-                          >
-                            #{String(article.order_index).padStart(2, '0')}
-                          </span>
-                        ) : null}
-
-                        {article.section ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium bg-surface-2 text-ink-2 border border-line/60">
-                            {article.section.order_index ? (
-                              <span className="font-mono text-[10px] text-ink-3">
-                                #{String(article.section.order_index).padStart(2, '0')}
-                              </span>
-                            ) : null}
-                            <span>{article.section.icon || '📁'}</span>
-                            <span>{article.section.name}</span>
-                          </span>
-                        ) : article.category ? (
-                          <span className="px-2 py-0.5 rounded-md text-[11px] font-medium bg-surface-2 text-ink-3">
-                            {article.category}
-                          </span>
-                        ) : null}
-
-                        <span className="text-[11px] text-ink-3">
-                          Updated {new Date(article.updated_at || article.created_at).toLocaleDateString()}
-                        </span>
-                      </div>
-
-                      <h3
-                        onClick={() => {
-                          setEditingArticle(article);
-                          setIsArticleModalOpen(true);
-                        }}
-                        className="text-[14.5px] font-semibold text-ink hover:text-accent cursor-pointer transition-colors"
-                      >
-                        {article.title}
-                      </h3>
-
-                      {article.summary && (
-                        <p className="text-[12.5px] text-ink-2 line-clamp-1 max-w-2xl">{article.summary}</p>
+                    {/* Section Group Header */}
+                    <div
+                      className={cn(
+                        'px-4 py-2.5 flex items-center justify-between gap-3 border-b',
+                        group.isUncategorised
+                          ? 'bg-amber-500/10 border-amber-500/20 text-amber-800 dark:text-amber-300'
+                          : 'bg-surface-2/80 border-line text-ink'
                       )}
-                    </div>
-
-                    {/* Stats & Actions */}
-                    <div className="flex items-center gap-6 shrink-0 text-[12px] text-ink-3">
-                      <div className="flex items-center gap-4">
-                        <span className="flex items-center gap-1" title="Total Views">
-                          <Eye className="w-3.5 h-3.5 text-ink-3" />
-                          <span>{article.views_count || 0}</span>
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        {group.isUncategorised ? (
+                          <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                        ) : (
+                          <span className="text-[15px] shrink-0">{groupIcon}</span>
+                        )}
+                        <span className="text-[13.5px] font-semibold truncate">
+                          {groupTitle}
                         </span>
-
-                        <span className="flex items-center gap-1" title="Helpful votes">
-                          <ThumbsUp className="w-3.5 h-3.5 text-emerald-500/80" />
-                          <span>{article.helpful_count || 0}</span>
-                        </span>
-
-                        {Boolean(article.not_helpful_count) && (
-                          <span className="flex items-center gap-1" title="Unhelpful votes">
-                            <ThumbsDown className="w-3.5 h-3.5 text-rose-500/80" />
-                            <span>{article.not_helpful_count}</span>
+                        {groupDesc && (
+                          <span className="text-[12px] text-ink-3 hidden sm:inline truncate max-w-md">
+                            — {groupDesc}
                           </span>
                         )}
                       </div>
 
-                      <div className="flex items-center gap-1">
-                        <button
-                          onClick={() => handleCopyArticleLink(article)}
-                          className="h-8 w-8 rounded-md hover:bg-surface-2 flex items-center justify-center text-ink-3 hover:text-ink transition-colors"
-                          title="Copy public article link"
-                        >
-                          <Link2 className="w-3.5 h-3.5" />
-                        </button>
+                      <span
+                        className={cn(
+                          'text-[11.5px] font-medium px-2 py-0.5 rounded-full shrink-0',
+                          group.isUncategorised
+                            ? 'bg-amber-500/20 text-amber-800 dark:text-amber-300'
+                            : 'bg-surface border border-line text-ink-3'
+                        )}
+                      >
+                        {totalCount} {totalCount === 1 ? 'article' : 'articles'}
+                      </span>
+                    </div>
 
-                        <button
-                          onClick={() => handleOpenArticleLive(article)}
-                          className="h-8 w-8 rounded-md hover:bg-surface-2 flex items-center justify-center text-ink-3 hover:text-ink transition-colors"
-                          title="Open live article"
-                        >
-                          <ExternalLink className="w-3.5 h-3.5" />
-                        </button>
+                    {/* Section Articles */}
+                    <div className="divide-y divide-line/80">
+                      {group.articles.map((article) => {
+                        const isPublished = article.status === 'published';
+                        const isDragging = draggedArticleId === article.id;
+                        const isDragOver = dragOverArticleId === article.id;
 
-                        <button
-                          onClick={() => handleToggleStatus(article)}
-                          className="h-8 px-2.5 rounded-md text-[11.5px] font-medium border border-line hover:bg-surface-2 text-ink transition-colors"
-                          title={isPublished ? 'Unpublish to draft' : 'Publish live'}
-                        >
-                          {isPublished ? 'Unpublish' : 'Publish'}
-                        </button>
+                        return (
+                          <div
+                            key={article.id}
+                            id={`article-item-${article.id}`}
+                            draggable
+                            onDragStart={(e) => handleDragStart(e, article)}
+                            onDragOver={(e) => handleDragOver(e, article)}
+                            onDragLeave={handleDragLeave}
+                            onDrop={(e) => handleDrop(e, article)}
+                            onDragEnd={() => {
+                              setDraggedArticleId(null);
+                              setDragOverArticleId(null);
+                            }}
+                            className={cn(
+                              'p-4 hover:bg-surface-2/50 transition-all flex flex-col md:flex-row items-start md:items-center justify-between gap-4 group cursor-default',
+                              isDragging && 'opacity-40 bg-surface-2/60',
+                              isDragOver && 'border-t-2 border-accent bg-accent/5'
+                            )}
+                          >
+                            <div className="min-w-0 flex-1 space-y-1.5">
+                              <div className="flex items-center gap-2.5 flex-wrap">
+                                {/* Drag Handle */}
+                                <div
+                                  className="cursor-grab active:cursor-grabbing text-ink-3 hover:text-ink p-0.5 rounded hover:bg-surface transition-colors shrink-0"
+                                  title="Drag to reorder inside section"
+                                >
+                                  <GripVertical className="w-3.5 h-3.5" />
+                                </div>
 
-                        <button
-                          onClick={() => {
-                            setEditingArticle(article);
-                            setIsArticleModalOpen(true);
-                          }}
-                          className="h-8 w-8 rounded-md hover:bg-surface-2 flex items-center justify-center text-ink-2 hover:text-ink transition-colors"
-                          title="Edit article"
-                        >
-                          <Edit2 className="w-3.5 h-3.5" />
-                        </button>
+                                <span
+                                  className={cn(
+                                    'inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold',
+                                    isPublished
+                                      ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
+                                      : 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20'
+                                  )}
+                                >
+                                  <span
+                                    className={cn(
+                                      'w-1.5 h-1.5 rounded-full',
+                                      isPublished ? 'bg-emerald-500' : 'bg-amber-500'
+                                    )}
+                                  />
+                                  {isPublished ? 'Published' : 'Draft'}
+                                </span>
 
-                        <button
-                          onClick={() => handleDeleteArticle(article.id, article.title)}
-                          className="h-8 w-8 rounded-md hover:bg-rose-500/10 flex items-center justify-center text-ink-3 hover:text-rose-500 transition-colors"
-                          title="Delete article"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
+                                {/* Order Index Badge */}
+                                {article.order_index && article.order_index > 0 ? (
+                                  <span
+                                    className="font-mono text-[10.5px] font-bold px-1.5 py-0.5 rounded bg-surface-2 border border-line text-ink-3"
+                                    title="Display order within section"
+                                  >
+                                    #{String(article.order_index).padStart(2, '0')}
+                                  </span>
+                                ) : null}
+
+                                <span className="text-[11px] text-ink-3">
+                                  Updated {new Date(article.updated_at || article.created_at).toLocaleDateString()}
+                                </span>
+                              </div>
+
+                              <h3
+                                onClick={() => {
+                                  setEditingArticle(article);
+                                  setIsArticleModalOpen(true);
+                                }}
+                                className="text-[14.5px] font-semibold text-ink hover:text-accent cursor-pointer transition-colors"
+                              >
+                                {article.title}
+                              </h3>
+
+                              {article.summary && (
+                                <p className="text-[12.5px] text-ink-2 line-clamp-1 max-w-2xl">
+                                  {article.summary}
+                                </p>
+                              )}
+                            </div>
+
+                            {/* Stats & Actions */}
+                            <div className="flex items-center gap-5 shrink-0 text-[12px] text-ink-3">
+                              <div className="flex items-center gap-3">
+                                <span className="flex items-center gap-1" title="Total Views">
+                                  <Eye className="w-3.5 h-3.5 text-ink-3" />
+                                  <span>{article.views_count || 0}</span>
+                                </span>
+
+                                <span className="flex items-center gap-1" title="Helpful votes">
+                                  <ThumbsUp className="w-3.5 h-3.5 text-emerald-500/80" />
+                                  <span>{article.helpful_count || 0}</span>
+                                </span>
+
+                                {Boolean(article.not_helpful_count) && (
+                                  <span className="flex items-center gap-1" title="Unhelpful votes">
+                                    <ThumbsDown className="w-3.5 h-3.5 text-rose-500/80" />
+                                    <span>{article.not_helpful_count}</span>
+                                  </span>
+                                )}
+                              </div>
+
+                              <div className="flex items-center gap-1">
+                                <button
+                                  type="button"
+                                  onClick={() => handleCopyArticleLink(article)}
+                                  className="h-8 w-8 rounded-md hover:bg-surface-2 flex items-center justify-center text-ink-3 hover:text-ink transition-colors"
+                                  title="Copy public article link"
+                                >
+                                  <Link2 className="w-3.5 h-3.5" />
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenArticleLive(article)}
+                                  className="h-8 w-8 rounded-md hover:bg-surface-2 flex items-center justify-center text-ink-3 hover:text-ink transition-colors"
+                                  title="Open live article"
+                                >
+                                  <ExternalLink className="w-3.5 h-3.5" />
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => handleToggleStatus(article)}
+                                  className="h-8 px-2.5 rounded-md text-[11.5px] font-medium border border-line hover:bg-surface-2 text-ink transition-colors"
+                                  title={isPublished ? 'Unpublish to draft' : 'Publish live'}
+                                >
+                                  {isPublished ? 'Unpublish' : 'Publish'}
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setEditingArticle(article);
+                                    setIsArticleModalOpen(true);
+                                  }}
+                                  className="h-8 w-8 rounded-md hover:bg-surface-2 flex items-center justify-center text-ink-2 hover:text-ink transition-colors"
+                                  title="Edit article"
+                                >
+                                  <Edit2 className="w-3.5 h-3.5" />
+                                </button>
+
+                                {/* More actions ("...") dropdown containing Delete with confirmation */}
+                                <Menu
+                                  value=""
+                                  align="end"
+                                  label={`More actions for "${article.title}"`}
+                                  options={[
+                                    { value: 'edit', label: 'Edit article' },
+                                    { value: 'copy', label: 'Copy link' },
+                                    { value: 'live', label: 'Open live article' },
+                                    { value: 'status', label: isPublished ? 'Unpublish to draft' : 'Publish live' },
+                                    { value: 'delete', label: 'Delete article', danger: true },
+                                  ]}
+                                  onChange={(val) => {
+                                    if (val === 'edit') {
+                                      setEditingArticle(article);
+                                      setIsArticleModalOpen(true);
+                                    } else if (val === 'copy') {
+                                      handleCopyArticleLink(article);
+                                    } else if (val === 'live') {
+                                      handleOpenArticleLive(article);
+                                    } else if (val === 'status') {
+                                      handleToggleStatus(article);
+                                    } else if (val === 'delete') {
+                                      handleDeleteArticle(article.id, article.title);
+                                    }
+                                  }}
+                                  trigger={() => (
+                                    <span
+                                      className="h-8 w-8 rounded-md hover:bg-surface-2 flex items-center justify-center text-ink-3 hover:text-ink transition-colors cursor-pointer"
+                                      title="More options"
+                                    >
+                                      <MoreHorizontal className="w-4 h-4" />
+                                    </span>
+                                  )}
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 );
               })}
+
+              {/* Pagination footer (25 per page) */}
+              {totalArticlePages > 1 && (
+                <div className="flex items-center justify-between px-3 py-2.5 rounded-xl border border-line bg-surface text-[12.5px] text-ink-3 shadow-xs">
+                  <span>
+                    Showing {(articlePage - 1) * ARTICLES_PER_PAGE + 1} to{' '}
+                    {Math.min(articlePage * ARTICLES_PER_PAGE, filteredArticles.length)} of {filteredArticles.length} articles
+                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      disabled={articlePage <= 1}
+                      onClick={() => setArticlePage((p) => Math.max(1, p - 1))}
+                      className="h-7 px-2.5 rounded-md border border-line bg-surface text-ink hover:bg-surface-2 disabled:opacity-30 disabled:pointer-events-none inline-flex items-center gap-1 text-[12px] font-medium"
+                    >
+                      <ChevronLeft className="w-3.5 h-3.5" />
+                      Previous
+                    </button>
+                    <div className="flex items-center gap-1 px-1">
+                      {Array.from({ length: totalArticlePages }, (_, i) => i + 1).map((pg) => (
+                        <button
+                          key={pg}
+                          type="button"
+                          onClick={() => setArticlePage(pg)}
+                          className={cn(
+                            'w-7 h-7 rounded-md text-[12px] font-semibold transition-all',
+                            articlePage === pg
+                              ? 'bg-accent text-accent-ink shadow-xs'
+                              : 'text-ink-2 hover:bg-surface-2 hover:text-ink'
+                          )}
+                        >
+                          {pg}
+                        </button>
+                      ))}
+                    </div>
+                    <button
+                      type="button"
+                      disabled={articlePage >= totalArticlePages}
+                      onClick={() => setArticlePage((p) => Math.min(totalArticlePages, p + 1))}
+                      className="h-7 px-2.5 rounded-md border border-line bg-surface text-ink hover:bg-surface-2 disabled:opacity-30 disabled:pointer-events-none inline-flex items-center gap-1 text-[12px] font-medium"
+                    >
+                      Next
+                      <ChevronRight className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </section>

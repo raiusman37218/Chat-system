@@ -221,13 +221,14 @@ const SETTING_GROUPS: SettingGroup[] = [
           'branding',
         ],
         getBadge: ({ workspace }) => {
+          if (!workspace?.custom_domain?.trim()) return null;
           if (workspace?.custom_domain_status === 'verified') {
             return { text: 'DNS Verified', variant: 'emerald' };
           }
-          if (workspace?.custom_domain) {
-            return { text: 'Pending DNS', variant: 'amber' };
+          if (workspace?.custom_domain_status === 'failed') {
+            return { text: 'DNS Check Failed', variant: 'amber' };
           }
-          return { text: 'Default Domain', variant: 'neutral' };
+          return { text: 'Pending DNS', variant: 'amber' };
         },
       },
     ],

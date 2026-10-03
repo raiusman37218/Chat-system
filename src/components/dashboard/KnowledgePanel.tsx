@@ -14,6 +14,9 @@ import {
   EyeOff,
   FileText,
   Loader2,
+  ChevronLeft,
+  ChevronRight,
+  Layers,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
@@ -27,16 +30,152 @@ import {
 } from '@/app/actions/knowledge';
 
 /**
- * Two things the help centre could not hold.
- *
- * **Team knowledge** is everything a team needs on hand that should never be
- * published — refund thresholds, escalation paths, the workaround for last
- * month's bug. Before this it either went into a public article or nowhere.
- *
- * **Gaps** are the questions customers asked that nothing answered. They used
- * to be handed to a person and then forgotten, so the same hole was
- * rediscovered every week instead of being written up once.
+ * Filter out greetings, thanks, and human-handoff requests from knowledge gaps.
  */
+function isIgnoredGapQuestion(raw: string): boolean {
+  if (!raw) return true;
+  const q = raw.trim().toLowerCase().replace(/[^\w\s]/g, ' ').replace(/\s+/g, ' ').trim();
+  if (q.length < 2) return true;
+
+  // Greetings
+  const greetingsRegex = /^(hi|hello|hey|heya|howdy|good\s+(morning|afternoon|evening|day)|greetings|hola|salut|yo)(\s+(there|team|support|bot|assistant|everyone|all|agent))?$/i;
+  if (greetingsRegex.test(q)) return true;
+
+  // Thanks
+  const thanksRegex = /^(thank\s*you|thanks|thx|ty|many\s*thanks|appreciate\s*it|thank\s*you\s*(so\s*much|very\s*much|a\s*lot))(\s+(all|team|for\s*help))?$/i;
+  if (thanksRegex.test(q)) return true;
+
+  // Human handoff requests
+  const handoffPatterns = [
+    /^(can\s+i\s+)?(talk|speak)\s+to\s+(a\s+)?(human|person|agent|representative|operator|support|someone|somebody)/i,
+    /^(can\s+i\s+)?connect\s+(me\s+)?(to|with)\s+(a\s+)?(human|person|agent|representative|operator|support)/i,
+    /^(i\s+want\s+to\s+)?(talk|speak)\s+(to|with)\s+(a\s+)?(human|person|agent|real\s+person)/i,
+    /^(transfer|hand\s*over)\s+(me\s+)?to\s+(a\s+)?(human|agent|person|operator)/i,
+    /^(human|agent|representative|operator|real\s*person)\s*(please)?$/i,
+    /^(live\s+agent|customer\s+service|human\s+support|talk\s+to\s+human)$/i,
+  ];
+
+  if (handoffPatterns.some((pattern) => pattern.test(q))) return true;
+
+  return false;
+}
+
+/**
+ * Replace technical/confusing reasons with plain user-friendly text.
+ */
+function formatGapReason(reason?: string | null): string {
+  if (!reason) return 'No article covers this topic';
+  const lower = reason.toLowerCase();
+  if (
+    lower.includes('matched equally') ||
+    lower.includes('two article') ||
+    lower.includes('tie') ||
+    lower.includes('ambiguous') ||
+    lower.includes('equal')
+  ) {
+    return 'Two articles matched equally';
+  }
+  if (
+    lower.includes('uses words no article contains') ||
+    lower.includes('no article') ||
+    lower.includes('below threshold') ||
+    lower.includes('similarity not high') ||
+    lower.includes('not high enough') ||
+    lower.includes('no matching') ||
+    lower.includes('no relevant') ||
+    /\d+%\s+of the question/.test(lower)
+  ) {
+    return 'No article covers this topic';
+  }
+  return reason.charAt(0).toUpperCase() + reason.slice(1);
+}
+
+/**
+ * Computes semantic similarity using vector cosine similarity if available,
+ * or token / bigram text similarity as fallback.
+ */
+function computeSimilarity(
+  q1: { text: string; embedding?: number[] | null },
+  q2: { text: string; embedding?: number[] | null }
+): number {
+  if (q1.embedding && q2.embedding && q1.embedding.length > 0 && q1.embedding.length === q2.embedding.length) {
+    let dot = 0;
+    let normA = 0;
+    let normB = 0;
+    for (let i = 0; i < q1.embedding.length; i++) {
+      const a = q1.embedding[i];
+      const b = q2.embedding[i];
+      dot += a * b;
+      normA += a * a;
+      normB += b * b;
+    }
+    if (normA > 0 && normB > 0) {
+      const cosSim = dot / (Math.sqrt(normA) * Math.sqrt(normB));
+      if (cosSim >= 0.82) return cosSim;
+    }
+  }
+
+  const stopWords = new Set([
+    'what', 'is', 'are', 'was', 'were', 'the', 'a', 'an', 'how', 'do', 'does', 'did',
+    'i', 'can', 'to', 'for', 'my', 'your', 'in', 'on', 'at', 'please', 'me', 'we',
+    'you', 'it', 'and', 'or', 'of', 'be', 'this', 'that', 'there', 'have', 'has', 'with'
+  ]);
+
+  const clean = (s: string) =>
+    s
+      .toLowerCase()
+      .replace(/[^\w\s]/g, ' ')
+      .split(/\s+/)
+      .filter((w) => w.length > 1 && !stopWords.has(w));
+
+  const tokensA = clean(q1.text);
+  const tokensB = clean(q2.text);
+
+  if (tokensA.length === 0 || tokensB.length === 0) {
+    const normA = q1.text.toLowerCase().replace(/[^\w\s]/g, '').trim();
+    const normB = q2.text.toLowerCase().replace(/[^\w\s]/g, '').trim();
+    return normA === normB ? 1 : 0;
+  }
+
+  const setA = new Set(tokensA);
+  const setB = new Set(tokensB);
+
+  let intersection = 0;
+  for (const t of setA) {
+    if (setB.has(t)) intersection++;
+  }
+  const union = new Set([...tokensA, ...tokensB]).size;
+  const jaccard = union > 0 ? intersection / union : 0;
+
+  const getBigrams = (s: string) => {
+    const norm = s.toLowerCase().replace(/\s+/g, ' ').trim();
+    const bg = new Set<string>();
+    for (let i = 0; i < norm.length - 1; i++) {
+      bg.add(norm.slice(i, i + 2));
+    }
+    return bg;
+  };
+  const bgA = getBigrams(q1.text);
+  const bgB = getBigrams(q2.text);
+  let bgOverlap = 0;
+  for (const b of bgA) {
+    if (bgB.has(b)) bgOverlap++;
+  }
+  const dice = (bgA.size + bgB.size > 0) ? (2 * bgOverlap) / (bgA.size + bgB.size) : 0;
+
+  return Math.max(jaccard, dice * 0.85);
+}
+
+export interface GroupedGap {
+  id: string;
+  primaryQuestion: string;
+  allQuestions: string[];
+  questionCount: number;
+  timesAsked: number;
+  lastAskedAt: string;
+  reason: string;
+  rawGaps: UnansweredQuestion[];
+}
 
 type Tab = 'notes' | 'gaps';
 
@@ -48,10 +187,6 @@ export function KnowledgePanel({
   workspaceId: string;
   /** Turns a gap straight into a draft article. */
   onCreateArticle?: (title: string) => void;
-  /**
-   * Changes when the page header's primary button is pressed. A counter rather
-   * than a boolean so pressing it twice in a row still opens the editor.
-   */
   newNoteSignal?: number;
 }) {
   const [tab, setTab] = useState<Tab>('notes');
@@ -102,6 +237,47 @@ export function KnowledgePanel({
     );
   }, [notes, query]);
 
+  // Group similar questions with semantic similarity and hide greetings/thanks/handoffs
+  const groupedGaps = useMemo<GroupedGap[]>(() => {
+    const filtered = gaps.filter((g) => !isIgnoredGapQuestion(g.question));
+    const groups: GroupedGap[] = [];
+
+    for (const gap of filtered) {
+      const existing = groups.find((grp) => {
+        const sim = computeSimilarity(
+          { text: gap.question, embedding: gap.embedding },
+          { text: grp.primaryQuestion, embedding: grp.rawGaps[0]?.embedding }
+        );
+        return sim >= 0.5;
+      });
+
+      if (existing) {
+        if (!existing.allQuestions.includes(gap.question)) {
+          existing.allQuestions.push(gap.question);
+        }
+        existing.questionCount += 1;
+        existing.timesAsked += gap.times_asked || 1;
+        existing.rawGaps.push(gap);
+        if (new Date(gap.last_asked_at).getTime() > new Date(existing.lastAskedAt).getTime()) {
+          existing.lastAskedAt = gap.last_asked_at;
+        }
+      } else {
+        groups.push({
+          id: gap.id,
+          primaryQuestion: gap.question,
+          allQuestions: [gap.question],
+          questionCount: 1,
+          timesAsked: gap.times_asked || 1,
+          lastAskedAt: gap.last_asked_at,
+          reason: formatGapReason(gap.reason),
+          rawGaps: [gap],
+        });
+      }
+    }
+
+    return groups;
+  }, [gaps]);
+
   const handleSave = async (note: Partial<KnowledgeNote>) => {
     try {
       const saved = await saveKnowledgeNoteAction(workspaceId, {
@@ -134,14 +310,17 @@ export function KnowledgePanel({
     }
   };
 
-  const resolveGap = async (
-    gap: UnansweredQuestion,
+  const resolveGroupedGap = async (
+    group: GroupedGap,
     status: 'answered' | 'ignored'
   ) => {
-    setBusyId(gap.id);
+    setBusyId(group.id);
     try {
-      await updateUnansweredStatusAction(workspaceId, gap.id, status);
-      setGaps((prev) => prev.filter((g) => g.id !== gap.id));
+      await Promise.all(
+        group.rawGaps.map((g) => updateUnansweredStatusAction(workspaceId, g.id, status))
+      );
+      const idsToRemove = new Set(group.rawGaps.map((g) => g.id));
+      setGaps((prev) => prev.filter((g) => !idsToRemove.has(g.id)));
     } catch (err: any) {
       setError(err?.message || 'Could not update that question.');
     } finally {
@@ -156,7 +335,7 @@ export function KnowledgePanel({
           {(
             [
               ['notes', 'Team knowledge', notes.length],
-              ['gaps', 'Gaps', gaps.length],
+              ['gaps', 'Gaps', groupedGaps.length],
             ] as const
           ).map(([id, label, count]) => (
             <button
@@ -183,27 +362,15 @@ export function KnowledgePanel({
 
         <div className="flex items-center gap-2">
           {tab === 'notes' && (
-            <>
-              <div className="relative w-56">
-                <Search className="w-3.5 h-3.5 text-ink-3 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-                <input
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Search notes"
-                  className="w-full h-8 pl-8 pr-2.5 rounded-lg border border-line bg-surface-2/70 text-[12.5px] text-ink placeholder:text-ink-3 focus:outline-none focus:border-accent"
-                />
-              </div>
-              <button
-                type="button"
-                onClick={() =>
-                  setEditing({ title: '', content: '', tags: [], visibility: 'agent_only' })
-                }
-                className="h-8 px-3 rounded-lg bg-accent text-accent-ink text-[12.5px] font-semibold inline-flex items-center gap-1.5"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                New note
-              </button>
-            </>
+            <div className="relative w-64">
+              <Search className="w-3.5 h-3.5 text-ink-3 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search notes..."
+                className="w-full h-8 pl-8 pr-2.5 rounded-lg border border-line bg-surface-2/70 text-[12.5px] text-ink placeholder:text-ink-3 focus:outline-none focus:border-accent"
+              />
+            </div>
           )}
         </div>
       </div>
@@ -235,13 +402,13 @@ export function KnowledgePanel({
         />
       ) : (
         <GapsList
-          gaps={gaps}
+          gaps={groupedGaps}
           busyId={busyId}
-          onResolve={resolveGap}
+          onResolve={resolveGroupedGap}
           onCreateArticle={onCreateArticle}
-          onCreateNote={(q) =>
+          onCreateNote={(group) =>
             setEditing({
-              title: q.question.slice(0, 120),
+              title: group.primaryQuestion.slice(0, 120),
               content: '',
               tags: ['from-a-real-question'],
               visibility: 'assistant',
@@ -538,12 +705,22 @@ function GapsList({
   onCreateArticle,
   onCreateNote,
 }: {
-  gaps: UnansweredQuestion[];
+  gaps: GroupedGap[];
   busyId: string | null;
-  onResolve: (g: UnansweredQuestion, status: 'answered' | 'ignored') => void;
+  onResolve: (g: GroupedGap, status: 'answered' | 'ignored') => void;
   onCreateArticle?: (title: string) => void;
-  onCreateNote: (g: UnansweredQuestion) => void;
+  onCreateNote: (g: GroupedGap) => void;
 }) {
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 10;
+  const totalPages = Math.max(1, Math.ceil(gaps.length / PAGE_SIZE));
+
+  useEffect(() => {
+    if (page > totalPages) {
+      setPage(totalPages);
+    }
+  }, [totalPages, page]);
+
   if (gaps.length === 0) {
     return (
       <div className="p-12 rounded-2xl border border-dashed border-line text-center space-y-2 bg-surface-2/40">
@@ -557,69 +734,115 @@ function GapsList({
     );
   }
 
-  return (
-    <div className="border border-line rounded-xl overflow-hidden bg-surface divide-y divide-line/80">
-      {gaps.map((gap) => (
-        <div key={gap.id} className="p-4 flex items-start justify-between gap-4">
-          <div className="min-w-0 flex-1 space-y-1.5">
-            <div className="flex items-center gap-2 flex-wrap">
-              {gap.times_asked > 1 && (
-                <span className="px-2 py-0.5 rounded-md text-[11px] font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
-                  asked {gap.times_asked}×
-                </span>
-              )}
-              <span className="text-[11px] text-ink-3">
-                last {new Date(gap.last_asked_at).toLocaleDateString()}
-              </span>
-            </div>
-            <p className="text-[14px] font-medium text-ink">“{gap.question}”</p>
-            {gap.reason && (
-              <p className="text-[11.5px] text-ink-3">Why it went unanswered: {gap.reason}</p>
-            )}
-          </div>
+  const paginatedGaps = gaps.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
-          <div className="flex items-center gap-1.5 shrink-0">
-            {onCreateArticle && (
+  return (
+    <div className="space-y-3">
+      <div className="border border-line rounded-xl overflow-hidden bg-surface divide-y divide-line/80">
+        {paginatedGaps.map((gap) => (
+          <div key={gap.id} className="p-4 flex items-start justify-between gap-4">
+            <div className="min-w-0 flex-1 space-y-1.5">
+              <div className="flex items-center gap-2 flex-wrap">
+                {gap.timesAsked > 1 && (
+                  <span className="px-2 py-0.5 rounded-md text-[11px] font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+                    asked {gap.timesAsked}×
+                  </span>
+                )}
+                {gap.questionCount > 1 && (
+                  <span
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium bg-surface-2 text-ink-2 border border-line/60"
+                    title={`Grouped similar questions:\n${gap.allQuestions.map((q) => `• ${q}`).join('\n')}`}
+                  >
+                    <Layers className="w-3 h-3 text-ink-3" />
+                    <span>{gap.questionCount} similar questions</span>
+                  </span>
+                )}
+                <span className="text-[11px] text-ink-3">
+                  last {new Date(gap.lastAskedAt).toLocaleDateString()}
+                </span>
+              </div>
+              <p className="text-[14px] font-medium text-ink">“{gap.primaryQuestion}”</p>
+              {gap.reason && (
+                <p className="text-[11.5px] text-ink-3">Why it went unanswered: {gap.reason}</p>
+              )}
+            </div>
+
+            <div className="flex items-center gap-1.5 shrink-0">
+              {onCreateArticle && (
+                <button
+                  type="button"
+                  onClick={() => onCreateArticle(gap.primaryQuestion)}
+                  title="Write a public article answering this"
+                  className="h-8 px-2.5 rounded-lg border border-line text-[12px] font-medium text-ink hover:bg-surface-2 inline-flex items-center gap-1.5"
+                >
+                  <FileText className="w-3.5 h-3.5" />
+                  Write article
+                </button>
+              )}
               <button
                 type="button"
-                onClick={() => onCreateArticle(gap.question)}
-                title="Write a public article answering this"
+                onClick={() => onCreateNote(gap)}
+                title="Answer it in a team note instead"
                 className="h-8 px-2.5 rounded-lg border border-line text-[12px] font-medium text-ink hover:bg-surface-2 inline-flex items-center gap-1.5"
               >
-                <FileText className="w-3.5 h-3.5" />
-                Article
+                <Lock className="w-3.5 h-3.5" />
+                Note
               </button>
-            )}
+              <button
+                type="button"
+                onClick={() => onResolve(gap, 'answered')}
+                disabled={busyId === gap.id}
+                title="Mark as covered"
+                className="h-8 w-8 rounded-md hover:bg-emerald-500/10 grid place-items-center text-ink-3 hover:text-emerald-500 disabled:opacity-50"
+              >
+                <Check className="w-4 h-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => onResolve(gap, 'ignored')}
+                disabled={busyId === gap.id}
+                title="Out of scope — stop showing this"
+                className="h-8 w-8 rounded-md hover:bg-surface-2 grid place-items-center text-ink-3 hover:text-ink disabled:opacity-50"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between px-2 py-1 text-[12.5px] text-ink-3">
+          <span>
+            Showing {(page - 1) * PAGE_SIZE + 1} to{' '}
+            {Math.min(page * PAGE_SIZE, gaps.length)} of {gaps.length} gaps
+          </span>
+          <div className="flex items-center gap-1.5">
             <button
               type="button"
-              onClick={() => onCreateNote(gap)}
-              title="Answer it in a team note instead"
-              className="h-8 px-2.5 rounded-lg border border-line text-[12px] font-medium text-ink hover:bg-surface-2 inline-flex items-center gap-1.5"
+              disabled={page <= 1}
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              className="h-7 px-2.5 rounded-md border border-line bg-surface text-ink hover:bg-surface-2 disabled:opacity-30 disabled:pointer-events-none inline-flex items-center gap-1 text-[12px]"
             >
-              <Lock className="w-3.5 h-3.5" />
-              Note
+              <ChevronLeft className="w-3.5 h-3.5" />
+              Previous
             </button>
+            <span className="px-2 text-[12px] font-medium text-ink">
+              Page {page} of {totalPages}
+            </span>
             <button
               type="button"
-              onClick={() => onResolve(gap, 'answered')}
-              disabled={busyId === gap.id}
-              title="Mark as covered"
-              className="h-8 w-8 rounded-md hover:bg-emerald-500/10 grid place-items-center text-ink-3 hover:text-emerald-500 disabled:opacity-50"
+              disabled={page >= totalPages}
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              className="h-7 px-2.5 rounded-md border border-line bg-surface text-ink hover:bg-surface-2 disabled:opacity-30 disabled:pointer-events-none inline-flex items-center gap-1 text-[12px]"
             >
-              <Check className="w-4 h-4" />
-            </button>
-            <button
-              type="button"
-              onClick={() => onResolve(gap, 'ignored')}
-              disabled={busyId === gap.id}
-              title="Out of scope — stop showing this"
-              className="h-8 w-8 rounded-md hover:bg-surface-2 grid place-items-center text-ink-3 hover:text-ink disabled:opacity-50"
-            >
-              <X className="w-4 h-4" />
+              Next
+              <ChevronRight className="w-3.5 h-3.5" />
             </button>
           </div>
         </div>
-      ))}
+      )}
     </div>
   );
 }
+
