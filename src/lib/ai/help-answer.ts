@@ -9,6 +9,11 @@ import {
   type RetrievableArticle,
   type Confidence,
 } from './retrieval';
+import {
+  buildSemanticModelContext,
+  hybridSearchWorkspaceChunks,
+} from './semantic-retrieval';
+import type { RetrievedChunk } from '@/types/database';
 
 /**
  * Answers a customer from the workspace's own help centre, with no model API.
@@ -144,10 +149,13 @@ export interface AnswerRequest {
   conversationId?: string | null;
   /** Earlier visitor turns, most recent first. */
   history?: string[];
+  recentMessages?: { sender_type?: string; role?: string; content?: string }[];
   /** Used to open the reply; omitted when unknown. */
   visitorName?: string | null;
   /** Where the help centre lives, so the answer can link to the full article. */
   helpCenterUrl?: string | null;
+  chunks?: RetrievedChunk[];
+  providerConfig?: ProviderConfig | null;
 }
 
 /**
@@ -192,6 +200,39 @@ export async function answerFromHelpCenter(
       reason: 'customer asked for a human',
       alternatives: [],
     };
+  }
+
+  // If semantic retrieval provided high-scoring chunks, use the top chunk
+  if (req.chunks && req.chunks.length > 0) {
+    const topChunk = req.chunks[0];
+    if (topChunk.combined_score >= 0.35 || topChunk.similarity >= 0.55 || topChunk.keyword_score >= 0.5) {
+      const cleanContent = topChunk.content.replace(/^Article:\s*.*?\nSection:\s*.*?\n\n/i, '').trim();
+      const link = req.helpCenterUrl
+        ? `${req.helpCenterUrl.replace(/\/$/, '')}/${topChunk.article_slug || topChunk.article_id}`
+        : null;
+
+      const heading = `### ${topChunk.article_title}\n\n`;
+      const confidence: Confidence = topChunk.combined_score >= 0.5 || topChunk.similarity >= 0.65 ? 'high' : 'medium';
+      const opening = confidence === 'high' ? '' : `I think this is what you're after — tell me if you meant something else.\n\n`;
+      const body = cleanContent.replace(/^\s*•\s+/gm, '- ').replace(/\n{3,}/g, '\n\n');
+      const citation = link ? `\n\n[Read the full article](${link})` : '';
+
+      return {
+        text: `${heading}${opening}${body}${citation}`,
+        source: 'article',
+        confidence,
+        article: { id: topChunk.article_id, title: topChunk.article_title, slug: topChunk.article_slug },
+        reason: `semantic hybrid match (score: ${topChunk.combined_score.toFixed(2)})`,
+        alternatives: req.chunks
+          .slice(1, 3)
+          .filter((c) => c.article_id !== topChunk.article_id)
+          .map((c) => ({
+            id: c.article_id,
+            title: c.article_title,
+            slug: c.article_slug,
+          })),
+      };
+    }
   }
 
   const index = await loadIndex(req.workspaceId);
@@ -305,17 +346,44 @@ export interface ModelContext {
 
 /**
  * The passages a model should be given to answer this question.
- *
- * Uses the same ranking as the no-API path. The model path used to select its
- * own context by counting substring hits per word — the ranker that answered
- * questions about daily drawdown with an article about leverage — so adding an
- * API key swapped a good retriever for a bad one without anyone noticing.
+ * Uses semantic retrieval (rewrites query, embeds, and executes pgvector hybrid search).
+ * Falls back to BM25 index if semantic retrieval is unavailable or empty.
  */
 export async function buildModelContext(
   workspaceId: string,
   question: string,
-  options: { history?: string[]; limit?: number } = {}
-): Promise<ModelContext> {
+  options: {
+    history?: string[];
+    turns?: { role: 'user' | 'assistant'; content: string }[];
+    recentMessages?: { sender_type?: string; role?: string; content?: string }[];
+    limit?: number;
+    providerConfig?: ProviderConfig | null;
+  } = {}
+): Promise<ModelContext & { rewrittenQuery?: string; chunks?: RetrievedChunk[] }> {
+  // 1. Primary: Semantic Retrieval with pgvector & query rewriting
+  try {
+    const messages = options.recentMessages || options.turns || (options.history || []).map((h) => ({ role: 'user', content: h }));
+    const semantic = await buildSemanticModelContext({
+      workspaceId,
+      visitorMessage: question,
+      recentMessages: messages,
+      providerConfig: options.providerConfig,
+      limit: options.limit ?? 6,
+    });
+
+    if (semantic.chunks.length > 0 && semantic.text.trim()) {
+      return {
+        text: semantic.text,
+        used: semantic.used,
+        rewrittenQuery: semantic.rewrittenQuery,
+        chunks: semantic.chunks,
+      };
+    }
+  } catch (err) {
+    console.warn('[Semantic Retrieval] buildModelContext fallback to keyword index:', err);
+  }
+
+  // 2. Fallback to keyword index if no semantic chunks found
   const index = await loadIndex(workspaceId);
   const hits = search(index, question, {
     history: options.history,

@@ -2,6 +2,11 @@
 
 import { createClient } from '@/lib/supabase/server';
 import { Agent, Article, HelpSection, Workspace } from '@/types/database';
+import {
+  syncArticleChunks,
+  deleteArticleChunks,
+  syncWorkspaceArticleEmbeddings,
+} from '@/lib/ai/semantic-retrieval';
 
 /**
  * Ensures the requesting user is authenticated and belongs to the specified workspace.
@@ -271,6 +276,9 @@ export async function updateHelpSectionAction(
       .update({ category: data.name.trim() })
       .eq('section_id', sectionId)
       .eq('workspace_id', workspaceId);
+
+    // Re-sync article chunks with updated section name in background
+    void syncWorkspaceArticleEmbeddings(workspaceId).catch(console.error);
   }
 
   return { success: true, section: updated as HelpSection };
@@ -363,6 +371,11 @@ export async function createArticleAction(
     .single();
 
   if (error) throw new Error(error.message);
+
+  if (inserted.status === 'published') {
+    void syncArticleChunks(inserted.id, workspaceId).catch(console.error);
+  }
+
   return { success: true, article: inserted as Article };
 }
 
@@ -418,6 +431,13 @@ export async function updateArticleAction(
     .single();
 
   if (error) throw new Error(error.message);
+
+  if (updated.status === 'published') {
+    void syncArticleChunks(articleId, workspaceId).catch(console.error);
+  } else {
+    void deleteArticleChunks(articleId).catch(console.error);
+  }
+
   return { success: true, article: updated as Article };
 }
 
@@ -456,6 +476,7 @@ export async function deleteArticleAction(workspaceId: string, articleId: string
     .eq('workspace_id', workspaceId);
 
   if (error) throw new Error(error.message);
+  void deleteArticleChunks(articleId).catch(console.error);
   return { success: true };
 }
 
@@ -476,6 +497,13 @@ export async function toggleArticleStatusAction(
     .single();
 
   if (error) throw new Error(error.message);
+
+  if (newStatus === 'published') {
+    void syncArticleChunks(articleId, workspaceId).catch(console.error);
+  } else {
+    void deleteArticleChunks(articleId).catch(console.error);
+  }
+
   return { success: true, article: updated as Article };
 }
 

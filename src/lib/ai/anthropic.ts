@@ -145,13 +145,20 @@ export async function generateHelpDeskResponseWithHandover({
     };
   }
 
-  // 1. Help center retrieval query
-  const searchQuery =
-    langCode === 'en'
-      ? incomingMessage
-      : await translateForSearch(providerConfig, incomingMessage);
+  // 1. Semantic retrieval with conversational query rewriting & hybrid search
+  const recentTurns = (turns && turns.length
+    ? turns
+    : (history || []).slice(0, 4).reverse().map((h) => ({ role: 'user' as const, content: h }))
+  ).slice(-6);
 
-  const context = await buildModelContext(workspaceId, searchQuery, { history, limit: 5 });
+  const context = await buildModelContext(workspaceId, incomingMessage, {
+    history,
+    turns: recentTurns,
+    limit: 6,
+    providerConfig,
+  });
+
+  const effectiveSearchQuery = context.rewrittenQuery || incomingMessage;
 
   // 2. Ask whichever provider this workspace configured
   if (isConfigured(providerConfig)) {
@@ -236,10 +243,12 @@ export async function generateHelpDeskResponseWithHandover({
   const answer = await answerFromHelpCenter({
     workspaceId,
     conversationId,
-    message: searchQuery,
+    message: effectiveSearchQuery,
     history,
     visitorName,
     helpCenterUrl,
+    chunks: context.chunks,
+    providerConfig,
   });
 
   if (answer.text) {

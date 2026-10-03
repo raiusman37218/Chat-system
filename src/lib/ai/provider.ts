@@ -78,7 +78,7 @@ export class ProviderError extends Error {
 export const DEFAULT_MODELS: Record<ProviderId, string> = {
   anthropic: 'claude-opus-5',
   openai: 'gpt-5',
-  google: 'gemini-2.5-pro',
+  google: 'gemini-3.8-flash',
   // deepseek-chat is the general model; deepseek-reasoner is the thinking one.
   deepseek: 'deepseek-chat',
   compatible: '',
@@ -294,37 +294,51 @@ async function googleChat(
   req: ChatRequest,
   timeoutMs: number
 ): Promise<ChatResult> {
-  // Gemini keeps the system prompt in its own field and calls the assistant
-  // role "model".
-  const res = await fetchJson(
-    `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(
-      model
-    )}:generateContent?key=${encodeURIComponent(apiKey)}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        systemInstruction: { parts: [{ text: req.system }] },
-        contents: req.messages.map((m) => ({
-          role: m.role === 'assistant' ? 'model' : 'user',
-          parts: [{ text: m.content }],
-        })),
-        generationConfig: {
-          maxOutputTokens: req.maxTokens ?? 4096,
-          ...(req.temperature !== undefined ? { temperature: req.temperature } : {}),
-          ...(req.reasoning === 'fast' ? googleFastThinking(model) : {}),
-        },
-      }),
-    },
-    timeoutMs,
-    'google'
-  );
+  try {
+    // Gemini keeps the system prompt in its own field and calls the assistant
+    // role "model".
+    const res = await fetchJson(
+      `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(
+        model
+      )}:generateContent?key=${encodeURIComponent(apiKey)}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          systemInstruction: { parts: [{ text: req.system }] },
+          contents: req.messages.map((m) => ({
+            role: m.role === 'assistant' ? 'model' : 'user',
+            parts: [{ text: m.content }],
+          })),
+          generationConfig: {
+            maxOutputTokens: req.maxTokens ?? 4096,
+            ...(req.temperature !== undefined ? { temperature: req.temperature } : {}),
+            ...(req.reasoning === 'fast' ? googleFastThinking(model) : {}),
+          },
+        }),
+      },
+      timeoutMs,
+      'google'
+    );
 
-  const text: string =
-    res?.candidates?.[0]?.content?.parts
-      ?.map((p: { text?: string }) => p.text || '')
-      .join('') ?? '';
-  return { text: text.trim(), provider: 'google', model };
+    const text: string =
+      res?.candidates?.[0]?.content?.parts
+        ?.map((p: { text?: string }) => p.text || '')
+        .join('') ?? '';
+    return { text: text.trim(), provider: 'google', model };
+  } catch (err) {
+    if (err instanceof ProviderError && (err.status === 429 || err.status === 404)) {
+      if (model !== 'gemini-3.8-flash' && model !== 'gemini-3.1-flash-lite') {
+        console.warn(`[ai] google ${model} failed with ${err.status}, retrying with gemini-3.8-flash`);
+        return googleChat(apiKey, 'gemini-3.8-flash', req, timeoutMs);
+      }
+      if (model === 'gemini-3.8-flash') {
+        console.warn(`[ai] google gemini-3.8-flash failed with ${err.status}, retrying with gemini-3.1-flash-lite`);
+        return googleChat(apiKey, 'gemini-3.1-flash-lite', req, timeoutMs);
+      }
+    }
+    throw err;
+  }
 }
 
 /* ── Shared HTTP ──────────────────────────────────────────────────────── */

@@ -562,19 +562,6 @@ export function assess(hits: Hit[], query: string): Assessment {
     return { confidence: 'none', hit: null, reason: 'question has no content words', margin };
   }
 
-  // Mostly-unfamiliar vocabulary means the question is about something the
-  // documentation does not discuss — a chargeback, a VPN, the weather. This is
-  // the gate that keeps the bot quiet instead of reaching for the nearest
-  // article that shares one ordinary word.
-  if (top.unknownRatio >= 0.5) {
-    return {
-      confidence: 'none',
-      hit: top,
-      reason: `${Math.round(top.unknownRatio * 100)}% of the question uses words no article contains`,
-      margin,
-    };
-  }
-
   // With no distinctive vocabulary to go on, only a commanding lead counts as
   // understanding rather than coincidence. A close race decided by one ordinary
   // word is the failure mode this whole gate exists to prevent.

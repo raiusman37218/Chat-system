@@ -296,6 +296,34 @@ export interface ArticleFeedback {
   created_at: string;
 }
 
+export interface ArticleChunk {
+  id: string;
+  workspace_id: string;
+  article_id: string;
+  chunk_index: number;
+  article_title: string;
+  section_name?: string | null;
+  article_slug?: string | null;
+  content: string;
+  token_count: number;
+  embedding?: number[] | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface RetrievedChunk {
+  id: string;
+  article_id: string;
+  article_title: string;
+  section_name?: string | null;
+  article_slug?: string | null;
+  chunk_index: number;
+  content: string;
+  similarity: number;
+  keyword_score: number;
+  combined_score: number;
+}
+
 export interface NavbarTriggerConfig {
   enabled: boolean;
   label: string;
@@ -483,6 +511,12 @@ export interface Database {
         Row: ArticleFeedback;
         Insert: Partial<ArticleFeedback>;
         Update: Partial<ArticleFeedback>;
+        Relationships: [];
+      };
+      article_chunks: {
+        Row: ArticleChunk;
+        Insert: Partial<ArticleChunk>;
+        Update: Partial<ArticleChunk>;
         Relationships: [];
       };
       [key: string]: {
