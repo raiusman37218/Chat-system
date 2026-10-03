@@ -1081,11 +1081,31 @@ export default function ChatWidget({
                           }
                         });
 
-                        const sectionsList = [...helpSections];
+                        // 1. Filter out sections that have zero published articles
+                        const filteredSections = helpSections.filter(
+                          (sec) => (countMap[sec.id] || 0) > 0
+                        );
+
+                        // 2. Deduplicate section names
+                        const seenNames = new Set<string>();
+                        const uniqueSections: typeof helpSections = [];
+                        for (const sec of filteredSections) {
+                          const norm = sec.name.trim().toLowerCase();
+                          if (!seenNames.has(norm)) {
+                            seenNames.add(norm);
+                            uniqueSections.push(sec);
+                          }
+                        }
+
+                        // 3. Articles without section_id appear under "Other" only if such articles exist
                         if (unsortedCount > 0) {
-                          sectionsList.push({
+                          let otherName = 'Other';
+                          if (seenNames.has('other')) {
+                            otherName = 'More Articles';
+                          }
+                          uniqueSections.push({
                             id: '__other__',
-                            name: 'General',
+                            name: otherName,
                             icon: '📚',
                             description: null,
                           });
@@ -1093,7 +1113,7 @@ export default function ChatWidget({
 
                         return (
                           <div className="space-y-2">
-                            {sectionsList.map((sec) => {
+                            {uniqueSections.map((sec) => {
                               const count = sec.id === '__other__' ? unsortedCount : (countMap[sec.id] || 0);
                               return (
                                 <div
@@ -1125,7 +1145,7 @@ export default function ChatWidget({
                     (() => {
                       const currentSec = helpSections.find((s) => s.id === selectedSectionId) || {
                         id: selectedSectionId,
-                        name: 'General',
+                        name: selectedSectionId === '__other__' ? 'Other' : 'Articles',
                         icon: '📚',
                         description: null,
                       };

@@ -376,7 +376,7 @@ class ChatifyWidget {
         q: a.title,
         summary: a.summary || '',
         a: a.content,
-        category: a.section?.name || a.category || 'General',
+        category: a.section?.name || (a.section_id ? (a.category || 'Other') : 'Other'),
         icon: a.section?.icon || '📚',
         sectionId: a.section_id || null,
         order_index: a.order_index ?? 0,
@@ -393,28 +393,49 @@ class ChatifyWidget {
         }
       });
 
-      this.sections = rawSections.map((s: any) => ({
-        id: s.id,
-        name: s.name,
-        description: s.description || null,
-        icon: s.icon || '📚',
-        order_index: s.order_index ?? 0,
-        slug: s.slug || '',
-        articleCount: countMap[s.id] || 0,
-      }));
+      // 1. Do not list a section that has zero published articles
+      const publishedSections = rawSections
+        .filter((s: any) => (countMap[s.id] || 0) > 0)
+        .map((s: any) => ({
+          id: s.id,
+          name: s.name,
+          description: s.description || null,
+          icon: s.icon || '📚',
+          order_index: s.order_index ?? 0,
+          slug: s.slug || '',
+          articleCount: countMap[s.id] || 0,
+        }));
 
-      // If there are articles without an assigned section, add a fallback section
+      // 2. Never duplicate a section name
+      const seenNames = new Set<string>();
+      const uniqueSections: HelpSectionItem[] = [];
+      for (const sec of publishedSections) {
+        const norm = (sec.name || '').trim().toLowerCase();
+        if (norm && !seenNames.has(norm)) {
+          seenNames.add(norm);
+          uniqueSections.push(sec);
+        }
+      }
+
+      // 3. Articles without a section_id appear under one group named "Other" only if such articles exist
       if (unsortedCount > 0) {
-        this.sections.push({
+        let otherName = 'Other';
+        if (seenNames.has('other')) {
+          otherName = 'More Articles';
+        }
+        seenNames.add(otherName.toLowerCase());
+        uniqueSections.push({
           id: '__other__',
-          name: 'General',
+          name: otherName,
           description: null,
           icon: '📚',
           order_index: 9999,
-          slug: 'general',
+          slug: 'other',
           articleCount: unsortedCount,
         });
       }
+
+      this.sections = uniqueSections;
 
       if (!this.config.customDomain) {
         const { data: ws } = await this.supabase
@@ -665,17 +686,11 @@ class ChatifyWidget {
 
     const cardHelpSearch = this.shadow?.getElementById('cardHelpSearch') as HTMLElement | null;
     if (cardHelpSearch) {
-      cardHelpSearch.style.display = (this.config.showHelpTab !== false && (this.faqs.length > 0 || this.sections.length > 0)) ? 'block' : 'none';
+      cardHelpSearch.style.display = (this.config.showHelpTab !== false && this.faqs.length > 0) ? 'block' : 'none';
     }
 
-    if (this.faqs.length === 0 && this.sections.length === 0) {
-      listEl.innerHTML = `
-        <div style="padding: 36px 16px; text-align: center; color: var(--w-ink-3); font-size: 13px;">
-          <div style="font-size: 28px; margin-bottom: 8px;">📖</div>
-          <p style="margin: 0; font-weight: 600; color: var(--w-ink-2); font-size: 13.5px;">No help articles published yet</p>
-          <p style="margin: 6px 0 0; font-size: 12px; color: var(--w-ink-3); line-height: 1.5;">Articles created in your Help Desk dashboard will appear here.</p>
-        </div>
-      `;
+    if (this.faqs.length === 0) {
+      listEl.innerHTML = '';
       return;
     }
 
@@ -1685,13 +1700,7 @@ class ChatifyWidget {
             <input type="text" id="helpSearchInput" placeholder="Search answers..." />
           </div>
 
-          <div class="chatify-faq-list" id="faqList">
-            <div style="padding: 36px 16px; text-align: center; color: var(--w-ink-3); font-size: 13px;">
-              <div style="font-size: 28px; margin-bottom: 8px;">📖</div>
-              <p style="margin: 0; font-weight: 600; color: var(--w-ink-2); font-size: 13.5px;">No help articles published yet</p>
-              <p style="margin: 6px 0 0; font-size: 12px; color: var(--w-ink-3); line-height: 1.5;">Articles created in your Help Desk dashboard will appear here.</p>
-            </div>
-          </div>
+          <div class="chatify-faq-list" id="faqList"></div>
         </div>
       </div>
 
@@ -1713,7 +1722,6 @@ class ChatifyWidget {
           </div>
           <span class="chatify-nav-label-wrap">
             <span id="navMessagesText">Chat</span>
-            <span class="chatify-nav-inline-badge" id="navMsgInlineBadge" style="display:none;">1</span>
           </span>
         </button>
         <button class="chatify-nav-item" data-tab="help" id="navHelp" style="display:none;">
@@ -2381,13 +2389,15 @@ class ChatifyWidget {
       homeSearchSpan.textContent = `🔍 Search for ${this.config.helpTabLabel.toLowerCase()} articles...`;
     }
 
-    // Toggle Help Tab & Home Card Visibility based on showHelpTab setting and whether articles exist
+    // Toggle Help Tab & Home Card Visibility based on showHelpTab setting and whether published articles exist
     const navHelpBtn = this.shadow?.getElementById('navHelp') as HTMLElement | null;
     const cardHelpSearch = this.shadow?.getElementById('cardHelpSearch') as HTMLElement | null;
+    const tabHelp = this.shadow?.getElementById('tabHelp') as HTMLElement | null;
     const hasPublishedArticles = this.faqs.length > 0;
     if (this.config.showHelpTab === false || !hasPublishedArticles) {
       if (navHelpBtn) navHelpBtn.style.display = 'none';
       if (cardHelpSearch) cardHelpSearch.style.display = 'none';
+      if (tabHelp) tabHelp.style.display = 'none';
       if (this.activeTab === 'help') {
         this.switchTab('home');
       }
@@ -4825,7 +4835,6 @@ class ChatifyWidget {
   private updateUnreadBadge() {
     const badge = this.shadow?.getElementById('chatifyBadge');
     const navBadge = this.shadow?.getElementById('navMsgBadge');
-    const navInlineBadge = this.shadow?.getElementById('navMsgInlineBadge');
     const homePill = this.shadow?.getElementById('homeCardUnreadPill');
     const homeCtaBadge = this.shadow?.getElementById('homeCardCtaBadge');
     const homeTitle = this.shadow?.getElementById('homeCardTitle');
@@ -4844,10 +4853,6 @@ class ChatifyWidget {
         navBadge.textContent = text;
         navBadge.style.display = 'flex';
       }
-      if (navInlineBadge) {
-        navInlineBadge.textContent = text;
-        navInlineBadge.style.display = 'inline-flex';
-      }
       if (homePill) {
         homePill.textContent = `${this.unreadCount} new ${this.unreadCount === 1 ? 'message' : 'messages'}`;
         homePill.style.display = 'inline-flex';
@@ -4862,7 +4867,6 @@ class ChatifyWidget {
     } else {
       if (badge) badge.style.display = 'none';
       if (navBadge) navBadge.style.display = 'none';
-      if (navInlineBadge) navInlineBadge.style.display = 'none';
       if (homePill) homePill.style.display = 'none';
       if (homeCtaBadge) homeCtaBadge.style.display = 'none';
       if (homeTitle) homeTitle.textContent = 'Chat with us';
