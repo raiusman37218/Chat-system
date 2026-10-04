@@ -64,6 +64,7 @@ import {
   detectLanguage,
   SUPPORTED_LANGUAGES,
   getLanguageInfo,
+  normalizeDetectedLanguage,
 } from '@/lib/ai/translator';
 
 interface ChatThreadProps {
@@ -192,6 +193,14 @@ export function ChatThread({
   const [autoTranslateEnabled, setAutoTranslateEnabled] = useState<boolean>(false);
   const [isTranslating, setIsTranslating] = useState<boolean>(false);
   const [expandedTranslations, setExpandedTranslations] = useState<Record<string, boolean>>({});
+  // Agent-chosen language for this conversation; wins over auto-detection.
+  // Local picks are keyed by conversation so switching threads never leaks one.
+  const [localLanguageOverrides, setLocalLanguageOverrides] = useState<Record<string, string | null>>({});
+  const savedLanguageOverride =
+    ((conversation.channel_metadata as Record<string, unknown> | undefined)?.language_override as string | undefined) ||
+    null;
+  const languageOverride =
+    conversation.id in localLanguageOverrides ? localLanguageOverrides[conversation.id] : savedLanguageOverride;
   const [showTranslateMenu, setShowTranslateMenu] = useState<boolean>(false);
   const translateMenuRef = useRef<HTMLDivElement>(null);
   const bottomTranslateBtnRef = useRef<HTMLButtonElement>(null);
@@ -712,6 +721,11 @@ export function ChatThread({
 
   // 6. Customer Language Auto-Detection & Sync
   const detectedVisitorLang = useMemo(() => {
+    // 0. An agent's manual correction always wins
+    if (languageOverride && SUPPORTED_LANGUAGES[languageOverride]) {
+      return languageOverride;
+    }
+
     // 1. Scan visitor messages in the thread (most recent first)
     const visitorMessages = [...messages]
       .reverse()
@@ -728,8 +742,9 @@ export function ChatThread({
           msg.metadata?.detected_language;
 
         // If explicitly detected and supported
-        if (transLang && SUPPORTED_LANGUAGES[transLang.toLowerCase()]) {
-          return transLang.toLowerCase();
+        const normalizedLang = transLang ? normalizeDetectedLanguage(transLang, text) : '';
+        if (normalizedLang && SUPPORTED_LANGUAGES[normalizedLang]) {
+          return normalizedLang;
         }
 
         const det = detectLanguage(text);
@@ -752,7 +767,30 @@ export function ChatThread({
     }
 
     return 'en';
-  }, [conversation, messages]);
+  }, [conversation, messages, languageOverride]);
+
+  const handleLanguageOverride = async (code: string) => {
+    const next = code === 'auto' ? null : code;
+    setLocalLanguageOverrides((prev) => ({ ...prev, [conversation.id]: next }));
+    if (next) {
+      setTargetLanguage(next);
+      setAutoTranslateEnabled(next !== 'en');
+    }
+    try {
+      const supabase = createClient();
+      const meta: Record<string, unknown> = { ...((conversation.channel_metadata as Record<string, unknown>) || {}) };
+      if (next) {
+        meta.language_override = next;
+        meta.visitor_language = next;
+        meta.language_name = getLanguageInfo(next).name;
+      } else {
+        delete meta.language_override;
+      }
+      await supabase.from('conversations').update({ channel_metadata: meta }).eq('id', conversation.id);
+    } catch (err) {
+      console.warn('Failed to save conversation language override:', err);
+    }
+  };
 
   // Close translation menu when clicking outside
   useEffect(() => {
@@ -1667,23 +1705,28 @@ export function ChatThread({
                   translationMeta?.detected_language ||
                   msg.metadata?.detected_language ||
                   (msg.content ? detectLanguage(msg.content).code : 'en');
-                const isForeign = detectedCode !== 'en';
+                const sourceCode = languageOverride || normalizeDetectedLanguage(detectedCode, msg.content || '');
+                // Same language as the inbox (English): no translation UI at all.
+                if (sourceCode === 'en') {
+                  return msg.content;
+                }
                 const hasEnglishTranslation =
                   Boolean(englishText) &&
                   englishText.trim().toLowerCase() !== originalText.trim().toLowerCase();
-                const langInfo = getLanguageInfo(detectedCode);
+                const langInfo = getLanguageInfo(sourceCode);
                 const isExpanded = expandedTranslations[msg.id];
 
-                if (isForeign || hasEnglishTranslation || translationMeta?.is_translated) {
+                if (sourceCode !== 'en' || hasEnglishTranslation || translationMeta?.is_translated) {
                   return (
                     <div className="space-y-2">
                       {englishText ? (
                         <p className="whitespace-pre-wrap leading-relaxed font-normal">
-                          {isExpanded ? originalText : englishText}
+                          {/* Original is the message exactly as the visitor sent it. */}
+                          {isExpanded ? msg.content : englishText}
                         </p>
                       ) : (
                         <div>
-                          <p className="whitespace-pre-wrap leading-relaxed">{originalText}</p>
+                          <p className="whitespace-pre-wrap leading-relaxed">{msg.content}</p>
                           <span className="inline-flex items-center gap-1.5 text-[11.5px] text-accent mt-1.5 font-bold animate-pulse px-2 py-0.5 rounded-md bg-accent/10 border border-accent/20">
                             <Globe className="w-3.5 h-3.5 shrink-0 animate-spin" />
                             Auto-translating to English...
@@ -1773,17 +1816,18 @@ export function ChatThread({
     : null;
 
   return (
-    <div className="@container/thread flex-1 min-w-0 h-screen flex flex-col bg-canvas overflow-x-hidden">
+    <div className="@container/thread flex-1 min-w-0 h-[var(--app-vvh,100dvh)] flex flex-col bg-canvas overflow-x-hidden">
       {/* ── Header ── */}
       <header className="shrink-0 px-3 sm:px-4 py-2 min-h-16 flex items-center justify-between gap-2 border-b border-line bg-surface max-w-full overflow-hidden">
         <div className="flex items-center gap-2.5 min-w-0 flex-1 overflow-hidden">
           {onBack && (
             <button
               onClick={onBack}
-              className="md:hidden p-1.5 -ml-1 rounded-lg text-ink-3 hover:text-ink hover:bg-surface-2 transition-colors shrink-0"
+              className="md:hidden w-11 h-11 -ml-2 flex items-center justify-center rounded-lg text-ink-2 hover:text-ink hover:bg-surface-2 transition-colors shrink-0"
               title="Back to conversations"
+              aria-label="Back to conversations"
             >
-              <ArrowLeft className="w-4 h-4" />
+              <ArrowLeft className="w-5 h-5" />
             </button>
           )}
           <Avatar
@@ -1919,6 +1963,34 @@ export function ChatThread({
 
         {/* Actions strip in header: keep in one row without shifting or wrapping */}
         <div className="flex items-center gap-1 sm:gap-1.5 shrink-0 ml-auto flex-nowrap">
+          <label
+            className="btn btn-sm btn-secondary relative gap-1 shrink-0 px-2 sm:px-2.5"
+            title={
+              languageOverride
+                ? `Language set manually: ${getLanguageInfo(detectedVisitorLang).name}`
+                : `Detected language: ${getLanguageInfo(detectedVisitorLang).name} — click to correct`
+            }
+          >
+            <Globe className="w-3.5 h-3.5 text-ink-3" />
+            <span className="text-[11px] font-semibold uppercase">{detectedVisitorLang}</span>
+            {languageOverride && <span className="w-1.5 h-1.5 rounded-full bg-accent" aria-hidden />}
+            <select
+              value={languageOverride || 'auto'}
+              onChange={(e) => handleLanguageOverride(e.target.value)}
+              aria-label="Conversation language"
+              className="absolute inset-0 opacity-0 cursor-pointer"
+            >
+              <option value="auto">Auto-detect</option>
+              {Object.values(SUPPORTED_LANGUAGES)
+                .sort((a, b) => a.name.localeCompare(b.name))
+                .map((l) => (
+                  <option key={l.code} value={l.code}>
+                    {l.name}
+                    {l.nativeName && l.nativeName !== l.name ? ` (${l.nativeName})` : ''}
+                  </option>
+                ))}
+            </select>
+          </label>
           <Menu<ConversationStatus>
             value={conversation.status}
             options={STATUS_OPTIONS}

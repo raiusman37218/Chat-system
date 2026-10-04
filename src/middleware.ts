@@ -206,6 +206,16 @@ export async function middleware(request: NextRequest) {
     }
   }
 
+  // Agent dashboard requires a session — send logged-out visitors to sign in
+  // and bring them back afterwards.
+  if (pathname === '/dashboard' || pathname.startsWith('/dashboard/')) {
+    if (!user) {
+      const loginUrl = new URL('/login', request.url);
+      loginUrl.searchParams.set('redirect', pathname + request.nextUrl.search);
+      return NextResponse.redirect(loginUrl);
+    }
+  }
+
   // Platform super admin protection for /admin routes
   if (request.nextUrl.pathname.startsWith('/admin')) {
     if (!user) {

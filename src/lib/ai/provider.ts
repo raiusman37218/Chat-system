@@ -11,6 +11,7 @@
  */
 
 import Anthropic from '@anthropic-ai/sdk';
+import { DEFAULT_MODELS as BASE_DEFAULT_MODELS } from './models';
 
 export type ProviderId =
   | 'anthropic'
@@ -75,14 +76,7 @@ export class ProviderError extends Error {
  * a model. Overridable in Settings, because model names change faster than
  * this file does.
  */
-export const DEFAULT_MODELS: Record<ProviderId, string> = {
-  anthropic: 'claude-opus-5',
-  openai: 'gpt-5',
-  google: 'gemini-3.8-flash',
-  // deepseek-chat is the general model; deepseek-reasoner is the thinking one.
-  deepseek: 'deepseek-chat',
-  compatible: '',
-};
+export const DEFAULT_MODELS: Record<ProviderId, string> = BASE_DEFAULT_MODELS;
 
 /** Fixed endpoints for the providers that speak OpenAI's shape. */
 const OPENAI_SHAPED_BASE_URLS: Partial<Record<ProviderId, string>> = {

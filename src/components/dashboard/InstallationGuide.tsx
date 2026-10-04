@@ -1,5 +1,6 @@
 'use client';
 
+import { getWidgetOrigin } from '@/lib/domain';
 import React, { useState } from 'react';
 import {
   Check,
@@ -38,8 +39,7 @@ export function InstallationGuide({
   const [copied, setCopied] = useState(false);
   const [activePlatform, setActivePlatform] = useState<Platform>('html');
 
-  const origin =
-    typeof window !== 'undefined' ? window.location.origin : (process.env.NEXT_PUBLIC_APP_URL || '');
+  const origin = getWidgetOrigin();
   const workspaceId = workspace?.id || 'YOUR_WORKSPACE_ID';
 
   const embedScript = `<!-- Zen-try Live Chat Support -->

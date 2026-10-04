@@ -762,7 +762,7 @@ export function ConversationList({
     filteredAndSorted.length > 0 && selectedIds.size === filteredAndSorted.length;
 
   return (
-    <div className="w-full h-screen flex flex-col border-r border-line bg-surface select-none relative">
+    <div className="w-full h-[var(--app-vvh,100dvh)] flex flex-col border-r border-line bg-surface select-none relative">
       {/* 1. Header Toolbar */}
       <div className="p-3 border-b border-line/80 space-y-2 bg-surface/80 backdrop-blur-xs">
         <div className="flex items-center justify-between gap-2 px-0.5">

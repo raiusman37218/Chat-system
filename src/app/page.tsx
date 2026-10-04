@@ -1,5 +1,4 @@
 import Link from 'next/link';
-import Script from 'next/script';
 import {
   ArrowRight,
   Blocks,
@@ -18,9 +17,11 @@ import {
 } from 'lucide-react';
 import { ProductShowcase } from '@/components/marketing/ProductShowcase';
 import { LandingNav } from '@/components/marketing/LandingNav';
+import { WidgetLoader } from '@/components/marketing/WidgetLoader';
 import { FaqSection } from '@/components/marketing/FaqSection';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { Logo } from '@/components/ui/Logo';
+import { PRODUCTION_APP_ORIGIN } from '@/lib/domain';
 
 const PLATFORMS = [
   'WordPress',
@@ -42,11 +43,11 @@ const STEPS = [
       <div className="space-y-1.5 font-mono text-[11px]">
         <div className="flex justify-between">
           <span className="text-ink-3">workspace</span>
-          <span className="text-ink">Northwind</span>
+          <span className="text-ink">Lumen Outdoor Co.</span>
         </div>
         <div className="flex justify-between">
           <span className="text-ink-3">owner</span>
-          <span className="text-ink">alex@northwind.com</span>
+          <span className="text-ink">priya@lumenoutdoor.com</span>
         </div>
       </div>
     ),
@@ -77,7 +78,7 @@ const STEPS = [
     body: 'Drop the script tag anywhere in your site. The launcher appears for every visitor, instantly.',
     detail: (
       <div className="font-mono text-[10.5px] text-ink-2 truncate">
-        &lt;script src=&quot;…/widget.js&quot; data-workspace-id=&quot;…&quot;&gt;
+        &lt;script src=&quot;{PRODUCTION_APP_ORIGIN}/widget.js&quot; …&gt;
       </div>
     ),
   },
@@ -102,10 +103,11 @@ export default function HomePage() {
           <div className="absolute inset-0 grid-lines pointer-events-none" />
 
           <div className="u-container relative pt-20 pb-16 sm:pt-28 sm:pb-20">
-            <div className="max-w-3xl mx-auto text-center">
+            {/* Side padding keeps the fixed chat launcher clear of the copy on tablet widths. */}
+            <div className="max-w-3xl mx-auto text-center sm:px-14 lg:px-0">
               <a
                 href="#product"
-                className="animate-rise inline-flex items-center gap-2 h-7 pl-1.5 pr-3 rounded-full border border-line bg-surface hover:border-accent shadow-xs text-[12px] font-medium text-ink-2 transition-all hover:scale-102"
+                className="animate-rise relative before:absolute before:inset-x-0 before:-inset-y-2 before:content-[''] inline-flex items-center gap-2 h-7 pl-1.5 pr-3 rounded-full border border-line bg-surface hover:border-accent shadow-xs text-[12px] font-medium text-ink-2 transition-all hover:scale-102"
               >
                 <span className="inline-flex items-center h-5 px-2 rounded-full bg-accent text-white text-[10px] font-bold tracking-wide">
                   NEW
@@ -113,10 +115,10 @@ export default function HomePage() {
                 Live visitor radar & AI Autopilot are live →
               </a>
 
-              <h1 className="animate-rise delay-1 mt-7 text-[2.6rem] leading-[1.05] sm:text-6xl sm:leading-[1.03] font-semibold text-ink">
+              <h1 className="animate-rise delay-1 mt-7 text-[clamp(1.85rem,8.2vw,2.6rem)] leading-[1.08] sm:text-6xl sm:leading-[1.03] font-semibold text-ink text-balance">
                 Live chat your customers
                 <br className="hidden sm:block" />{' '}
-                <span className="text-gradient">actually want to use.</span>
+                <span className="text-gradient whitespace-nowrap">actually want to use.</span>
               </h1>
 
               <p className="animate-rise delay-2 mt-6 mx-auto max-w-xl text-[16.5px] leading-relaxed text-ink-2">
@@ -137,9 +139,9 @@ export default function HomePage() {
                     required
                     placeholder="you@company.com"
                     aria-label="Work email"
-                    className="flex-1 min-w-0 bg-transparent px-3 text-[14px] text-ink placeholder:text-ink-3 focus:outline-none"
+                    className="flex-1 min-w-0 h-11 bg-transparent px-3 text-[16px] sm:text-[14px] text-ink placeholder:text-ink-3 focus:outline-none"
                   />
-                  <button type="submit" className="btn btn-primary shrink-0">
+                  <button type="submit" className="btn btn-primary shrink-0 max-sm:h-11">
                     Start free
                     <ArrowRight className="w-3.5 h-3.5" />
                   </button>
@@ -230,13 +232,13 @@ export default function HomePage() {
                 {[
                   {
                     n: 'Maya C.',
-                    url: '/pricing',
+                    url: '/products/summit-30l',
                     meta: 'Berlin · Chrome · 4m 12s',
                     live: true,
                   },
                   {
                     n: 'Anonymous',
-                    url: '/docs/webhooks',
+                    url: '/checkout',
                     meta: 'Lahore · Safari · 47s',
                     live: true,
                   },
@@ -281,7 +283,7 @@ export default function HomePage() {
               <div className="mt-6 -mb-14 mx-auto w-[236px] rounded-2xl border border-line bg-surface shadow-lg overflow-hidden">
                 <div className="px-4 pt-4 pb-5 bg-invert text-invert-ink">
                   <div className="w-7 h-7 rounded-full bg-white/15 flex items-center justify-center text-[11px] font-bold mb-3">
-                    N
+                    L
                   </div>
                   <div className="text-[15px] font-semibold">Hi there 👋</div>
                   <div className="text-[11px] opacity-70 mt-0.5">
@@ -461,8 +463,8 @@ export default function HomePage() {
                 </div>
                 <pre className="code-block rounded-none">{`<!-- Zen-try live chat -->
 <script
-  src="https://your-app.vercel.app/widget.js"
-  data-workspace-id="ws_3f8a…"
+  src="${PRODUCTION_APP_ORIGIN}/widget.js"
+  data-workspace-id="YOUR_WORKSPACE_ID"
   defer
 ></script>`}</pre>
               </div>
@@ -532,8 +534,7 @@ export default function HomePage() {
             <div className="lg:col-span-2 max-w-xs">
               <Logo size={32} />
               <p className="mt-4 text-[13px] leading-relaxed text-ink-2">
-                Real-time human support for any website. Built on Next.js and
-                Supabase.
+                Real-time human support for any website.
               </p>
               <div className="mt-5">
                 <ThemeToggle />
@@ -589,11 +590,7 @@ export default function HomePage() {
       </footer>
 
       {/* The real widget, running on our own site */}
-      <Script
-        src="/widget.js"
-        data-workspace-id="c0000000-0000-0000-0000-000000000001"
-        strategy="lazyOnload"
-      />
+      <WidgetLoader workspaceId="c0000000-0000-0000-0000-000000000001" />
     </div>
   );
 }

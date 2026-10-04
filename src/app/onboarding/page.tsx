@@ -333,7 +333,7 @@ export default function OnboardingPage() {
                     id="biz"
                     type="text"
                     required
-                    placeholder="Northwind Studio"
+                    placeholder="Lumen Outdoor Co."
                     value={businessName}
                     onChange={(e) => {
                       setBusinessName(e.target.value);
@@ -386,7 +386,7 @@ export default function OnboardingPage() {
                   <input
                     id="site"
                     type="url"
-                    placeholder="https://northwind.com"
+                    placeholder="https://lumenoutdoor.com"
                     value={websiteUrl}
                     onChange={(e) => setWebsiteUrl(e.target.value)}
                     className="input"

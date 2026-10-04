@@ -61,6 +61,46 @@ export default function DashboardPage() {
   const PAGE_SIZE = 30;
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
+
+  // Size the app to the *visible* viewport. On phones this shrinks when the
+  // on-screen keyboard opens, so the composer stays above it.
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const root = document.documentElement;
+    const sync = () => root.style.setProperty('--app-vvh', `${Math.round(vv.height)}px`);
+    sync();
+    vv.addEventListener('resize', sync);
+    return () => {
+      vv.removeEventListener('resize', sync);
+      root.style.removeProperty('--app-vvh');
+    };
+  }, []);
+
+  // Mobile: an open conversation is its own history entry, so the browser
+  // back button / edge-swipe returns to the list instead of leaving the app.
+  useEffect(() => {
+    if (!selectedConversationId) return;
+    if (!window.matchMedia('(max-width: 767px)').matches) return;
+    if (window.history.state?.zentryThread) return;
+    window.history.pushState({ ...(window.history.state || {}), zentryThread: true }, '');
+  }, [selectedConversationId]);
+
+  useEffect(() => {
+    const onPop = (e: PopStateEvent) => {
+      if (!e.state?.zentryThread) setSelectedConversationId(null);
+    };
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, []);
+
+  const handleMobileBack = useCallback(() => {
+    if (window.history.state?.zentryThread) {
+      window.history.back(); // popstate clears the selection
+    } else {
+      setSelectedConversationId(null);
+    }
+  }, []);
   const [messages, setMessages] = useState<Message[]>([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [page, setPage] = useState(0);
@@ -139,7 +179,7 @@ export default function DashboardPage() {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
-        router.replace('/login');
+        router.replace('/login?redirect=%2Fdashboard');
         return;
       }
 
@@ -498,7 +538,9 @@ export default function DashboardPage() {
             return enrichedConversations;
           });
 
-          if (!selectedConversationIdRef.current && enrichedConversations.length > 0) {
+          // Desktop opens the newest thread; phones start on the list.
+          const isPhone = typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches;
+          if (!selectedConversationIdRef.current && enrichedConversations.length > 0 && !isPhone) {
             setSelectedConversationId(enrichedConversations[0].id);
           } else if (selectedConversationIdRef.current) {
             loadMessages(selectedConversationIdRef.current);
@@ -1345,7 +1387,7 @@ export default function DashboardPage() {
   };
 
   return (
-    <div className="flex flex-col h-screen w-screen overflow-hidden bg-canvas relative">
+    <div className="flex flex-col h-[var(--app-vvh,100dvh)] w-screen overflow-hidden bg-canvas relative">
       {/* Super Admin Switch Banner */}
       {isViewingAsSuperAdmin && (
         <div className="bg-gradient-to-r from-purple-700 via-indigo-700 to-purple-800 text-white px-6 py-2.5 text-xs font-semibold flex items-center justify-between shadow-md z-50 shrink-0">
@@ -1455,7 +1497,7 @@ export default function DashboardPage() {
                 onAssignAgent={handleAssignAgent}
                 onUpdatePriority={handleUpdatePriority}
                 onUpdateTags={handleUpdateTags}
-                onBack={() => setSelectedConversationId(null)}
+                onBack={handleMobileBack}
                 isDetailsSidebarOpen={isDetailsSidebarOpen}
                 onToggleDetailsSidebar={() => setIsDetailsSidebarOpen((prev) => !prev)}
                 onMerged={async () => {
@@ -1598,6 +1640,8 @@ export default function DashboardPage() {
           <AnalyticsDashboard
             workspace={currentWorkspace}
             currentAgent={currentAgent}
+            onOpenInstall={() => handleOpenSettingsSection('install')}
+            onOpenInbox={() => setActiveView('inbox')}
           />
         </div>
       )}

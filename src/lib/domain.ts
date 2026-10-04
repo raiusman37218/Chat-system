@@ -466,3 +466,20 @@ export function getExpectedDnsRecords(
     hasTxtChallenge: (options?.vercelVerification?.length ?? 0) > 0,
   };
 }
+
+/** Public production origin that serves widget.js. */
+export const PRODUCTION_APP_ORIGIN = 'https://zen-try.site';
+
+/**
+ * Origin used in copy-paste install snippets. Uses the current deployment's
+ * origin in the browser, but never hands customers a localhost URL.
+ */
+export function getWidgetOrigin(): string {
+  if (typeof window !== 'undefined') {
+    const { origin, hostname } = window.location;
+    if (!/^(localhost|127\.0\.0\.1|\[::1\])$/.test(hostname) && !hostname.endsWith('.localhost')) {
+      return origin;
+    }
+  }
+  return PRODUCTION_APP_ORIGIN;
+}

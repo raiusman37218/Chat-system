@@ -197,6 +197,16 @@ const ROMAN_URDU_WORDS_REGEX =
   /\b(hum|humein|humay|ham|hamara|hamari|main|mein|aap|ap|tum|aapko|apko|aapka|apka|aapki|apki|mera|meri|mere|mujhe|mujhko|mujhy|chahiye|chahye|chahie|shukriya|shukria|theek|thik|hai|hain|hoga|hogi|kya|kia|kaise|kese|kaisay|batao|bataen|bataiye|kitna|kitni|kitne|denge|dainge|karenge|krenge|karen|karo|karein|madad|acha|accha|salam|assalam|walekum|nahi|nahin|bhi|kuch|koi|yeh|woh|mil|jayega|jayegi|milega)\b/i;
 
 /**
+ * Hindi is only ever written in Devanagari by our visitors; Hindi/Urdu typed in
+ * Latin script is Roman Urdu. Engines (LLMs, Google) routinely label it "hi".
+ */
+export function normalizeDetectedLanguage(code: string, text: string): string {
+  const c = (code || '').toLowerCase().split('-')[0];
+  if (c === 'hi' && !/[\u0900-\u097F]/.test(text || '')) return 'ur';
+  return c;
+}
+
+/**
  * Detects the language of a customer message.
  */
 export function detectLanguage(text: string): { code: string; name: string } {
@@ -464,7 +474,7 @@ export async function translateToEnglish({
       if (jsonMatch) {
         const parsed = JSON.parse(jsonMatch[0]);
         if (parsed.english_text) {
-          const code = (parsed.detected_language || 'en').toLowerCase();
+          const code = normalizeDetectedLanguage(parsed.detected_language || 'en', trimmed);
           const langInfo = getLanguageInfo(code);
           return {
             englishText: parsed.english_text.trim(),
@@ -482,7 +492,7 @@ export async function translateToEnglish({
   // 2. High-speed Google GTX translation & language auto-detection
   const googleRes = await translateWithGoogleGtx(trimmed, 'en', detectedLanguage || 'auto');
   if (googleRes) {
-    const code = googleRes.detectedLanguage || 'en';
+    const code = normalizeDetectedLanguage(googleRes.detectedLanguage || 'en', trimmed);
     const langInfo = getLanguageInfo(code);
     const isNonEnglish = code !== 'en';
 

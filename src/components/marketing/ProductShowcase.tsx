@@ -19,7 +19,7 @@ const THREADS = [
   {
     initial: 'M',
     name: 'Maya Chandra',
-    snippet: 'The webhook fires twice on retry — is that expected?',
+    snippet: 'Will the Ridgeline 2P tent reach Toronto by Saturday?',
     time: '2m',
     tint: 'var(--ds-accent)',
     live: true,
@@ -29,7 +29,7 @@ const THREADS = [
   {
     initial: 'J',
     name: 'Jonas Weber',
-    snippet: 'You: I have upgraded your workspace to the Scale plan.',
+    snippet: 'You: Your exchange for the size 10 boots ships today.',
     time: '14m',
     tint: '#7c5cff',
     live: true,
@@ -39,7 +39,7 @@ const THREADS = [
   {
     initial: 'A',
     name: 'Amara Osei',
-    snippet: 'Perfect, that fixed it. Thank you so much! 🙏',
+    snippet: 'Perfect, the tracking link works now. Thank you! 🙏',
     time: '1h',
     tint: '#0f9d76',
     live: false,
@@ -49,7 +49,7 @@ const THREADS = [
   {
     initial: 'T',
     name: 'Tomás Rivera',
-    snippet: 'Can I export the conversation transcript as CSV?',
+    snippet: 'Is the Summit 30L pack carry-on size for most airlines?',
     time: '3h',
     tint: '#d97706',
     live: false,
@@ -114,7 +114,7 @@ export function ProductShowcase() {
           </div>
           <div className="flex-1 flex justify-center">
             <div className="px-3 py-1 rounded-md bg-surface border border-line text-[10.5px] text-ink-3 font-mono">
-              app.zen-try.io/inbox
+              zen-try.site/dashboard
             </div>
           </div>
           <div className="w-14" />
@@ -125,14 +125,14 @@ export function ProductShowcase() {
           <div className="hidden sm:flex w-[172px] flex-col border-r border-line bg-surface-2 p-3 gap-4">
             <div className="flex items-center gap-2 px-1">
               <div className="w-6 h-6 rounded-lg bg-ink text-ink-inv flex items-center justify-center text-[11px] font-bold">
-                N
+                L
               </div>
               <div className="min-w-0">
                 <div className="text-[11px] font-semibold text-ink truncate">
-                  Northwind
+                  Lumen Outdoor Co.
                 </div>
                 <div className="text-[9.5px] text-ink-3 truncate">
-                  northwind.com
+                  lumenoutdoor.com
                 </div>
               </div>
             </div>
@@ -238,7 +238,7 @@ export function ProductShowcase() {
                   </div>
                   <div className="text-[10px] text-ink-3 flex items-center gap-1 truncate">
                     <span className="live-dot" />
-                    Viewing /docs/webhooks
+                    Viewing /products/ridgeline-2p-tent
                   </div>
                 </div>
               </div>
@@ -253,8 +253,8 @@ export function ProductShowcase() {
                 <span className="pill pill-neutral">Today · 09:14</span>
               </div>
               <Bubble side="in">
-                Hey! The webhook fires twice whenever a retry happens. Is that
-                expected behaviour?
+                Hi! If I order the Ridgeline 2P tent today, will it reach
+                Toronto before Saturday?
               </Bubble>
               <Bubble
                 side="out"
@@ -265,11 +265,11 @@ export function ProductShowcase() {
                   </>
                 }
               >
-                Good catch — retries are at-least-once by design. Add the{' '}
-                <span className="font-mono opacity-80">Idempotency-Key</span>{' '}
-                header and we&apos;ll dedupe them for you.
+                Yes — order before 3pm ET and pick{' '}
+                <span className="font-semibold">Express</span> at checkout.
+                It ships today and arrives Thursday.
               </Bubble>
-              <Bubble side="in">That did it. Thank you! 🎉</Bubble>
+              <Bubble side="in">Perfect, ordering now. Thank you! 🎉</Bubble>
               <div className="flex items-center gap-1.5 text-ink-3 pl-1">
                 <span className="typing-dots">
                   <span />

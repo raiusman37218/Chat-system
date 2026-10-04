@@ -44,6 +44,9 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   viewportFit: "cover",
+  // Android: shrink the layout when the keyboard opens so fixed composers and
+  // form fields stay visible above it.
+  interactiveWidget: "resizes-content",
 };
 
 /**

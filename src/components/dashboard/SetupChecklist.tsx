@@ -1,5 +1,6 @@
 'use client';
 
+import { getWidgetOrigin } from '@/lib/domain';
 import React, { useState, useEffect, useMemo } from 'react';
 import {
   CheckCircle2,
@@ -339,8 +340,7 @@ export function SetupChecklist({
   const progressPercent = Math.round((completedCount / checklistItems.length) * 100);
   const isAllComplete = completedCount === checklistItems.length;
 
-  const origin =
-    typeof window !== 'undefined' ? window.location.origin : (process.env.NEXT_PUBLIC_APP_URL || '');
+  const origin = getWidgetOrigin();
   const workspaceId = workspace?.id || 'YOUR_WORKSPACE_ID';
 
   const embedSnippet = `<!-- Zen-try Live Chat Support -->

@@ -193,6 +193,8 @@ class ZentryWidget {
 
     this.initDOM();
     this.fetchWorkspaceSettingsAndApply().then(async (isActive) => {
+      // Branding is applied now — swap the shimmer for the real launcher.
+      this.shadow?.getElementById('chatifyLauncherBtn')?.classList.remove('is-loading');
       if (isActive === false) return;
       this.bindGlobalTriggers();
       this.initVisitorTracking();
@@ -1628,6 +1630,20 @@ class ZentryWidget {
 
     this.shadow = this.container.attachShadow({ mode: 'open' });
 
+    // On phones the panel is full-screen. Track the *visual* viewport so the
+    // composer rides above the on-screen keyboard instead of hiding behind it.
+    const vv = window.visualViewport;
+    if (vv && this.container) {
+      const root = this.container;
+      const syncViewport = () => {
+        root.style.setProperty('--w-vvh', `${Math.round(vv.height)}px`);
+        root.style.setProperty('--w-vv-top', `${Math.round(vv.offsetTop)}px`);
+      };
+      syncViewport();
+      vv.addEventListener('resize', syncViewport);
+      vv.addEventListener('scroll', syncViewport);
+    }
+
     // 1. Stop keyboard events that originate inside the widget from reaching the host page
     ['keydown', 'keyup', 'keypress'].forEach((eventType) => {
       this.shadow?.addEventListener(eventType, (e: Event) => {
@@ -1679,8 +1695,10 @@ class ZentryWidget {
 
     // Launcher HTML
     const launcher = document.createElement('button');
-    launcher.className = 'chatify-launcher';
+    // Shimmers until workspace branding arrives, so the default colour never flashes.
+    launcher.className = this.config.workspaceId ? 'chatify-launcher is-loading' : 'chatify-launcher';
     launcher.id = 'chatifyLauncherBtn';
+    launcher.setAttribute('aria-label', 'Open chat');
     const shouldShowLauncherLogo = this.config.showLauncherLogo !== false && Boolean(this.config.logoUrl);
     const initialLogo = shouldShowLauncherLogo ? this.config.logoUrl! : (ZENTRY_ICON_DATA_URI || CHATIFY_ICON_DATA_URI);
     const isCustomLogo = shouldShowLauncherLogo;
@@ -1874,8 +1892,8 @@ class ZentryWidget {
               </div>
               <div class="chatify-form-group">
                 <label>Email Address <span class="chatify-required-tag" style="color:#ef4444; font-weight:700;">*</span></label>
-                <input type="email" id="chatifyInputEmail" class="chatify-input" placeholder="sarah@example.com" required />
-                <div id="chatifyEmailError" style="display:none; color:#ef4444; font-size:12px; margin-top:4px; font-weight:500;">Please enter a valid email address.</div>
+                <input type="email" id="chatifyInputEmail" class="chatify-input" placeholder="sarah@example.com" autocomplete="email" inputmode="email" required aria-required="true" aria-describedby="chatifyEmailError" />
+                <div id="chatifyEmailError" class="chatify-field-error" role="alert" aria-live="polite" style="display:none;"></div>
               </div>
               <button class="chatify-start-btn" id="chatifyStartBtn">Start Live Conversation</button>
             </div>
@@ -2104,10 +2122,13 @@ class ZentryWidget {
     };
     prechatEmail?.addEventListener('keydown', handlePrechatEnter);
     prechatName?.addEventListener('keydown', handlePrechatEnter);
+    // Validate when the visitor leaves the field (once they've typed), and
+    // re-check live while an error is showing so it clears as soon as it's fixed.
+    prechatEmail?.addEventListener('blur', () => {
+      if (prechatEmail.value.trim()) this.validatePrechatEmail();
+    });
     prechatEmail?.addEventListener('input', () => {
-      if (prechatEmail.style.borderColor) prechatEmail.style.borderColor = '';
-      const err = this.shadow?.getElementById('chatifyEmailError');
-      if (err) err.style.display = 'none';
+      if (prechatEmail.getAttribute('aria-invalid') === 'true') this.validatePrechatEmail();
     });
 
     const sendBtn = this.shadow.getElementById('chatifySendBtn');
@@ -2823,6 +2844,27 @@ class ZentryWidget {
 
       .chatify-launcher:active { transform: scale(.95); }
 
+      .chatify-launcher.is-loading {
+        background: #e7e9ef;
+        box-shadow: 0 6px 18px rgba(11,11,15,.10);
+        overflow: hidden;
+        animation: w-launcher-in .3s var(--w-ease) both;
+      }
+      .chatify-launcher.is-loading > * { opacity: 0; }
+      .chatify-launcher.is-loading::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        border-radius: 50%;
+        background: linear-gradient(100deg, transparent 20%, rgba(255,255,255,.75) 50%, transparent 80%);
+        transform: translateX(-100%);
+        animation: w-launcher-shimmer 1.4s infinite;
+      }
+      .chatify-launcher-icon,
+      .chatify-launcher svg { transition: opacity .2s var(--w-ease); }
+      @keyframes w-launcher-shimmer { to { transform: translateX(100%); } }
+      @keyframes w-launcher-in { from { opacity: 0; transform: scale(.85); } to { opacity: 1; transform: none; } }
+
       /* An expanding ring, drawn only while messages are waiting. A launcher
          that pulses permanently is just noise the visitor learns to ignore. */
       .chatify-launcher::after {
@@ -3225,13 +3267,13 @@ class ZentryWidget {
           inset: 0 !important;
           left: 0 !important;
           right: 0 !important;
-          top: 0 !important;
-          bottom: 0 !important;
+          top: var(--w-vv-top, 0px) !important;
+          bottom: auto !important;
           width: 100vw !important;
           max-width: 100vw !important;
           height: 100% !important;
-          height: 100dvh !important;
-          max-height: 100dvh !important;
+          height: var(--w-vvh, 100dvh) !important;
+          max-height: var(--w-vvh, 100dvh) !important;
           border-radius: 0 !important;
           border: none !important;
           box-shadow: none !important;
@@ -3250,12 +3292,23 @@ class ZentryWidget {
           bottom: ${offsetBottom + 64}px !important;
         }
 
+        /* 16px stops iOS from zooming the page when a field is focused. */
+        .chatify-textarea,
+        .chatify-input {
+          font-size: 16px !important;
+        }
+
+        .chatify-messages,
+        .chatify-body {
+          overscroll-behavior: contain;
+        }
+
         .chatify-close-btn,
         .chatify-icon-btn#homeCloseBtn {
-          width: 38px !important;
-          height: 38px !important;
-          min-width: 38px !important;
-          min-height: 38px !important;
+          width: 44px !important;
+          height: 44px !important;
+          min-width: 44px !important;
+          min-height: 44px !important;
           border-radius: 50% !important;
           display: flex !important;
           align-items: center !important;
@@ -3899,6 +3952,20 @@ class ZentryWidget {
       }
 
       .chatify-input::placeholder { color: var(--w-ink-3); }
+
+      .chatify-input.chatify-input-invalid,
+      .chatify-input.chatify-input-invalid:focus {
+        border-color: #ef4444;
+        box-shadow: 0 0 0 3px rgba(239, 68, 68, .14);
+      }
+
+      .chatify-field-error {
+        margin-top: 6px;
+        font-size: 12px;
+        line-height: 1.4;
+        font-weight: 500;
+        color: #dc2626;
+      }
 
       .chatify-input:focus {
         border-color: var(--w-brand);
@@ -4868,27 +4935,40 @@ class ZentryWidget {
     `;
   }
 
+  /** Shows or clears the inline error under the pre-chat email field. */
+  private validatePrechatEmail(): boolean {
+    const emailInput = this.shadow?.getElementById('chatifyInputEmail') as HTMLInputElement | null;
+    const emailError = this.shadow?.getElementById('chatifyEmailError');
+    const email = (emailInput?.value || '').trim();
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+
+    const message = !email
+      ? 'Please enter your email so we can follow up.'
+      : !emailRegex.test(email)
+      ? 'That doesn\'t look like a valid email — try name@company.com.'
+      : '';
+
+    if (emailInput) {
+      emailInput.classList.toggle('chatify-input-invalid', Boolean(message));
+      emailInput.setAttribute('aria-invalid', message ? 'true' : 'false');
+    }
+    if (emailError) {
+      emailError.textContent = message;
+      emailError.style.display = message ? 'block' : 'none';
+    }
+    return !message;
+  }
+
   // 11. Handlers
   private async handleStartPreChat() {
     const nameInput = this.shadow?.getElementById('chatifyInputName') as HTMLInputElement | null;
     const emailInput = this.shadow?.getElementById('chatifyInputEmail') as HTMLInputElement | null;
-    const emailError = this.shadow?.getElementById('chatifyEmailError');
 
     const email = (emailInput?.value || '').trim();
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!email || !emailRegex.test(email)) {
-      if (emailInput) {
-        emailInput.style.borderColor = '#ef4444';
-        emailInput.focus();
-      }
-      if (emailError) {
-        emailError.style.display = 'block';
-      }
+    if (!this.validatePrechatEmail()) {
+      emailInput?.focus();
       return;
     }
-
-    if (emailError) emailError.style.display = 'none';
-    if (emailInput) emailInput.style.borderColor = '';
 
     this.visitorName = nameInput?.value.trim() || '';
     this.visitorEmail = email;

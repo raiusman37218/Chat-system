@@ -1,5 +1,7 @@
 'use client';
 
+import { getWidgetOrigin } from '@/lib/domain';
+import { DEFAULT_MODELS } from '@/lib/ai/models';
 import React, { useState, useMemo, useEffect } from 'react';
 import { testAiProviderAction } from '@/app/actions/knowledge';
 import {
@@ -790,6 +792,10 @@ export function AdminSettingsPanel({
     warning?: string;
   } | null>(null);
 
+  // Same fallback the server applies when no model is saved.
+  const defaultAiModel: string =
+    DEFAULT_MODELS[(aiSettings.provider || 'anthropic') as keyof typeof DEFAULT_MODELS] ?? '';
+
   const handleTestAiProvider = async () => {
     setTestingProvider(true);
     setProviderTest(null);
@@ -829,10 +835,7 @@ export function AdminSettingsPanel({
   // ──────────────────────────────────────────────────────────────────────────
   // SECTION 6: INSTALL SNIPPET
   // ──────────────────────────────────────────────────────────────────────────
-  const origin =
-    typeof window !== 'undefined'
-      ? window.location.origin
-      : process.env.NEXT_PUBLIC_APP_ORIGIN || '';
+  const origin = getWidgetOrigin();
   const installSnippetCode = `<!-- Zen-try Live Chat Tracker & Widget -->
 <script
   src="${origin}/tracker.js"
@@ -3482,23 +3485,17 @@ export function AdminSettingsPanel({
                         type="text"
                         value={aiSettings.model || ''}
                         onChange={(e) => setAiSettings({ ...aiSettings, model: e.target.value })}
-                        placeholder={
-                          aiSettings.provider === 'openai'
-                            ? 'gpt-5'
-                            : aiSettings.provider === 'google'
-                            ? 'gemini-2.5-pro'
-                            : aiSettings.provider === 'deepseek'
-                            ? 'deepseek-chat'
-                            : aiSettings.provider === 'compatible'
-                            ? 'provider/model-name'
-                            : 'claude-opus-5'
-                        }
+                        placeholder={defaultAiModel || 'provider/model-name'}
                         className="input font-mono text-xs"
                       />
                       <p className="text-[11px] text-ink-3">
                         {/* Typed rather than picked from a list: model names
                             change faster than this page can be redeployed. */}
-                        Leave empty for the provider&apos;s default.
+                        {aiSettings.model
+                          ? <>Using <span className="font-mono text-ink-2">{aiSettings.model}</span>.</>
+                          : defaultAiModel
+                          ? <>Leave empty to use the default, <span className="font-mono text-ink-2">{defaultAiModel}</span>.</>
+                          : 'Enter the model name your endpoint serves.'}
                       </p>
                     </div>
                   </div>
@@ -4486,7 +4483,7 @@ export function AdminSettingsPanel({
                 <button
                   type="button"
                   onClick={() => {
-                    const host = typeof window !== 'undefined' ? window.location.origin : 'https://zen-try.com';
+                    const host = getWidgetOrigin();
                     const snippet = `<script\n  src="${host}/widget.js"\n  data-workspace-id="${workspace.id}"\n  data-color="${workspace.brand_color || '#2563eb'}"\n  data-title="${workspace.name} Support"\n  async>\n</script>`;
                     navigator.clipboard.writeText(snippet);
                     setCopiedSnippet(true);
@@ -4502,7 +4499,7 @@ export function AdminSettingsPanel({
 
               {/* Code Display */}
               {(() => {
-                const host = typeof window !== 'undefined' ? window.location.origin : 'https://zen-try.com';
+                const host = getWidgetOrigin();
                 const snippet = `<script\n  src="${host}/widget.js"\n  data-workspace-id="${workspace.id}"\n  data-color="${workspace.brand_color || '#2563eb'}"\n  data-title="${workspace.name} Support"\n  async>\n</script>`;
                 return (
                   <div className="relative rounded-xl border border-line bg-surface-2 p-4 font-mono text-[12.5px] text-ink overflow-x-auto leading-relaxed">
@@ -4690,7 +4687,7 @@ window.Zentry.close();`}</code></pre>
                 <button
                   type="button"
                   onClick={() => {
-                    const host = typeof window !== 'undefined' ? window.location.origin : 'https://zen-try.com';
+                    const host = getWidgetOrigin();
                     const nextSnippet = `import Script from 'next/script';\n\nexport default function RootLayout({ children }) {\n  return (\n    <html lang="en">\n      <body>\n        {children}\n        <Script\n          src="${host}/widget.js"\n          data-workspace-id="${workspace.id}"\n          strategy="afterInteractive"\n        />\n      </body>\n    </html>\n  );\n}`;
                     navigator.clipboard.writeText(nextSnippet);
                     showStatus('Next.js component snippet copied!');
@@ -4703,7 +4700,7 @@ window.Zentry.close();`}</code></pre>
               </div>
 
               {(() => {
-                const host = typeof window !== 'undefined' ? window.location.origin : 'https://zen-try.com';
+                const host = getWidgetOrigin();
                 const nextSnippet = `import Script from 'next/script';\n\nexport default function RootLayout({ children }) {\n  return (\n    <html lang="en">\n      <body>\n        {children}\n        <Script\n          src="${host}/widget.js"\n          data-workspace-id="${workspace.id}"\n          strategy="afterInteractive"\n        />\n      </body>\n    </html>\n  );\n}`;
                 return (
                   <div className="rounded-xl border border-line bg-surface-2 p-4 font-mono text-[12px] text-ink overflow-x-auto leading-relaxed">

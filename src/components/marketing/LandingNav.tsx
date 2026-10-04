@@ -12,7 +12,7 @@ export function LandingNav() {
   return (
     <header className="sticky top-0 z-50 border-b border-line bg-surface/80 backdrop-blur-md">
       <div className="u-container h-16 flex items-center justify-between gap-4 sm:gap-6 flex-nowrap">
-        <Link href="/" className="flex items-center shrink-0 whitespace-nowrap">
+        <Link href="/" className="flex items-center min-h-11 shrink-0 whitespace-nowrap">
           <Logo size={34} />
         </Link>
 
@@ -58,7 +58,7 @@ export function LandingNav() {
           >
             Sign in
           </Link>
-          <Link href="/signup" className="btn btn-sm btn-primary shadow-xs shrink-0 whitespace-nowrap">
+          <Link href="/signup" className="btn btn-sm btn-primary shadow-xs shrink-0 whitespace-nowrap max-sm:h-11 max-sm:px-4">
             <span>Get started</span>
             <ArrowRight className="w-3.5 h-3.5" />
           </Link>
@@ -68,7 +68,7 @@ export function LandingNav() {
             type="button"
             onClick={() => setMobileMenuOpen((prev) => !prev)}
             aria-label="Toggle navigation menu"
-            className="lg:hidden p-2 rounded-xl text-ink-2 hover:text-ink hover:bg-surface-2 transition-colors border border-line shrink-0"
+            className="lg:hidden w-11 h-11 flex items-center justify-center rounded-xl text-ink-2 hover:text-ink hover:bg-surface-2 transition-colors border border-line shrink-0"
           >
             {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </button>
@@ -82,35 +82,35 @@ export function LandingNav() {
             <a
               href="#product"
               onClick={() => setMobileMenuOpen(false)}
-              className="px-3 py-2 rounded-lg text-ink hover:bg-surface-2 transition-colors whitespace-nowrap"
+              className="px-3 py-2 min-h-11 flex items-center rounded-lg text-ink hover:bg-surface-2 transition-colors whitespace-nowrap"
             >
               Product
             </a>
             <a
               href="#how"
               onClick={() => setMobileMenuOpen(false)}
-              className="px-3 py-2 rounded-lg text-ink hover:bg-surface-2 transition-colors whitespace-nowrap"
+              className="px-3 py-2 min-h-11 flex items-center rounded-lg text-ink hover:bg-surface-2 transition-colors whitespace-nowrap"
             >
               How it works
             </a>
             <a
               href="#install"
               onClick={() => setMobileMenuOpen(false)}
-              className="px-3 py-2 rounded-lg text-ink hover:bg-surface-2 transition-colors whitespace-nowrap"
+              className="px-3 py-2 min-h-11 flex items-center rounded-lg text-ink hover:bg-surface-2 transition-colors whitespace-nowrap"
             >
               Installation
             </a>
             <a
               href="#faq"
               onClick={() => setMobileMenuOpen(false)}
-              className="px-3 py-2 rounded-lg text-ink hover:bg-surface-2 transition-colors whitespace-nowrap"
+              className="px-3 py-2 min-h-11 flex items-center rounded-lg text-ink hover:bg-surface-2 transition-colors whitespace-nowrap"
             >
               FAQ
             </a>
             <Link
               href="/help"
               onClick={() => setMobileMenuOpen(false)}
-              className="px-3 py-2 rounded-lg text-ink hover:bg-surface-2 transition-colors flex items-center justify-between whitespace-nowrap"
+              className="px-3 py-2 min-h-11 flex items-center rounded-lg text-ink hover:bg-surface-2 transition-colors flex items-center justify-between whitespace-nowrap"
             >
               <span>Help Center</span>
             </Link>
@@ -119,7 +119,7 @@ export function LandingNav() {
               target="_blank"
               rel="noreferrer"
               onClick={() => setMobileMenuOpen(false)}
-              className="px-3 py-2 rounded-lg text-accent font-semibold hover:bg-accent/10 transition-colors flex items-center justify-between whitespace-nowrap"
+              className="px-3 py-2 min-h-11 rounded-lg text-accent font-semibold hover:bg-accent/10 transition-colors flex items-center justify-between whitespace-nowrap"
             >
               <span>Live demo</span>
               <span className="live-dot" />
@@ -131,7 +131,7 @@ export function LandingNav() {
             <Link
               href="/login"
               onClick={() => setMobileMenuOpen(false)}
-              className="btn btn-sm btn-secondary flex-1 justify-center whitespace-nowrap"
+              className="btn btn-sm btn-secondary flex-1 justify-center whitespace-nowrap max-sm:h-11"
             >
               Sign in
             </Link>

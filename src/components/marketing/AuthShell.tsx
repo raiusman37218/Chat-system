@@ -22,7 +22,7 @@ export function AuthShell({
         <div className="flex items-center justify-between">
           <Link
             href="/"
-            className="inline-flex items-center group"
+            className="inline-flex items-center min-h-11 group"
             aria-label="Zen-try home"
           >
             <Logo size={32} />
@@ -36,7 +36,7 @@ export function AuthShell({
 
         <Link
           href="/"
-          className="inline-flex items-center gap-1.5 text-[12.5px] text-ink-3 hover:text-ink transition-colors"
+          className="inline-flex items-center gap-1.5 min-h-11 text-[12.5px] text-ink-3 hover:text-ink transition-colors"
         >
           <ArrowLeft className="w-3.5 h-3.5" />
           Back to home

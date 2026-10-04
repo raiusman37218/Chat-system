@@ -10,6 +10,7 @@ import {
   TrendingDown,
   RefreshCw,
   MessageSquare,
+  ArrowRight,
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -30,6 +31,79 @@ import { Workspace, Agent } from '@/types/database';
 interface AnalyticsDashboardProps {
   workspace: Workspace;
   currentAgent: Agent;
+  /** Opens the widget install instructions (Settings → Install). */
+  onOpenInstall?: () => void;
+  /** Jumps to the inbox. */
+  onOpenInbox?: () => void;
+}
+
+/** Illustrative shape only — rendered faded behind empty charts. */
+const SAMPLE_TIMELINE = [3, 5, 4, 7, 6, 9, 8, 11, 10, 13, 12, 15].map((total, i) => ({
+  date: `Day ${i + 1}`,
+  total,
+  resolved: Math.max(0, total - 2 - (i % 3)),
+  csat: [4.2, 4.4, 4.1, 4.6, 4.5, 4.7, 4.3, 4.8, 4.6, 4.7, 4.9, 4.8][i],
+}));
+
+/**
+ * Empty KPI footnote: what the number means, plus the one action that
+ * produces it.
+ */
+function KpiEmpty({
+  meaning,
+  action,
+  cta,
+  onClick,
+}: {
+  meaning: string;
+  action: string;
+  cta?: string;
+  onClick?: () => void;
+}) {
+  return (
+    <div className="space-y-1.5">
+      <p className="text-[11.5px] text-ink-3 leading-snug">{meaning}</p>
+      <p className="text-[11.5px] text-ink-2 leading-snug">{action}</p>
+      {cta && onClick && (
+        <button
+          type="button"
+          onClick={onClick}
+          className="inline-flex items-center gap-1 text-[11.5px] font-semibold text-accent hover:underline"
+        >
+          {cta}
+          <ArrowRight className="w-3 h-3" />
+        </button>
+      )}
+    </div>
+  );
+}
+
+/** Overlay shown on top of a faded sample chart. */
+function ChartEmpty({
+  title,
+  body,
+  cta,
+  onClick,
+}: {
+  title: string;
+  body: string;
+  cta?: string;
+  onClick?: () => void;
+}) {
+  return (
+    <div className="absolute inset-0 flex items-center justify-center p-4">
+      <div className="max-w-xs text-center rounded-xl border border-line bg-surface/95 backdrop-blur-sm shadow-sm px-5 py-4">
+        <p className="text-[13px] font-semibold text-ink">{title}</p>
+        <p className="mt-1 text-[12px] text-ink-3 leading-snug">{body}</p>
+        {cta && onClick && (
+          <button type="button" onClick={onClick} className="btn btn-sm btn-primary mt-3">
+            {cta}
+            <ArrowRight className="w-3.5 h-3.5" />
+          </button>
+        )}
+      </div>
+    </div>
+  );
 }
 
 interface AnalyticsData {
@@ -81,7 +155,12 @@ function formatDuration(seconds: number | null): string {
   return `${hours}h ${remMins}m`;
 }
 
-export function AnalyticsDashboard({ workspace, currentAgent }: AnalyticsDashboardProps) {
+export function AnalyticsDashboard({
+  workspace,
+  currentAgent,
+  onOpenInstall,
+  onOpenInbox,
+}: AnalyticsDashboardProps) {
   const [range, setRange] = useState<'7d' | '30d' | '90d'>('30d');
   const [granularity, setGranularity] = useState<'daily' | 'weekly' | 'monthly'>('daily');
   const [loading, setLoading] = useState(true);
@@ -121,6 +200,12 @@ export function AnalyticsDashboard({ workspace, currentAgent }: AnalyticsDashboa
     positiveCsatPercent: null,
     totalCsatRatings: 0,
   };
+
+  // Empty states only once data has loaded, so they never flash during fetch.
+  const noConversations = !loading && summary.totalConversations === 0;
+  const timeline = data?.timelineData || [];
+  const volumeEmpty = !loading && !timeline.some((d) => d.total > 0 || d.resolved > 0);
+  const csatEmpty = !loading && summary.totalCsatRatings === 0;
 
   return (
     <div className="flex-1 flex flex-col h-full bg-surface-2 overflow-y-auto">
@@ -235,7 +320,16 @@ export function AnalyticsDashboard({ workspace, currentAgent }: AnalyticsDashboa
                 </span>
               )}
             </div>
-            <p className="text-[11.5px] text-ink-3">Inbound visitor messages</p>
+            {noConversations ? (
+              <KpiEmpty
+                meaning="Every chat a visitor starts on your site."
+                action="Install the widget on your site to start collecting conversations."
+                cta="Install the widget"
+                onClick={onOpenInstall}
+              />
+            ) : (
+              <p className="text-[11.5px] text-ink-3">Inbound visitor messages</p>
+            )}
           </div>
 
           {/* KPI 2: Avg First Response Time */}
@@ -257,11 +351,25 @@ export function AnalyticsDashboard({ workspace, currentAgent }: AnalyticsDashboa
                   </span>
                 )}
             </div>
-            <p className="text-[11.5px] text-ink-3">
-              {summary.avgFirstResponseSeconds === null
-                ? 'No replies measured yet'
-                : 'Time until first agent reply'}
-            </p>
+            {summary.avgFirstResponseSeconds === null && !loading ? (
+              noConversations ? (
+                <KpiEmpty
+                  meaning="How long visitors wait for your first reply."
+                  action="Starts measuring once the widget brings in a conversation."
+                  cta="Install the widget"
+                  onClick={onOpenInstall}
+                />
+              ) : (
+                <KpiEmpty
+                  meaning="How long visitors wait for your first reply."
+                  action="Reply to an open conversation to start measuring."
+                  cta="Open inbox"
+                  onClick={onOpenInbox}
+                />
+              )
+            ) : (
+              <p className="text-[11.5px] text-ink-3">Time until first agent reply</p>
+            )}
           </div>
 
           {/* KPI 3: Avg Resolution Time */}
@@ -275,11 +383,20 @@ export function AnalyticsDashboard({ workspace, currentAgent }: AnalyticsDashboa
                 {formatDuration(summary.avgResolutionSeconds)}
               </span>
             </div>
-            <p className="text-[11.5px] text-ink-3">
-              {summary.avgResolutionSeconds === null
-                ? 'No conversations resolved yet'
-                : 'From start to closed ticket'}
-            </p>
+            {summary.avgResolutionSeconds === null && !loading ? (
+              <KpiEmpty
+                meaning="Time from a visitor's first message to resolved."
+                action={
+                  noConversations
+                    ? 'Appears after your first conversation is resolved.'
+                    : 'Resolve a conversation to see this.'
+                }
+                cta={noConversations ? undefined : 'Open inbox'}
+                onClick={onOpenInbox}
+              />
+            ) : (
+              <p className="text-[11.5px] text-ink-3">From start to closed ticket</p>
+            )}
           </div>
 
           {/* KPI 4: CSAT Satisfaction Score */}
@@ -307,13 +424,22 @@ export function AnalyticsDashboard({ workspace, currentAgent }: AnalyticsDashboa
                 </span>
               )}
             </div>
-            <p className="text-[11.5px] text-ink-3">
-              {summary.totalCsatRatings > 0
-                ? `Based on ${summary.totalCsatRatings} post-chat rating${
-                    summary.totalCsatRatings === 1 ? '' : 's'
-                  }`
-                : 'No ratings collected yet'}
-            </p>
+            {csatEmpty ? (
+              <KpiEmpty
+                meaning="Visitors' 1–5★ rating of their chat."
+                action="Visitors are asked to rate automatically when you resolve a conversation."
+                cta={noConversations ? undefined : 'Open inbox'}
+                onClick={onOpenInbox}
+              />
+            ) : (
+              <p className="text-[11.5px] text-ink-3">
+                {summary.totalCsatRatings > 0
+                  ? `Based on ${summary.totalCsatRatings} post-chat rating${
+                      summary.totalCsatRatings === 1 ? '' : 's'
+                    }`
+                  : 'Post-chat ratings from visitors'}
+              </p>
+            )}
           </div>
         </div>
 
@@ -342,10 +468,11 @@ export function AnalyticsDashboard({ workspace, currentAgent }: AnalyticsDashboa
               </div>
             </div>
 
-            <div className="h-72 w-full pt-2">
+            <div className="h-72 w-full pt-2 relative">
+              <div className={volumeEmpty ? 'h-full opacity-25 grayscale pointer-events-none' : 'h-full'} aria-hidden={volumeEmpty}>
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart
-                  data={data?.timelineData || []}
+                  data={volumeEmpty ? SAMPLE_TIMELINE : timeline}
                   margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
                 >
                   <defs>
@@ -400,6 +527,19 @@ export function AnalyticsDashboard({ workspace, currentAgent }: AnalyticsDashboa
                   />
                 </AreaChart>
               </ResponsiveContainer>
+              </div>
+              {volumeEmpty && (
+                <ChartEmpty
+                  title="No conversations in this period"
+                  body={
+                    noConversations
+                      ? 'Install the widget on your site and new chats will chart here, next to how many you resolve.'
+                      : 'Try a longer date range, or check back once new chats arrive.'
+                  }
+                  cta={noConversations ? 'Install the widget' : undefined}
+                  onClick={onOpenInstall}
+                />
+              )}
             </div>
           </div>
 
@@ -483,10 +623,11 @@ export function AnalyticsDashboard({ workspace, currentAgent }: AnalyticsDashboa
             </div>
           </div>
 
-          <div className="h-56 w-full pt-2">
+          <div className="h-56 w-full pt-2 relative">
+            <div className={csatEmpty ? 'h-full opacity-25 grayscale pointer-events-none' : 'h-full'} aria-hidden={csatEmpty}>
             <ResponsiveContainer width="100%" height="100%">
               <LineChart
-                data={data?.timelineData || []}
+                data={csatEmpty ? SAMPLE_TIMELINE : timeline}
                 margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
               >
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--color-line, #e2e8f0)" opacity={0.6} />
@@ -525,6 +666,13 @@ export function AnalyticsDashboard({ workspace, currentAgent }: AnalyticsDashboa
                 />
               </LineChart>
             </ResponsiveContainer>
+            </div>
+            {csatEmpty && (
+              <ChartEmpty
+                title="No ratings yet"
+                body="When you resolve a chat, the widget asks the visitor for a 1–5★ rating. Their scores trend here."
+              />
+            )}
           </div>
         </div>
 
@@ -554,8 +702,9 @@ export function AnalyticsDashboard({ workspace, currentAgent }: AnalyticsDashboa
 
             {/* Table Rows */}
             {(data?.perAgentPerformance || []).length === 0 ? (
-              <div className="p-8 text-center text-xs text-ink-3">
-                No active conversations assigned to agents in this timeframe.
+              <div className="p-8 text-center text-xs text-ink-3 space-y-1">
+                <p className="text-ink-2 font-medium">No assigned conversations in this period.</p>
+                <p>Assign a conversation to a teammate from the inbox to compare workload and response times here.</p>
               </div>
             ) : (
               (data?.perAgentPerformance || []).map((agent) => (

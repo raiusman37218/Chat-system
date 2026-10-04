@@ -86,6 +86,16 @@ export default function ChatWidget({
   const [isOpen, setIsOpen] = useState(mode === 'window-only');
   const [visitorName, setVisitorName] = useState('');
   const [visitorEmail, setVisitorEmail] = useState('');
+  const [emailError, setEmailError] = useState<string | null>(null);
+  // Email is optional here, so only a filled-in, malformed value is an error.
+  const checkEmail = (value: string) => {
+    const v = value.trim();
+    const msg = v && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v)
+      ? "That doesn't look like a valid email — try name@company.com."
+      : null;
+    setEmailError(msg);
+    return !msg;
+  };
   const [isIdentified, setIsIdentified] = useState(false);
   const [isAgentOnline, setIsAgentOnline] = useState<boolean | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -628,6 +638,7 @@ export default function ChatWidget({
   // Pre-chat Form Submission: immediately sends auto welcome message before user sends their message
   const handlePreChatSubmit = async (e?: React.FormEvent, isSkip: boolean = false) => {
     if (e) e.preventDefault();
+    if (!isSkip && !checkEmail(visitorEmail)) return;
     const cleanName = isSkip ? '' : visitorName.trim();
     const cleanEmail = isSkip ? '' : visitorEmail.trim();
 
@@ -1386,7 +1397,7 @@ export default function ChatWidget({
                 </p>
               </div>
 
-              <form onSubmit={handlePreChatSubmit} className="space-y-3">
+              <form onSubmit={handlePreChatSubmit} noValidate className="space-y-3">
                 <div>
                   <label className="block text-xs font-medium text-slate-600 dark:text-slate-300 mb-1">
                     Your Name <span className="text-[11px] font-normal text-slate-400 dark:text-slate-500">(Optional)</span>
@@ -1408,9 +1419,27 @@ export default function ChatWidget({
                     type="email"
                     placeholder="sarah@example.com"
                     value={visitorEmail}
-                    onChange={(e) => setVisitorEmail(e.target.value)}
-                    className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    autoComplete="email"
+                    aria-invalid={Boolean(emailError)}
+                    aria-describedby="prechat-email-error"
+                    onChange={(e) => {
+                      setVisitorEmail(e.target.value);
+                      if (emailError) checkEmail(e.target.value);
+                    }}
+                    onBlur={(e) => checkEmail(e.target.value)}
+                    className={`w-full px-3 py-2 text-sm rounded-lg border bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 ${
+                      emailError
+                        ? 'border-red-500 focus:ring-red-500/40'
+                        : 'border-slate-300 dark:border-slate-700 focus:ring-blue-500'
+                    }`}
                   />
+                  <p
+                    id="prechat-email-error"
+                    role="alert"
+                    className={`mt-1 text-xs font-medium text-red-600 dark:text-red-400 ${emailError ? '' : 'hidden'}`}
+                  >
+                    {emailError}
+                  </p>
                 </div>
 
                 <button

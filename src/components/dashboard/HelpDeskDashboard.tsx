@@ -70,6 +70,7 @@ import { Agent, Article, HelpSection, Workspace } from '@/types/database';
 import { EmojiPickerPopover } from '@/components/dashboard/EmojiPickerPopover';
 import { MarkdownArticleContent } from '@/components/dashboard/MarkdownArticleContent';
 import { getWorkspaceHelpCenterUrl, cleanDomain } from '@/lib/domain';
+import { createClient } from '@/lib/supabase/client';
 import {
   getHelpDeskDataAction,
   createHelpSectionAction,
@@ -247,7 +248,41 @@ export function HelpDeskDashboard({
       setSections(data.sections);
       setArticles(data.articles);
     } catch (err: any) {
-      showToast(err.message || 'Failed to load Help Desk data', 'error');
+      // The server action's tenancy check can reject sessions the sidebar
+      // badge (RLS-scoped browser client) still serves, which left the tiles
+      // at "0 published / 0 drafts". Read the same projection through RLS.
+      try {
+        const supabase = createClient();
+        const [secRes, artRes] = await Promise.all([
+          supabase
+            .from('help_sections')
+            .select('*')
+            .eq('workspace_id', workspace.id)
+            .order('order_index', { ascending: true })
+            .order('created_at', { ascending: true }),
+          supabase
+            .from('articles')
+            .select(
+              'id, workspace_id, section_id, title, slug, category, summary, status, order_index, ' +
+                'author_id, views_count, helpful_count, not_helpful_count, created_at, updated_at, ' +
+                'author:agents(id, name, avatar_url), section:help_sections(id, name, slug, icon)'
+            )
+            .eq('workspace_id', workspace.id)
+            .order('order_index', { ascending: true })
+            .order('created_at', { ascending: true }),
+        ]);
+        if (secRes.error || artRes.error) throw secRes.error || artRes.error;
+        const secs = (secRes.data as HelpSection[]) || [];
+        const arts = (artRes.data as unknown as Article[]) || [];
+        const perSection: Record<string, number> = {};
+        arts.forEach((a) => {
+          if (a.section_id) perSection[a.section_id] = (perSection[a.section_id] || 0) + 1;
+        });
+        setSections(secs.map((s) => ({ ...s, article_count: perSection[s.id] || 0 })));
+        setArticles(arts);
+      } catch {
+        showToast(err.message || 'Failed to load Help Desk data', 'error');
+      }
     } finally {
       setLoading(false);
     }
@@ -955,14 +990,23 @@ export function HelpDeskDashboard({
               <span className="text-[12px] font-medium text-ink-3 uppercase tracking-wider">Total Articles</span>
               <BookOpen className="w-4 h-4 text-accent" />
             </div>
-            <div className="text-[26px] font-bold text-ink mt-2">{metrics.totalArticles}</div>
-            <div className="text-[11.5px] text-ink-3 mt-1 flex items-center gap-2">
-              <span className="text-emerald-500 font-medium">{metrics.publishedCount} published</span>
-              <span>•</span>
-              <span className="text-amber-500 font-medium">
-                {metrics.draftCount} {metrics.draftCount === 1 ? 'draft' : 'drafts'}
-              </span>
-            </div>
+            {loading && articles.length === 0 ? (
+              <>
+                <div className="skeleton h-[30px] w-12 mt-2 rounded-md" />
+                <div className="skeleton h-3 w-32 mt-2 rounded" />
+              </>
+            ) : (
+              <>
+                <div className="text-[26px] font-bold text-ink mt-2">{metrics.totalArticles}</div>
+                <div className="text-[11.5px] text-ink-3 mt-1 flex items-center gap-2">
+                  <span className="text-emerald-500 font-medium">{metrics.publishedCount} published</span>
+                  <span>•</span>
+                  <span className="text-amber-500 font-medium">
+                    {metrics.draftCount} {metrics.draftCount === 1 ? 'draft' : 'drafts'}
+                  </span>
+                </div>
+              </>
+            )}
           </div>
 
           <div className="p-4 rounded-xl border border-line bg-surface-2/60">

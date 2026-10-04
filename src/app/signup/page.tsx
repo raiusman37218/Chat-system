@@ -585,7 +585,7 @@ function SignupForm() {
               type="button"
               onClick={() => setShowPassword((s) => !s)}
               aria-label={showPassword ? 'Hide password' : 'Show password'}
-              className="absolute right-1.5 top-1/2 -translate-y-1/2 w-8 h-8 rounded-lg flex items-center justify-center text-ink-3 hover:text-ink hover:bg-surface-3 transition-colors cursor-pointer"
+              className="absolute right-0.5 top-1/2 -translate-y-1/2 w-11 h-11 sm:w-8 sm:h-8 sm:right-1.5 rounded-lg flex items-center justify-center text-ink-3 hover:text-ink hover:bg-surface-3 transition-colors cursor-pointer"
             >
               {showPassword ? (
                 <EyeOff className="w-4 h-4" />
@@ -659,7 +659,7 @@ function SignupForm() {
 
         {/* Checkbox with links to Terms and Privacy Policy */}
         <div className="pt-1">
-          <label className="flex items-start gap-2.5 cursor-pointer select-none">
+          <label className="flex items-start gap-2.5 min-h-11 cursor-pointer select-none">
             <input
               type="checkbox"
               id="terms"
@@ -677,7 +677,7 @@ function SignupForm() {
               <Link
                 href="/terms"
                 target="_blank"
-                className="font-medium text-ink underline underline-offset-4 hover:text-accent transition-colors"
+                className="py-[14px] font-medium text-ink underline underline-offset-4 hover:text-accent transition-colors"
               >
                 Terms of Service
               </Link>{' '}
@@ -685,7 +685,7 @@ function SignupForm() {
               <Link
                 href="/privacy"
                 target="_blank"
-                className="font-medium text-ink underline underline-offset-4 hover:text-accent transition-colors"
+                className="py-[14px] font-medium text-ink underline underline-offset-4 hover:text-accent transition-colors"
               >
                 Privacy Policy
               </Link>
@@ -716,7 +716,7 @@ function SignupForm() {
         Already have an account?{' '}
         <Link
           href="/login"
-          className="font-medium text-ink hover:underline underline-offset-4"
+          className="py-[14px] font-medium text-ink hover:underline underline-offset-4"
         >
           Sign in
         </Link>

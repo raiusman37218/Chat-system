@@ -21,6 +21,13 @@ function LoginForm() {
   const [googleLoading, setGoogleLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
+  // Where to land after signing in. Only same-site paths are honoured.
+  const redirectParam = searchParams.get('redirect');
+  const redirectTo =
+    redirectParam && redirectParam.startsWith('/') && !redirectParam.startsWith('//')
+      ? redirectParam
+      : '/dashboard';
+
   // undefined while we ask Supabase which providers are switched on.
   const googleEnabled = useProviderEnabled('google');
 
@@ -88,7 +95,7 @@ function LoginForm() {
         }
       }
 
-      router.push('/dashboard');
+      router.push(redirectTo);
       router.refresh();
     }
   };
@@ -114,7 +121,7 @@ function LoginForm() {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${origin}/auth/callback?next=/dashboard`,
+          redirectTo: `${origin}/auth/callback?next=${redirectTo === '/dashboard' ? '/dashboard' : encodeURIComponent(redirectTo)}`,
           queryParams: {
             access_type: 'offline',
             prompt: 'consent',
@@ -224,7 +231,7 @@ function LoginForm() {
               type="button"
               onClick={() => setShowPassword((s) => !s)}
               aria-label={showPassword ? 'Hide password' : 'Show password'}
-              className="absolute right-1.5 top-1/2 -translate-y-1/2 w-8 h-8 rounded-lg flex items-center justify-center text-ink-3 hover:text-ink hover:bg-surface-3 transition-colors"
+              className="absolute right-0.5 top-1/2 -translate-y-1/2 w-11 h-11 sm:w-8 sm:h-8 sm:right-1.5 rounded-lg flex items-center justify-center text-ink-3 hover:text-ink hover:bg-surface-3 transition-colors"
             >
               {showPassword ? (
                 <EyeOff className="w-4 h-4" />
@@ -260,7 +267,7 @@ function LoginForm() {
         <button
           type="button"
           onClick={handleDemoFill}
-          className="font-medium text-accent hover:underline underline-offset-4"
+          className="inline-flex items-center min-h-11 font-medium text-accent hover:underline underline-offset-4"
         >
           Use demo credentials
         </button>
@@ -268,7 +275,7 @@ function LoginForm() {
           No account?{' '}
           <Link
             href="/signup"
-            className="font-medium text-ink hover:underline underline-offset-4"
+            className="inline-flex items-center min-h-11 font-medium text-ink hover:underline underline-offset-4"
           >
             Sign up
           </Link>

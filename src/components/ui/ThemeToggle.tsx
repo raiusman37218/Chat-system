@@ -114,7 +114,8 @@ export function ThemeToggle({ className }: { className?: string }) {
             title={label}
             onClick={() => select(value)}
             className={cn(
-              'w-7 h-7 rounded-full flex items-center justify-center transition-colors duration-150',
+              // 44px touch targets on phones, compact on larger screens.
+              'w-11 h-11 sm:w-7 sm:h-7 rounded-full flex items-center justify-center transition-colors duration-150',
               active
                 ? 'bg-surface text-ink shadow-xs'
                 : 'text-ink-3 hover:text-ink-2'

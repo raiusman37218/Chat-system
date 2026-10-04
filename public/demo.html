@@ -3,7 +3,18 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Customer Website Simulator — Zen-try Live Support</title>
+  <title>Live demo — Zen-try</title>
+  <meta name="description" content="Try Zen-try live chat on a sample website. The chat in the corner is the real product." />
+  <script>
+    // Public visitors get a clean demo. The internal simulator HUD and SDK
+    // console only appear when a workspace is passed in (from the dashboard)
+    // or with ?mode=qa.
+    (function () {
+      var p = new URLSearchParams(location.search);
+      var qa = p.has('workspaceId') || p.has('ws') || p.get('mode') === 'qa';
+      document.documentElement.classList.add(qa ? 'qa-mode' : 'public-demo');
+    })();
+  </script>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
@@ -31,6 +42,40 @@
       line-height: 1.6;
       overflow-x: hidden;
       padding-top: 50px;
+    }
+
+    /* Public demo hides internal QA tooling */
+    .public-demo .qa-only { display: none !important; }
+    .qa-mode .public-only { display: none !important; }
+    .public-demo body { padding-top: 0; }
+
+    .demo-banner {
+      background: linear-gradient(90deg, #1d4ed8, #4f46e5);
+      color: #fff;
+      font-size: 13px;
+      padding: 10px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      text-align: center;
+    }
+    .demo-banner a {
+      display: inline-flex;
+      align-items: center;
+      min-height: 32px;
+      padding: 0 12px;
+      border-radius: 8px;
+      background: #fff;
+      color: #1d4ed8;
+      font-weight: 700;
+      text-decoration: none;
+      font-size: 12.5px;
+    }
+    .demo-banner a.ghost {
+      background: rgba(255,255,255,.14);
+      color: #fff;
     }
 
     /* Simulator HUD Bar */
@@ -448,8 +493,15 @@
 </head>
 <body>
 
-  <!-- Top Simulator HUD Bar -->
-  <aside class="simulator-hud">
+  <!-- Public demo banner -->
+  <div class="demo-banner public-only">
+    <span>You're on a sample website. The chat in the corner is the real Zen-try widget — say hello.</span>
+    <a href="/signup">Start free</a>
+    <a class="ghost" href="/">Back to Zen-try</a>
+  </div>
+
+  <!-- Top Simulator HUD Bar (internal) -->
+  <aside class="simulator-hud qa-only">
     <div class="sim-left">
       <span class="sim-tag">CUSTOMER SIMULATOR</span>
       <span class="sim-text">
@@ -509,8 +561,8 @@
         Deploy globally distributed compute and database primitives in under 60 seconds with zero configuration.
       </p>
 
-      <!-- Testing Guide for the User -->
-      <div class="sim-guide-box">
+      <!-- Testing Guide for the User (internal) -->
+      <div class="sim-guide-box qa-only">
         <div class="sim-guide-title">
           <span>🧪 How to Test Your Live Chat End-to-End:</span>
         </div>
@@ -534,7 +586,7 @@
       </div>
 
       <!-- Realtime Navigation Simulator -->
-      <div class="page-nav-simulator">
+      <div class="page-nav-simulator qa-only">
         <div style="font-size:12px; font-weight:600; color:#cbd5e1; margin-bottom:4px;">
           📡 Realtime URL Tracking Simulation
         </div>
@@ -549,10 +601,10 @@
         </div>
       </div>
 
-      <!-- Phase 3: Widget SDK & Help Center Trigger Testing Console -->
-      <div class="sim-guide-box" style="margin-top: 24px; border-color: rgba(99, 102, 241, 0.4); background: rgba(99, 102, 241, 0.07);">
+      <!-- Widget SDK & Help Center trigger console (internal) -->
+      <div class="sim-guide-box qa-only" style="margin-top: 24px; border-color: rgba(99, 102, 241, 0.4); background: rgba(99, 102, 241, 0.07);">
         <div class="sim-guide-title" style="color: #a5b4fc; margin-bottom: 8px;">
-          <span>⚡ Phase 3: Help Center &amp; Widget SDK Trigger Console</span>
+          <span>⚡ Widget SDK &amp; Help Center triggers</span>
         </div>
         <p style="font-size: 12px; color: #cbd5e1; margin-bottom: 14px;">
           Test the new <code style="color: #818cf8; background: #1e1b4b; padding: 2px 6px; border-radius: 4px;">window.Zentry</code> JavaScript SDK API and declarative <code style="color: #818cf8; background: #1e1b4b; padding: 2px 6px; border-radius: 4px;">data-zentry-*</code> HTML triggers:
@@ -607,7 +659,7 @@
     <!-- Live Chat Banner -->
     <section class="chat-banner">
       <h2>Have questions about integration?</h2>
-      <p>Our support team is online right now. Click the button below to test live real-time messaging.</p>
+      <p>Ask anything — a real person on the Zen-try team answers right here, in real time.</p>
       <button class="btn-primary" onclick="openChatBubble()">
         Open Live Chat Window
       </button>
@@ -615,14 +667,20 @@
   </main>
 
   <footer>
-    <p>© 2026 Zen-try Customer Simulator. Embedded with the Zen-try Live Support System.</p>
+    <p class="public-only">Nova Cloud is a sample company. Live chat by <a href="/" style="color:#93c5fd;">Zen-try</a>.</p>
+    <p class="qa-only">Customer website simulator · Zen-try</p>
   </footer>
 
   <script>
     // 1. Extract Workspace parameters from URL (or remembered active workspace)
     const urlParams = new URLSearchParams(window.location.search);
-    const workspaceId = urlParams.get('workspaceId') || urlParams.get('ws') || localStorage.getItem('zentry_active_workspace') || localStorage.getItem('chatify_active_workspace') || '';
-    if (workspaceId) {
+    const isQaMode = document.documentElement.classList.contains('qa-mode');
+    // Public demo always runs on the Zen-try demo workspace.
+    const DEMO_WORKSPACE_ID = 'c0000000-0000-0000-0000-000000000001';
+    const workspaceId = isQaMode
+      ? urlParams.get('workspaceId') || urlParams.get('ws') || localStorage.getItem('zentry_active_workspace') || localStorage.getItem('chatify_active_workspace') || DEMO_WORKSPACE_ID
+      : DEMO_WORKSPACE_ID;
+    if (isQaMode && workspaceId !== DEMO_WORKSPACE_ID) {
       localStorage.setItem('zentry_active_workspace', workspaceId);
     }
     const workspaceName = urlParams.get('name');
@@ -631,14 +689,14 @@
     document.addEventListener('DOMContentLoaded', () => {
       const wsDisplay = document.getElementById('simWsDisplay');
       if (wsDisplay) {
-        wsDisplay.textContent = workspaceId
-          ? `Workspace: ${workspaceName ? decodeURIComponent(workspaceName) : workspaceId.slice(0, 8) + '...'}`
-          : 'Workspace: (None selected)';
+        wsDisplay.textContent = workspaceId === DEMO_WORKSPACE_ID && !workspaceName
+          ? 'Workspace: Zen-try demo'
+          : `Workspace: ${workspaceName ? decodeURIComponent(workspaceName) : workspaceId.slice(0, 8) + '...'}`;
       }
 
       if (workspaceName) {
         const decoded = decodeURIComponent(workspaceName);
-        document.title = `${decoded} (Customer Website Simulator)`;
+        document.title = isQaMode ? `${decoded} (Customer Website Simulator)` : `${decoded} — Live demo`;
         const brandTitle = document.getElementById('simBrandTitle');
         if (brandTitle) brandTitle.textContent = decoded;
       }
@@ -680,10 +738,9 @@
 
     // 6. Dynamically load the Zen-try widget (with cache busting)
     const widgetScript = document.createElement('script');
-    widgetScript.src = '/widget.js?v=' + Date.now();
-    if (workspaceId) {
-      widgetScript.setAttribute('data-workspace-id', workspaceId);
-    }
+    // Cache-bust only for internal QA; public visitors get the cached build.
+    widgetScript.src = isQaMode ? '/widget.js?v=' + Date.now() : '/widget.js';
+    widgetScript.setAttribute('data-workspace-id', workspaceId);
     document.body.appendChild(widgetScript);
   </script>
 </body>
