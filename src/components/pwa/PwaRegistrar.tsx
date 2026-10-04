@@ -38,7 +38,7 @@ export function PwaRegistrar() {
           registration.update().catch(() => {});
         }, 30 * 60 * 1000);
       } catch (err) {
-        console.debug('[Chatify PWA] SW registration ignored:', err);
+        console.debug('[Zen-try PWA] SW registration ignored:', err);
       }
     };
 

@@ -6,16 +6,16 @@ export const dynamic = 'force-dynamic';
 export default async function HelpRootPage() {
   const supabase = await createClient();
 
-  // Priority 1: Dedicated Chatify workspace
-  const { data: chatifyWs } = await supabase
+  // Priority 1: Dedicated Zen-try workspace
+  const { data: zentryWs } = await supabase
     .from('public_workspaces')
     .select('id, slug')
-    .or('slug.eq.chatify,name.ilike.Chatify')
+    .or('slug.eq.zen-try,slug.eq.zentry,name.ilike.Zen-try,slug.eq.chatify,name.ilike.Chatify')
     .limit(1)
     .maybeSingle();
 
-  if (chatifyWs) {
-    redirect(`/help/${chatifyWs.slug || chatifyWs.id}`);
+  if (zentryWs) {
+    redirect(`/help/${zentryWs.slug || zentryWs.id}`);
   }
 
   // Priority 2: First active public workspace
@@ -26,6 +26,6 @@ export default async function HelpRootPage() {
     .limit(1)
     .maybeSingle();
 
-  const target = ws?.slug || ws?.id || 'chatify';
+  const target = ws?.slug || ws?.id || 'zen-try';
   redirect(`/help/${target}`);
 }

@@ -7,7 +7,7 @@
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
 /* ==========================================================================
-   CHATIFY DESIGN SYSTEM
+   ZEN-TRY DESIGN SYSTEM
    Deep Ink + Electric Blue. Light-first, dark by token swap.
    Every colour in the app resolves through these variables — never hardcode.
    ========================================================================== */

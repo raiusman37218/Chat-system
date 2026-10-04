@@ -1,6 +1,6 @@
-# Chatify Architecture & System Map
+# Zen-try Architecture & System Map
 
-Chatify is a multi-tenant live chat platform built with **Next.js (App Router)** and **Supabase (PostgreSQL, Auth, Realtime, Storage)**, deployed on **Vercel**.
+Zen-try is a multi-tenant live chat platform built with **Next.js (App Router)** and **Supabase (PostgreSQL, Auth, Realtime, Storage)**, deployed on **Vercel**.
 
 This document maps all application components, API routes, database tables, AI retrieval and auto-reply pipelines, and hardcoded values across the codebase.
 

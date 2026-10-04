@@ -12,7 +12,7 @@ const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
  * The help centre pages are client components, so they cannot export
  * `generateMetadata` themselves — a `<title>` written in their JSX loses to the
  * root layout's metadata. The result was every customer's help centre, on their
- * own domain, showing "Chatify — Live chat…" in the browser tab and in search
+ * own domain, showing "Zen-try — Live chat…" in the browser tab and in search
  * results. This server layout puts the workspace's own name back on the page.
  */
 export async function generateMetadata({

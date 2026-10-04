@@ -459,7 +459,7 @@ export default function HomePage() {
                     Zero dependencies
                   </span>
                 </div>
-                <pre className="code-block rounded-none">{`<!-- Chatify live chat -->
+                <pre className="code-block rounded-none">{`<!-- Zen-try live chat -->
 <script
   src="https://your-app.vercel.app/widget.js"
   data-workspace-id="ws_3f8a…"
@@ -579,7 +579,7 @@ export default function HomePage() {
           </div>
 
           <div className="mt-12 pt-6 border-t border-line flex flex-col sm:flex-row items-center justify-between gap-3 text-[12.5px] text-ink-3">
-            <span>© {new Date().getFullYear()} Chatify. All rights reserved.</span>
+            <span>© {new Date().getFullYear()} Zen-try. All rights reserved.</span>
             <span className="inline-flex items-center gap-1.5">
               <span className="live-dot" />
               All systems operational

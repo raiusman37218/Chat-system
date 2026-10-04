@@ -59,15 +59,19 @@ export function SetupChecklist({
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [hasInteractedCustomise, setHasInteractedCustomise] = useState(false);
 
-  const storageKey = workspace?.id ? `chatify_setup_checklist_collapsed_${workspace.id}` : null;
-  const customiseStorageKey = workspace?.id ? `chatify_customise_done_${workspace.id}` : null;
+  const storageKey = workspace?.id ? `zentry_setup_checklist_collapsed_${workspace.id}` : null;
+  const legacyStorageKey = workspace?.id ? `chatify_setup_checklist_collapsed_${workspace.id}` : null;
+  const customiseStorageKey = workspace?.id ? `zentry_customise_done_${workspace.id}` : null;
+  const legacyCustomiseStorageKey = workspace?.id ? `chatify_customise_done_${workspace.id}` : null;
 
   useEffect(() => {
     if (!storageKey) return;
     try {
-      const stored = localStorage.getItem(storageKey);
+      const stored = localStorage.getItem(storageKey) || (legacyStorageKey ? localStorage.getItem(legacyStorageKey) : null);
       if (stored === 'true') setIsCollapsed(true);
-      if (customiseStorageKey && localStorage.getItem(customiseStorageKey) === 'true') {
+      const custStored = (customiseStorageKey ? localStorage.getItem(customiseStorageKey) : null) ||
+        (legacyCustomiseStorageKey ? localStorage.getItem(legacyCustomiseStorageKey) : null);
+      if (custStored === 'true') {
         setHasInteractedCustomise(true);
       }
     } catch {
@@ -146,7 +150,7 @@ export function SetupChecklist({
     {
       id: 'install',
       title: 'Install widget',
-      description: 'Add the Chatify script tag to your website before the closing </body> tag.',
+      description: 'Add the Zen-try script tag to your website before the closing </body> tag.',
       done: isWidgetDetected,
       statusBadge: isWidgetDetected ? (
         <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25">
@@ -339,7 +343,7 @@ export function SetupChecklist({
     typeof window !== 'undefined' ? window.location.origin : (process.env.NEXT_PUBLIC_APP_URL || '');
   const workspaceId = workspace?.id || 'YOUR_WORKSPACE_ID';
 
-  const embedSnippet = `<!-- Chatify Live Chat Support -->
+  const embedSnippet = `<!-- Zen-try Live Chat Support -->
 <script
   src="${origin}/widget.js"
   data-workspace-id="${workspaceId}"

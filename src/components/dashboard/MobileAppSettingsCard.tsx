@@ -85,7 +85,7 @@ export function MobileAppSettingsCard() {
             <div className="w-14 h-14 rounded-2xl bg-surface-2 border border-line p-2 shadow-sm shrink-0 ring-4 ring-accent/15 flex items-center justify-center">
               <img
                 src="/icon-192.png"
-                alt="Chatify App Icon"
+                alt="Zen-try App Icon"
                 className="w-full h-full object-contain"
               />
             </div>
@@ -104,7 +104,7 @@ export function MobileAppSettingsCard() {
                 )}
               </div>
               <p className="text-sm text-ink-3 mt-1 max-w-2xl leading-relaxed">
-                Add Chatify directly to your Android or iPhone home screen. It launches in a distraction-free fullscreen window with zero browser bars, push notifications, and ultra-fast loading.
+                Add Zen-try directly to your Android or iPhone home screen. It launches in a distraction-free fullscreen window with zero browser bars, push notifications, and ultra-fast loading.
               </p>
             </div>
           </div>
@@ -181,7 +181,7 @@ export function MobileAppSettingsCard() {
           <div className="flex items-center justify-between">
             <div>
               <h3 className="text-base font-bold text-ink">
-                How to Add Chatify on Android
+                How to Add Zen-try on Android
               </h3>
               <p className="text-xs text-ink-3 mt-0.5">
                 Works on Google Chrome, Samsung Internet, Microsoft Edge, and Brave.
@@ -202,7 +202,7 @@ export function MobileAppSettingsCard() {
               <div>
                 <h4 className="text-sm font-semibold text-ink">Open in Chrome</h4>
                 <p className="text-xs text-ink-3 mt-1 leading-relaxed">
-                  Open your Chatify dashboard in Google Chrome or your Android web browser.
+                  Open your Zen-try dashboard in Google Chrome or your Android web browser.
                 </p>
               </div>
             </div>
@@ -238,7 +238,7 @@ export function MobileAppSettingsCard() {
         <div className="rounded-3xl border border-line bg-surface p-6 md:p-8 space-y-6">
           <div>
             <h3 className="text-base font-bold text-ink">
-              How to Add Chatify on iPhone &amp; iPad
+              How to Add Zen-try on iPhone &amp; iPad
             </h3>
             <p className="text-xs text-ink-3 mt-0.5">
               Requires Apple Safari browser (pre-installed on every iOS device).
@@ -283,7 +283,7 @@ export function MobileAppSettingsCard() {
               <div>
                 <h4 className="text-sm font-semibold text-ink">Tap &ldquo;Add&rdquo;</h4>
                 <p className="text-xs text-ink-3 mt-1 leading-relaxed">
-                  Tap &ldquo;Add&rdquo; in the top-right corner. Chatify is now placed on your iPhone screen!
+                  Tap &ldquo;Add&rdquo; in the top-right corner. Zen-try is now placed on your iPhone screen!
                 </p>
               </div>
             </div>
@@ -317,7 +317,7 @@ export function MobileAppSettingsCard() {
                 Scan with your Smartphone Camera
               </h3>
               <p className="text-xs text-ink-3 leading-relaxed max-w-md">
-                Open your iPhone or Android camera app, point it at this QR code, and tap the link that appears to immediately open Chatify on your mobile phone.
+                Open your iPhone or Android camera app, point it at this QR code, and tap the link that appears to immediately open Zen-try on your mobile phone.
               </p>
 
               <div className="pt-2 flex items-center gap-2">
@@ -354,7 +354,7 @@ export function MobileAppSettingsCard() {
             <Zap className="w-5 h-5 text-amber-500" />
             <h4 className="text-xs font-bold text-ink">0 MB Storage Overhead</h4>
             <p className="text-[11.5px] text-ink-3 leading-relaxed">
-              Unlike 100MB+ Play Store apps that fill your storage, Chatify PWA uses almost zero space.
+              Unlike 100MB+ Play Store apps that fill your storage, Zen-try PWA uses almost zero space.
             </p>
           </div>
 

@@ -102,8 +102,8 @@ export function useHelpFavicon(workspace: Workspace | null | undefined) {
 
 /** Opens the embedded chat widget if it has loaded. */
 export function openChat() {
-  const w = window as unknown as { Chatify?: { open?: () => void } };
-  w.Chatify?.open?.();
+  const w = window as unknown as { Zentry?: { open?: () => void }; Chatify?: { open?: () => void } };
+  (w.Zentry?.open || w.Chatify?.open)?.();
 }
 
 /** Copies text, reporting whether it worked rather than assuming it did. */
@@ -243,7 +243,7 @@ export function HelpFooter({ workspace }: { workspace: Workspace }) {
             `© ${new Date().getFullYear()} ${title}. All rights reserved.`}
         </span>
         <span className="text-ink-3/80">
-          Powered by <span className="font-medium text-ink-2">Chatify</span>
+          Powered by <span className="font-medium text-ink-2">Zen-try</span>
         </span>
       </div>
     </footer>

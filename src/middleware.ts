@@ -71,7 +71,7 @@ export async function middleware(request: NextRequest) {
         return NextResponse.redirect(liveUrl, 308);
       }
 
-      // Sitemap routing on subdomain (e.g. acme.chatifyhelp.com/sitemap.xml)
+      // Sitemap routing on subdomain (e.g. acme.zentryhelp.com/sitemap.xml)
       if (pathname === '/sitemap.xml') {
         const sitemapUrl = request.nextUrl.clone();
         sitemapUrl.pathname = `/help/${ws.id}/sitemap.xml`;
@@ -80,7 +80,7 @@ export async function middleware(request: NextRequest) {
         });
       }
 
-      // Root Help Center on subdomain (e.g. acme.chatifyhelp.com/)
+      // Root Help Center on subdomain (e.g. acme.zentryhelp.com/)
       if (pathname === '/' || pathname === '') {
         const helpUrl = request.nextUrl.clone();
         helpUrl.pathname = `/help/${ws.id}`;
@@ -102,7 +102,7 @@ export async function middleware(request: NextRequest) {
         return NextResponse.redirect(cleanUrl, 308);
       }
 
-      // Direct article paths (e.g. acme.chatifyhelp.com/getting-started)
+      // Direct article paths (e.g. acme.zentryhelp.com/getting-started)
       if (
         !pathname.startsWith('/api') &&
         !pathname.startsWith('/_next') &&

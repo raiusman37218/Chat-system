@@ -6,7 +6,7 @@ let baseIconImage: HTMLImageElement | null = null;
 function getOriginalTitle(): string {
   if (typeof document === 'undefined') return '';
   if (!originalTitle) {
-    originalTitle = document.title.replace(/^\(\d+\+?\)\s*/, '') || 'Chatify';
+    originalTitle = document.title.replace(/^\(\d+\+?\)\s*/, '') || 'Zen-try';
   }
   return originalTitle;
 }
@@ -24,7 +24,7 @@ function getFaviconLink(): HTMLLinkElement | null {
 
 /**
  * Updates the browser favicon with a dynamic badge count overlay
- * and sets the document title prefix e.g. "(3) Chatify - Inbox".
+ * and sets the document title prefix e.g. "(3) Zen-try - Inbox".
  */
 export function updateFaviconBadge(unreadCount: number) {
   if (typeof window === 'undefined' || typeof document === 'undefined') return;

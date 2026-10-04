@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          text: '🚀 *Chatify Test Notification*\nYour Slack webhook is connected successfully! New customer conversations will appear here.',
+          text: '🚀 *Zen-try Test Notification*\nYour Slack webhook is connected successfully! New customer conversations will appear here.',
         }),
       });
 
@@ -125,7 +125,7 @@ export async function POST(req: NextRequest) {
               elements: [
                 {
                   type: 'button',
-                  text: { type: 'plain_text', text: 'Open in Chatify Inbox ↗', emoji: true },
+                  text: { type: 'plain_text', text: 'Open in Zen-try Inbox ↗', emoji: true },
                   url: inboxUrl,
                   style: 'primary',
                 },
@@ -208,7 +208,7 @@ export async function POST(req: NextRequest) {
 
       const visitorName = conv.visitor?.name || 'A customer';
       const ticketUrl = `${appBaseUrl}/dashboard?conversation=${conv.id}`;
-      const emailSubject = `[Chatify] New message from ${visitorName} (Ticket #${conv.id.slice(0, 8)})`;
+      const emailSubject = `[Zen-try] New message from ${visitorName} (Ticket #${conv.id.slice(0, 8)})`;
       const messageSnippet = message.content || 'Sent an attachment';
 
       console.log(
@@ -225,13 +225,13 @@ export async function POST(req: NextRequest) {
             Authorization: `Bearer ${RESEND_API_KEY}`,
           },
           body: JSON.stringify({
-            from: 'Chatify Support <notifications@chatify.dev>',
+            from: 'Zen-try Support <notifications@zen-try.dev>',
             to: agent.email,
             subject: emailSubject,
             html: `
               <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 580px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; rounded: 12px;">
                 <div style="margin-bottom: 16px;">
-                  <span style="font-weight: 700; font-size: 18px; color: #0f172a;">Chatify</span>
+                  <span style="font-weight: 700; font-size: 18px; color: #0f172a;">Zen-try</span>
                 </div>
                 <h2 style="font-size: 16px; color: #1e293b; margin-top: 0;">You have a new message while offline</h2>
                 <p style="font-size: 14px; color: #475569; line-height: 1.5;">

@@ -200,7 +200,7 @@ const ALL_TIMEZONES: string[] = (() => {
 })();
 
 const COLOR_PRESETS = [
-  '#2563eb', // Chatify Blue
+  '#2563eb', // Zen-try Blue
   '#0d9488', // Teal
   '#10b981', // Emerald
   '#8b5cf6', // Violet
@@ -833,7 +833,7 @@ export function AdminSettingsPanel({
     typeof window !== 'undefined'
       ? window.location.origin
       : process.env.NEXT_PUBLIC_APP_ORIGIN || '';
-  const installSnippetCode = `<!-- Chatify Live Chat Tracker & Widget -->
+  const installSnippetCode = `<!-- Zen-try Live Chat Tracker & Widget -->
 <script
   src="${origin}/tracker.js"
   data-workspace-id="${workspace.id}"
@@ -1361,7 +1361,7 @@ export function AdminSettingsPanel({
                     </div>
                     <div className="flex flex-wrap items-center gap-2.5">
                       {[
-                        { color: '#2563eb', label: 'Chatify Blue' },
+                        { color: '#2563eb', label: 'Zen-try Blue' },
                         { color: '#0d9488', label: 'Teal' },
                         { color: '#10b981', label: 'Emerald' },
                         { color: '#8b5cf6', label: 'Violet' },
@@ -2378,7 +2378,7 @@ export function AdminSettingsPanel({
                     type="text"
                     value={helpCenterFooterText}
                     onChange={(e) => setHelpCenterFooterText(e.target.value)}
-                    placeholder={`© ${new Date().getFullYear()} ${workspace.name}. Powered by Chatify.`}
+                    placeholder={`© ${new Date().getFullYear()} ${workspace.name}. Powered by Zen-try.`}
                     className="input"
                   />
                   <p className="text-[11.5px] text-ink-3 mt-1">
@@ -2578,7 +2578,7 @@ export function AdminSettingsPanel({
 
                 {/* Mock Footer */}
                 <div className="px-4 py-2.5 bg-surface border-t border-line text-center text-[10px] text-ink-3">
-                  {helpCenterFooterText || `© ${new Date().getFullYear()} ${workspace.name}. Powered by Chatify.`}
+                  {helpCenterFooterText || `© ${new Date().getFullYear()} ${workspace.name}. Powered by Zen-try.`}
                 </div>
               </div>
             </div>
@@ -4446,7 +4446,7 @@ export function AdminSettingsPanel({
                       <Code className="w-5 h-5" />
                     </div>
                     <div>
-                      <h3 className="text-[17px] font-bold text-ink">Install Chatify &amp; Help Center Widget</h3>
+                      <h3 className="text-[17px] font-bold text-ink">Install Zen-try &amp; Help Center Widget</h3>
                       <p className="text-[12.5px] text-ink-3">
                         Embed live chat, knowledge base search, and custom Help buttons onto any website or app.
                       </p>
@@ -4486,7 +4486,7 @@ export function AdminSettingsPanel({
                 <button
                   type="button"
                   onClick={() => {
-                    const host = typeof window !== 'undefined' ? window.location.origin : 'https://chatify.com';
+                    const host = typeof window !== 'undefined' ? window.location.origin : 'https://zen-try.com';
                     const snippet = `<script\n  src="${host}/widget.js"\n  data-workspace-id="${workspace.id}"\n  data-color="${workspace.brand_color || '#2563eb'}"\n  data-title="${workspace.name} Support"\n  async>\n</script>`;
                     navigator.clipboard.writeText(snippet);
                     setCopiedSnippet(true);
@@ -4502,7 +4502,7 @@ export function AdminSettingsPanel({
 
               {/* Code Display */}
               {(() => {
-                const host = typeof window !== 'undefined' ? window.location.origin : 'https://chatify.com';
+                const host = typeof window !== 'undefined' ? window.location.origin : 'https://zen-try.com';
                 const snippet = `<script\n  src="${host}/widget.js"\n  data-workspace-id="${workspace.id}"\n  data-color="${workspace.brand_color || '#2563eb'}"\n  data-title="${workspace.name} Support"\n  async>\n</script>`;
                 return (
                   <div className="relative rounded-xl border border-line bg-surface-2 p-4 font-mono text-[12.5px] text-ink overflow-x-auto leading-relaxed">
@@ -4554,7 +4554,7 @@ export function AdminSettingsPanel({
                     <button
                       type="button"
                       onClick={() => {
-                        const code = `<button data-chatify-help class="help-btn">\n  📖 Help & FAQs\n</button>`;
+                        const code = `<button data-zentry-help class="help-btn">\n  📖 Help & FAQs\n</button>`;
                         navigator.clipboard.writeText(code);
                         showStatus('Help button trigger copied!');
                       }}
@@ -4568,7 +4568,7 @@ export function AdminSettingsPanel({
                     Clicking this element opens the widget directly into the Help tab and focuses the article search bar.
                   </p>
                   <div className="rounded-lg bg-surface-2 p-3 font-mono text-xs text-ink overflow-x-auto">
-                    <code>&lt;button data-chatify-help class=&quot;help-btn&quot;&gt;&#10;  📖 Help &amp; FAQs&#10;&lt;/button&gt;</code>
+                    <code>&lt;button data-zentry-help class=&quot;help-btn&quot;&gt;&#10;  📖 Help &amp; FAQs&#10;&lt;/button&gt;</code>
                   </div>
                 </div>
 
@@ -4579,7 +4579,7 @@ export function AdminSettingsPanel({
                     <button
                       type="button"
                       onClick={() => {
-                        const code = `<button data-chatify-article="your-article-slug">\n  Read Getting Started Guide ↗\n</button>`;
+                        const code = `<button data-zentry-article="your-article-slug">\n  Read Getting Started Guide ↗\n</button>`;
                         navigator.clipboard.writeText(code);
                         showStatus('Article trigger copied!');
                       }}
@@ -4593,7 +4593,7 @@ export function AdminSettingsPanel({
                     Directly opens and expands an article accordion inside the widget using its slug or ID.
                   </p>
                   <div className="rounded-lg bg-surface-2 p-3 font-mono text-xs text-ink overflow-x-auto">
-                    <code>&lt;button data-chatify-article=&quot;your-article-slug&quot;&gt;&#10;  Read Getting Started Guide ↗&#10;&lt;/button&gt;</code>
+                    <code>&lt;button data-zentry-article=&quot;your-article-slug&quot;&gt;&#10;  Read Getting Started Guide ↗&#10;&lt;/button&gt;</code>
                   </div>
                 </div>
 
@@ -4604,7 +4604,7 @@ export function AdminSettingsPanel({
                     <button
                       type="button"
                       onClick={() => {
-                        const code = `<button data-chatify-open data-chatify-tab="messages">\n  Chat with Support\n</button>`;
+                        const code = `<button data-zentry-open data-zentry-tab="messages">\n  Chat with Support\n</button>`;
                         navigator.clipboard.writeText(code);
                         showStatus('Live chat trigger copied!');
                       }}
@@ -4618,7 +4618,7 @@ export function AdminSettingsPanel({
                     Opens the widget straight into the live chat messenger screen.
                   </p>
                   <div className="rounded-lg bg-surface-2 p-3 font-mono text-xs text-ink overflow-x-auto">
-                    <code>&lt;button data-chatify-open data-chatify-tab=&quot;messages&quot;&gt;&#10;  Chat with Support&#10;&lt;/button&gt;</code>
+                    <code>&lt;button data-zentry-open data-zentry-tab=&quot;messages&quot;&gt;&#10;  Chat with Support&#10;&lt;/button&gt;</code>
                   </div>
                 </div>
               </div>
@@ -4632,7 +4632,7 @@ export function AdminSettingsPanel({
                     3
                   </span>
                   <div>
-                    <h4 className="text-[14px] font-semibold text-ink">JavaScript SDK API (`window.Chatify`)</h4>
+                    <h4 className="text-[14px] font-semibold text-ink">JavaScript SDK API (`window.Zentry`)</h4>
                     <p className="text-[12px] text-ink-3">
                       Control the widget programmatically in your frontend framework (React, Vue, Angular, Next.js).
                     </p>
@@ -4642,7 +4642,7 @@ export function AdminSettingsPanel({
                 <button
                   type="button"
                   onClick={() => {
-                    const jsCode = `// Open Help Center Tab directly\nwindow.Chatify.openHelp();\n\n// Open Live Chat screen\nwindow.Chatify.openMessages();\n\n// Search articles programmatically\nwindow.Chatify.search('billing');\n\n// Open specific article by slug\nwindow.Chatify.openArticle('how-to-reset-password');\n\n// Toggle widget\nwindow.Chatify.toggle();\n\n// Check if widget is open\nconsole.log(window.Chatify.isOpen());`;
+                    const jsCode = `// Open Help Center Tab directly\nwindow.Zentry.openHelp();\n\n// Open Live Chat screen\nwindow.Zentry.openMessages();\n\n// Search articles programmatically\nwindow.Zentry.search('billing');\n\n// Open specific article by slug\nwindow.Zentry.openArticle('how-to-reset-password');\n\n// Toggle widget\nwindow.Zentry.toggle();\n\n// Check if widget is open\nconsole.log(window.Zentry.isOpen());`;
                     navigator.clipboard.writeText(jsCode);
                     showStatus('JavaScript SDK cheat-sheet copied!');
                   }}
@@ -4655,20 +4655,20 @@ export function AdminSettingsPanel({
 
               <div className="rounded-xl border border-line bg-surface-2 p-4 font-mono text-[12px] text-ink overflow-x-auto leading-relaxed">
                 <pre><code>{`// 1. Open Help Center Tab directly
-window.Chatify.openHelp();
+window.Zentry.openHelp();
 
 // 2. Open Live Chat screen
-window.Chatify.openMessages();
+window.Zentry.openMessages();
 
 // 3. Search articles programmatically
-window.Chatify.search('billing');
+window.Zentry.search('billing');
 
 // 4. Open specific article by slug
-window.Chatify.openArticle('how-to-reset-password');
+window.Zentry.openArticle('how-to-reset-password');
 
 // 5. Toggle or close widget
-window.Chatify.toggle();
-window.Chatify.close();`}</code></pre>
+window.Zentry.toggle();
+window.Zentry.close();`}</code></pre>
               </div>
             </div>
 
@@ -4690,7 +4690,7 @@ window.Chatify.close();`}</code></pre>
                 <button
                   type="button"
                   onClick={() => {
-                    const host = typeof window !== 'undefined' ? window.location.origin : 'https://chatify.com';
+                    const host = typeof window !== 'undefined' ? window.location.origin : 'https://zen-try.com';
                     const nextSnippet = `import Script from 'next/script';\n\nexport default function RootLayout({ children }) {\n  return (\n    <html lang="en">\n      <body>\n        {children}\n        <Script\n          src="${host}/widget.js"\n          data-workspace-id="${workspace.id}"\n          strategy="afterInteractive"\n        />\n      </body>\n    </html>\n  );\n}`;
                     navigator.clipboard.writeText(nextSnippet);
                     showStatus('Next.js component snippet copied!');
@@ -4703,7 +4703,7 @@ window.Chatify.close();`}</code></pre>
               </div>
 
               {(() => {
-                const host = typeof window !== 'undefined' ? window.location.origin : 'https://chatify.com';
+                const host = typeof window !== 'undefined' ? window.location.origin : 'https://zen-try.com';
                 const nextSnippet = `import Script from 'next/script';\n\nexport default function RootLayout({ children }) {\n  return (\n    <html lang="en">\n      <body>\n        {children}\n        <Script\n          src="${host}/widget.js"\n          data-workspace-id="${workspace.id}"\n          strategy="afterInteractive"\n        />\n      </body>\n    </html>\n  );\n}`;
                 return (
                   <div className="rounded-xl border border-line bg-surface-2 p-4 font-mono text-[12px] text-ink overflow-x-auto leading-relaxed">

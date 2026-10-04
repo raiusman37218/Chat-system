@@ -4,8 +4,8 @@ import { ArrowLeft, Lock } from 'lucide-react';
 import { Logo } from '@/components/ui/Logo';
 
 export const metadata = {
-  title: 'Privacy Policy | Chatify',
-  description: 'Chatify Privacy Policy and data protection practices.',
+  title: 'Privacy Policy | Zen-try',
+  description: 'Zen-try Privacy Policy and data protection practices.',
 };
 
 export default function PrivacyPage() {
@@ -44,7 +44,7 @@ export default function PrivacyPage() {
           <section className="space-y-2">
             <h2 className="text-[18px] font-semibold text-ink">1. Information We Collect</h2>
             <p>
-              When you create an account, we collect your name, business email address, and authentication credentials. For website visitors chatting via the Chatify widget, we collect session metadata including IP address, browser type, referral URLs, and active page paths to enable live routing.
+              When you create an account, we collect your name, business email address, and authentication credentials. For website visitors chatting via the Zen-try widget, we collect session metadata including IP address, browser type, referral URLs, and active page paths to enable live routing.
             </p>
           </section>
 
@@ -72,13 +72,13 @@ export default function PrivacyPage() {
           <section className="space-y-2">
             <h2 className="text-[18px] font-semibold text-ink">5. Contact Our Privacy Team</h2>
             <p>
-              If you have any questions or data protection requests under GDPR or CCPA, reach out through our Help Center at <Link href="/help" className="text-accent underline">Chatify Help Center</Link>.
+              If you have any questions or data protection requests under GDPR or CCPA, reach out through our Help Center at <Link href="/help" className="text-accent underline">Zen-try Help Center</Link>.
             </p>
           </section>
         </div>
 
         <div className="pt-8 border-t border-line flex items-center justify-between text-[13px] text-ink-3">
-          <span>&copy; {new Date().getFullYear()} Chatify Inc. All rights reserved.</span>
+          <span>&copy; {new Date().getFullYear()} Zen-try Inc. All rights reserved.</span>
           <Link href="/terms" className="hover:text-ink underline">
             Terms of Service
           </Link>

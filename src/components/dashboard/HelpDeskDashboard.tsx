@@ -3430,7 +3430,7 @@ function ArticleEditorModal({
                 </button>
                 <button
                   type="button"
-                  onClick={() => insertText('\n```javascript\n// Sample code snippet\nconst app = new Chatify();\n```\n\n')}
+                  onClick={() => insertText('\n```javascript\n// Sample code snippet\nconst app = new Zentry();\n```\n\n')}
                   className="h-7 px-1.5 rounded hover:bg-surface-2 text-[11px] font-mono text-ink hover:text-accent"
                   title="Code Block"
                 >

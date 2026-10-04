@@ -639,7 +639,7 @@ export default function DashboardPage() {
   useEffect(() => {
     const channelSuffix = `${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
     const messagesChannel = supabase
-      .channel(`chatify-dashboard-messages-${channelSuffix}`)
+      .channel(`zen-try-dashboard-messages-${channelSuffix}`)
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'messages' },
@@ -815,7 +815,7 @@ export default function DashboardPage() {
       });
 
     const conversationsChannel = supabase
-      .channel(`chatify-dashboard-conversations-${channelSuffix}`)
+      .channel(`zen-try-dashboard-conversations-${channelSuffix}`)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'conversations' },
@@ -881,7 +881,7 @@ export default function DashboardPage() {
       .subscribe();
 
     const visitorsChannel = supabase
-      .channel(`chatify-dashboard-visitors-${channelSuffix}`)
+      .channel(`zen-try-dashboard-visitors-${channelSuffix}`)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'visitors' },
@@ -917,7 +917,7 @@ export default function DashboardPage() {
       .subscribe();
 
     const internalNotesChannel = supabase
-      .channel(`chatify-dashboard-internal-notes-${channelSuffix}`)
+      .channel(`zen-try-dashboard-internal-notes-${channelSuffix}`)
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'internal_notes' },

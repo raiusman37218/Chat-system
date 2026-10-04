@@ -5,7 +5,7 @@ import { Logo } from '@/components/ui/Logo';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 
 export const metadata = {
-  title: '404 - Page Not Found | Chatify',
+  title: '404 - Page Not Found | Zen-try',
   description: 'The requested page could not be found.',
 };
 
@@ -119,7 +119,7 @@ export default function NotFound() {
       {/* Footer */}
       <footer className="border-t border-line py-6 text-center text-[12.5px] text-ink-3">
         <div className="u-container flex flex-col sm:flex-row items-center justify-between gap-3">
-          <span>&copy; {new Date().getFullYear()} Chatify Inc. All rights reserved.</span>
+          <span>&copy; {new Date().getFullYear()} Zen-try Inc. All rights reserved.</span>
           <div className="flex items-center gap-4">
             <Link href="/" className="hover:text-ink transition-colors">
               Home

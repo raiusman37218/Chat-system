@@ -10,7 +10,7 @@ function getSupabase() {
 }
 
 /**
- * Inbound webhook for LangGraph Agent to push replies or tool execution updates to Chatify
+ * Inbound webhook for LangGraph Agent to push replies or tool execution updates to Zen-try
  */
 export async function POST(req: NextRequest) {
   try {

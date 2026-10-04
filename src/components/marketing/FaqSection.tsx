@@ -6,8 +6,8 @@ import { cn } from '@/lib/utils';
 
 const FAQS = [
   {
-    q: 'How do I install Chatify on my website?',
-    a: 'Simply paste a single `<script>` tag right before the closing `</body>` tag of your site. Chatify works on WordPress, Shopify, Webflow, Squarespace, Framer, Next.js, and custom HTML.',
+    q: 'How do I install Zen-try on my website?',
+    a: 'Simply paste a single `<script>` tag right before the closing `</body>` tag of your site. Zen-try works on WordPress, Shopify, Webflow, Squarespace, Framer, Next.js, and custom HTML.',
   },
   {
     q: 'How does AI Autopilot work?',
@@ -15,11 +15,11 @@ const FAQS = [
   },
   {
     q: 'Will the chat widget slow down my website?',
-    a: 'Not at all. The Chatify widget is ultra-lightweight (<30KB), loads asynchronously, and runs inside an isolated Shadow DOM so it never blocks page rendering or conflicts with your site’s CSS.',
+    a: 'Not at all. The Zen-try widget is ultra-lightweight (<30KB), loads asynchronously, and runs inside an isolated Shadow DOM so it never blocks page rendering or conflicts with your site’s CSS.',
   },
   {
     q: 'Can multiple agents collaborate on the same inbox?',
-    a: 'Yes! Chatify supports unlimited agent seats with realtime agent collision detection (so two agents never accidentally reply to the same customer) and round-robin auto-assignment.',
+    a: 'Yes! Zen-try supports unlimited agent seats with realtime agent collision detection (so two agents never accidentally reply to the same customer) and round-robin auto-assignment.',
   },
   {
     q: 'Can I customize the widget to match my brand?',
@@ -42,7 +42,7 @@ export function FaqSection() {
           Frequently asked questions
         </h2>
         <p className="mt-4 text-[15px] text-ink-2">
-          Everything you need to know about setting up and running Chatify.
+          Everything you need to know about setting up and running Zen-try.
         </p>
       </div>
 

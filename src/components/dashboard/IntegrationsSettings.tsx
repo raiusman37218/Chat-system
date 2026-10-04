@@ -58,7 +58,7 @@ export function IntegrationsSettings({
     langgraph_webhook_url: '',
     langgraph_api_key: '',
     langgraph_system_prompt:
-      'You are Chatify AI Support Assistant. Be polite, concise, and helpful. Escalate to a human agent when needed.',
+      'You are Zen-try AI Support Assistant. Be polite, concise, and helpful. Escalate to a human agent when needed.',
     langgraph_auto_pilot: true,
     whatsapp_enabled: false,
     whatsapp_phone_number_id: '',
@@ -66,7 +66,7 @@ export function IntegrationsSettings({
     whatsapp_business_account_id: '',
     meta_enabled: false,
     meta_page_access_token: '',
-    meta_verify_token: 'chatify_meta_verify_secret',
+    meta_verify_token: 'zentry_meta_verify_secret',
     meta_app_secret: '',
     linkedin_enabled: false,
     linkedin_access_token: '',
@@ -115,7 +115,7 @@ export function IntegrationsSettings({
         ]);
 
         let currentVerifyToken = data?.meta_verify_token;
-        if (!currentVerifyToken || currentVerifyToken === 'chatify_meta_verify_secret') {
+        if (!currentVerifyToken || currentVerifyToken === 'chatify_meta_verify_secret' || currentVerifyToken === 'zentry_meta_verify_secret') {
           currentVerifyToken = 'meta_vfy_' + Math.random().toString(36).substring(2, 10) + Math.random().toString(36).substring(2, 10);
           await supabase
             .from('workspace_integrations')
@@ -197,7 +197,7 @@ export function IntegrationsSettings({
             conversation_id: 'test-ping-123',
             workspace_id: workspace?.id,
             channel: 'test',
-            visitor: { name: 'Chatify Test User' },
+            visitor: { name: 'Zen-try Test User' },
             current_message: 'ping',
             history: [],
           }),
@@ -397,7 +397,7 @@ export function IntegrationsSettings({
                     WhatsApp Business Cloud API
                   </h3>
                   <p className="mt-1 text-[12.5px] text-ink-3 max-w-2xl">
-                    Receive and reply to WhatsApp messages from your official business number inside Chatify. Powered by Meta Cloud API.
+                    Receive and reply to WhatsApp messages from your official business number inside Zen-try. Powered by Meta Cloud API.
                   </p>
                 </div>
 
@@ -480,10 +480,10 @@ export function IntegrationsSettings({
                 <div>
                   <span className="text-[11px] font-semibold text-ink-3 uppercase">Verify Token</span>
                   <div className="flex items-center justify-between p-2.5 rounded-xl bg-surface-2 border border-line font-mono text-[12px] mt-1">
-                    <span className="text-ink">{formData.meta_verify_token || 'chatify_meta_verify_secret'}</span>
+                    <span className="text-ink">{formData.meta_verify_token || 'zentry_meta_verify_secret'}</span>
                     <button
                       type="button"
-                      onClick={() => copyToClipboard(formData.meta_verify_token || 'chatify_meta_verify_secret', 'meta-token')}
+                      onClick={() => copyToClipboard(formData.meta_verify_token || 'zentry_meta_verify_secret', 'meta-token')}
                       className="btn btn-xs btn-ghost text-ink-3 hover:text-ink gap-1"
                     >
                       {copiedField === 'meta-token' ? <Check className="w-3 h-3 text-success" /> : <Copy className="w-3 h-3" />}
@@ -585,7 +585,7 @@ export function IntegrationsSettings({
                     LinkedIn Messaging API
                   </h3>
                   <p className="mt-1 text-[12.5px] text-ink-3 max-w-2xl">
-                    Manage LinkedIn page direct messages inside your Chatify inbox.
+                    Manage LinkedIn page direct messages inside your Zen-try inbox.
                   </p>
                 </div>
 

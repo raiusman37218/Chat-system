@@ -4,8 +4,8 @@ import { ArrowLeft, ShieldCheck } from 'lucide-react';
 import { Logo } from '@/components/ui/Logo';
 
 export const metadata = {
-  title: 'Terms of Service | Chatify',
-  description: 'Chatify Terms of Service and legal agreements.',
+  title: 'Terms of Service | Zen-try',
+  description: 'Zen-try Terms of Service and legal agreements.',
 };
 
 export default function TermsPage() {
@@ -44,7 +44,7 @@ export default function TermsPage() {
           <section className="space-y-2">
             <h2 className="text-[18px] font-semibold text-ink">1. Acceptance of Terms</h2>
             <p>
-              By signing up for an account, accessing, or using Chatify (&quot;the Service&quot;), you agree to be bound by these Terms of Service. If you do not agree to these terms, do not create an account or use the Service.
+              By signing up for an account, accessing, or using Zen-try (&quot;the Service&quot;), you agree to be bound by these Terms of Service. If you do not agree to these terms, do not create an account or use the Service.
             </p>
           </section>
 
@@ -58,14 +58,14 @@ export default function TermsPage() {
           <section className="space-y-2">
             <h2 className="text-[18px] font-semibold text-ink">3. Acceptable Use Policy</h2>
             <p>
-              You agree not to use Chatify to transmit spam, unlawful, abusive, or malicious content. Automated scraping of visitor data without consent or interference with widget delivery across subscriber websites is strictly prohibited.
+              You agree not to use Zen-try to transmit spam, unlawful, abusive, or malicious content. Automated scraping of visitor data without consent or interference with widget delivery across subscriber websites is strictly prohibited.
             </p>
           </section>
 
           <section className="space-y-2">
             <h2 className="text-[18px] font-semibold text-ink">4. AI Features & Customer Data</h2>
             <p>
-              Chatify offers AI copilot features that process conversations and knowledge notes to provide automated assistance. Your customer conversations are your proprietary data and will never be shared with third parties for general model training without explicit consent.
+              Zen-try offers AI copilot features that process conversations and knowledge notes to provide automated assistance. Your customer conversations are your proprietary data and will never be shared with third parties for general model training without explicit consent.
             </p>
           </section>
 
@@ -79,13 +79,13 @@ export default function TermsPage() {
           <section className="space-y-2">
             <h2 className="text-[18px] font-semibold text-ink">6. Contact Information</h2>
             <p>
-              For legal inquiries regarding these terms, please contact us through our Help Center at <Link href="/help" className="text-accent underline">Chatify Help Center</Link>.
+              For legal inquiries regarding these terms, please contact us through our Help Center at <Link href="/help" className="text-accent underline">Zen-try Help Center</Link>.
             </p>
           </section>
         </div>
 
         <div className="pt-8 border-t border-line flex items-center justify-between text-[13px] text-ink-3">
-          <span>&copy; {new Date().getFullYear()} Chatify Inc. All rights reserved.</span>
+          <span>&copy; {new Date().getFullYear()} Zen-try Inc. All rights reserved.</span>
           <Link href="/privacy" className="hover:text-ink underline">
             Privacy Policy
           </Link>

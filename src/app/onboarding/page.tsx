@@ -160,7 +160,7 @@ export default function OnboardingPage() {
         if (taken) customDomain = null;
       }
 
-      const verificationToken = `chatify_tok_${Math.random().toString(36).substring(2, 10)}`;
+      const verificationToken = `zentry_tok_${Math.random().toString(36).substring(2, 10)}`;
 
       // Create Workspace & Link Agent via Server Action
       const result = await createWorkspaceAction({
@@ -191,7 +191,7 @@ export default function OnboardingPage() {
 
   const getEmbedSnippet = () => {
     const origin = typeof window !== 'undefined' ? window.location.origin : (process.env.NEXT_PUBLIC_APP_URL || '');
-    return `<!-- Chatify Live Chat Support -->
+    return `<!-- Zen-try Live Chat Support -->
 <script
   src="${origin}/widget.js"
   data-workspace-id="${createdWorkspaceId || 'YOUR_WORKSPACE_ID'}"

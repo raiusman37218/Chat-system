@@ -1,5 +1,5 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import { CHATIFY_ICON_DATA_URI } from './icon';
+import { CHATIFY_ICON_DATA_URI, ZENTRY_ICON_DATA_URI } from './icon';
 import { EMOJI_CATEGORIES, ALL_EMOJIS } from '../../src/lib/emojis';
 
 const DEFAULT_SUPABASE_URL = 'https://vfjsaynnubxywdbevxtx.supabase.co';
@@ -82,7 +82,7 @@ interface FAQItem {
   order_index?: number;
 }
 
-export interface ChatifyAPI {
+export interface ZentryAPI {
   open: (tab?: 'home' | 'messages' | 'help') => void;
   close: () => void;
   toggle: () => void;
@@ -95,17 +95,22 @@ export interface ChatifyAPI {
   switchTab: (tab: 'home' | 'messages' | 'help') => void;
   showPopup: (text?: string, senderTitle?: string) => void;
   hidePopup: () => void;
-  instance: ChatifyWidget;
+  instance: ZentryWidget;
 }
+
+export type ChatifyAPI = ZentryAPI;
 
 declare global {
   interface Window {
+    Zentry?: ZentryAPI | any;
+    'Zen-try'?: ZentryAPI | any;
     Chatify?: ChatifyAPI | any;
-    __ChatifyInstance?: ChatifyWidget;
+    __ZentryInstance?: ZentryWidget;
+    __ChatifyInstance?: ZentryWidget;
   }
 }
 
-class ChatifyWidget {
+class ZentryWidget {
   private config: WidgetConfig;
   private supabase: SupabaseClient;
   private container: HTMLDivElement | null = null;
@@ -171,9 +176,17 @@ class ChatifyWidget {
     // Initialize or restore visitor ID (scoped to workspace)
     const storageKeySuffix = this.config.workspaceId ? `_${this.config.workspaceId.slice(0, 8)}` : '';
     this.visitorId = this.getOrCreateVisitorId(storageKeySuffix);
-    this.conversationId = localStorage.getItem(`chatify_conversation_id${storageKeySuffix}`);
-    this.visitorName = localStorage.getItem(`chatify_visitor_name${storageKeySuffix}`) || '';
-    this.visitorEmail = localStorage.getItem(`chatify_visitor_email${storageKeySuffix}`) || '';
+    this.conversationId =
+      localStorage.getItem(`zentry_conversation_id${storageKeySuffix}`) ||
+      localStorage.getItem(`chatify_conversation_id${storageKeySuffix}`);
+    this.visitorName =
+      localStorage.getItem(`zentry_visitor_name${storageKeySuffix}`) ||
+      localStorage.getItem(`chatify_visitor_name${storageKeySuffix}`) ||
+      '';
+    this.visitorEmail =
+      localStorage.getItem(`zentry_visitor_email${storageKeySuffix}`) ||
+      localStorage.getItem(`chatify_visitor_email${storageKeySuffix}`) ||
+      '';
     if (this.visitorEmail) {
       this.isPreChatCompleted = true;
     }
@@ -200,6 +213,7 @@ class ChatifyWidget {
           if (existingConv?.id) {
             this.conversationId = existingConv.id;
             this.conversationStatus = existingConv.status || 'open';
+            localStorage.setItem(`zentry_conversation_id${storageKeySuffix}`, existingConv.id);
             localStorage.setItem(`chatify_conversation_id${storageKeySuffix}`, existingConv.id);
           }
         } catch {}
@@ -214,8 +228,11 @@ class ChatifyWidget {
 
       // Restore widget state if visitor reloaded while widget was open
       try {
-        const savedOpen = sessionStorage.getItem(`chatify_widget_open${storageKeySuffix}`);
-        const savedTab = sessionStorage.getItem(`chatify_widget_tab${storageKeySuffix}`) as 'home' | 'messages' | 'help' | null;
+        const savedOpen =
+          sessionStorage.getItem(`zentry_widget_open${storageKeySuffix}`) ||
+          sessionStorage.getItem(`chatify_widget_open${storageKeySuffix}`);
+        const savedTab = (sessionStorage.getItem(`zentry_widget_tab${storageKeySuffix}`) ||
+          sessionStorage.getItem(`chatify_widget_tab${storageKeySuffix}`)) as 'home' | 'messages' | 'help' | null;
         if (savedOpen === '1') {
           this.open(savedTab || 'messages');
           this.scrollToBottom(false);
@@ -234,7 +251,7 @@ class ChatifyWidget {
       script = document.querySelector('script[src*="widget.js"]');
     }
     const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
-    const urlWs = urlParams?.get('workspaceId') || urlParams?.get('ws') || urlParams?.get('chatify_workspace');
+    const urlWs = urlParams?.get('workspaceId') || urlParams?.get('ws') || urlParams?.get('zentry_workspace') || urlParams?.get('chatify_workspace');
     const urlLogo = urlParams?.get('logo') || urlParams?.get('logoUrl') || urlParams?.get('logo_url');
     const urlShowLauncherLogo = urlParams?.get('show_launcher_logo') ?? urlParams?.get('launcher_logo');
 
@@ -277,6 +294,10 @@ class ChatifyWidget {
   // Helper for simulators: reset visitor session
   public resetSession() {
     const storageKeySuffix = this.config.workspaceId ? `_${this.config.workspaceId.slice(0, 8)}` : '';
+    localStorage.removeItem(`zentry_visitor_id${storageKeySuffix}`);
+    localStorage.removeItem(`zentry_conversation_id${storageKeySuffix}`);
+    localStorage.removeItem(`zentry_visitor_name${storageKeySuffix}`);
+    localStorage.removeItem(`zentry_visitor_email${storageKeySuffix}`);
     localStorage.removeItem(`chatify_visitor_id${storageKeySuffix}`);
     localStorage.removeItem(`chatify_conversation_id${storageKeySuffix}`);
     localStorage.removeItem(`chatify_visitor_name${storageKeySuffix}`);
@@ -293,7 +314,7 @@ class ChatifyWidget {
       });
 
       if (error || !data) {
-        console.warn('[Chatify] Workspace is suspended, inactive, or not found. Widget will not load.');
+        console.warn('[Zen-try] Workspace is suspended, inactive, or not found. Widget will not load.');
         if (this.container && this.container.parentNode) {
           this.container.parentNode.removeChild(this.container);
         }
@@ -375,7 +396,7 @@ class ChatifyWidget {
         await this.loadWorkspaceArticles();
         return true;
       } catch (e) {
-        console.warn('[Chatify] Could not fetch workspace config:', e);
+        console.warn('[Zen-try] Could not fetch workspace config:', e);
         return true;
       }
     }
@@ -515,7 +536,7 @@ class ChatifyWidget {
       this.updateThemeAndTexts();
       this.initNavbarAutoTrigger();
     } catch (err) {
-      console.warn('[Chatify] Failed to fetch dynamic articles or sections:', err);
+      console.warn('[Zen-try] Failed to fetch dynamic articles or sections:', err);
       this.sections = [];
       this.faqs = [];
       this.renderFaqList();
@@ -944,14 +965,19 @@ class ChatifyWidget {
 
   // 3. Visitor ID Management
   private getOrCreateVisitorId(suffix: string): string {
-    let id = localStorage.getItem(`chatify_visitor_id${suffix}`);
+    let id =
+      localStorage.getItem(`zentry_visitor_id${suffix}`) ||
+      localStorage.getItem(`chatify_visitor_id${suffix}`);
     if (!id) {
       id = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
         const r = (Math.random() * 16) | 0;
         const v = c === 'x' ? r : (r & 0x3) | 0x8;
         return v.toString(16);
       });
+      localStorage.setItem(`zentry_visitor_id${suffix}`, id);
       localStorage.setItem(`chatify_visitor_id${suffix}`, id);
+    } else {
+      localStorage.setItem(`zentry_visitor_id${suffix}`, id);
     }
     return id;
   }
@@ -981,7 +1007,7 @@ class ChatifyWidget {
         });
       } catch {}
     } catch (e) {
-      console.warn('[Chatify] Visitor tracking error:', e);
+      console.warn('[Zen-try] Visitor tracking error:', e);
     }
 
     // 2. Fetch accurate city & country in background with fallbacks and update
@@ -1327,7 +1353,7 @@ class ChatifyWidget {
     this.forceNewConversation = false;
 
     if (error || !data) {
-      console.warn('[Chatify] fn_get_or_create_conversation fallback:', error);
+      console.warn('[Zen-try] fn_get_or_create_conversation fallback:', error);
       try {
         await this.supabase.from('visitors').upsert({
           id: this.visitorId,
@@ -1402,7 +1428,7 @@ class ChatifyWidget {
     }).select().single();
 
     if (error) {
-      console.error('[Chatify] Error sending message:', error);
+      console.error('[Zen-try] Error sending message:', error);
       tempMsg.pending = false;
       this.renderMessages();
       return;
@@ -1569,7 +1595,10 @@ class ChatifyWidget {
     this.messages = [];
     this.botTyping = false;
     this.agentTyping = false;
-    try { localStorage.setItem(`chatify_conversation_id${suffix}`, id); } catch {}
+    try {
+      localStorage.setItem(`zentry_conversation_id${suffix}`, id);
+      localStorage.setItem(`chatify_conversation_id${suffix}`, id);
+    } catch {}
     this.subscribeToRealtime();
     this.switchTab('messages');
     await this.loadMessageHistory();
@@ -1592,7 +1621,9 @@ class ChatifyWidget {
   // 10. DOM & Shadow Root Initialization (Intercom Messenger 2.0)
   private initDOM() {
     this.container = document.createElement('div');
-    this.container.id = 'chatify-widget-root';
+    this.container.id = 'zentry-widget-root';
+    this.container.className = 'zentry-widget-root chatify-widget-root';
+    this.container.setAttribute('data-zentry-root', 'true');
     document.body.appendChild(this.container);
 
     this.shadow = this.container.attachShadow({ mode: 'open' });
@@ -1651,7 +1682,7 @@ class ChatifyWidget {
     launcher.className = 'chatify-launcher';
     launcher.id = 'chatifyLauncherBtn';
     const shouldShowLauncherLogo = this.config.showLauncherLogo !== false && Boolean(this.config.logoUrl);
-    const initialLogo = shouldShowLauncherLogo ? this.config.logoUrl! : CHATIFY_ICON_DATA_URI;
+    const initialLogo = shouldShowLauncherLogo ? this.config.logoUrl! : (ZENTRY_ICON_DATA_URI || CHATIFY_ICON_DATA_URI);
     const isCustomLogo = shouldShowLauncherLogo;
     launcher.innerHTML = `
       <div class="chatify-badge" id="chatifyBadge">0</div>
@@ -2509,7 +2540,7 @@ class ChatifyWidget {
               this.updatePresenceAndTexts();
             }
           } catch (e) {
-            console.warn('[Chatify] Error updating agent presence:', e);
+            console.warn('[Zen-try] Error updating agent presence:', e);
           }
         }
       )
@@ -2548,11 +2579,11 @@ class ChatifyWidget {
         openIcon.src = this.config.logoUrl!;
         openIcon.classList.add('chatify-custom-logo');
         openIcon.onerror = () => {
-          openIcon.src = CHATIFY_ICON_DATA_URI;
+          openIcon.src = ZENTRY_ICON_DATA_URI || CHATIFY_ICON_DATA_URI;
           openIcon.classList.remove('chatify-custom-logo');
         };
       } else {
-        openIcon.src = CHATIFY_ICON_DATA_URI;
+        openIcon.src = ZENTRY_ICON_DATA_URI || CHATIFY_ICON_DATA_URI;
         openIcon.classList.remove('chatify-custom-logo');
       }
     }
@@ -4864,8 +4895,10 @@ class ChatifyWidget {
 
     const suffix = this.config.workspaceId ? `_${this.config.workspaceId.slice(0, 8)}` : '';
     if (this.visitorName) {
+      localStorage.setItem(`zentry_visitor_name${suffix}`, this.visitorName);
       localStorage.setItem(`chatify_visitor_name${suffix}`, this.visitorName);
     }
+    localStorage.setItem(`zentry_visitor_email${suffix}`, this.visitorEmail);
     localStorage.setItem(`chatify_visitor_email${suffix}`, this.visitorEmail);
 
     await this.supabase.rpc('fn_upsert_visitor', {
@@ -5200,6 +5233,7 @@ class ChatifyWidget {
     this.isOpen = !this.isOpen;
     const suffix = this.config.workspaceId ? `_${this.config.workspaceId.slice(0, 8)}` : '';
     try {
+      sessionStorage.setItem(`zentry_widget_open${suffix}`, this.isOpen ? '1' : '0');
       sessionStorage.setItem(`chatify_widget_open${suffix}`, this.isOpen ? '1' : '0');
     } catch {}
 
@@ -5528,7 +5562,10 @@ class ChatifyWidget {
     setTimeout(() => {
       if (this.isOpen || this.messages.length > 0) return;
       try {
-        if (sessionStorage.getItem('chatify_proactive_welcome_dismissed') === '1') return;
+        if (
+          sessionStorage.getItem('zentry_proactive_welcome_dismissed') === '1' ||
+          sessionStorage.getItem('chatify_proactive_welcome_dismissed') === '1'
+        ) return;
       } catch {}
 
       if (this.hasHostModalOrOverlay()) return;
@@ -5621,10 +5658,12 @@ class ChatifyWidget {
   public dismissMessagePopup() {
     if (this.currentPopupMsgId) {
       try {
+        sessionStorage.setItem(`zentry_popup_dismissed_${this.currentPopupMsgId}`, '1');
         sessionStorage.setItem(`chatify_popup_dismissed_${this.currentPopupMsgId}`, '1');
       } catch {}
     }
     try {
+      sessionStorage.setItem('zentry_proactive_welcome_dismissed', '1');
       sessionStorage.setItem('chatify_proactive_welcome_dismissed', '1');
     } catch {}
     this.hideMessagePopup(true);
@@ -5661,7 +5700,7 @@ class ChatifyWidget {
   private subscribeToVisitorConversations(storageKeySuffix: string) {
     if (!this.visitorId) return;
     this.supabase
-      .channel(`chatify-visitor-convs-${this.visitorId}`)
+      .channel(`zen-try-visitor-convs-${this.visitorId}`)
       .on(
         'postgres_changes',
         {
@@ -5675,6 +5714,7 @@ class ChatifyWidget {
           if (conv?.id && (!this.config.workspaceId || conv.workspace_id === this.config.workspaceId)) {
             this.conversationId = conv.id;
             this.conversationStatus = conv.status || 'open';
+            localStorage.setItem(`zentry_conversation_id${storageKeySuffix}`, conv.id);
             localStorage.setItem(`chatify_conversation_id${storageKeySuffix}`, conv.id);
             await this.loadMessageHistory();
             this.subscribeToRealtime();
@@ -5748,8 +5788,8 @@ class ChatifyWidget {
       const target = e.target as HTMLElement | null;
       if (!target) return;
 
-      // 1. Help tab trigger: [data-chatify-help] or .chatify-help-trigger
-      const helpTrigger = target.closest('[data-chatify-help], .chatify-help-trigger');
+      // 1. Help tab trigger: [data-zentry-help], [data-chatify-help], .zentry-help-trigger, .chatify-help-trigger
+      const helpTrigger = target.closest('[data-zentry-help], [data-chatify-help], .zentry-help-trigger, .chatify-help-trigger');
       if (helpTrigger) {
         e.preventDefault();
         if (this.config.showHelpTab === false || this.faqs.length === 0) {
@@ -5759,11 +5799,11 @@ class ChatifyWidget {
         return;
       }
 
-      // 2. Open specific article: [data-chatify-article]
-      const articleTrigger = target.closest('[data-chatify-article]');
+      // 2. Open specific article: [data-zentry-article], [data-chatify-article]
+      const articleTrigger = target.closest('[data-zentry-article], [data-chatify-article]');
       if (articleTrigger) {
         e.preventDefault();
-        const articleIdOrSlug = articleTrigger.getAttribute('data-chatify-article') || '';
+        const articleIdOrSlug = articleTrigger.getAttribute('data-zentry-article') || articleTrigger.getAttribute('data-chatify-article') || '';
         if (articleIdOrSlug) {
           this.openArticle(articleIdOrSlug);
         } else {
@@ -5772,25 +5812,25 @@ class ChatifyWidget {
         return;
       }
 
-      // 3. General open trigger: [data-chatify-open] or .chatify-open-trigger
-      const openTrigger = target.closest('[data-chatify-open], .chatify-open-trigger');
+      // 3. General open trigger: [data-zentry-open], [data-chatify-open], .zentry-open-trigger, .chatify-open-trigger
+      const openTrigger = target.closest('[data-zentry-open], [data-chatify-open], .zentry-open-trigger, .chatify-open-trigger');
       if (openTrigger) {
         e.preventDefault();
-        const targetTab = openTrigger.getAttribute('data-chatify-tab') as 'home' | 'messages' | 'help' | null;
+        const targetTab = (openTrigger.getAttribute('data-zentry-tab') || openTrigger.getAttribute('data-chatify-tab')) as 'home' | 'messages' | 'help' | null;
         this.open(targetTab || 'home');
         return;
       }
 
-      // 4. Close trigger: [data-chatify-close]
-      const closeTrigger = target.closest('[data-chatify-close]');
+      // 4. Close trigger: [data-zentry-close], [data-chatify-close]
+      const closeTrigger = target.closest('[data-zentry-close], [data-chatify-close]');
       if (closeTrigger) {
         e.preventDefault();
         this.close();
         return;
       }
 
-      // 5. Toggle trigger: [data-chatify-toggle]
-      const toggleTrigger = target.closest('[data-chatify-toggle]');
+      // 5. Toggle trigger: [data-zentry-toggle], [data-chatify-toggle]
+      const toggleTrigger = target.closest('[data-zentry-toggle], [data-chatify-toggle]');
       if (toggleTrigger) {
         e.preventDefault();
         this.toggle();
@@ -5819,13 +5859,17 @@ class ChatifyWidget {
 
     // Helper to safely clean up any injected nodes
     const removeInjectedNodes = () => {
-      document.querySelectorAll('[data-chatify-nav]').forEach((el) => el.remove());
+      document.querySelectorAll('[data-zentry-nav], [data-chatify-nav]').forEach((el) => el.remove());
       // Also clean up any legacy IDs from previous widget versions
+      document.getElementById('zentryNavTriggerBtn')?.remove();
+      document.getElementById('zentryNavTriggerBtnMobile')?.remove();
       document.getElementById('chatifyNavTriggerBtn')?.remove();
       document.getElementById('chatifyNavTriggerBtnMobile')?.remove();
       // Remove any lingering hooked markers from prior sessions
-      document.querySelectorAll('[data-chatify-hooked]').forEach((el) => {
+      document.querySelectorAll('[data-zentry-hooked], [data-chatify-hooked]').forEach((el) => {
+        el.removeAttribute('data-zentry-hooked');
         el.removeAttribute('data-chatify-hooked');
+        el.removeAttribute('data-zentry-help');
         el.removeAttribute('data-chatify-help');
       });
     };
@@ -5851,6 +5895,7 @@ class ChatifyWidget {
 
     if (
       (customDomain && (currentHost === customDomain || currentHost === `www.${customDomain}` || currentHost.replace(/^www\./, '') === customDomain.replace(/^www\./, ''))) ||
+      currentHost.endsWith('zentryhelp.com') ||
       currentHost.endsWith('chatifyhelp.com') ||
       currentPath.startsWith('/help')
     ) {
@@ -5863,9 +5908,9 @@ class ChatifyWidget {
     if (customDomain) {
       helpCenterUrl = `https://${customDomain}`;
     } else if (helpSlug) {
-      helpCenterUrl = `https://${helpSlug}.chatifyhelp.com`;
+      helpCenterUrl = `https://${helpSlug}.zentryhelp.com`;
     } else if (this.config.workspaceId) {
-      helpCenterUrl = `https://chatifyhelp.com/help/${this.config.workspaceId}`;
+      helpCenterUrl = `/help/${this.config.workspaceId}`;
     }
 
     // 4. If the nav already has a link whose href points to the workspace help center, do nothing.
@@ -5876,13 +5921,13 @@ class ChatifyWidget {
     );
 
     const alreadyHasHelpCenterLink = allExistingNavLinks.some((a) => {
-      if (a.hasAttribute('data-chatify-nav')) return false;
+      if (a.hasAttribute('data-zentry-nav') || a.hasAttribute('data-chatify-nav')) return false;
       const href = (a.getAttribute('href') || '').toLowerCase().trim();
       if (!href || href === '#' || href.startsWith('javascript:')) return false;
       if (customDomain && href.includes(customDomain)) return true;
       if (helpSlug && (href.includes(`/${helpSlug}`) || href.includes(`${helpSlug}.`))) return true;
       if (this.config.workspaceId && href.includes(`/help/${this.config.workspaceId.toLowerCase()}`)) return true;
-      if (href.includes('chatifyhelp.com')) return true;
+      if (href.includes('zentryhelp.com') || href.includes('chatifyhelp.com') || href.includes('zen-try')) return true;
       return false;
     });
 
@@ -5915,6 +5960,7 @@ class ChatifyWidget {
       const isList = container.tagName.toLowerCase() === 'ul' || container.tagName.toLowerCase() === 'ol';
       const a = document.createElement('a');
       a.textContent = label;
+      a.setAttribute('data-zentry-nav', isMobile ? 'mobile' : 'desktop');
       a.setAttribute('data-chatify-nav', isMobile ? 'mobile' : 'desktop');
 
       if (action === 'redirect' && helpCenterUrl) {
@@ -5928,7 +5974,7 @@ class ChatifyWidget {
       a.addEventListener('click', handleLinkClick);
 
       // Find an existing sibling link in the container to copy styles/classes
-      const siblingLink = container.querySelector<HTMLAnchorElement>('a:not([data-chatify-nav])');
+      const siblingLink = container.querySelector<HTMLAnchorElement>('a:not([data-zentry-nav]):not([data-chatify-nav])');
 
       if (style === 'pill') {
         const bg = this.config.primaryColor || '#2563eb';
@@ -5988,8 +6034,9 @@ class ChatifyWidget {
 
       if (isList) {
         const li = document.createElement('li');
+        li.setAttribute('data-zentry-nav', isMobile ? 'mobile' : 'desktop');
         li.setAttribute('data-chatify-nav', isMobile ? 'mobile' : 'desktop');
-        const siblingLi = container.querySelector<HTMLLIElement>('li:not([data-chatify-nav])');
+        const siblingLi = container.querySelector<HTMLLIElement>('li:not([data-zentry-nav]):not([data-chatify-nav])');
         if (siblingLi && siblingLi.className) {
           li.className = siblingLi.className;
         }
@@ -6007,7 +6054,7 @@ class ChatifyWidget {
       if (explicitSelector) {
         try {
           const matched = document.querySelector<HTMLElement>(explicitSelector);
-          if (matched && !matched.closest('#chatifyWidgetContainer')) {
+          if (matched && !matched.closest('#zentry-widget-root, #chatify-widget-root, #chatifyWidgetContainer, [data-zentry-root]')) {
             return { desktop: matched, mobile: null };
           }
         } catch {}
@@ -6020,7 +6067,7 @@ class ChatifyWidget {
           'header nav ul, header nav, nav ul, nav, [role="navigation"] ul, [role="navigation"], .navbar-nav, .navbar, [class*="nav" i] ul'
         )
       ).filter((el) => {
-        if (el.closest('#chatifyWidgetContainer')) return false;
+        if (el.closest('#zentry-widget-root, #chatify-widget-root, #chatifyWidgetContainer, [data-zentry-root]')) return false;
         const style = window.getComputedStyle(el);
         return style.display !== 'none' && style.visibility !== 'hidden';
       });
@@ -6035,7 +6082,7 @@ class ChatifyWidget {
           const directLis = Array.from(el.children).filter((c) => c.tagName.toLowerCase() === 'li');
           linkCount = directLis.filter((li) => li.querySelector('a')).length;
         } else {
-          linkCount = Array.from(el.querySelectorAll('a')).filter((a) => !a.closest('#chatifyWidgetContainer')).length;
+          linkCount = Array.from(el.querySelectorAll('a')).filter((a) => !a.closest('#zentry-widget-root, #chatify-widget-root, #chatifyWidgetContainer, [data-zentry-root]')).length;
         }
 
         if (linkCount < 2) continue;
@@ -6061,7 +6108,7 @@ class ChatifyWidget {
           '[class*="mobile" i] nav ul, [class*="mobile" i] nav, [id*="mobile" i] ul, [id*="mobile" i] nav, [class*="drawer" i] ul, [class*="drawer" i] nav, nav[class*="mobile" i]'
         )
       ).filter((el) => {
-        if (el.closest('#chatifyWidgetContainer')) return false;
+        if (el.closest('#zentry-widget-root, #chatify-widget-root, #chatifyWidgetContainer, [data-zentry-root]')) return false;
         if (el === bestDesktop || el.contains(bestDesktop!) || bestDesktop?.contains(el)) return false;
         return true;
       });
@@ -6082,7 +6129,7 @@ class ChatifyWidget {
       }
 
       // Inject into desktop nav if not already injected
-      if (desktop && !document.querySelector('[data-chatify-nav="desktop"]')) {
+      if (desktop && !document.querySelector('[data-zentry-nav="desktop"], [data-chatify-nav="desktop"]')) {
         const desktopEl = createNavElement(desktop, false);
         if (position === 'start' && desktop.firstChild) {
           desktop.insertBefore(desktopEl, desktop.firstChild);
@@ -6092,7 +6139,7 @@ class ChatifyWidget {
       }
 
       // Inject into mobile nav if exists and not already injected
-      if (mobile && !document.querySelector('[data-chatify-nav="mobile"]')) {
+      if (mobile && !document.querySelector('[data-zentry-nav="mobile"], [data-chatify-nav="mobile"]')) {
         const mobileEl = createNavElement(mobile, true);
         if (position === 'start' && mobile.firstChild) {
           mobile.insertBefore(mobileEl, mobile.firstChild);
@@ -6114,7 +6161,7 @@ class ChatifyWidget {
       const observer = new MutationObserver(() => {
         clearTimeout(timer);
         timer = setTimeout(() => {
-          if (!document.querySelector('[data-chatify-nav]')) {
+          if (!document.querySelector('[data-zentry-nav], [data-chatify-nav]')) {
             inject();
           }
         }, 300);
@@ -6126,8 +6173,8 @@ class ChatifyWidget {
 }
 
 if (typeof window !== 'undefined') {
-  // If window.Chatify not defined, initialize placeholder queue so early calls don't crash
-  if (!(window as any).Chatify) {
+  // If window.Zentry or window.Chatify not defined, initialize placeholder queue so early calls don't crash
+  const makeStub = () => {
     const queue: any[] = [];
     const stub: any = {
       q: queue,
@@ -6141,23 +6188,36 @@ if (typeof window !== 'undefined') {
       isOpen: () => false,
       resetSession: () => {},
       switchTab: (...args: any[]) => queue.push(['switchTab', args]),
+      showPopup: (...args: any[]) => queue.push(['showPopup', args]),
+      hidePopup: (...args: any[]) => queue.push(['hidePopup', args]),
     };
-    (window as any).Chatify = stub;
-  }
+    return stub;
+  };
+
+  const initialStub =
+    (window as any).Zentry ||
+    (window as any)['Zen-try'] ||
+    (window as any).Chatify ||
+    makeStub();
+
+  (window as any).Zentry = initialStub;
+  (window as any)['Zen-try'] = initialStub;
+  (window as any).Chatify = initialStub;
 
   const init = () => {
-    const widget = new ChatifyWidget();
+    const widget = new ZentryWidget();
+    (window as any).__ZentryInstance = widget;
     (window as any).__ChatifyInstance = widget;
 
-    // Check if window.Chatify had a queue of pre-invoked commands
-    const existingChatify = (window as any).Chatify;
-    const queue = Array.isArray(existingChatify?.q)
-      ? existingChatify.q
-      : Array.isArray(existingChatify)
-      ? existingChatify
+    // Check if window.Zentry or window.Chatify had a queue of pre-invoked commands
+    const existingQueueSource = (window as any).Zentry || (window as any)['Zen-try'] || (window as any).Chatify;
+    const queue = Array.isArray(existingQueueSource?.q)
+      ? existingQueueSource.q
+      : Array.isArray(existingQueueSource)
+      ? existingQueueSource
       : [];
 
-    const api: ChatifyAPI = {
+    const api: ZentryAPI = {
       open: (tab) => widget.open(tab),
       close: () => widget.close(),
       toggle: () => widget.toggle(),
@@ -6173,6 +6233,8 @@ if (typeof window !== 'undefined') {
       instance: widget,
     };
 
+    (window as any).Zentry = api;
+    (window as any)['Zen-try'] = api;
     (window as any).Chatify = api;
 
     // Flush any queued method calls if callers pushed items like ['openHelp', []]
@@ -6198,3 +6260,5 @@ if (typeof window !== 'undefined') {
     init();
   }
 }
+
+export { ZentryWidget, ZentryWidget as ChatifyWidget };

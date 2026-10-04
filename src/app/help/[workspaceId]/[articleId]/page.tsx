@@ -266,7 +266,7 @@ export default function ArticleDetailPage() {
 
     let visitorId = 'anon';
     try {
-      visitorId = localStorage.getItem('chatify_vid') || 'anon';
+      visitorId = localStorage.getItem('zentry_vid') || localStorage.getItem('chatify_vid') || 'anon';
     } catch {
       /* storage blocked; an anonymous vote still counts */
     }

@@ -70,7 +70,7 @@ export function sendBrowserNotification(
       const notif = new Notification(title, {
         body: body.length > 140 ? `${body.slice(0, 137)}...` : body,
         icon: options?.icon || '/chat-icon.png',
-        tag: options?.tag || 'chatify-notification',
+        tag: options?.tag || 'zen-try-notification',
       });
 
       notif.onclick = () => {

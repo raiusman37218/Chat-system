@@ -32,7 +32,7 @@ export function Logo({
       >
         <img
           src="/logo.png"
-          alt="Chatify Logo"
+          alt="Zen-try Logo"
           width={pixelSize}
           height={pixelSize}
           className="w-full h-full object-contain filter drop-shadow-sm"
@@ -44,7 +44,7 @@ export function Logo({
             pixelSize >= 40 ? 'text-[19px]' : pixelSize >= 32 ? 'text-[17px]' : 'text-[15px]'
           } ${textClassName}`}
         >
-          Chat<span className="text-blue-600 dark:text-blue-500">i</span>fy
+          Zen<span className="text-blue-600 dark:text-blue-500">-try</span>
         </span>
       )}
     </div>

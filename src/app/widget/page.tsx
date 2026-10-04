@@ -46,7 +46,7 @@ function WidgetFrameContent() {
     // 2. Listen to postMessage from parent host window
     const handleParentMessage = (event: MessageEvent) => {
       if (!event.data || typeof event.data !== 'object') return;
-      if (event.data.type === 'chatify_update_config') {
+      if (event.data.type === 'zentry_update_config' || event.data.type === 'chatify_update_config') {
         setConfig((prev) => ({ ...prev, ...event.data.config }));
       }
     };
@@ -57,12 +57,14 @@ function WidgetFrameContent() {
 
   const handleClose = () => {
     if (window.parent && window.parent !== window) {
+      window.parent.postMessage({ type: 'zentry_close' }, '*');
       window.parent.postMessage({ type: 'chatify_close' }, '*');
     }
   };
 
   const handleUnreadChange = (count: number) => {
     if (window.parent && window.parent !== window) {
+      window.parent.postMessage({ type: 'zentry_unread_count', count }, '*');
       window.parent.postMessage({ type: 'chatify_unread_count', count }, '*');
     }
   };

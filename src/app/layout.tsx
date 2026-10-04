@@ -14,15 +14,15 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Chatify — Live chat your customers actually want to use",
+  title: "Zen-try — Live chat your customers actually want to use",
   description:
     "Real-time human support for any website. See who's browsing, reply in one shared inbox, and ship it with a single line of code.",
   manifest: "/manifest.webmanifest",
-  applicationName: "Chatify",
+  applicationName: "Zen-try",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "Chatify",
+    title: "Zen-try",
   },
   icons: {
     icon: [
@@ -59,7 +59,7 @@ export const viewport: Viewport = {
 const themeBootstrap = `
 (function () {
   var stored = null;
-  try { stored = localStorage.getItem('chatify-theme'); } catch (e) {}
+  try { stored = localStorage.getItem('zentry-theme') || localStorage.getItem('chatify-theme'); } catch (e) {}
   var theme = stored === 'light' || stored === 'dark'
     ? stored
     : (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');

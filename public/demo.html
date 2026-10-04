@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Customer Website Simulator — Chatify Live Support</title>
+  <title>Customer Website Simulator — Zen-try Live Support</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
@@ -453,7 +453,7 @@
     <div class="sim-left">
       <span class="sim-tag">CUSTOMER SIMULATOR</span>
       <span class="sim-text">
-        Simulating an end-user visiting your website with Chatify widget installed.
+        Simulating an end-user visiting your website with Zen-try widget installed.
       </span>
     </div>
     <div class="sim-right">
@@ -555,29 +555,29 @@
           <span>⚡ Phase 3: Help Center &amp; Widget SDK Trigger Console</span>
         </div>
         <p style="font-size: 12px; color: #cbd5e1; margin-bottom: 14px;">
-          Test the new <code style="color: #818cf8; background: #1e1b4b; padding: 2px 6px; border-radius: 4px;">window.Chatify</code> JavaScript SDK API and declarative <code style="color: #818cf8; background: #1e1b4b; padding: 2px 6px; border-radius: 4px;">data-chatify-*</code> HTML triggers:
+          Test the new <code style="color: #818cf8; background: #1e1b4b; padding: 2px 6px; border-radius: 4px;">window.Zentry</code> JavaScript SDK API and declarative <code style="color: #818cf8; background: #1e1b4b; padding: 2px 6px; border-radius: 4px;">data-zentry-*</code> HTML triggers:
         </p>
         <div style="display: flex; flex-wrap: wrap; gap: 8px;">
-          <button data-chatify-help class="sim-action-btn" style="background: #312e81; border-color: #6366f1; color: #e0e7ff; font-weight: 600;">
-            📖 [data-chatify-help] Trigger
+          <button data-zentry-help class="sim-action-btn" style="background: #312e81; border-color: #6366f1; color: #e0e7ff; font-weight: 600;">
+            📖 [data-zentry-help] Trigger
           </button>
-          <button class="sim-action-btn" onclick="window.Chatify &amp;&amp; window.Chatify.openHelp()" style="background: #1e293b; border-color: #475569;">
-            ⚙️ Chatify.openHelp()
+          <button class="sim-action-btn" onclick="window.Zentry &amp;&amp; window.Zentry.openHelp()" style="background: #1e293b; border-color: #475569;">
+            ⚙️ Zentry.openHelp()
           </button>
-          <button class="sim-action-btn" onclick="window.Chatify &amp;&amp; window.Chatify.openMessages()" style="background: #1e293b; border-color: #475569;">
-            💬 Chatify.openMessages()
+          <button class="sim-action-btn" onclick="window.Zentry &amp;&amp; window.Zentry.openMessages()" style="background: #1e293b; border-color: #475569;">
+            💬 Zentry.openMessages()
           </button>
-          <button class="sim-action-btn" onclick="window.Chatify &amp;&amp; window.Chatify.open('home')" style="background: #1e293b; border-color: #475569;">
-            🏠 Chatify.open(&apos;home&apos;)
+          <button class="sim-action-btn" onclick="window.Zentry &amp;&amp; window.Zentry.open('home')" style="background: #1e293b; border-color: #475569;">
+            🏠 Zentry.open(&apos;home&apos;)
           </button>
-          <button class="sim-action-btn" onclick="window.Chatify &amp;&amp; window.Chatify.search('getting')" style="background: #1e293b; border-color: #475569;">
-            🔍 Chatify.search(&apos;getting&apos;)
+          <button class="sim-action-btn" onclick="window.Zentry &amp;&amp; window.Zentry.search('getting')" style="background: #1e293b; border-color: #475569;">
+            🔍 Zentry.search(&apos;getting&apos;)
           </button>
-          <button class="sim-action-btn" onclick="window.Chatify &amp;&amp; window.Chatify.showPopup('Hi, how can we help?', 'Trader Care Desk')" style="background: #4338ca; border-color: #6366f1; color: #ffffff; font-weight: 600;">
+          <button class="sim-action-btn" onclick="window.Zentry &amp;&amp; window.Zentry.showPopup('Hi, how can we help?', 'Trader Care Desk')" style="background: #4338ca; border-color: #6366f1; color: #ffffff; font-weight: 600;">
             📩 Test Admin Message Popup
           </button>
-          <button data-chatify-close class="sim-action-btn" style="background: rgba(239, 68, 68, 0.15); border-color: rgba(239, 68, 68, 0.4); color: #fca5a5;">
-            ✕ [data-chatify-close]
+          <button data-zentry-close class="sim-action-btn" style="background: rgba(239, 68, 68, 0.15); border-color: rgba(239, 68, 68, 0.4); color: #fca5a5;">
+            ✕ [data-zentry-close]
           </button>
         </div>
       </div>
@@ -600,7 +600,7 @@
       <div class="card">
         <div class="card-icon">💬</div>
         <h3>24/7 Human Live Chat</h3>
-        <p>Get instant answers from on-duty customer engineers using our embedded Chatify widget.</p>
+        <p>Get instant answers from on-duty customer engineers using our embedded Zen-try widget.</p>
       </div>
     </section>
 
@@ -615,15 +615,15 @@
   </main>
 
   <footer>
-    <p>© 2026 Chatify Customer Simulator. Embedded with the Chatify Live Support System.</p>
+    <p>© 2026 Zen-try Customer Simulator. Embedded with the Zen-try Live Support System.</p>
   </footer>
 
   <script>
     // 1. Extract Workspace parameters from URL (or remembered active workspace)
     const urlParams = new URLSearchParams(window.location.search);
-    const workspaceId = urlParams.get('workspaceId') || urlParams.get('ws') || localStorage.getItem('chatify_active_workspace') || '';
+    const workspaceId = urlParams.get('workspaceId') || urlParams.get('ws') || localStorage.getItem('zentry_active_workspace') || localStorage.getItem('chatify_active_workspace') || '';
     if (workspaceId) {
-      localStorage.setItem('chatify_active_workspace', workspaceId);
+      localStorage.setItem('zentry_active_workspace', workspaceId);
     }
     const workspaceName = urlParams.get('name');
 
@@ -655,28 +655,30 @@
 
     // 4. Open chat bubble
     function openChatBubble() {
-      if (window.Chatify && typeof window.Chatify.toggle === 'function') {
-        window.Chatify.toggle();
-      } else if (window.__ChatifyInstance && typeof window.__ChatifyInstance.toggleWindow === 'function') {
-        window.__ChatifyInstance.toggleWindow();
+      if (window.Zentry && typeof window.Zentry.toggle === 'function') {
+        window.Zentry.toggle();
+      } else if (window.__ZentryInstance && typeof window.__ZentryInstance.toggleWindow === 'function') {
+        window.__ZentryInstance.toggleWindow();
       }
     }
 
     // 5. Reset visitor session to test from scratch
     function resetVisitorSession() {
-      if (window.__ChatifyInstance && typeof window.__ChatifyInstance.resetSession === 'function') {
-        window.__ChatifyInstance.resetSession();
+      if (window.__ZentryInstance && typeof window.__ZentryInstance.resetSession === 'function') {
+        window.__ZentryInstance.resetSession();
       } else {
         const suffix = workspaceId ? `_${workspaceId.slice(0, 8)}` : '';
-        localStorage.removeItem(`chatify_visitor_id${suffix}`);
-        localStorage.removeItem(`chatify_conversation_id${suffix}`);
-        localStorage.removeItem(`chatify_visitor_name${suffix}`);
-        localStorage.removeItem(`chatify_visitor_email${suffix}`);
+        ['zentry', 'chatify'].forEach((p) => {
+          localStorage.removeItem(`${p}_visitor_id${suffix}`);
+          localStorage.removeItem(`${p}_conversation_id${suffix}`);
+          localStorage.removeItem(`${p}_visitor_name${suffix}`);
+          localStorage.removeItem(`${p}_visitor_email${suffix}`);
+        });
         window.location.reload();
       }
     }
 
-    // 6. Dynamically load the Chatify widget (with cache busting)
+    // 6. Dynamically load the Zen-try widget (with cache busting)
     const widgetScript = document.createElement('script');
     widgetScript.src = '/widget.js?v=' + Date.now();
     if (workspaceId) {

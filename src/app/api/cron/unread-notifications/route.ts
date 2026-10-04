@@ -125,6 +125,8 @@ async function processUnreadNotifications(req: NextRequest) {
       // Determine chat link
       const fallbackUrl = visitor.current_url || workspace.website_url || `${appBaseUrl}/demo.html?workspaceId=${workspace.id}`;
       const urlObj = new URL(fallbackUrl, appBaseUrl);
+      urlObj.searchParams.set('zentry_conversation', conv.id);
+      urlObj.searchParams.set('zentry_open', '1');
       urlObj.searchParams.set('chatify_conversation', conv.id);
       urlObj.searchParams.set('chatify_open', '1');
       const chatUrl = urlObj.toString();

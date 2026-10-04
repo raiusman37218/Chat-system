@@ -114,7 +114,7 @@ export function ProductShowcase() {
           </div>
           <div className="flex-1 flex justify-center">
             <div className="px-3 py-1 rounded-md bg-surface border border-line text-[10.5px] text-ink-3 font-mono">
-              app.chatify.io/inbox
+              app.zen-try.io/inbox
             </div>
           </div>
           <div className="w-14" />

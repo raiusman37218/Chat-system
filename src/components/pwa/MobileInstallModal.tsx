@@ -111,14 +111,14 @@ export function MobileInstallModal({ isOpen, onClose }: MobileInstallModalProps)
             <div className="w-12 h-12 rounded-2xl bg-surface-2 border border-line shadow-sm overflow-hidden flex items-center justify-center p-1.5 shrink-0 ring-2 ring-accent/20">
               <img
                 src="/icon-192.png"
-                alt="Chatify Mobile App"
+                alt="Zen-try Mobile App"
                 className="w-full h-full object-contain"
               />
             </div>
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="text-base sm:text-lg font-bold text-ink tracking-tight">
-                  Chatify Mobile App
+                  Zen-try Mobile App
                 </h3>
                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-accent text-accent-ink uppercase tracking-wide">
                   PWA Shortcut
@@ -189,7 +189,7 @@ export function MobileInstallModal({ isOpen, onClose }: MobileInstallModalProps)
               <CheckCircle className="w-5 h-5 shrink-0" />
               <div className="text-xs">
                 <span className="font-bold block text-[13px]">App Already Installed!</span>
-                You are currently running Chatify directly from your mobile home screen.
+                You are currently running Zen-try directly from your mobile home screen.
               </div>
             </div>
           )}
@@ -210,7 +210,7 @@ export function MobileInstallModal({ isOpen, onClose }: MobileInstallModalProps)
                 </div>
 
                 <p className="text-xs text-ink-3 leading-relaxed">
-                  You can add Chatify directly to your Android home screen as an app icon with standalone full-screen window support.
+                  You can add Zen-try directly to your Android home screen as an app icon with standalone full-screen window support.
                 </p>
 
                 {canInstall ? (
@@ -270,7 +270,7 @@ export function MobileInstallModal({ isOpen, onClose }: MobileInstallModalProps)
                         Tap &ldquo;Install app&rdquo; or &ldquo;Add to Home screen&rdquo;
                       </span>
                       <span className="text-ink-3 text-[11.5px]">
-                        Confirm the dialog. The Chatify logo shortcut will appear on your phone's home screen!
+                        Confirm the dialog. The Zen-try logo shortcut will appear on your phone's home screen!
                       </span>
                     </div>
                   </div>
@@ -287,7 +287,7 @@ export function MobileInstallModal({ isOpen, onClose }: MobileInstallModalProps)
                   iPhone / iPad Safari Setup
                 </div>
                 <p className="text-xs text-ink-3 leading-relaxed">
-                  Apple Safari lets you add Chatify to your iPhone home screen in 3 seconds. It works exactly like an iOS app with push notifications and full screen.
+                  Apple Safari lets you add Zen-try to your iPhone home screen in 3 seconds. It works exactly like an iOS app with push notifications and full screen.
                 </p>
               </div>
 
@@ -335,7 +335,7 @@ export function MobileInstallModal({ isOpen, onClose }: MobileInstallModalProps)
                       Tap &ldquo;Add&rdquo; in the top-right corner
                     </span>
                     <span className="text-ink-3 text-[11.5px]">
-                      Chatify is now installed on your home screen without needing Apple App Store!
+                      Zen-try is now installed on your home screen without needing Apple App Store!
                     </span>
                   </div>
                 </div>

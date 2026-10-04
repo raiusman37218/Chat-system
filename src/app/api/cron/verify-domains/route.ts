@@ -30,6 +30,7 @@ function isHostingTarget(target: string): boolean {
     /\.vercel-dns(-\d+)?\.com$/.test(t) ||
     t.endsWith('.vercel.app') ||
     t.endsWith('.vercel-dns.com') ||
+    t.includes('zentry') ||
     t.includes('chatify')
   );
 }

@@ -1,5 +1,5 @@
-// Chatify Progressive Web App Service Worker (v2.0.0)
-const CACHE_NAME = 'chatify-pwa-v2';
+// Zen-try Progressive Web App Service Worker (v2.0.0)
+const CACHE_NAME = 'zen-try-pwa-v2';
 
 const STATIC_ASSETS = [
   '/icon-192.png',
@@ -16,7 +16,7 @@ self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
       return cache.addAll(STATIC_ASSETS).catch((err) => {
-        console.debug('[Chatify SW] Pre-cache non-fatal warning:', err);
+        console.debug('[Zen-try SW] Pre-cache non-fatal warning:', err);
       });
     })
   );
@@ -105,7 +105,7 @@ self.addEventListener('fetch', (event) => {
 
 // 5. Push Notification Handler
 self.addEventListener('push', (event) => {
-  let data = { title: 'Chatify Live Chat', body: 'New message received', icon: '/icon-192.png' };
+  let data = { title: 'Zen-try Live Chat', body: 'New message received', icon: '/icon-192.png' };
   try {
     if (event.data) {
       data = event.data.json();
@@ -117,7 +117,7 @@ self.addEventListener('push', (event) => {
   }
 
   const options = {
-    body: data.body || 'New message in Chatify',
+    body: data.body || 'New message in Zen-try',
     icon: data.icon || '/icon-192.png',
     badge: '/icon-192.png',
     vibrate: [100, 50, 100],
@@ -126,7 +126,7 @@ self.addEventListener('push', (event) => {
     },
   };
 
-  event.waitUntil(self.registration.showNotification(data.title || 'Chatify', options));
+  event.waitUntil(self.registration.showNotification(data.title || 'Zen-try', options));
 });
 
 // 6. Notification Click Handler

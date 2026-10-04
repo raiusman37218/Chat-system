@@ -182,15 +182,15 @@ export default function ChatWidget({
   useEffect(() => {
     let vid = '';
     try {
-      vid = localStorage.getItem('chatify_vid') || '';
+      vid = localStorage.getItem('zentry_vid') || localStorage.getItem('chatify_vid') || '';
       if (!vid) {
         vid = crypto.randomUUID();
-        localStorage.setItem('chatify_vid', vid);
+        localStorage.setItem('zentry_vid', vid);
       }
       setVisitorId(vid);
 
-      const savedName = localStorage.getItem('chatify_visitor_name') || '';
-      const savedEmail = localStorage.getItem('chatify_visitor_email') || '';
+      const savedName = localStorage.getItem('zentry_visitor_name') || localStorage.getItem('chatify_visitor_name') || '';
+      const savedEmail = localStorage.getItem('zentry_visitor_email') || localStorage.getItem('chatify_visitor_email') || '';
       if (savedName && savedEmail) {
         setVisitorName(savedName);
         setVisitorEmail(savedEmail);
@@ -324,7 +324,7 @@ export default function ChatWidget({
       if (!chosenConv) {
         let savedEmail = '';
         try {
-          savedEmail = localStorage.getItem('chatify_visitor_email') || '';
+          savedEmail = localStorage.getItem('zentry_visitor_email') || localStorage.getItem('chatify_visitor_email') || '';
         } catch {}
 
         if (savedEmail) {
@@ -375,7 +375,7 @@ export default function ChatWidget({
   useEffect(() => {
     if (!conversationId) return;
 
-    const channel = supabase.channel(`chatify-widget-${conversationId}`);
+    const channel = supabase.channel(`zen-try-widget-${conversationId}`);
 
     // Listen for new messages
     channel.on(
@@ -539,7 +539,7 @@ export default function ChatWidget({
     setInputContent(e.target.value);
 
     if (conversationId) {
-      supabase.channel(`chatify-widget-${conversationId}`).send({
+      supabase.channel(`zen-try-widget-${conversationId}`).send({
         type: 'broadcast',
         event: 'typing',
         payload: { isTyping: e.target.value.length > 0, sender: 'visitor' },
@@ -632,8 +632,14 @@ export default function ChatWidget({
     const cleanEmail = isSkip ? '' : visitorEmail.trim();
 
     try {
-      if (cleanName) localStorage.setItem('chatify_visitor_name', cleanName);
-      if (cleanEmail) localStorage.setItem('chatify_visitor_email', cleanEmail);
+      if (cleanName) {
+        localStorage.setItem('zentry_visitor_name', cleanName);
+        localStorage.setItem('chatify_visitor_name', cleanName);
+      }
+      if (cleanEmail) {
+        localStorage.setItem('zentry_visitor_email', cleanEmail);
+        localStorage.setItem('chatify_visitor_email', cleanEmail);
+      }
     } catch (err) {}
 
     setIsIdentified(true);
@@ -875,7 +881,7 @@ export default function ChatWidget({
 
   return (
     <div
-      className={`chatify-widget-container font-sans antialiased text-slate-800 dark:text-slate-100 ${
+      className={`zentry-widget-container chatify-widget-container font-sans antialiased text-slate-800 dark:text-slate-100 ${
         mode === 'window-only' ? 'w-full h-full' : 'fixed z-[999999]'
       } ${
         mode !== 'window-only'

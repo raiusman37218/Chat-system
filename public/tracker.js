@@ -1,12 +1,13 @@
 /**
- * Chatify Lightweight Analytics & Presence Tracker (< 10kb, zero dependencies)
+ * Zen-try Lightweight Analytics & Presence Tracker (< 10kb, zero dependencies)
  * Embed: <script src="https://YOUR_DOMAIN/tracker.js" async></script>
  */
 (function (window, document) {
   'use strict';
 
   // Prevent multiple initializations on the same page
-  if (window.__CHATIFY_TRACKER_INITIALIZED__) return;
+  if (window.__ZENTRY_TRACKER_INITIALIZED__ || window.__CHATIFY_TRACKER_INITIALIZED__) return;
+  window.__ZENTRY_TRACKER_INITIALIZED__ = true;
   window.__CHATIFY_TRACKER_INITIALIZED__ = true;
 
   // 1. Resolve Backend API Endpoint
@@ -46,11 +47,11 @@
   function getOrCreateVisitorId() {
     var vid = null;
     try {
-      vid = window.localStorage.getItem('chatify_vid');
+      vid = window.localStorage.getItem('zentry_vid') || window.localStorage.getItem('chatify_vid');
     } catch (e) {}
 
     if (!vid) {
-      vid = getCookie('_chatify_vid');
+      vid = getCookie('_zentry_vid') || getCookie('_chatify_vid');
     }
 
     if (!vid) {
@@ -64,9 +65,16 @@
         });
       }
       try {
+        window.localStorage.setItem('zentry_vid', vid);
         window.localStorage.setItem('chatify_vid', vid);
       } catch (e) {}
+      setCookie('_zentry_vid', vid, 365);
       setCookie('_chatify_vid', vid, 365);
+    } else {
+      try {
+        window.localStorage.setItem('zentry_vid', vid);
+      } catch (e) {}
+      setCookie('_zentry_vid', vid, 365);
     }
     return vid;
   }
@@ -77,12 +85,11 @@
   function getVisitCount() {
     var isNewSession = false;
     try {
-      if (!window.sessionStorage.getItem('chatify_sid')) {
+      if (!window.sessionStorage.getItem('zentry_sid') && !window.sessionStorage.getItem('chatify_sid')) {
         isNewSession = true;
-        window.sessionStorage.setItem(
-          'chatify_sid',
-          's_' + Date.now() + '_' + Math.random().toString(36).substring(2, 8)
-        );
+        var sid = 's_' + Date.now() + '_' + Math.random().toString(36).substring(2, 8);
+        window.sessionStorage.setItem('zentry_sid', sid);
+        window.sessionStorage.setItem('chatify_sid', sid);
       }
     } catch (e) {
       isNewSession = true;
@@ -90,17 +97,19 @@
 
     var count = 1;
     try {
-      var saved = window.localStorage.getItem('chatify_vcount');
+      var saved = window.localStorage.getItem('zentry_vcount') || window.localStorage.getItem('chatify_vcount');
       count = saved ? parseInt(saved, 10) : 0;
       if (isNewSession) {
         count += 1;
+        window.localStorage.setItem('zentry_vcount', count.toString());
         window.localStorage.setItem('chatify_vcount', count.toString());
       }
     } catch (e) {
-      var cookieCount = getCookie('_chatify_vcount');
+      var cookieCount = getCookie('_zentry_vcount') || getCookie('_chatify_vcount');
       count = cookieCount ? parseInt(cookieCount, 10) : 0;
       if (isNewSession) {
         count += 1;
+        setCookie('_zentry_vcount', count.toString(), 365);
         setCookie('_chatify_vcount', count.toString(), 365);
       }
     }
@@ -138,7 +147,7 @@
   // 6. Free Geolocation Lookup with Session Caching
   function fetchLocation(callback) {
     try {
-      var cached = window.sessionStorage.getItem('chatify_geo');
+      var cached = window.sessionStorage.getItem('zentry_geo') || window.sessionStorage.getItem('chatify_geo');
       if (cached) {
         return callback(JSON.parse(cached));
       }
@@ -157,6 +166,7 @@
             country: res.country_name || res.country || null,
           };
           try {
+            window.sessionStorage.setItem('zentry_geo', JSON.stringify(geo));
             window.sessionStorage.setItem('chatify_geo', JSON.stringify(geo));
           } catch (e) {}
           return callback(geo);

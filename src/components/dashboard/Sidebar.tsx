@@ -130,8 +130,8 @@ export function Sidebar({
         <div className="flex items-center justify-between gap-2.5 p-2 rounded-xl bg-surface-2/80 hover:bg-surface-2 transition-all border border-line/60">
           <div className="flex items-center gap-2.5 min-w-0 flex-1">
             <Avatar
-              name={workspace?.name || 'C'}
-              seed={workspace?.id || 'chatify'}
+              name={workspace?.name || 'Z'}
+              seed={workspace?.id || 'zen-try'}
               color={workspace?.brand_color || undefined}
               size="sm"
               className="shadow-xs ring-1 ring-black/5 dark:ring-white/10"
@@ -139,7 +139,7 @@ export function Sidebar({
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-1.5">
                 <span className="text-[13px] font-bold text-ink truncate leading-tight">
-                  {workspace?.name || 'Chatify'}
+                  {workspace?.name || 'Zen-try'}
                 </span>
                 {hasVisitors && (
                   <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 uppercase tracking-wider">

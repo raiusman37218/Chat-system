@@ -17,7 +17,7 @@ export function MobileInstallBanner({ onOpenModal, className }: MobileInstallBan
   useEffect(() => {
     if (typeof window === 'undefined') return;
     try {
-      const isDismissed = localStorage.getItem('chatify-mobile-banner-dismissed');
+      const isDismissed = localStorage.getItem('zentry-mobile-banner-dismissed') || localStorage.getItem('chatify-mobile-banner-dismissed');
       if (isDismissed === '1' || isDismissed === 'true') {
         setDismissed(true);
       } else {
@@ -36,7 +36,7 @@ export function MobileInstallBanner({ onOpenModal, className }: MobileInstallBan
   const handleDismiss = () => {
     setDismissed(true);
     try {
-      localStorage.setItem('chatify-mobile-banner-dismissed', '1');
+      localStorage.setItem('zentry-mobile-banner-dismissed', '1');
     } catch (e) {}
   };
 

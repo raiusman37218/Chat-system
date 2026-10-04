@@ -143,7 +143,7 @@ function LoginForm() {
   };
 
   const handleDemoFill = () => {
-    setEmail('agent@chatify.io');
+    setEmail('agent@zentry.io');
     setPassword('ChatifyDemo2026!');
   };
 

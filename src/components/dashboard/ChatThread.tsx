@@ -528,7 +528,7 @@ export function ChatThread({
     if (!state || state.convId !== conversation.id) {
       const supabase = createClient();
       if (state) supabase.removeChannel(state.channel);
-      const channel = supabase.channel(`chatify-typing-${conversation.id}`);
+      const channel = supabase.channel(`zen-try-typing-${conversation.id}`);
       channel.subscribe();
       state = { convId: conversation.id, channel, last: 0 };
       typingSignalRef.current = state;
@@ -1367,7 +1367,7 @@ export function ChatThread({
         {!isAgent && (
           <Avatar
             name={isAI ? 'AI' : displayName}
-            seed={isAI ? 'chatify-ai' : conversation.visitor_id}
+            seed={isAI ? 'zen-try-ai' : conversation.visitor_id}
             size="xs"
             className="mt-auto mb-1"
           />

@@ -78,7 +78,7 @@ export function AdminClientLayout({
               title="Return to Agent Inbox"
               className="w-10 h-10 rounded-xl bg-accent text-accent-ink flex items-center justify-center font-bold text-sm shadow-xs hover:opacity-90 transition-opacity"
             >
-              <img src="/logo.png" alt="Chatify" className="w-6 h-6 object-contain" />
+              <img src="/logo.png" alt="Zen-try" className="w-6 h-6 object-contain" />
             </Link>
 
             {/* Nav Tabs */}

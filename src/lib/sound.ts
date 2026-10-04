@@ -1,5 +1,6 @@
 // Synthesizes pleasant modern UI audio chimes using Web Audio API
-const STORAGE_KEY = 'chatify_sound_enabled';
+const STORAGE_KEY = 'zentry_sound_enabled';
+const LEGACY_STORAGE_KEY = 'chatify_sound_enabled';
 
 class SoundManager {
   private ctx: AudioContext | null = null;
@@ -15,7 +16,7 @@ class SoundManager {
     if (this.hydrated || typeof window === 'undefined') return;
     this.hydrated = true;
     try {
-      const stored = localStorage.getItem(STORAGE_KEY);
+      const stored = localStorage.getItem(STORAGE_KEY) || localStorage.getItem(LEGACY_STORAGE_KEY);
       if (stored !== null) this.soundEnabled = stored === 'true';
     } catch {
       // Storage unavailable — keep the default.

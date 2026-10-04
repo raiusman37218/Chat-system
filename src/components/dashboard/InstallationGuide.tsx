@@ -42,7 +42,7 @@ export function InstallationGuide({
     typeof window !== 'undefined' ? window.location.origin : (process.env.NEXT_PUBLIC_APP_URL || '');
   const workspaceId = workspace?.id || 'YOUR_WORKSPACE_ID';
 
-  const embedScript = `<!-- Chatify Live Chat Support -->
+  const embedScript = `<!-- Zen-try Live Chat Support -->
 <script
   src="${origin}/widget.js"
   data-workspace-id="${workspaceId}"
@@ -61,7 +61,7 @@ export function InstallationGuide({
         {[
           'Open your site\'s main HTML template or master layout file.',
           'Scroll to the bottom and find the closing </body> tag.',
-          'Paste the Chatify snippet directly above it.',
+          'Paste the Zen-try snippet directly above it.',
           'Save and deploy — the launcher appears for every visitor.',
         ].map((s, i) => (
           <li key={i} className="flex gap-3.5 items-center">

@@ -23,7 +23,7 @@ export function AuthShell({
           <Link
             href="/"
             className="inline-flex items-center group"
-            aria-label="Chatify home"
+            aria-label="Zen-try home"
           >
             <Logo size={32} />
           </Link>

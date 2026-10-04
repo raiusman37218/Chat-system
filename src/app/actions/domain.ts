@@ -91,7 +91,7 @@ export async function connectCustomDomainAction(
 
     // 5. Store pending domain in Supabase
     const now = new Date().toISOString();
-    const token = `chatify_tok_${Math.random().toString(36).substring(2, 10)}${Date.now().toString(36)}`;
+    const token = `zentry_tok_${Math.random().toString(36).substring(2, 10)}${Date.now().toString(36)}`;
 
     const { data: updated, error: updateErr } = await supabase
       .from('workspaces')
@@ -229,6 +229,7 @@ function isHostingTarget(target: string): boolean {
     /\.vercel-dns(-\d+)?\.com$/.test(t) ||
     t.endsWith('.vercel.app') ||
     t.endsWith('.vercel-dns.com') ||
+    t.includes('zentry') ||
     t.includes('chatify') ||
     t.includes('range4ex')
   );
@@ -397,9 +398,9 @@ export async function verifyWorkspaceDomainAction(
       }
     }
 
-    // 4. Check TXT record on domain and on _chatify-challenge.{domain}
+    // 4. Check TXT record on domain and on _zentry-challenge.{domain} or _chatify-challenge.{domain}
     if (!cnameVerified && token) {
-      const txtTargets = [`_chatify-challenge.${domain}`, domain];
+      const txtTargets = [`_zentry-challenge.${domain}`, `_chatify-challenge.${domain}`, domain];
 
       for (const target of txtTargets) {
         try {
@@ -407,7 +408,7 @@ export async function verifyWorkspaceDomainAction(
           const flatTxt = txtRecords.flat().join(' ');
           diagnosticLogs.push(`TXT on ${target}: "${flatTxt}"`);
 
-          if (flatTxt.includes(token) || flatTxt.includes('chatify-site-verification=')) {
+          if (flatTxt.includes(token) || flatTxt.includes('zentry-site-verification=') || flatTxt.includes('chatify-site-verification=')) {
             txtVerified = true;
             break;
           }
@@ -443,13 +444,13 @@ export async function verifyWorkspaceDomainAction(
         }
 
         reachable =
-          probe.ok && body?.app === 'chatify' && body?.workspaceId === workspaceId;
+          probe.ok && (body?.app === 'zentry' || body?.app === 'chatify') && body?.workspaceId === workspaceId;
 
         // A clean HTTPS answer that is not this app means the hostname is
         // wired up correctly — to a different site. On Vercel that is almost
         // always the domain sitting in the customer's own project rather than
         // ours, and a domain can only live in one project at a time.
-        servedBySomeoneElse = !reachable && body?.app !== 'chatify';
+        servedBySomeoneElse = !reachable && body?.app !== 'zentry' && body?.app !== 'chatify';
 
         diagnosticLogs.push(
           `Live probe: HTTP ${probe.status}` +

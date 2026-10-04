@@ -135,7 +135,7 @@ const SETTING_GROUPS: SettingGroup[] = [
       {
         id: 'mobile',
         label: 'Mobile App & Shortcuts',
-        description: 'Add Chatify to your Android or iPhone home screen without Play Store',
+        description: 'Add Zen-try to your Android or iPhone home screen without Play Store',
         Icon: Smartphone,
         adminOnly: false,
         keywords: [
