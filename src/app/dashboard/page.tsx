@@ -371,8 +371,21 @@ export default function DashboardPage() {
     }
 
     // Immediately clear unread_count for the opened conversation in UI state
+    // while keeping last_message intact so conversation list ordering does not jump
     setConversations((prev) =>
-      prev.map((c) => (c.id === conversationId ? { ...c, unread_count: 0 } : c))
+      prev.map((c) =>
+        c.id === conversationId
+          ? {
+              ...c,
+              unread_count: 0,
+              last_message:
+                c.last_message ||
+                (fetchedMessages.length > 0
+                  ? fetchedMessages[fetchedMessages.length - 1]
+                  : null),
+            }
+          : c
+      )
     );
   }, [supabase]);
 
@@ -1027,6 +1040,7 @@ export default function DashboardPage() {
             ? {
                 ...c,
                 ai_mode: 'disabled',
+                last_message: (insertedMsg as Message) || c.last_message,
                 channel_metadata: {
                   ...((c.channel_metadata as Record<string, any>) || {}),
                   last_human_reply_at: now,
@@ -1044,6 +1058,18 @@ export default function DashboardPage() {
           ...(isFirstAgentReply ? { assigned_agent_id: currentAgent.id } : {}),
         })
         .eq('id', targetId);
+
+      setConversations((prev) =>
+        prev.map((c) =>
+          c.id === targetId
+            ? {
+                ...c,
+                last_message: (insertedMsg as Message) || c.last_message,
+                ...(isFirstAgentReply ? { assigned_agent_id: currentAgent.id } : {}),
+              }
+            : c
+        )
+      );
     }
   };
 

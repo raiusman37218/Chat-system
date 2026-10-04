@@ -93,9 +93,8 @@ export async function POST(req: NextRequest) {
       updates.summary = summary;
     }
 
-    // D. Persist updates to conversations table
+    // D. Persist updates to conversations table (without altering updated_at recency)
     if (Object.keys(updates).length > 0) {
-      updates.updated_at = new Date().toISOString();
       await supabase
         .from('conversations')
         .update(updates)

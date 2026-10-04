@@ -95,13 +95,21 @@ function displayNameFor(conv: Conversation) {
 }
 
 function getLastActivityTime(conv: Conversation): number {
-  if (conv.updated_at) {
-    return new Date(conv.updated_at).getTime();
-  }
+  // Most recent message timestamp determines list recency
   if (conv.last_message?.created_at) {
-    return new Date(conv.last_message.created_at).getTime();
+    const t = new Date(conv.last_message.created_at).getTime();
+    if (!Number.isNaN(t)) return t;
   }
-  return conv.created_at ? new Date(conv.created_at).getTime() : 0;
+  // For newly started conversations with no messages yet, use conversation creation time
+  if (conv.created_at) {
+    const t = new Date(conv.created_at).getTime();
+    if (!Number.isNaN(t)) return t;
+  }
+  if (conv.updated_at) {
+    const t = new Date(conv.updated_at).getTime();
+    if (!Number.isNaN(t)) return t;
+  }
+  return 0;
 }
 
 function isWaitingOnAgent(conv: Conversation): boolean {
@@ -593,8 +601,9 @@ export function ConversationList({
         return timeB - timeA;
       }
 
-      // Default: newest activity on top
-      return timeB - timeA;
+      // Default: newest activity on top (most recent message first)
+      if (timeB !== timeA) return timeB - timeA;
+      return b.id.localeCompare(a.id);
     });
   }, [
     conversations,

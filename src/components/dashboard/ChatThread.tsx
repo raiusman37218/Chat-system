@@ -442,11 +442,19 @@ export function ChatThread({
     setSuggestedReplies([]);
   }
 
-  // Trigger background sentiment & tag analysis on new visitor message
+  // Trigger background sentiment & tag analysis only on a new unanalyzed visitor message
+  const lastAnalyzedMsgIdRef = useRef<string | null>(null);
+
   useEffect(() => {
     if (!conversation?.id || !conversation?.workspace_id || messages.length === 0) return;
     const lastMsg = messages[messages.length - 1];
-    if (lastMsg?.sender_type === 'visitor') {
+    if (
+      lastMsg?.sender_type === 'visitor' &&
+      lastMsg.id &&
+      lastMsg.id !== lastAnalyzedMsgIdRef.current &&
+      !conversation.sentiment
+    ) {
+      lastAnalyzedMsgIdRef.current = lastMsg.id;
       fetch('/api/ai/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -456,7 +464,7 @@ export function ChatThread({
         }),
       }).catch((err) => console.warn('Failed to trigger AI analysis:', err));
     }
-  }, [conversation.id, messages.length]);
+  }, [conversation?.id, conversation?.sentiment, conversation?.workspace_id, messages]);
 
   // Close the tag popover on an outside click and track positioning
   useEffect(() => {
