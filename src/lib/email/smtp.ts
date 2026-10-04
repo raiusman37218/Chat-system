@@ -44,8 +44,12 @@ export async function testSmtpConnection(config: SMTPSettingsConfig): Promise<{ 
   } catch (error: any) {
     console.error('[SMTP Verify Error]:', error);
     let msg = error.message || 'Failed to connect to SMTP server. Please check your credentials.';
-    if (msg.includes('EAUTH') || msg.includes('535')) {
-      msg = `Authentication failed for ${config.user}. Please verify your email login and password. If using Hostinger or Google, make sure your credentials are valid.`;
+    if (msg.includes('EAUTH') || msg.includes('535') || msg.includes('BadCredentials')) {
+      if (config.host.includes('gmail')) {
+        msg = `Gmail authentication failed. Google does not accept your regular Gmail password for SMTP. Please generate a 16-character Google App Password at https://myaccount.google.com/apppasswords and paste it in the password field.`;
+      } else {
+        msg = `Authentication failed for ${config.user}. Please verify your email login and password.`;
+      }
     } else if (msg.includes('ETIMEDOUT') || msg.includes('ECONNREFUSED')) {
       msg = `Could not connect to ${config.host}:${config.port}. Please verify the host and port (465 SSL or 587 TLS).`;
     }
