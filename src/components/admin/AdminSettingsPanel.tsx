@@ -866,7 +866,7 @@ export function AdminSettingsPanel({
   const [isPollingDomain, setIsPollingDomain] = useState(false);
   const [verificationResult, setVerificationResult] = useState<{
     verified: boolean;
-    status: 'verified' | 'pending' | 'failed';
+    status: 'live' | 'connecting' | 'verified' | 'pending' | 'failed';
     details: string;
   } | null>(null);
   const [copiedHost, setCopiedHost] = useState(false);
@@ -922,7 +922,7 @@ export function AdminSettingsPanel({
           const updatedWs: Workspace = {
             ...workspace,
             custom_domain: cleanDomain(workspace.custom_domain),
-            custom_domain_status: 'verified',
+            custom_domain_status: 'live',
             custom_domain_verified_at: new Date().toISOString(),
           };
           setWorkspace(updatedWs);
@@ -1052,7 +1052,7 @@ export function AdminSettingsPanel({
           const updatedWs: Workspace = {
             ...workspace,
             custom_domain: cleanDomain(workspace.custom_domain || customDomainInput),
-            custom_domain_status: 'verified',
+            custom_domain_status: 'live',
             custom_domain_verified_at: new Date().toISOString(),
           };
           setWorkspace(updatedWs);
@@ -3929,7 +3929,7 @@ export function AdminSettingsPanel({
               </div>
 
               {/* Connected / Live State */}
-              {workspace.custom_domain && workspace.custom_domain_status === 'verified' ? (
+              {workspace.custom_domain && (workspace.custom_domain_status === 'live' || workspace.custom_domain_status === 'verified') ? (
                 <div className="p-4 rounded-xl border border-emerald-500/30 bg-emerald-500/10 space-y-3">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div className="space-y-1 min-w-0">

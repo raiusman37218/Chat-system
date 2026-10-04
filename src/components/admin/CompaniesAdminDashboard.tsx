@@ -59,6 +59,7 @@ import {
   assignWorkspaceOwnerAction,
   updateCompanySettingsAction,
   mergeWorkspacesAction,
+  resyncCustomDomainsAction,
   PlatformCompaniesData,
   PlatformAnalyticsData,
   CompanyMetricItem,
@@ -144,6 +145,26 @@ export function CompaniesAdminDashboard({
   const [platformDays, setPlatformDays] = useState<7 | 30 | 90>(30);
   const [platformAnalytics, setPlatformAnalytics] = useState<PlatformAnalyticsData | null>(null);
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
+
+  // Vercel Custom Domains Resync Backfill State (Requirement 7)
+  const [resyncingDomains, setResyncingDomains] = useState(false);
+  const [resyncNotice, setResyncNotice] = useState<string | null>(null);
+
+  const handleResyncDomains = async () => {
+    setResyncingDomains(true);
+    setResyncNotice(null);
+    try {
+      const res = await resyncCustomDomainsAction();
+      if (res.success) {
+        setResyncNotice(`Successfully re-synced ${res.synced} / ${res.total} custom domains with Vercel project.`);
+        loadData(true);
+      }
+    } catch (err: any) {
+      setResyncNotice(`Re-sync error: ${err.message}`);
+    } finally {
+      setResyncingDomains(false);
+    }
+  };
 
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<'conversations' | 'visitors' | 'agents' | 'newest'>('newest');
@@ -533,6 +554,16 @@ export function CompaniesAdminDashboard({
             </button>
 
             <button
+              onClick={handleResyncDomains}
+              disabled={resyncingDomains}
+              className="h-9 px-3.5 rounded-xl border border-line bg-surface-2 hover:bg-surface text-ink text-[12.5px] font-semibold flex items-center gap-1.5 transition-all shadow-xs disabled:opacity-50"
+              title="Re-sync all workspace custom domains with Vercel project"
+            >
+              <Globe className={cn('w-3.5 h-3.5 text-blue-500', resyncingDomains && 'animate-spin')} />
+              <span>{resyncingDomains ? 'Syncing...' : 'Re-sync domains with Vercel'}</span>
+            </button>
+
+            <button
               onClick={() => setIsCreateModalOpen(true)}
               className="h-9 px-4 rounded-xl bg-accent text-accent-ink hover:opacity-90 text-[12.5px] font-semibold flex items-center gap-1.5 transition-all shadow-xs"
             >
@@ -545,6 +576,17 @@ export function CompaniesAdminDashboard({
 
       {/* Main Content Area */}
       <main className="p-8 space-y-7 max-w-7xl w-full mx-auto">
+        {resyncNotice && (
+          <div className="p-4 rounded-2xl border border-blue-500/30 bg-blue-500/10 text-blue-700 dark:text-blue-300 text-sm flex items-center justify-between shadow-xs">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="w-5 h-5 text-blue-500" />
+              <span>{resyncNotice}</span>
+            </div>
+            <button onClick={() => setResyncNotice(null)} className="p-1 hover:bg-blue-500/20 rounded-lg text-blue-500">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
         {/* Navigation Mode Switcher: Platform Executive Radar vs Companies Directory */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-line pb-5">
           <div className="flex items-center gap-1.5 p-1 rounded-xl bg-surface-2 border border-line">

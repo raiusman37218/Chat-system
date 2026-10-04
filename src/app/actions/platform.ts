@@ -6,6 +6,8 @@ import { serviceClient } from '@/lib/supabase/service';
 import { Workspace, Agent, SuperAdminAuditLog, SMTPSettingsConfig, PlatformSettings } from '@/types/database';
 import { generateUniqueWorkspaceSlug } from '@/lib/slug';
 import { testSmtpConnection, sendSmtpEmail, isValidEmail } from '@/lib/email/smtp';
+import { addDomain } from '@/lib/vercel-domains';
+import { cleanDomain } from '@/lib/domain';
 
 export interface CompanyPlanLimits {
   max_seats: number;
@@ -1199,3 +1201,86 @@ export async function testPlatformSMTPSettingsAction(
 
   return { success: true, message: 'ZenTry platform SMTP connected and verified successfully!' };
 }
+
+/**
+ * Super Admin Action: Re-sync custom domains with Vercel project (Requirement 7)
+ * Calls addDomain for every custom domain saved in the database missing from Vercel project.
+ */
+export async function resyncCustomDomainsAction(): Promise<{
+  success: boolean;
+  total: number;
+  synced: number;
+  results: Array<{
+    workspaceId: string;
+    workspaceName: string;
+    domain: string;
+    status: string;
+    error?: string;
+  }>;
+}> {
+  const { agent } = await assertSuperAdmin();
+  const supabase = await createClient();
+
+  const { data: workspaces, error } = await supabase
+    .from('workspaces')
+    .select('id, name, custom_domain, custom_domain_status')
+    .not('custom_domain', 'is', null)
+    .neq('custom_domain', '');
+
+  if (error || !workspaces) {
+    throw new Error(`Failed to load custom domains: ${error?.message}`);
+  }
+
+  const results: Array<{
+    workspaceId: string;
+    workspaceName: string;
+    domain: string;
+    status: string;
+    error?: string;
+  }> = [];
+
+  let synced = 0;
+
+  for (const ws of workspaces) {
+    if (!ws.custom_domain) continue;
+    const domain = cleanDomain(ws.custom_domain);
+    if (!domain) continue;
+
+    try {
+      const vercelRes = await addDomain(domain);
+      synced++;
+      results.push({
+        workspaceId: ws.id,
+        workspaceName: ws.name,
+        domain,
+        status: vercelRes.alreadyExists ? 'already_attached' : 'added',
+      });
+    } catch (err: any) {
+      results.push({
+        workspaceId: ws.id,
+        workspaceName: ws.name,
+        domain,
+        status: 'error',
+        error: err.message || 'Failed to add domain to Vercel',
+      });
+    }
+  }
+
+  await recordSuperAdminAudit({
+    admin: agent,
+    action: 'resync_domains_with_vercel',
+    details: {
+      total: workspaces.length,
+      synced,
+      results,
+    },
+  });
+
+  return {
+    success: true,
+    total: workspaces.length,
+    synced,
+    results,
+  };
+}
+

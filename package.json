@@ -13,6 +13,7 @@
     "@supabase/ssr": "^0.12.5",
     "@supabase/supabase-js": "^2.112.4",
     "@types/qrcode": "^1.5.6",
+    "@vercel/sdk": "^1.28.38",
     "cloudinary": "^2.11.0",
     "clsx": "^2.1.1",
     "jpeg-js": "^0.4.4",

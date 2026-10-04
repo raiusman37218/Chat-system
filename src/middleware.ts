@@ -64,7 +64,7 @@ export async function middleware(request: NextRequest) {
 
     if (ws) {
       // If the custom domain is live (verified), redirect the platform subdomain to it
-      if (ws.custom_domain && ws.custom_domain_status === 'verified') {
+      if (ws.custom_domain && (ws.custom_domain_status === 'live' || ws.custom_domain_status === 'verified')) {
         const liveDomain = cleanDomain(ws.custom_domain);
         const liveUrl = new URL(`https://${liveDomain}${pathname}`);
         liveUrl.search = request.nextUrl.search;
@@ -186,8 +186,8 @@ export async function middleware(request: NextRequest) {
           const rest = segments.slice(2).join('/');
           const subPath = rest ? `/${rest}` : '';
 
-          // If workspace has a verified custom domain, redirect to it
-          if (targetWs.custom_domain && targetWs.custom_domain_status === 'verified') {
+          // If workspace has a live/verified custom domain, redirect to it
+          if (targetWs.custom_domain && (targetWs.custom_domain_status === 'live' || targetWs.custom_domain_status === 'verified')) {
             const customUrl = new URL(`https://${cleanDomain(targetWs.custom_domain)}${subPath}`);
             customUrl.search = request.nextUrl.search;
             return NextResponse.redirect(customUrl, 308);

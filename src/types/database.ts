@@ -360,7 +360,7 @@ export interface PublicWorkspace {
   help_center_tab_icon: string;
   slug: string | null;
   custom_domain: string | null;
-  custom_domain_status: 'pending' | 'verified' | 'failed' | null;
+  custom_domain_status: 'connecting' | 'live' | 'pending' | 'verified' | 'failed' | null;
   help_center_title: string | null;
   help_center_subtitle: string | null;
   help_center_logo_url: string | null;
@@ -416,7 +416,7 @@ export interface Workspace {
   slug_changes_count?: number | null;
   slug_changed_at?: string | null;
   custom_domain?: string | null;
-  custom_domain_status?: 'pending' | 'verified' | 'failed' | null;
+  custom_domain_status?: 'connecting' | 'live' | 'pending' | 'verified' | 'failed' | null;
   custom_domain_verified_at?: string | null;
   custom_domain_verification_token?: string | null;
   custom_domain_connected_at?: string | null;
