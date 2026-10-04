@@ -19,13 +19,31 @@ export function createSmtpTransporter(config: SMTPSettingsConfig) {
     ? config.secure 
     : (Number(config.port) === 465);
 
+  const cleanPass = (config.pass || '').trim().replace(/\s+/g, '');
+  const cleanUser = (config.user || '').trim();
+  const host = (config.host || '').trim();
+
+  // If using Gmail / Google Workspace, use optimized Gmail service configuration
+  if (host.includes('gmail') || cleanUser.endsWith('@gmail.com')) {
+    return nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: cleanUser,
+        pass: cleanPass,
+      },
+      connectionTimeout: 15000,
+      greetingTimeout: 15000,
+      socketTimeout: 20000,
+    });
+  }
+
   return nodemailer.createTransport({
-    host: config.host.trim(),
+    host: host,
     port: Number(config.port),
     secure: isSecure,
     auth: {
-      user: config.user.trim(),
-      pass: config.pass,
+      user: cleanUser,
+      pass: cleanPass,
     },
     connectionTimeout: 15000,
     greetingTimeout: 15000,
@@ -95,6 +113,8 @@ export async function sendSmtpEmail(
     let errMsg = error.message || 'Failed to send email';
     if (errMsg.includes('553') && errMsg.includes('Sender address rejected')) {
       errMsg = `Sender address rejected. Most email providers (including Hostinger) require the "From" address to match your authenticated login username (${config.user}).`;
+    } else if (errMsg.includes('535') || errMsg.includes('BadCredentials')) {
+      errMsg = `Google rejected SMTP login for ${config.user} (535 BadCredentials). Please verify your 16-character Google App Password at myaccount.google.com/apppasswords.`;
     }
     return { success: false, error: errMsg };
   }

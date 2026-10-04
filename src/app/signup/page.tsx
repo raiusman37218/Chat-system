@@ -45,6 +45,8 @@ function SignupForm() {
   // OTP 6-digit code state
   const [otp, setOtp] = useState<string[]>(['', '', '', '', '', '']);
   const [verifyingCode, setVerifyingCode] = useState(false);
+  const [deliveryWarning, setDeliveryWarning] = useState<string | null>(null);
+  const [fallbackCode, setFallbackCode] = useState<string | null>(null);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
   const [loading, setLoading] = useState(false);
@@ -159,6 +161,18 @@ function SignupForm() {
       if (!res.success) {
         setErrorMsg(res.error || 'Failed to initiate account registration.');
         return;
+      }
+
+      if (res.warning) {
+        setDeliveryWarning(res.warning);
+      } else {
+        setDeliveryWarning(null);
+      }
+
+      if (res.code) {
+        setFallbackCode(res.code);
+      } else {
+        setFallbackCode(null);
       }
 
       setPhase('verify_code');
@@ -294,6 +308,16 @@ function SignupForm() {
       } else {
         setResendSuccess(true);
         setResendTimer(30);
+        if (res.warning) {
+          setDeliveryWarning(res.warning);
+        } else {
+          setDeliveryWarning(null);
+        }
+        if (res.code) {
+          setFallbackCode(res.code);
+        } else {
+          setFallbackCode(null);
+        }
         setOtp(['', '', '', '', '', '']);
         inputRefs.current[0]?.focus();
       }
@@ -368,6 +392,40 @@ function SignupForm() {
           >
             <CheckCircle2 className="w-4 h-4 shrink-0" />
             <span>A fresh verification code has been dispatched to your email.</span>
+          </div>
+        )}
+
+        {deliveryWarning && (
+          <div
+            role="alert"
+            className="mt-5 p-4 rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-900 dark:text-amber-200 text-xs space-y-2 animate-pop"
+          >
+            <div className="font-bold flex items-center gap-1.5 text-amber-700 dark:text-amber-300">
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              <span>Email Delivery Notice:</span>
+            </div>
+            <p className="leading-relaxed">{deliveryWarning}</p>
+            {fallbackCode && (
+              <div className="pt-2 border-t border-amber-500/20 flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-ink-2 font-medium">Verification Code:</span>
+                  <span className="font-mono font-bold text-sm bg-surface px-2.5 py-1 rounded-lg border border-line text-ink">
+                    {fallbackCode}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const digits = fallbackCode.split('');
+                    setOtp(digits);
+                    handleVerifyOtp(fallbackCode);
+                  }}
+                  className="px-3 py-1.5 rounded-lg bg-accent text-accent-ink font-bold text-xs hover:opacity-90 transition-opacity cursor-pointer shadow-xs"
+                >
+                  Auto-fill &amp; Verify Now &rarr;
+                </button>
+              </div>
+            )}
           </div>
         )}
 

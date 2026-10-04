@@ -18,7 +18,7 @@ export async function sendSignupVerificationCodeAction(params: {
   email: string;
   name: string;
   password?: string;
-}): Promise<{ success: boolean; error?: string; email?: string }> {
+}): Promise<{ success: boolean; error?: string; email?: string; warning?: string; code?: string }> {
   try {
     const normalizedEmail = (params.email || '').trim().toLowerCase();
     const cleanName = (params.name || '').trim();
@@ -107,6 +107,8 @@ export async function sendSignupVerificationCodeAction(params: {
 
     const smtpConfig = platformData?.smtp_settings as SMTPSettingsConfig | null;
 
+    let warning: string | undefined = undefined;
+
     if (smtpConfig && smtpConfig.user && smtpConfig.pass && smtpConfig.enabled) {
       const emailHtml = generateVerificationCodeEmailHtml({
         code,
@@ -123,16 +125,19 @@ export async function sendSignupVerificationCodeAction(params: {
 
       if (!sendResult.success) {
         console.error('[Verification] SMTP dispatch failed:', sendResult.error);
-        return {
-          success: false,
-          error: `Could not send verification email: ${sendResult.error}. Please check your ZenTry SMTP settings in Super Admin.`,
-        };
+        warning = sendResult.error || 'Failed to dispatch email';
       }
     } else {
       console.warn('[Verification] Platform SMTP not configured yet. Code generated:', code);
+      warning = 'Platform SMTP credentials are not configured or active.';
     }
 
-    return { success: true, email: normalizedEmail };
+    return {
+      success: true,
+      email: normalizedEmail,
+      warning,
+      code: warning ? code : undefined,
+    };
   } catch (err: any) {
     console.error('[Verification] Unexpected error sending code:', err);
     return { success: false, error: err.message || 'Failed to dispatch verification email.' };
@@ -215,7 +220,7 @@ export async function verifySignupCodeAction(params: {
 export async function resendSignupVerificationCodeAction(params: {
   email: string;
   name?: string;
-}): Promise<{ success: boolean; error?: string }> {
+}): Promise<{ success: boolean; error?: string; email?: string; warning?: string; code?: string }> {
   return sendSignupVerificationCodeAction({
     email: params.email,
     name: params.name || 'Business Owner',
