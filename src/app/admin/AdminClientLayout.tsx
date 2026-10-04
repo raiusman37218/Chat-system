@@ -7,6 +7,7 @@ import { Workspace, Agent, CannedResponse } from '@/types/database';
 import { CompaniesAdminDashboard } from '@/components/admin/CompaniesAdminDashboard';
 import { SettingsHub } from '@/components/dashboard/SettingsHub';
 import { SuperAdminAuditLogView } from '@/components/admin/SuperAdminAuditLogView';
+import { PlatformSMTPSettingsSection } from '@/components/admin/PlatformSMTPSettingsSection';
 import { exitSuperAdminWorkspaceViewAction } from '@/app/actions/platform';
 import { cn } from '@/lib/utils';
 
@@ -97,7 +98,7 @@ export function AdminClientLayout({
 
               <button
                 onClick={() => setActiveTab('email')}
-                title="Email & SMTP Settings"
+                title="ZenTry Master Platform Email (Super Admin)"
                 className={cn(
                   'w-10 h-10 rounded-xl flex items-center justify-center transition-colors',
                   activeTab === 'email'
@@ -167,15 +168,7 @@ export function AdminClientLayout({
           ) : activeTab === 'audit' ? (
             <SuperAdminAuditLogView />
           ) : activeTab === 'email' ? (
-            <SettingsHub
-              key="email-settings-hub"
-              workspace={currentWorkspace}
-              currentAgent={agent}
-              agents={initialAgents}
-              cannedResponses={initialCannedResponses}
-              initialSection="email"
-              onWorkspaceUpdated={(newWs) => setCurrentWorkspace(newWs)}
-            />
+            <PlatformSMTPSettingsSection />
           ) : (
             <SettingsHub
               key="workspace-settings-hub"

@@ -299,11 +299,16 @@ export function SMTPSettingsSection({
               <Mail className="h-6 w-6" />
             </div>
             <div>
-              <h3 className="text-lg font-bold text-ink">
-                Email (SMTP) Integration
-              </h3>
+              <div className="flex items-center gap-2">
+                <h3 className="text-lg font-bold text-ink">
+                  {workspace.name} Email (SMTP) Integration
+                </h3>
+                <span className="px-2 py-0.5 rounded-md text-[11px] font-bold bg-surface-2 border border-line text-ink-2">
+                  Company Workspace
+                </span>
+              </div>
               <p className="text-[13px] text-ink-2 mt-0.5 leading-relaxed">
-                Configure your custom workspace email credentials. When a user has not seen a query reply for 5 minutes, an automatic professional email notification is sent to them.
+                Configure custom email credentials specifically for <strong>{workspace.name}</strong>. When a website visitor has not seen an agent reply for 5 minutes, an automatic email notification is sent from this company&apos;s address.
               </p>
             </div>
           </div>

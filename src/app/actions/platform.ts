@@ -3,8 +3,9 @@
 import { cookies } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 import { serviceClient } from '@/lib/supabase/service';
-import { Workspace, Agent, SuperAdminAuditLog } from '@/types/database';
+import { Workspace, Agent, SuperAdminAuditLog, SMTPSettingsConfig, PlatformSettings } from '@/types/database';
 import { generateUniqueWorkspaceSlug } from '@/lib/slug';
+import { testSmtpConnection, sendSmtpEmail, isValidEmail } from '@/lib/email/smtp';
 
 export interface CompanyPlanLimits {
   max_seats: number;
@@ -1037,4 +1038,164 @@ export async function getSuperAdminAuditLogsAction(options: {
     logs: (data || []) as SuperAdminAuditLog[],
     totalCount: count || 0,
   };
+}
+
+/**
+ * Super Admin Action: Get master platform settings (ZenTry platform email & config)
+ */
+export async function getPlatformSettingsAction(): Promise<{
+  platform_name: string;
+  platform_url: string;
+  support_email: string;
+  smtp_settings: SMTPSettingsConfig | null;
+}> {
+  await assertSuperAdmin();
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from('platform_settings')
+    .select('*')
+    .eq('id', 'default')
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(`Failed to load platform settings: ${error.message}`);
+  }
+
+  return {
+    platform_name: data?.platform_name || 'ZenTry',
+    platform_url: data?.platform_url || 'https://zen-try.site',
+    support_email: data?.support_email || 'support@zen-try.site',
+    smtp_settings: data?.smtp_settings || null,
+  };
+}
+
+/**
+ * Super Admin Action: Update master platform SMTP settings (ZenTry company email)
+ */
+export async function updatePlatformSMTPSettingsAction(smtp: SMTPSettingsConfig) {
+  const { agent } = await assertSuperAdmin();
+  const supabase = await createClient();
+
+  const effectiveFrom = (smtp.from_email && isValidEmail(smtp.from_email))
+    ? smtp.from_email.trim()
+    : (smtp.user || '').trim();
+
+  const normalizedConfig: SMTPSettingsConfig = {
+    ...smtp,
+    host: (smtp.host || 'smtp.hostinger.com').trim(),
+    port: Number(smtp.port) || 465,
+    user: (smtp.user || '').trim(),
+    pass: smtp.pass,
+    from_name: (smtp.from_name || 'ZenTry').trim(),
+    from_email: effectiveFrom,
+    secure: Number(smtp.port) === 465,
+  };
+
+  const { error } = await supabase
+    .from('platform_settings')
+    .upsert({
+      id: 'default',
+      platform_name: 'ZenTry',
+      platform_url: 'https://zen-try.site',
+      support_email: effectiveFrom || 'support@zen-try.site',
+      smtp_settings: normalizedConfig,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'id' });
+
+  if (error) {
+    throw new Error(`Failed to save platform SMTP settings: ${error.message}`);
+  }
+
+  await recordSuperAdminAudit({
+    admin: agent,
+    action: 'update_platform_smtp',
+    details: {
+      host: normalizedConfig.host,
+      port: normalizedConfig.port,
+      user: normalizedConfig.user,
+      from_name: normalizedConfig.from_name,
+      from_email: normalizedConfig.from_email,
+      enabled: normalizedConfig.enabled,
+    },
+  });
+
+  return { success: true };
+}
+
+/**
+ * Super Admin Action: Test master platform SMTP credentials and send real test email
+ */
+export async function testPlatformSMTPSettingsAction(
+  config: SMTPSettingsConfig,
+  sendTestTo?: string
+): Promise<{ success: boolean; message?: string }> {
+  await assertSuperAdmin();
+
+  if (!config || !config.host || !config.port || !config.user || !config.pass) {
+    return {
+      success: false,
+      message: 'Missing required SMTP fields (Host, Port, User, Password)',
+    };
+  }
+
+  const effectiveFrom = (config.from_email && isValidEmail(config.from_email))
+    ? config.from_email.trim()
+    : config.user.trim();
+
+  const normalizedConfig: SMTPSettingsConfig = {
+    ...config,
+    host: config.host.trim(),
+    port: Number(config.port) || 465,
+    user: config.user.trim(),
+    pass: config.pass,
+    from_name: (config.from_name || 'ZenTry Master').trim(),
+    from_email: effectiveFrom,
+    secure: Number(config.port) === 465,
+  };
+
+  const testResult = await testSmtpConnection(normalizedConfig);
+  if (!testResult.success) {
+    return {
+      success: false,
+      message: testResult.message || 'Could not connect to SMTP server',
+    };
+  }
+
+  if (sendTestTo && isValidEmail(sendTestTo)) {
+    const emailResult = await sendSmtpEmail(normalizedConfig, {
+      to: sendTestTo.trim(),
+      subject: `[ZenTry Master] Verification Email System Connected`,
+      html: `
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 540px; margin: 0 auto; padding: 28px; border: 1px solid #e2e8f0; border-radius: 16px; background: #ffffff; color: #1e293b;">
+          <div style="display: inline-block; background: #ecfdf5; color: #059669; padding: 5px 12px; border-radius: 999px; font-size: 12px; font-weight: 700; border: 1px solid #a7f3d0; margin-bottom: 14px;">
+            ✓ ZENTRY MASTER PLATFORM SMTP VERIFIED
+          </div>
+          <h2 style="color: #0f172a; margin: 0 0 10px 0; font-size: 21px; font-weight: 700;">ZenTry Master Email Connected!</h2>
+          <p style="color: #475569; line-height: 1.6; font-size: 14.5px; margin: 0 0 18px 0;">
+            Congratulations! Your ZenTry platform email (<strong>${normalizedConfig.from_email}</strong>) is successfully authenticated and delivering emails.
+          </p>
+          <div style="background-color: #f8fafc; padding: 16px 18px; border-radius: 12px; font-size: 13.5px; color: #334155; border: 1px solid #e2e8f0; line-height: 1.7;">
+            <div><strong>Platform:</strong> ZenTry (zen-try.site)</div>
+            <div><strong>SMTP Host:</strong> ${normalizedConfig.host}:${normalizedConfig.port} (${normalizedConfig.port === 465 ? 'SSL' : 'TLS'})</div>
+            <div><strong>Sender Name:</strong> ${normalizedConfig.from_name}</div>
+            <div><strong>Sender Email:</strong> ${normalizedConfig.from_email}</div>
+            <div><strong>Authenticated User:</strong> ${normalizedConfig.user}</div>
+          </div>
+          <p style="font-size: 13px; color: #64748b; margin: 18px 0 0 0; line-height: 1.55;">
+            This master email is isolated from individual tenant workspaces. It handles business onboarding, account verification, and security notifications for all new workspaces creating an account on ZenTry.
+          </p>
+        </div>
+      `,
+    });
+
+    if (!emailResult.success) {
+      return {
+        success: false,
+        message: emailResult.error || 'Failed to send test email',
+      };
+    }
+  }
+
+  return { success: true, message: 'ZenTry platform SMTP connected and verified successfully!' };
 }

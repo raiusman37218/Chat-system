@@ -45,9 +45,9 @@ export async function testSmtpConnection(config: SMTPSettingsConfig): Promise<{ 
     console.error('[SMTP Verify Error]:', error);
     let msg = error.message || 'Failed to connect to SMTP server. Please check your credentials.';
     if (msg.includes('EAUTH') || msg.includes('535')) {
-      msg = 'Authentication failed. Please verify your email address and password on Hostinger.';
+      msg = `Authentication failed for ${config.user}. Please verify your email login and password. If using Hostinger or Google, make sure your credentials are valid.`;
     } else if (msg.includes('ETIMEDOUT') || msg.includes('ECONNREFUSED')) {
-      msg = `Could not connect to ${config.host}:${config.port}. Please verify the host and port (465 SSL is recommended for Hostinger).`;
+      msg = `Could not connect to ${config.host}:${config.port}. Please verify the host and port (465 SSL or 587 TLS).`;
     }
     return { 
       success: false, 
@@ -90,7 +90,7 @@ export async function sendSmtpEmail(
     console.error('[SMTP Send Error]:', error);
     let errMsg = error.message || 'Failed to send email';
     if (errMsg.includes('553') && errMsg.includes('Sender address rejected')) {
-      errMsg = `Hostinger rejected the sender address. Hostinger requires the "From" address to be your authenticated email (${config.user}).`;
+      errMsg = `Sender address rejected. Most email providers (including Hostinger) require the "From" address to match your authenticated login username (${config.user}).`;
     }
     return { success: false, error: errMsg };
   }

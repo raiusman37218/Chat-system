@@ -384,6 +384,16 @@ export interface SMTPSettingsConfig {
   unread_threshold_minutes?: number;
 }
 
+export interface PlatformSettings {
+  id: string;
+  platform_name: string;
+  platform_url: string;
+  support_email: string;
+  smtp_settings: SMTPSettingsConfig | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Workspace {
   id: string;
   name: string;
