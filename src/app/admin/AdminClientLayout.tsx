@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { Building2, Settings, ArrowLeft, ShieldAlert, LogOut, ExternalLink } from 'lucide-react';
+import { Building2, Settings, ArrowLeft, ShieldAlert, LogOut, ExternalLink, Mail } from 'lucide-react';
 import { Workspace, Agent, CannedResponse } from '@/types/database';
 import { CompaniesAdminDashboard } from '@/components/admin/CompaniesAdminDashboard';
 import { SettingsHub } from '@/components/dashboard/SettingsHub';
@@ -15,7 +15,7 @@ interface AdminClientLayoutProps {
   agent: Agent;
   initialAgents: Agent[];
   initialCannedResponses: CannedResponse[];
-  initialTab?: 'companies' | 'audit' | 'settings';
+  initialTab?: 'companies' | 'audit' | 'settings' | 'email';
 }
 
 export function AdminClientLayout({
@@ -25,7 +25,7 @@ export function AdminClientLayout({
   initialCannedResponses,
   initialTab = 'companies',
 }: AdminClientLayoutProps) {
-  const [activeTab, setActiveTab] = useState<'companies' | 'audit' | 'settings'>(initialTab);
+  const [activeTab, setActiveTab] = useState<'companies' | 'audit' | 'settings' | 'email'>(initialTab);
   const [currentWorkspace, setCurrentWorkspace] = useState<Workspace>(initialWorkspace);
 
   const isSwitched = currentWorkspace.id !== agent.workspace_id;
@@ -96,6 +96,19 @@ export function AdminClientLayout({
               </button>
 
               <button
+                onClick={() => setActiveTab('email')}
+                title="Email & SMTP Settings"
+                className={cn(
+                  'w-10 h-10 rounded-xl flex items-center justify-center transition-colors',
+                  activeTab === 'email'
+                    ? 'bg-accent text-accent-ink shadow-xs font-bold'
+                    : 'text-ink-3 hover:text-ink hover:bg-surface-2'
+                )}
+              >
+                <Mail className="w-5 h-5" />
+              </button>
+
+              <button
                 onClick={() => setActiveTab('audit')}
                 title="Super Admin Audit Log"
                 className={cn(
@@ -153,8 +166,19 @@ export function AdminClientLayout({
             />
           ) : activeTab === 'audit' ? (
             <SuperAdminAuditLogView />
+          ) : activeTab === 'email' ? (
+            <SettingsHub
+              key="email-settings-hub"
+              workspace={currentWorkspace}
+              currentAgent={agent}
+              agents={initialAgents}
+              cannedResponses={initialCannedResponses}
+              initialSection="email"
+              onWorkspaceUpdated={(newWs) => setCurrentWorkspace(newWs)}
+            />
           ) : (
             <SettingsHub
+              key="workspace-settings-hub"
               workspace={currentWorkspace}
               currentAgent={agent}
               agents={initialAgents}
