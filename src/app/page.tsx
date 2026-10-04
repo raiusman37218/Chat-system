@@ -591,7 +591,7 @@ export default function HomePage() {
       {/* The real widget, running on our own site */}
       <Script
         src="/widget.js"
-        data-workspace-id="a0000000-0000-0000-0000-000000000001"
+        data-workspace-id="c0000000-0000-0000-0000-000000000001"
         strategy="lazyOnload"
       />
     </div>

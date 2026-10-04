@@ -424,8 +424,20 @@ export interface Workspace {
   widget_z_index?: number | null;
   enable_proactive_welcome?: boolean | null;
   proactive_delay_seconds?: number | null;
-  auto_close_days?: number | null;
   industry?: string | null;
+  widget_installed?: boolean | null;
+  is_suspended?: boolean | null;
+  suspended_at?: string | null;
+  suspension_reason?: string | null;
+  deleted_at?: string | null;
+  plan?: string | null;
+  plan_limits?: {
+    max_seats: number;
+    max_monthly_conversations: number;
+    max_ai_replies: number;
+  } | null;
+  merged_into_workspace_id?: string | null;
+  auto_close_days?: number | null;
   created_at: string;
 }
 

@@ -13,6 +13,7 @@ import {
   SMTPSettingsConfig,
 } from '@/types/database';
 import { generateUniqueWorkspaceSlug } from '@/lib/slug';
+import { getIndustryPreset } from '@/lib/onboarding-presets';
 
 /**
  * Ensures the requesting user is authenticated, has 'admin' or 'owner' role,
@@ -78,7 +79,7 @@ export async function getAdminDataAction(workspaceId: string) {
     supabase
       .from('canned_responses')
       .select('*')
-      .or(`workspace_id.eq.${workspaceId},workspace_id.is.null`)
+      .eq('workspace_id', workspaceId)
       .order('shortcut'),
   ]);
 
@@ -692,6 +693,7 @@ export async function createWorkspaceAction(input: {
   greetingTitle: string;
   greetingMessage: string;
   slug: string;
+  industry?: string | null;
   customDomain?: string | null;
   verificationToken?: string | null;
 }) {
@@ -705,11 +707,20 @@ export async function createWorkspaceAction(input: {
     throw new Error('Unauthorized: Authentication required.');
   }
 
+  // Require email verification before the workspace becomes active
+  const isEmailConfirmed = Boolean(user.email_confirmed_at || (user as any).confirmed_at);
+  if (!isEmailConfirmed) {
+    throw new Error('Email verification required: Please verify your email address before creating or activating a workspace.');
+  }
+
   // 1. Generate clean, unique slug from workspace name
   const slug = await generateUniqueWorkspaceSlug(
     supabase,
     input.slug || input.businessName
   );
+
+  const industry = input.industry?.toLowerCase()?.trim() || 'generic';
+  const preset = getIndustryPreset(industry);
 
   // 2. Insert Workspace
   const { data: ws, error: wsError } = await supabase
@@ -718,8 +729,8 @@ export async function createWorkspaceAction(input: {
       name: input.businessName,
       website_url: input.websiteUrl || null,
       brand_color: input.brandColor,
-      greeting_title: input.greetingTitle,
-      greeting_message: input.greetingMessage,
+      greeting_title: input.greetingTitle || preset.greetingTitle,
+      greeting_message: input.greetingMessage || preset.greetingPlaceholder,
       owner_id: user.id,
       slug,
       slug_changes_count: 0,
@@ -727,6 +738,7 @@ export async function createWorkspaceAction(input: {
       custom_domain: input.customDomain || null,
       custom_domain_status: input.customDomain ? 'pending' : null,
       custom_domain_verification_token: input.customDomain ? input.verificationToken : null,
+      industry,
     })
     .select()
     .single();
@@ -735,7 +747,7 @@ export async function createWorkspaceAction(input: {
     throw new Error(wsError?.message || 'Failed to create workspace.');
   }
 
-  // 2. Link current agent to workspace
+  // 3. Link current agent to workspace
   await supabase
     .from('agents')
     .upsert({
@@ -746,6 +758,58 @@ export async function createWorkspaceAction(input: {
       role: 'owner',
       status: 'online',
     });
+
+  // 4. Seed two generic saved replies (greeting, "we're checking")
+  await supabase.from('canned_responses').insert([
+    {
+      workspace_id: ws.id,
+      title: 'Greeting',
+      shortcut: 'hello',
+      content: 'Hi there! Thanks for reaching out. How can I help you today?',
+    },
+    {
+      workspace_id: ws.id,
+      title: "We're checking",
+      shortcut: 'checking',
+      content: "Thanks for your patience! I'm looking into this for you right now and will update you shortly.",
+    },
+  ]);
+
+  // 5. Seed industry first help section & 3 article blueprints
+  try {
+    const { data: section } = await supabase
+      .from('help_sections')
+      .insert({
+        workspace_id: ws.id,
+        name: preset.sectionName,
+        slug: preset.sectionSlug,
+        icon: preset.icon,
+        description: preset.sectionDescription,
+        order_index: 1,
+      })
+      .select('id')
+      .maybeSingle();
+
+    if (section?.id && preset.articles?.length) {
+      const articleInserts = preset.articles.map((art, idx) => ({
+        workspace_id: ws.id,
+        section_id: section.id,
+        title: art.title,
+        slug: art.slug,
+        category: preset.sectionName,
+        summary: art.summary,
+        content: art.content,
+        status: 'published',
+        author_id: user.id,
+        views_count: 0,
+        order_index: idx + 1,
+      }));
+
+      await supabase.from('articles').insert(articleInserts);
+    }
+  } catch (seedErr) {
+    console.warn('Could not seed help blueprints:', seedErr);
+  }
 
   return { success: true, workspace: ws as Workspace };
 }

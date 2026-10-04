@@ -39,7 +39,7 @@ export function InstallationGuide({
   const [activePlatform, setActivePlatform] = useState<Platform>('html');
 
   const origin =
-    typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000';
+    typeof window !== 'undefined' ? window.location.origin : (process.env.NEXT_PUBLIC_APP_URL || '');
   const workspaceId = workspace?.id || 'YOUR_WORKSPACE_ID';
 
   const embedScript = `<!-- Chatify Live Chat Support -->

@@ -179,9 +179,9 @@ class ChatifyWidget {
     }
 
     this.initDOM();
-    this.bindGlobalTriggers();
-    this.loadWorkspaceArticles();
-    this.fetchWorkspaceSettingsAndApply().then(async () => {
+    this.fetchWorkspaceSettingsAndApply().then(async (isActive) => {
+      if (isActive === false) return;
+      this.bindGlobalTriggers();
       this.initVisitorTracking();
       this.initSPANavigationTracking();
 
@@ -284,16 +284,21 @@ class ChatifyWidget {
     window.location.reload();
   }
 
-  // 2. Fetch custom business workspace settings if workspaceId provided
-  private async fetchWorkspaceSettingsAndApply() {
-    if (!this.config.workspaceId) return;
+  private async fetchWorkspaceSettingsAndApply(): Promise<boolean> {
+    if (!this.config.workspaceId) return true;
 
     try {
       const { data, error } = await this.supabase.rpc('fn_get_workspace_config', {
         p_workspace_id: this.config.workspaceId,
       });
 
-      if (!error && data) {
+      if (error || !data) {
+        console.warn('[Chatify] Workspace is suspended, inactive, or not found. Widget will not load.');
+        if (this.container && this.container.parentNode) {
+          this.container.parentNode.removeChild(this.container);
+        }
+        return false;
+      }
         if (data.name) this.config.businessName = data.name;
         if (data.brand_color) this.config.primaryColor = data.brand_color;
         if (data.greeting_title) this.config.title = data.greeting_title;
@@ -361,31 +366,19 @@ class ChatifyWidget {
 
         this.initNavbarAutoTrigger();
         this.updateThemeAndTexts();
+
+        this.renderAvatarsStack(this.workspaceAgents);
+        this.updatePresenceAndTexts();
+        this.subscribeToAgentsRealtime();
+
+        // Load Help Desk / Knowledge Base articles dynamically
+        await this.loadWorkspaceArticles();
+        return true;
+      } catch (e) {
+        console.warn('[Chatify] Could not fetch workspace config:', e);
+        return true;
       }
-
-      // If agents weren't returned by RPC or need fallback, query directly
-      if (this.workspaceAgents.length === 0 && this.config.workspaceId) {
-        try {
-          const { data: directAgents } = await this.supabase
-            .from('agents')
-            .select('id, name, avatar_url, status')
-            .eq('workspace_id', this.config.workspaceId);
-          if (directAgents && directAgents.length > 0) {
-            this.workspaceAgents = directAgents;
-          }
-        } catch {}
-      }
-
-      this.renderAvatarsStack(this.workspaceAgents);
-      this.updatePresenceAndTexts();
-      this.subscribeToAgentsRealtime();
-
-      // Load Help Desk / Knowledge Base articles dynamically
-      await this.loadWorkspaceArticles();
-    } catch (e) {
-      console.warn('[Chatify] Could not fetch workspace config:', e);
     }
-  }
 
   private isOutsideBusinessHours(businessHours: any): boolean {
     if (!businessHours || !businessHours.enabled || !businessHours.schedule) return false;

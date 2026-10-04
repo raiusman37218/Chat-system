@@ -12,6 +12,9 @@ import {
   Send,
   Sparkles,
   BookOpen,
+  Mail,
+  AlertCircle,
+  RefreshCw,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { createWorkspaceAction } from '@/app/actions/admin';
@@ -19,6 +22,7 @@ import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { Logo } from '@/components/ui/Logo';
 import { cleanDomain, getDefaultSubdomain } from '@/lib/domain';
 import { formatWorkspaceSlug } from '@/lib/slug';
+import { INDUSTRY_PRESETS, getIndustryPreset } from '@/lib/onboarding-presets';
 
 const PRESET_COLORS = [
   { name: 'Electric Blue', hex: '#2e5bff' },
@@ -27,7 +31,7 @@ const PRESET_COLORS = [
   { name: 'Violet', hex: '#7c5cff' },
   { name: 'Rose', hex: '#e11d48' },
   { name: 'Amber', hex: '#d97706' },
-];
+  ];
 
 const STEP_LABELS = ['Business', 'Branding', 'Install'] as const;
 
@@ -42,25 +46,95 @@ export default function OnboardingPage() {
   // Form State
   const [businessName, setBusinessName] = useState('');
   const [websiteUrl, setWebsiteUrl] = useState('');
+  const [industry, setIndustry] = useState<string>('generic');
   const [brandColor, setBrandColor] = useState('#2e5bff');
   const [greetingTitle, setGreetingTitle] = useState('Support Team');
   const [greetingMessage, setGreetingMessage] = useState(
     'We typically reply in under 5 minutes'
   );
 
+  const handleSelectIndustry = (indId: string) => {
+    setIndustry(indId);
+    const preset = getIndustryPreset(indId);
+    if (
+      !greetingMessage ||
+      greetingMessage === 'We typically reply in under 5 minutes' ||
+      Object.values(INDUSTRY_PRESETS).some((p) => p.greetingPlaceholder === greetingMessage)
+    ) {
+      setGreetingMessage(preset.greetingPlaceholder);
+    }
+  };
+
   // Created Workspace State
   const [createdWorkspaceId, setCreatedWorkspaceId] = useState<string | null>(null);
 
+  // Email verification check
+  const [emailUnconfirmed, setEmailUnconfirmed] = useState(false);
+  const [userEmail, setUserEmail] = useState('');
+  const [resendCooldown, setResendCooldown] = useState(0);
+  const [resending, setResending] = useState(false);
+  const [resendSuccess, setResendSuccess] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+    if (resendCooldown > 0) {
+      timer = setInterval(() => setResendCooldown((c) => c - 1), 1000);
+    }
+    return () => clearInterval(timer);
+  }, [resendCooldown]);
+
+  const verifyUserSession = async () => {
+    setRefreshing(true);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      router.replace('/login');
+      return;
+    }
+    setUserEmail(user.email || '');
+    const isConfirmed = Boolean(user.email_confirmed_at || (user as any).confirmed_at);
+    setEmailUnconfirmed(!isConfirmed);
+    setRefreshing(false);
+  };
+
   // Check auth session
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }: any) => {
-      if (!session) {
-        router.replace('/login');
-      }
-    });
+    verifyUserSession();
   }, [supabase, router]);
 
+  const handleResendConfirmation = async () => {
+    if (resendCooldown > 0 || resending || !userEmail) return;
+    setResending(true);
+    setResendSuccess(false);
+    try {
+      const origin =
+        typeof window !== 'undefined'
+          ? window.location.origin
+          : (process.env.NEXT_PUBLIC_APP_URL || '');
+      const { error } = await supabase.auth.resend({
+        type: 'signup',
+        email: userEmail,
+        options: {
+          emailRedirectTo: `${origin}/auth/callback?next=/onboarding`,
+        },
+      });
+      if (error) throw error;
+      setResendSuccess(true);
+      setResendCooldown(30);
+    } catch (err: any) {
+      console.error('Error resending confirmation:', err);
+      alert(err.message || 'Failed to resend confirmation email.');
+    } finally {
+      setResending(false);
+    }
+  };
+
   const handleCreateWorkspace = async () => {
+    if (emailUnconfirmed) {
+      alert('Email verification required: Please verify your email before activating your workspace. Check your inbox for the verification link.');
+      return;
+    }
+
     setLoading(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -96,6 +170,7 @@ export default function OnboardingPage() {
         greetingTitle,
         greetingMessage,
         slug,
+        industry,
         customDomain,
         verificationToken,
       });
@@ -115,7 +190,7 @@ export default function OnboardingPage() {
   };
 
   const getEmbedSnippet = () => {
-    const origin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000';
+    const origin = typeof window !== 'undefined' ? window.location.origin : (process.env.NEXT_PUBLIC_APP_URL || '');
     return `<!-- Chatify Live Chat Support -->
 <script
   src="${origin}/widget.js"
@@ -183,6 +258,61 @@ export default function OnboardingPage() {
             })}
           </div>
 
+          {/* Email verification requirement banner */}
+          {emailUnconfirmed && (
+            <div className="mb-6 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 sm:p-5 text-ink animate-pop">
+              <div className="flex items-start gap-3.5">
+                <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-500 flex items-center justify-center shrink-0 mt-0.5">
+                  <Mail className="w-5 h-5" />
+                </div>
+                <div className="space-y-1.5 flex-1 min-w-0">
+                  <h2 className="text-[15px] font-semibold text-ink flex items-center gap-2">
+                    <span>Email verification required</span>
+                    <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-500/20 text-amber-600 dark:text-amber-400">
+                      Pending
+                    </span>
+                  </h2>
+                  <p className="text-[13px] text-ink-2 leading-relaxed">
+                    Please confirm your email address <span className="font-semibold text-ink">{userEmail || 'in your inbox'}</span> before your workspace can become active.
+                  </p>
+                  <div className="pt-2 flex flex-wrap items-center gap-2.5">
+                    <button
+                      type="button"
+                      onClick={handleResendConfirmation}
+                      disabled={resendCooldown > 0 || resending}
+                      className="btn btn-sm btn-secondary font-medium"
+                    >
+                      {resending ? (
+                        <>
+                          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                          Sending…
+                        </>
+                      ) : resendCooldown > 0 ? (
+                        `Resend in ${resendCooldown}s`
+                      ) : (
+                        'Resend confirmation email'
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={verifyUserSession}
+                      disabled={refreshing}
+                      className="btn btn-sm btn-ghost text-ink-2 hover:text-ink font-medium"
+                    >
+                      <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
+                      Check status
+                    </button>
+                    {resendSuccess && (
+                      <span className="text-[12px] text-success font-medium animate-fade-in">
+                        Verification email sent!
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* STEP 1: Business Info */}
           {step === 1 && (
             <div className="animate-rise">
@@ -213,6 +343,40 @@ export default function OnboardingPage() {
                     }}
                     className="input"
                   />
+                </div>
+
+                {/* Industry Selection */}
+                <div>
+                  <label className="field-label flex items-center justify-between">
+                    <span>Industry &amp; Use Case</span>
+                    <span className="text-[11px] font-normal text-ink-3">Default: General</span>
+                  </label>
+                  <p className="text-[12.5px] text-ink-3 mb-3">
+                    Tailors your help center blueprints, section icon presets, and conversation placeholders.
+                  </p>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                    {Object.values(INDUSTRY_PRESETS).map((p) => {
+                      const isSelected = industry === p.id;
+                      return (
+                        <button
+                          key={p.id}
+                          type="button"
+                          onClick={() => handleSelectIndustry(p.id)}
+                          className={`flex items-center gap-2.5 p-3 rounded-xl border text-left transition-all ${
+                            isSelected
+                              ? 'border-accent bg-accent/10 text-accent font-semibold shadow-xs ring-1 ring-accent/30'
+                              : 'border-line bg-surface hover:bg-surface-2 text-ink-2 hover:text-ink'
+                          }`}
+                        >
+                          <span className="text-xl shrink-0 leading-none">{p.icon}</span>
+                          <div className="min-w-0 flex-1">
+                            <span className="text-[13px] block truncate">{p.label}</span>
+                          </div>
+                          {isSelected && <Check className="w-3.5 h-3.5 text-accent shrink-0" />}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
 
                 <div>
@@ -337,6 +501,7 @@ export default function OnboardingPage() {
                     <input
                       id="gm"
                       type="text"
+                      placeholder={getIndustryPreset(industry).greetingPlaceholder}
                       value={greetingMessage}
                       onChange={(e) => setGreetingMessage(e.target.value)}
                       className="input"
@@ -512,10 +677,10 @@ export default function OnboardingPage() {
                   href={`/demo.html?workspaceId=${createdWorkspaceId || ''}&name=${encodeURIComponent(businessName)}`}
                   target="_blank"
                   rel="noreferrer"
-                  className="btn btn-secondary w-full sm:w-auto"
+                  className="btn btn-secondary w-full sm:w-auto gap-2"
                 >
-                  <ExternalLink className="w-3.5 h-3.5" />
-                  Test in simulator
+                  <Sparkles className="w-4 h-4 text-accent" />
+                  Send yourself a test chat
                 </a>
 
                 <button

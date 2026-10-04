@@ -572,14 +572,14 @@ export async function executeHandoverToHuman({
       .eq('id', workspaceId)
       .maybeSingle();
 
-    if (ws?.auto_assignment?.enabled) {
-      const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
-      fetch(`${appUrl}/api/conversations/auto-assign`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ conversation_id: conversationId }),
-      }).catch((e) => console.warn('[Auto-Assign Error during Handover]:', e));
-    }
+      const appUrl = (process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || '').replace(/\/+$/, '');
+      if (appUrl) {
+        fetch(`${appUrl}/api/conversations/auto-assign`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ conversation_id: conversationId }),
+        }).catch((e) => console.warn('[Auto-Assign Error during Handover]:', e));
+      }
   } catch (err: any) {
     if (err?.code === '23505') {
       return;

@@ -55,6 +55,39 @@ function LoginForm() {
     }
 
     if (data.session) {
+      // Check if user is an agent whose workspace is suspended or deleted (super admins exempt)
+      const { data: agentData } = await supabase
+        .from('agents')
+        .select('workspace_id, is_super_admin')
+        .eq('id', data.session.user.id)
+        .maybeSingle();
+
+      if (agentData && !agentData.is_super_admin && agentData.workspace_id) {
+        const { data: ws } = await supabase
+          .from('workspaces')
+          .select('is_suspended, suspension_reason, deleted_at')
+          .eq('id', agentData.workspace_id)
+          .maybeSingle();
+
+        if (ws?.is_suspended) {
+          await supabase.auth.signOut();
+          setErrorMsg(
+            ws.suspension_reason
+              ? `Workspace suspended: ${ws.suspension_reason}`
+              : 'This workspace is currently suspended. Please contact your platform administrator.'
+          );
+          setLoading(false);
+          return;
+        }
+
+        if (ws?.deleted_at) {
+          await supabase.auth.signOut();
+          setErrorMsg('This workspace has been deactivated/deleted. Please contact support.');
+          setLoading(false);
+          return;
+        }
+      }
+
       router.push('/dashboard');
       router.refresh();
     }
@@ -76,7 +109,7 @@ function LoginForm() {
       const origin =
         typeof window !== 'undefined'
           ? window.location.origin
-          : 'http://localhost:3000';
+          : (process.env.NEXT_PUBLIC_APP_URL || '');
 
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',

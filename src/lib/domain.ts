@@ -187,16 +187,19 @@ export function getDefaultSubdomain(websiteUrl: string | null | undefined, prefi
  * Resolves the platform root origin.
  */
 export function getPlatformOrigin(): string {
+  if (process.env.NEXT_PUBLIC_APP_URL) {
+    return process.env.NEXT_PUBLIC_APP_URL.replace(/\/+$/, '');
+  }
+  if (process.env.APP_URL) {
+    return process.env.APP_URL.replace(/\/+$/, '');
+  }
   if (typeof window !== 'undefined' && window.location?.origin) {
     return window.location.origin;
-  }
-  if (process.env.NEXT_PUBLIC_APP_URL) {
-    return process.env.NEXT_PUBLIC_APP_URL.replace(/\/$/, '');
   }
   if (process.env.VERCEL_PROJECT_PRODUCTION_URL) {
     return `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`;
   }
-  return 'http://localhost:3000';
+  return '';
 }
 
 /**

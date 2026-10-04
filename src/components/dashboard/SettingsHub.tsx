@@ -497,6 +497,7 @@ interface SettingsHubProps {
   cannedResponses: CannedResponse[];
   hasVisitors?: boolean;
   latestVisitorUrl?: string;
+  initialSection?: SectionId;
   onWorkspaceUpdated?: (ws: Workspace) => void;
 }
 
@@ -507,12 +508,13 @@ export function SettingsHub({
   cannedResponses,
   hasVisitors = false,
   latestVisitorUrl,
+  initialSection,
   onWorkspaceUpdated,
 }: SettingsHubProps) {
   const isAdmin =
     currentAgent?.role === 'admin' || currentAgent?.role === 'owner';
 
-  const [active, setActive] = useState<SectionId>('widget');
+  const [active, setActive] = useState<SectionId>(initialSection || 'widget');
   const [searchQuery, setSearchQuery] = useState('');
   const [channelTab, setChannelTab] = useState<IntegrationTab>('whatsapp');
   const [copiedWsId, setCopiedWsId] = useState(false);
@@ -520,6 +522,12 @@ export function SettingsHub({
   const [topDropdownOpen, setTopDropdownOpen] = useState(false);
   const [integrations, setIntegrations] = useState<any>(null);
   const contentRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (initialSection) {
+      setActive(initialSection);
+    }
+  }, [initialSection]);
 
   useEffect(() => {
     if (!workspace?.id) return;

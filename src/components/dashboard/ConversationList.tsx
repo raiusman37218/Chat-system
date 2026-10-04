@@ -55,6 +55,7 @@ export interface ConversationListProps {
   onBulkResolve?: (ids: string[]) => Promise<void>;
   onBulkAssign?: (ids: string[], agentId: string | null) => Promise<void>;
   onBulkMarkSpam?: (ids: string[]) => Promise<void>;
+  onOpenSimulator?: () => void;
 }
 
 const CHANNELS: { value: ChannelType | 'all'; label: string }[] = [
@@ -439,6 +440,7 @@ export function ConversationList({
   onBulkResolve,
   onBulkAssign,
   onBulkMarkSpam,
+  onOpenSimulator,
 }: ConversationListProps) {
   // Requirement 2: Status tabs: Open, Waiting, Mine, Unassigned, Resolved, All
   const [activeTab, setActiveTab] = useState<StatusTab>('open');
@@ -765,6 +767,19 @@ export function ConversationList({
           </div>
 
           <div className="flex items-center gap-1.5">
+            {/* Test Chat simulator shortcut button */}
+            {onOpenSimulator && (
+              <button
+                type="button"
+                onClick={onOpenSimulator}
+                title="Send yourself a test chat (Opens simulator)"
+                className="h-7 px-2 rounded-lg text-[11px] font-semibold flex items-center gap-1.5 transition-all border border-line/70 bg-surface-2 text-ink-3 hover:text-accent hover:border-accent/40 hover:bg-accent/10 shadow-2xs"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-accent" />
+                <span className="hidden sm:inline">Test Chat</span>
+              </button>
+            )}
+
             {/* Bulk select toggle */}
             <button
               onClick={() => {
@@ -1152,11 +1167,21 @@ export function ConversationList({
                     ? 'No conversations match the currently selected filters.'
                     : 'When visitors send a message on your site, conversations appear here live.'
                 }
-                actionLabel={hasActiveFilters ? 'Reset Filters' : undefined}
+                actionLabel={
+                  hasActiveFilters
+                    ? 'Reset Filters'
+                    : onOpenSimulator
+                    ? 'Send yourself a test chat'
+                    : undefined
+                }
                 onAction={() => {
-                  setSortBy('newest');
-                  setChannelFilter('all');
-                  setSelectedTagFilter('all');
+                  if (hasActiveFilters) {
+                    setSortBy('newest');
+                    setChannelFilter('all');
+                    setSelectedTagFilter('all');
+                  } else if (onOpenSimulator) {
+                    onOpenSimulator();
+                  }
                 }}
               />
             )}

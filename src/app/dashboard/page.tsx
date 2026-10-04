@@ -20,7 +20,9 @@ import { MobileInstallBanner } from '@/components/pwa/MobileInstallBanner';
 import { sound } from '@/lib/sound';
 import { sendBrowserNotification, cn } from '@/lib/utils';
 import { updateFaviconBadge } from '@/lib/favicon';
-import { BarChart2, BookOpen, Inbox, Radio, Settings, Smartphone, ShieldAlert, LogOut } from 'lucide-react';
+import { SetupChecklist } from '@/components/dashboard/SetupChecklist';
+import type { SectionId } from '@/components/dashboard/SettingsHub';
+import { BarChart2, BookOpen, Inbox, Radio, Settings, Smartphone, ShieldAlert, LogOut, Sparkles } from 'lucide-react';
 import { exitSuperAdminWorkspaceViewAction } from '@/app/actions/platform';
 
 /**
@@ -48,6 +50,8 @@ export default function DashboardPage() {
   const [showMobileInstallModal, setShowMobileInstallModal] = useState(false);
   const [isDetailsSidebarOpen, setIsDetailsSidebarOpen] = useState(true);
   const [articlesCount, setArticlesCount] = useState(0);
+  const [sectionsCount, setSectionsCount] = useState(0);
+  const [settingsInitialSection, setSettingsInitialSection] = useState<SectionId | undefined>(undefined);
 
   // Five destinations: the inbox, the visitor radar, reports, help desk,
   // and the Settings hub.
@@ -217,6 +221,29 @@ export default function DashboardPage() {
         return;
       }
 
+      // If user is not super admin and workspace is suspended or deleted, log out and redirect
+      if (!agent?.is_super_admin) {
+        if (workspace.is_suspended) {
+          await supabase.auth.signOut();
+          router.replace(
+            `/login?error=${encodeURIComponent(
+              workspace.suspension_reason
+                ? `Workspace suspended: ${workspace.suspension_reason}`
+                : 'This workspace is currently suspended. Please contact your platform administrator.'
+            )}`
+          );
+          return;
+        }
+
+        if (workspace.deleted_at) {
+          await supabase.auth.signOut();
+          router.replace(
+            `/login?error=${encodeURIComponent('This workspace has been deactivated/deleted. Please contact support.')}`
+          );
+          return;
+        }
+      }
+
       setCurrentAgent(agent);
       setCurrentWorkspace(workspace);
 
@@ -245,7 +272,7 @@ export default function DashboardPage() {
       const { data: cannedList } = await supabase
         .from('canned_responses')
         .select('*')
-        .or(`workspace_id.eq.${workspace.id},workspace_id.is.null`)
+        .eq('workspace_id', workspace.id)
         .order('shortcut');
       if (cannedList) setCannedResponses(cannedList as CannedResponse[]);
 
@@ -255,6 +282,13 @@ export default function DashboardPage() {
         .select('*', { count: 'exact', head: true })
         .eq('workspace_id', workspace.id);
       if (artCount !== null && artCount !== undefined) setArticlesCount(artCount);
+
+      // Fetch sections count for setup checklist
+      const { count: secCount } = await supabase
+        .from('help_sections')
+        .select('*', { count: 'exact', head: true })
+        .eq('workspace_id', workspace.id);
+      if (secCount !== null && secCount !== undefined) setSectionsCount(secCount);
 
       setLoading(false);
     } catch (err) {
@@ -280,6 +314,18 @@ export default function DashboardPage() {
       clearTimeout(timeout);
       clearInterval(interval);
     };
+  }, []);
+
+  const handleOpenSimulator = useCallback(() => {
+    if (!currentWorkspace) return;
+    const origin = typeof window !== 'undefined' ? window.location.origin : (process.env.NEXT_PUBLIC_APP_URL || '');
+    const simUrl = `${origin}/demo.html?workspaceId=${encodeURIComponent(currentWorkspace.id)}&name=${encodeURIComponent(currentWorkspace.name)}`;
+    window.open(simUrl, '_blank');
+  }, [currentWorkspace]);
+
+  const handleOpenSettingsSection = useCallback((section: SectionId) => {
+    setSettingsInitialSection(section);
+    setActiveView('settings');
   }, []);
 
   // 2. Fetch Messages for Active Conversation with Instant In-Memory Cache
@@ -1356,6 +1402,7 @@ export default function DashboardPage() {
               onBulkResolve={handleBulkResolve}
               onBulkAssign={handleBulkAssign}
               onBulkMarkSpam={handleBulkMarkSpam}
+              onOpenSimulator={handleOpenSimulator}
             />
           </div>
 
@@ -1430,25 +1477,44 @@ export default function DashboardPage() {
               )}
             </div>
           ) : (
-            <div className="hidden md:flex flex-1 min-w-0 flex-col items-center justify-center p-4 sm:p-6 lg:p-8 bg-canvas text-center select-none overflow-y-auto w-full">
-              <div className="max-w-md w-full p-5 sm:p-8 rounded-3xl border border-line bg-surface shadow-md flex flex-col items-center animate-rise min-w-0">
-                <div className="relative mb-5">
-                  <div className="w-16 h-16 rounded-2xl bg-accent/10 border border-accent/20 flex items-center justify-center text-accent shadow-inner">
-                    <Inbox className="w-8 h-8" />
+            <div className="hidden md:flex flex-1 min-w-0 flex-col items-center justify-start p-4 sm:p-6 lg:p-8 bg-canvas text-center select-none overflow-y-auto w-full space-y-6">
+              {/* Setup Checklist */}
+              <SetupChecklist
+                workspace={currentWorkspace}
+                visitors={visitors}
+                allAgents={allAgents}
+                conversations={conversations}
+                articlesCount={articlesCount}
+                sectionsCount={sectionsCount}
+                onNavigate={setActiveView}
+                onOpenSettingsSection={handleOpenSettingsSection}
+                onOpenSimulator={handleOpenSimulator}
+                className="w-full max-w-xl text-left"
+              />
+
+              <div className="max-w-xl w-full p-5 sm:p-6 rounded-3xl border border-line bg-surface shadow-xs flex flex-col items-center animate-rise min-w-0">
+                <div className="flex items-center justify-between w-full mb-3 text-left">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-xl bg-accent/10 border border-accent/20 flex items-center justify-center text-accent">
+                      <Inbox className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-bold text-ink">Ready for conversations</h3>
+                      <p className="text-[12px] text-ink-3">Live updates stream instantly as visitors arrive.</p>
+                    </div>
                   </div>
-                  <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-emerald-500 text-white flex items-center justify-center text-xs font-bold border-2 border-surface shadow-xs">
-                    ✓
-                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleOpenSimulator}
+                    className="btn btn-xs btn-primary gap-1.5 shadow-xs"
+                  >
+                    <Sparkles className="w-3 h-3" />
+                    <span>Send test chat</span>
+                  </button>
                 </div>
 
-                <h3 className="text-lg font-bold text-ink tracking-tight mb-2">
-                  Ready for new conversations
-                </h3>
-                <p className="text-[13px] text-ink-3 leading-relaxed mb-6">
-                  Select a visitor from your inbox on the left to start replying, or monitor active traffic on the live radar.
-                </p>
-
-                <div className="flex flex-wrap sm:flex-nowrap items-center gap-2.5 w-full mb-6">
+                <div className="flex flex-wrap sm:flex-nowrap items-center gap-2.5 w-full mb-4">
                   <button
                     onClick={() => setActiveView('visitors')}
                     className="flex-1 min-w-[130px] btn btn-sm btn-secondary shadow-xs hover:border-line-2 gap-1.5"
@@ -1457,16 +1523,16 @@ export default function DashboardPage() {
                     <span className="truncate">Live Radar ({counts.liveVisitors})</span>
                   </button>
                   <button
-                    onClick={() => setActiveView('settings')}
-                    className="flex-1 min-w-[130px] btn btn-sm btn-primary shadow-xs gap-1.5"
+                    onClick={() => handleOpenSettingsSection('widget')}
+                    className="flex-1 min-w-[130px] btn btn-sm btn-secondary shadow-xs hover:border-line-2 gap-1.5"
                   >
                     <Settings className="w-3.5 h-3.5 shrink-0" />
-                    <span className="truncate">Widget Setup</span>
+                    <span className="truncate">Widget Settings</span>
                   </button>
                 </div>
 
                 {/* Keyboard Quick Guide */}
-                <div className="w-full pt-4 border-t border-line/60 grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] text-ink-3 text-left">
+                <div className="w-full pt-3 border-t border-line/60 grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px] text-ink-3 text-left">
                   <div className="flex items-center justify-between px-2 py-1 rounded-lg bg-surface-2">
                     <span>Search Inbox</span>
                     <span className="kbd text-[9.5px]">Ctrl K</span>
@@ -1515,7 +1581,19 @@ export default function DashboardPage() {
           <HelpDeskDashboard
             workspace={currentWorkspace}
             currentAgent={currentAgent}
-            onArticlesCountChange={(c) => setArticlesCount(c)}
+            onArticlesCountChange={(c) => {
+              setArticlesCount(c);
+              if (currentWorkspace?.id) {
+                supabase
+                  .from('help_sections')
+                  .select('*', { count: 'exact', head: true })
+                  .eq('workspace_id', currentWorkspace.id)
+                  .then((res: any) => {
+                    const count = res?.count;
+                    if (count !== null && count !== undefined) setSectionsCount(count);
+                  });
+              }
+            }}
           />
         </div>
       )}
@@ -1529,6 +1607,7 @@ export default function DashboardPage() {
             cannedResponses={cannedResponses}
             hasVisitors={visitors.length > 0}
             latestVisitorUrl={visitors[0]?.current_url}
+            initialSection={settingsInitialSection}
             onWorkspaceUpdated={(ws) => setCurrentWorkspace(ws)}
           />
         </div>

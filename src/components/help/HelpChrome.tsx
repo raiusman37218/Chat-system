@@ -155,6 +155,14 @@ export function HelpHeader({
   const links = headerLinksOf(workspace);
   const brand = brandOf(workspace);
 
+  // When a logo image fails to load (404, network error, or invalid path),
+  // fall back gracefully to the workspace initial.
+  const [logoFailed, setLogoFailed] = React.useState(false);
+
+  React.useEffect(() => {
+    setLogoFailed(false);
+  }, [logo]);
+
   // The website link is only shown when the owner actually gave one. It used to
   // fall back to a hardcoded URL belonging to one specific customer, which
   // every other workspace then advertised as its own website.
@@ -170,10 +178,11 @@ export function HelpHeader({
           onClick={onHome}
           className="flex items-center gap-3 min-w-0 group cursor-pointer text-left"
         >
-          {logo ? (
+          {logo && !logoFailed ? (
             <img
               src={logo}
               alt={title}
+              onError={() => setLogoFailed(true)}
               className="h-8 sm:h-9 w-auto max-h-9 max-w-[150px] sm:max-w-[180px] object-contain shrink-0 rounded-md"
             />
           ) : (
@@ -181,7 +190,7 @@ export function HelpHeader({
               className="w-8 h-8 rounded-lg grid place-items-center text-white text-[13px] font-bold shrink-0"
               style={{ backgroundColor: brand }}
             >
-              {title.slice(0, 2).toUpperCase()}
+              {(title?.trim()?.[0] || 'W').toUpperCase()}
             </span>
           )}
           <span className="text-[15.5px] font-semibold text-white truncate group-hover:text-white/80 transition-colors">
@@ -227,8 +236,8 @@ export function HelpFooter({ workspace }: { workspace: Workspace }) {
   const title = helpTitleOf(workspace);
 
   return (
-    <footer className="mt-auto border-t border-line bg-surface">
-      <div className="mx-auto max-w-5xl px-4 sm:px-6 py-6 flex flex-col sm:flex-row items-center justify-between gap-2 text-[12px] text-ink-3">
+    <footer className="mt-auto border-t border-line bg-surface pt-6 pb-28 sm:pb-24">
+      <div className="mx-auto max-w-5xl px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-2 text-[12px] text-ink-3">
         <span>
           {workspace.help_center_footer_text ||
             `© ${new Date().getFullYear()} ${title}. All rights reserved.`}

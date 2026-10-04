@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
     const { event, conversation_id, message, workspace_id } = body;
 
     const supabase = getSupabase();
-    const appBaseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+    const appBaseUrl = (process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || '').replace(/\/+$/, '');
 
     // ──────────────────────────────────────────────────────────────────────────
     // 1. TEST SLACK WEBHOOK
