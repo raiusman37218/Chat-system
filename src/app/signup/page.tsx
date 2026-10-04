@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, Suspense } from 'react';
+import React, { useState, useEffect, useRef, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -13,19 +13,26 @@ import {
   EyeOff,
   Mail,
   RefreshCw,
+  ShieldCheck,
+  KeyRound,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { AuthAside, AuthShell } from '@/components/marketing/AuthShell';
 import { GoogleButton } from '@/components/marketing/GoogleButton';
 import { isProviderEnabled, useProviderEnabled } from '@/lib/auth/providers';
+import {
+  sendSignupVerificationCodeAction,
+  verifySignupCodeAction,
+  resendSignupVerificationCodeAction,
+} from '@/app/actions/auth-verification';
 
 function SignupForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const supabase = createClient();
 
-  // Phase: 'form' (Details) -> 'check_inbox' (Email confirmation) -> 'verified' (Success redirect)
-  const [phase, setPhase] = useState<'form' | 'check_inbox' | 'verified'>('form');
+  // Phase: 'form' (Details) -> 'verify_code' (Enter 6-digit OTP) -> 'verified' (Success redirect)
+  const [phase, setPhase] = useState<'form' | 'verify_code' | 'verified'>('form');
 
   // Form Inputs - initialize email from query param if available
   const [name, setName] = useState('');
@@ -35,11 +42,15 @@ function SignupForm() {
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [termsError, setTermsError] = useState(false);
 
+  // OTP 6-digit code state
+  const [otp, setOtp] = useState<string[]>(['', '', '', '', '', '']);
+  const [verifyingCode, setVerifyingCode] = useState(false);
+  const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
+
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [resending, setResending] = useState(false);
   const [resendSuccess, setResendSuccess] = useState(false);
-  const [checkLoading, setCheckLoading] = useState(false);
 
   // undefined while we ask Supabase which providers are switched on.
   const googleEnabled = useProviderEnabled('google');
@@ -52,7 +63,7 @@ function SignupForm() {
   // Resend countdown timer
   useEffect(() => {
     let interval: NodeJS.Timeout;
-    if (phase === 'check_inbox' && resendTimer > 0) {
+    if (phase === 'verify_code' && resendTimer > 0) {
       interval = setInterval(() => {
         setResendTimer((prev) => prev - 1);
       }, 1000);
@@ -114,7 +125,7 @@ function SignupForm() {
     }
   };
 
-  // Submit Account Registration (Supabase email confirmation)
+  // Submit Account Registration (Sends 6-digit OTP from ZenTry)
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
@@ -139,45 +150,24 @@ function SignupForm() {
     setLoading(true);
 
     try {
-      const origin =
-        typeof window !== 'undefined'
-          ? window.location.origin
-          : (process.env.NEXT_PUBLIC_APP_URL || '');
-
-      const { data, error } = await supabase.auth.signUp({
+      const res = await sendSignupVerificationCodeAction({
         email: email.trim().toLowerCase(),
+        name: name.trim(),
         password,
-        options: {
-          data: {
-            name: name.trim(),
-          },
-          emailRedirectTo: `${origin}/auth/callback?next=/onboarding`,
-        },
       });
 
-      if (error) {
-        if (error.message.toLowerCase().includes('already registered')) {
-          setErrorMsg('An account with this email already exists. Please sign in instead.');
-        } else {
-          setErrorMsg(error.message);
-        }
+      if (!res.success) {
+        setErrorMsg(res.error || 'Failed to initiate account registration.');
         return;
       }
 
-      // If user is already confirmed (e.g. email confirmations turned off in dev)
-      if (data?.user?.email_confirmed_at || (data?.user as any)?.confirmed_at) {
-        setPhase('verified');
-        setTimeout(() => {
-          router.push('/onboarding');
-          router.refresh();
-        }, 1200);
-        return;
-      }
-
-      // Require email verification screen
-      setPhase('check_inbox');
+      setPhase('verify_code');
       setResendTimer(30);
       setResendSuccess(false);
+      setOtp(['', '', '', '', '', '']);
+      setTimeout(() => {
+        inputRefs.current[0]?.focus();
+      }, 150);
     } catch (err: any) {
       console.error('Registration error:', err);
       setErrorMsg(err.message || 'Failed to initiate account registration.');
@@ -186,62 +176,134 @@ function SignupForm() {
     }
   };
 
-  // Resend Email Confirmation Link
-  const handleResendEmail = async () => {
+  // Handle OTP paste
+  const handleOtpPaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    e.preventDefault();
+    const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6);
+    if (!pasted) return;
+
+    const newOtp = ['', '', '', '', '', ''];
+    for (let i = 0; i < 6; i++) {
+      newOtp[i] = pasted[i] || '';
+    }
+    setOtp(newOtp);
+
+    const nextIdx = Math.min(pasted.length, 5);
+    inputRefs.current[nextIdx]?.focus();
+
+    if (pasted.length === 6) {
+      handleVerifyOtp(pasted);
+    }
+  };
+
+  // Handle single digit input
+  const handleOtpChange = (index: number, value: string) => {
+    const clean = value.replace(/\D/g, '');
+    if (!clean) {
+      const newOtp = [...otp];
+      newOtp[index] = '';
+      setOtp(newOtp);
+      return;
+    }
+
+    const digit = clean[clean.length - 1];
+    const newOtp = [...otp];
+    newOtp[index] = digit;
+    setOtp(newOtp);
+
+    if (index < 5 && digit) {
+      inputRefs.current[index + 1]?.focus();
+    }
+
+    const combined = newOtp.join('');
+    if (combined.length === 6) {
+      handleVerifyOtp(combined);
+    }
+  };
+
+  // Handle backspace navigation
+  const handleOtpKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Backspace' && !otp[index] && index > 0) {
+      inputRefs.current[index - 1]?.focus();
+    }
+  };
+
+  // Verify OTP Code
+  const handleVerifyOtp = async (codeToVerify?: string) => {
+    const fullCode = (codeToVerify || otp.join('')).replace(/\D/g, '').trim();
+    if (fullCode.length !== 6) {
+      setErrorMsg('Please enter the complete 6-digit verification code.');
+      return;
+    }
+
+    setVerifyingCode(true);
+    setErrorMsg(null);
+
+    try {
+      const res = await verifySignupCodeAction({
+        email: email.trim().toLowerCase(),
+        code: fullCode,
+      });
+
+      if (!res.success) {
+        setErrorMsg(res.error || 'Invalid or expired verification code.');
+        setVerifyingCode(false);
+        return;
+      }
+
+      // Automatically sign in with credentials
+      if (password) {
+        const { error: signInErr } = await supabase.auth.signInWithPassword({
+          email: email.trim().toLowerCase(),
+          password,
+        });
+
+        if (signInErr) {
+          console.warn('Sign-in after verification:', signInErr.message);
+        }
+      }
+
+      setPhase('verified');
+      setTimeout(() => {
+        router.push('/onboarding');
+        router.refresh();
+      }, 1200);
+    } catch (err: any) {
+      console.error('Verification error:', err);
+      setErrorMsg(err.message || 'Failed to verify code.');
+    } finally {
+      setVerifyingCode(false);
+    }
+  };
+
+  // Resend OTP Code
+  const handleResendCode = async () => {
     if (resendTimer > 0 || resending) return;
     setResending(true);
     setErrorMsg(null);
     setResendSuccess(false);
 
     try {
-      const origin =
-        typeof window !== 'undefined'
-          ? window.location.origin
-          : (process.env.NEXT_PUBLIC_APP_URL || '');
-
-      const { error } = await supabase.auth.resend({
-        type: 'signup',
+      const res = await resendSignupVerificationCodeAction({
         email: email.trim().toLowerCase(),
-        options: {
-          emailRedirectTo: `${origin}/auth/callback?next=/onboarding`,
-        },
+        name: name.trim(),
       });
 
-      if (error) throw error;
-
-      setResendSuccess(true);
-      setResendTimer(30);
+      if (!res.success) {
+        setErrorMsg(res.error || 'Failed to resend code.');
+      } else {
+        setResendSuccess(true);
+        setResendTimer(30);
+        setOtp(['', '', '', '', '', '']);
+        inputRefs.current[0]?.focus();
+      }
     } catch (err: any) {
-      setErrorMsg(err.message || 'Failed to resend confirmation email.');
+      setErrorMsg(err.message || 'Failed to resend code.');
     } finally {
       setResending(false);
     }
   };
 
-  // Check if User Has Verified Their Email
-  const handleCheckVerification = async () => {
-    setCheckLoading(true);
-    setErrorMsg(null);
-
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-
-      if (user?.email_confirmed_at || (user as any)?.confirmed_at) {
-        setPhase('verified');
-        setTimeout(() => {
-          router.push('/onboarding');
-          router.refresh();
-        }, 1200);
-        return;
-      }
-
-      setErrorMsg('Email not verified yet. Please check your inbox and click the confirmation link.');
-    } catch (err: any) {
-      setErrorMsg(err.message || 'Error checking verification status.');
-    } finally {
-      setCheckLoading(false);
-    }
-  };
 
   /* ---------------------------------------------------------------- render */
 
@@ -262,7 +324,7 @@ function SignupForm() {
     );
   }
 
-  if (phase === 'check_inbox') {
+  if (phase === 'verify_code') {
     return (
       <div className="animate-rise">
         <button
@@ -278,15 +340,15 @@ function SignupForm() {
         </button>
 
         <div className="w-12 h-12 rounded-2xl bg-accent/15 border border-accent/20 text-accent flex items-center justify-center shadow-xs">
-          <Mail className="w-6 h-6 stroke-[1.8]" />
+          <KeyRound className="w-6 h-6 stroke-[1.8]" />
         </div>
 
         <h1 className="mt-5 text-[1.75rem] leading-tight font-semibold">
-          Check your inbox
+          Enter verification code
         </h1>
         <p className="mt-2 text-[14px] text-ink-2 leading-relaxed">
-          We sent a verification link to{' '}
-          <span className="font-semibold text-ink">{email}</span>. Click the link in the email to activate your account and start setting up your workspace.
+          We sent a 6-digit code from <strong className="text-ink">ZenTry</strong> to{' '}
+          <span className="font-semibold text-ink">{email}</span>. Enter or paste the code below to verify your email.
         </p>
 
         {errorMsg && (
@@ -305,45 +367,67 @@ function SignupForm() {
             className="mt-5 flex items-center gap-2 rounded-xl border border-success-line bg-success-soft px-3.5 py-3 text-[12.5px] text-success animate-pop"
           >
             <CheckCircle2 className="w-4 h-4 shrink-0" />
-            <span>A fresh verification link has been sent to your email.</span>
+            <span>A fresh verification code has been dispatched to your email.</span>
           </div>
         )}
 
-        <div className="mt-6 space-y-3">
-          <button
-            type="button"
-            onClick={handleCheckVerification}
-            disabled={checkLoading}
-            className="btn btn-lg btn-primary w-full"
-          >
-            {checkLoading ? (
-              <>
-                <span className="w-4 h-4 rounded-full border-2 border-current border-t-transparent animate-spin-slow" />
-                Checking status…
-              </>
-            ) : (
-              <>
-                I&apos;ve verified my email
-                <ArrowRight className="w-4 h-4" />
-              </>
-            )}
-          </button>
+        {/* 6-box OTP Input */}
+        <div className="mt-7 space-y-6">
+          <div className="flex items-center justify-between gap-2 sm:gap-3">
+            {otp.map((digit, idx) => (
+              <input
+                key={idx}
+                ref={(el) => { inputRefs.current[idx] = el; }}
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                maxLength={1}
+                value={digit}
+                autoFocus={idx === 0}
+                onChange={(e) => handleOtpChange(idx, e.target.value)}
+                onKeyDown={(e) => handleOtpKeyDown(idx, e)}
+                onPaste={handleOtpPaste}
+                className="w-11 h-14 sm:w-12 sm:h-14 text-center font-mono text-2xl font-bold rounded-xl border-2 border-line bg-surface text-ink focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all outline-hidden shadow-xs"
+              />
+            ))}
+          </div>
 
-          <div className="panel p-3.5 text-center text-[12px] text-ink-3">
-            Can&apos;t find the email? Check your spam folder or promotions tab.
+          <div className="space-y-3">
+            <button
+              type="button"
+              onClick={() => handleVerifyOtp()}
+              disabled={verifyingCode || otp.join('').replace(/\D/g, '').length !== 6}
+              className="btn btn-lg btn-primary w-full"
+            >
+              {verifyingCode ? (
+                <>
+                  <span className="w-4 h-4 rounded-full border-2 border-current border-t-transparent animate-spin-slow" />
+                  Verifying code…
+                </>
+              ) : (
+                <>
+                  Verify &amp; Create Workspace
+                  <ArrowRight className="w-4 h-4" />
+                </>
+              )}
+            </button>
+
+            <div className="panel p-3 text-center text-[12px] text-ink-3">
+              💡 Tip: You can copy the 6 digits from your email and paste them directly into the first box.
+            </div>
           </div>
         </div>
 
-        <div className="mt-5 text-center text-[12.5px] text-ink-3">
+        <div className="mt-6 text-center text-[12.5px] text-ink-3">
           Didn&apos;t receive the email?{' '}
           <button
             type="button"
-            onClick={handleResendEmail}
+            onClick={handleResendCode}
             disabled={resendTimer > 0 || resending}
             className="inline-flex items-center gap-1.5 font-medium text-accent disabled:text-ink-3 disabled:cursor-not-allowed hover:underline underline-offset-4 disabled:no-underline cursor-pointer"
           >
             <RefreshCw className={`w-3 h-3 ${resending ? 'animate-spin' : ''}`} />
-            {resendTimer > 0 ? `Resend in ${resendTimer}s` : 'Resend email'}
+            {resendTimer > 0 ? `Resend in ${resendTimer}s` : 'Resend code'}
           </button>
         </div>
       </div>

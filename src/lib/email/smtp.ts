@@ -203,3 +203,96 @@ export function generateUnreadAlertEmailHtml(props: UnreadEmailTemplateProps): s
 </body>
 </html>`;
 }
+
+export interface VerificationCodeEmailProps {
+  code: string;
+  name?: string;
+  platformName?: string;
+  platformUrl?: string;
+}
+
+export function generateVerificationCodeEmailHtml(props: VerificationCodeEmailProps): string {
+  const brand = '#6366f1';
+  const name = props.name || 'there';
+  const platform = props.platformName || 'ZenTry';
+  const url = props.platformUrl || 'https://zen-try.site';
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${props.code} is your ${platform} verification code</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; -webkit-font-smoothing: antialiased; color: #1e293b;">
+  <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #f8fafc; padding: 40px 12px;">
+    <tr>
+      <td align="center">
+        <table width="100%" border="0" cellspacing="0" cellpadding="0" style="max-width: 520px; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,0.06); border: 1px solid #e2e8f0;">
+          
+          <!-- Header Bar -->
+          <tr>
+            <td style="padding: 28px 32px 20px; border-bottom: 1px solid #f1f5f9; background: #ffffff;">
+              <table width="100%" border="0" cellspacing="0" cellpadding="0">
+                <tr>
+                  <td align="left" style="vertical-align: middle;">
+                    <span style="font-size: 22px; font-weight: 800; color: #0f172a; letter-spacing: -0.5px;">${platform}</span>
+                  </td>
+                  <td align="right" style="vertical-align: middle;">
+                    <span style="display: inline-block; padding: 4px 10px; background-color: #eff6ff; color: #2563eb; font-size: 12px; font-weight: 600; border-radius: 9999px; border: 1px solid #bfdbfe;">
+                      Email Verification
+                    </span>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Main Body -->
+          <tr>
+            <td style="padding: 32px 32px 28px;">
+              <h1 style="margin: 0 0 12px; font-size: 20px; font-weight: 700; color: #0f172a; line-height: 1.3;">
+                Confirm your business email
+              </h1>
+              <p style="margin: 0 0 24px; font-size: 15px; color: #475569; line-height: 1.55;">
+                Hello <strong>${name}</strong>, thank you for joining ${platform}. To complete your workspace registration and start using live chat on your website, please enter this 6-digit verification code:
+              </p>
+
+              <!-- OTP Code Display Box -->
+              <div style="background-color: #f8fafc; border: 2px dashed #818cf8; border-radius: 12px; padding: 24px 16px; text-align: center; margin: 24px 0;">
+                <div style="font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #6366f1; margin-bottom: 8px;">
+                  Your 6-Digit Verification Code
+                </div>
+                <div style="font-size: 38px; font-weight: 800; letter-spacing: 10px; color: #1e1b4b; font-family: ui-monospace, Menlo, Monaco, Consolas, monospace;">
+                  ${props.code}
+                </div>
+              </div>
+
+              <p style="margin: 0 0 8px; font-size: 13.5px; color: #64748b; line-height: 1.5;">
+                ⏱ This code will expire in <strong>15 minutes</strong>.
+              </p>
+              <p style="margin: 0 0 20px; font-size: 13.5px; color: #64748b; line-height: 1.5;">
+                🔒 If you did not create an account on <a href="${url}" style="color: ${brand}; text-decoration: none;">${platform}</a>, please disregard this message.
+              </p>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="padding: 20px 32px 24px; background-color: #fafaf9; border-top: 1px solid #f1f5f9; text-align: center;">
+              <p style="margin: 0 0 4px; font-size: 12px; color: #94a3b8;">
+                &copy; ${new Date().getFullYear()} ${platform}. All rights reserved.
+              </p>
+              <p style="margin: 0; font-size: 12px; color: #cbd5e1;">
+                ${url} &bull; Intelligent Multi-Tenant Chat Infrastructure
+              </p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+}
