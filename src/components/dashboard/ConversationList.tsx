@@ -762,11 +762,11 @@ export function ConversationList({
     filteredAndSorted.length > 0 && selectedIds.size === filteredAndSorted.length;
 
   return (
-    <div className="w-full h-[var(--app-vvh,100dvh)] flex flex-col border-r border-line bg-surface select-none relative">
+    <div className="w-full h-[var(--app-vvh,100dvh)] flex flex-col border-r border-line bg-surface select-none relative min-w-0">
       {/* 1. Header Toolbar */}
-      <div className="p-3 border-b border-line/80 space-y-2 bg-surface/80 backdrop-blur-xs">
-        <div className="flex items-center justify-between gap-2 px-0.5">
-          <div className="flex items-center gap-2">
+      <div className="p-3 border-b border-line/80 space-y-2 bg-surface/80 backdrop-blur-xs min-w-0">
+        <div className="flex items-center justify-between gap-1.5 px-0.5 min-w-0">
+          <div className="flex items-center gap-2 shrink-0">
             <h2 className="text-[14.5px] font-bold tracking-tight text-ink">
               Inbox
             </h2>
@@ -775,22 +775,23 @@ export function ConversationList({
             </span>
           </div>
 
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1 shrink-0 min-w-0">
             {/* Test Chat simulator shortcut button */}
             {onOpenSimulator && (
               <button
                 type="button"
                 onClick={onOpenSimulator}
                 title="Send yourself a test chat (Opens simulator)"
-                className="h-7 px-2 rounded-lg text-[11px] font-semibold flex items-center gap-1.5 transition-all border border-line/70 bg-surface-2 text-ink-3 hover:text-accent hover:border-accent/40 hover:bg-accent/10 shadow-2xs"
+                className="w-7 h-7 xl:w-auto xl:px-2 rounded-lg text-[11px] font-semibold inline-flex items-center justify-center gap-1.5 transition-all border border-line/70 bg-surface-2 text-ink-3 hover:text-accent hover:border-accent/40 hover:bg-accent/10 shadow-2xs shrink-0 whitespace-nowrap cursor-pointer"
               >
-                <Sparkles className="w-3.5 h-3.5 text-accent" />
-                <span className="hidden sm:inline">Test Chat</span>
+                <Sparkles className="w-3.5 h-3.5 text-accent shrink-0" />
+                <span className="hidden xl:inline">Test Chat</span>
               </button>
             )}
 
             {/* Bulk select toggle */}
             <button
+              type="button"
               onClick={() => {
                 if (isSelectionMode) {
                   setIsSelectionMode(false);
@@ -801,65 +802,57 @@ export function ConversationList({
               }}
               title={isSelectionMode ? 'Cancel bulk select' : 'Bulk select conversations'}
               className={cn(
-                'h-7 px-2 rounded-lg text-[11px] font-semibold flex items-center gap-1 transition-all border',
+                'w-7 h-7 xl:w-auto xl:px-2 rounded-lg text-[11px] font-semibold inline-flex items-center justify-center gap-1 transition-all border shrink-0 whitespace-nowrap cursor-pointer',
                 isSelectionMode || selectedIds.size > 0
                   ? 'border-accent bg-accent/10 text-accent font-bold'
                   : 'border-line/70 bg-surface-2 text-ink-3 hover:text-ink hover:bg-surface-3'
               )}
             >
-              <CheckSquare className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Select</span>
+              <CheckSquare className="w-3.5 h-3.5 shrink-0" />
+              <span className="hidden xl:inline">Select</span>
             </button>
 
             {/* Sync / Refresh Button */}
             {onRefresh && (
               <button
+                type="button"
                 onClick={onRefresh}
                 disabled={isRefreshing}
                 title={isRefreshing ? 'Refreshing inbox…' : 'Refresh inbox (Press R)'}
                 className={cn(
-                  'w-7 h-7 rounded-lg flex items-center justify-center transition-all border border-line/70 hover:border-line hover:bg-surface-3 text-ink-3 hover:text-ink',
+                  'w-7 h-7 rounded-lg flex items-center justify-center transition-all border border-line/70 hover:border-line hover:bg-surface-3 text-ink-3 hover:text-ink shrink-0 cursor-pointer',
                   isRefreshing && 'bg-surface-3 text-accent cursor-not-allowed'
                 )}
               >
                 <RefreshCw
                   className={cn(
-                    'w-3.5 h-3.5 transition-transform',
+                    'w-3.5 h-3.5 transition-transform shrink-0',
                     isRefreshing && 'animate-spin text-accent'
                   )}
                 />
               </button>
             )}
 
-            {/* Sort indicator & trigger */}
-            <button
-              onClick={() => setShowFilters((v) => !v)}
-              title={SORT_LABELS[sortBy].desc}
-              className={cn(
-                'inline-flex items-center gap-1 text-[10.5px] font-semibold px-2 py-1 rounded-lg transition-colors border',
-                sortBy === 'newest'
-                  ? 'border-line/70 text-ink-3 hover:text-ink hover:bg-surface-3'
-                  : 'border-accent/40 bg-accent/10 text-accent font-bold'
-              )}
-            >
-              <ArrowUpDown className="w-2.5 h-2.5" />
-              <span className="truncate max-w-[85px]">{SORT_LABELS[sortBy].label}</span>
-            </button>
-
-            {/* Filter Popover Trigger */}
+            {/* Sort & Filter Popover Trigger */}
             <div ref={filterRef} className="relative shrink-0">
               <button
+                type="button"
                 onClick={() => setShowFilters((v) => !v)}
                 aria-label="Sort & Filters"
-                title="Sort and filter inbox"
+                title={`${SORT_LABELS[sortBy].label} • Click to change sort & filters`}
                 className={cn(
-                  'w-7 h-7 rounded-lg border flex items-center justify-center transition-all shadow-xs',
+                  'h-7 px-2 rounded-lg text-[11px] font-semibold inline-flex items-center gap-1.5 transition-all border shadow-2xs whitespace-nowrap shrink-0 cursor-pointer',
                   hasActiveFilters
-                    ? 'border-accent bg-accent/10 text-accent font-bold ring-2 ring-accent/15'
+                    ? 'border-accent/50 bg-accent/10 text-accent font-bold ring-1 ring-accent/20'
                     : 'border-line/70 bg-surface-2 text-ink-3 hover:text-ink hover:bg-surface-3'
                 )}
               >
-                <SlidersHorizontal className="w-3 h-3" />
+                <ArrowUpDown className="w-2.5 h-2.5 shrink-0" />
+                <span className="truncate max-w-[85px]">{SORT_LABELS[sortBy].label}</span>
+                <SlidersHorizontal className="w-2.5 h-2.5 opacity-60 shrink-0 ml-0.5" />
+                {hasActiveFilters && (
+                  <span className="w-1.5 h-1.5 rounded-full bg-accent shrink-0 animate-pulse" />
+                )}
               </button>
 
               {/* Filter Popover Menu */}

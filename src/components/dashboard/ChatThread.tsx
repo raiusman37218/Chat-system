@@ -2517,69 +2517,69 @@ export function ChatThread({
           {/* Composer Header Bar */}
           <div
             className={cn(
-              'px-3 pt-2 pb-1.5 flex items-center justify-between gap-2 border-b border-line/40 bg-surface-2/30',
+              'px-2.5 sm:px-3 pt-2 pb-1.5 flex items-center justify-between gap-1.5 sm:gap-2 border-b border-line/40 bg-surface-2/30 min-w-0',
               !replyPreview && 'rounded-t-2xl'
             )}
           >
-            <div className="inline-flex items-center gap-1 p-0.5 rounded-lg bg-surface-2 border border-line/60">
+            <div className="inline-flex items-center gap-0.5 p-0.5 rounded-lg bg-surface-2 border border-line/60 shrink-0">
               <button
                 type="button"
                 onClick={() => setComposerMode('reply')}
                 className={cn(
-                  'h-6 px-2.5 rounded-md text-[11.5px] font-semibold transition-all inline-flex items-center gap-1.5',
+                  'h-6 px-2 sm:px-2.5 rounded-md text-[11px] sm:text-[11.5px] font-semibold transition-all inline-flex items-center gap-1.5 whitespace-nowrap',
                   composerMode === 'reply'
                     ? 'bg-surface text-ink font-bold shadow-xs'
                     : 'text-ink-3 hover:text-ink'
                 )}
               >
-                <Send className="w-3 h-3" />
-                Reply
+                <Send className="w-3 h-3 shrink-0" />
+                <span>Reply</span>
               </button>
               <button
                 type="button"
                 onClick={() => setComposerMode('internal')}
                 className={cn(
-                  'h-6 px-2.5 rounded-md text-[11.5px] font-semibold transition-all inline-flex items-center gap-1.5',
+                  'h-6 px-2 sm:px-2.5 rounded-md text-[11px] sm:text-[11.5px] font-semibold transition-all inline-flex items-center gap-1.5 whitespace-nowrap',
                   composerMode === 'internal'
                     ? 'bg-amber-500/20 text-amber-700 dark:text-amber-300 font-bold shadow-xs'
                     : 'text-ink-3 hover:text-ink'
                 )}
               >
-                <Lock className="w-3 h-3" />
-                Note
+                <Lock className="w-3 h-3 shrink-0" />
+                <span>Note</span>
               </button>
             </div>
 
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1 sm:gap-1.5 shrink-0 min-w-0">
               <button
                 type="button"
                 onClick={handleGenerateAiSuggestion}
                 disabled={aiDrafting}
-                className="h-6 px-2 rounded-md text-[11px] font-semibold text-accent hover:bg-accent/10 transition-colors inline-flex items-center gap-1 cursor-pointer"
+                className="h-6 px-1.5 sm:px-2 rounded-md text-[11px] font-semibold text-accent hover:bg-accent/10 transition-colors inline-flex items-center gap-1 cursor-pointer shrink-0 whitespace-nowrap"
                 title="Ask AI Copilot to draft a reply"
               >
-                <Sparkles className={cn('w-3 h-3', aiDrafting && 'animate-spin')} />
-                <span>{aiDrafting ? 'Drafting…' : 'AI Copilot'}</span>
+                <Sparkles className={cn('w-3 h-3 shrink-0', aiDrafting && 'animate-spin')} />
+                <span className="whitespace-nowrap">{aiDrafting ? 'Drafting…' : 'AI Copilot'}</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => setShowMacros((s) => !s)}
-                className="h-6 px-2 rounded-md text-[11px] font-medium text-ink-3 hover:text-ink hover:bg-surface-3 transition-colors inline-flex items-center gap-1 cursor-pointer"
+                className="h-6 px-1.5 sm:px-2 rounded-md text-[11px] font-medium text-ink-3 hover:text-ink hover:bg-surface-3 transition-colors inline-flex items-center gap-1 cursor-pointer shrink-0 whitespace-nowrap"
                 title="Saved replies (/)"
               >
-                <Zap className="w-3 h-3 text-amber-500" />
-                <span>Replies</span>
+                <Zap className="w-3 h-3 text-amber-500 shrink-0" />
+                <span className="whitespace-nowrap">Replies</span>
               </button>
 
               {/* ── Translation Controls (Side Badge & Safe Popover) ── */}
               {composerMode === 'reply' && (
-                <div className="relative" ref={translateMenuRef}>
+                <div className="relative shrink-0" ref={translateMenuRef}>
                   <button
                     type="button"
                     onClick={() => setShowTranslateMenu((prev) => !prev)}
                     className={cn(
-                      'h-6 px-2 rounded-md text-[11px] font-medium transition-all inline-flex items-center gap-1.5 cursor-pointer shadow-2xs',
+                      'h-6 px-1.5 sm:px-2 rounded-md text-[11px] font-medium transition-all inline-flex items-center gap-1 cursor-pointer shadow-2xs shrink-0 whitespace-nowrap',
                       autoTranslateEnabled && targetLanguage !== 'en'
                         ? 'bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/30 hover:bg-blue-500/25 font-bold'
                         : 'text-ink-3 hover:text-ink hover:bg-surface-3 border border-transparent'
@@ -2587,7 +2587,7 @@ export function ChatThread({
                     title={`Translation settings: Customer receives replies in ${getLanguageInfo(targetLanguage).name}. Click to view or change.`}
                   >
                     <Globe className={cn('w-3 h-3 shrink-0', autoTranslateEnabled && targetLanguage !== 'en' ? 'text-blue-500' : 'text-ink-3')} />
-                    <span className="truncate max-w-[120px]">
+                    <span className="truncate max-w-[80px] sm:max-w-[110px] whitespace-nowrap">
                       {autoTranslateEnabled && targetLanguage !== 'en'
                         ? `${getLanguageInfo(targetLanguage).flag || ''} ${getLanguageInfo(targetLanguage).name}`
                         : 'Translate'}

@@ -1445,7 +1445,7 @@ export default function DashboardPage() {
           {/* Conversation List: full width on mobile when no conversation active */}
           <div
             className={cn(
-              'h-full shrink-0 flex flex-col',
+              'h-full shrink-0 flex flex-col min-w-0',
               selectedConversationId
                 ? 'hidden md:flex md:w-[340px] xl:w-[360px]'
                 : 'flex w-full md:w-[340px] xl:w-[360px] pb-14 md:pb-0'
