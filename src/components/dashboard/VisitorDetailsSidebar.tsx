@@ -260,7 +260,7 @@ export function VisitorDetailsSidebar({
           size="lg"
           muted={!liveVisitor.name && !liveVisitor.email}
           online={isOnline}
-          className="shadow-sm ring-2 ring-black/5 dark:ring-white/10"
+          className="rounded-full shadow-sm ring-2 ring-black/5 dark:ring-white/10"
         />
         <h2 className="mt-3 text-[15px] font-bold tracking-tight text-ink">
           {displayName}

@@ -70,7 +70,7 @@ export function Avatar({
     // The size lives on the wrapper too. Without an explicit height it would
     // stretch to the row in an `align-items: stretch` flex parent, dragging
     // the absolutely-positioned presence dot down with it.
-    <div className={cn('relative shrink-0', SIZES[size], className)}>
+    <div className={cn('relative shrink-0 rounded-full', SIZES[size], className)}>
       {/* Size and text size live on the wrapper alone. Repeating SIZES[size]
           here pinned the circle to the prop's dimensions, so a caller passing
           `className="w-5 h-5"` got a 20px wrapper around a 32px circle — it
