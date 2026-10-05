@@ -51,9 +51,8 @@
   --ds-invert-ink: #ffffff;
   --ds-invert-ink-2: rgba(255, 255, 255, 0.62);
 
-  /* Outgoing chat bubble: ink in light, electric blue in dark — a white
-     bubble on a dark thread is far too loud to read comfortably. */
-  --ds-bubble-out: #0b0b0f;
+  /* Outgoing chat bubble: brand electric blue */
+  --ds-bubble-out: #2e5bff;
   --ds-bubble-out-ink: #ffffff;
 
   /* --- Semantics --- */

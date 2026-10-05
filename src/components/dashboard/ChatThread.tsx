@@ -1471,12 +1471,12 @@ export function ChatThread({
 
           <div
             className={cn(
-              'px-4 py-2.5 text-[13.5px] leading-relaxed whitespace-pre-wrap break-words',
+              'px-3.5 py-2 text-[14px] leading-relaxed whitespace-pre-wrap break-words',
               isAgent
-                ? 'rounded-2xl rounded-br-md bg-bubble-out text-bubble-out-ink shadow-sm'
+                ? 'rounded-2xl rounded-br-xs bg-bubble-out text-bubble-out-ink shadow-xs font-normal'
                 : isAI
-                ? 'rounded-2xl rounded-bl-md bg-accent-soft border border-accent-line text-ink'
-                : 'rounded-2xl rounded-bl-md bg-surface-2 border border-line text-ink'
+                ? 'rounded-2xl rounded-bl-xs bg-accent-soft border border-accent-line text-ink font-normal'
+                : 'rounded-2xl rounded-bl-xs bg-surface-2 border border-line text-ink font-normal'
             )}
           >
             {isAI && (
@@ -1818,120 +1818,68 @@ export function ChatThread({
   return (
     <div className="@container/thread flex-1 min-w-0 h-[var(--app-vvh,100dvh)] flex flex-col bg-canvas overflow-x-hidden">
       {/* ── Header ── */}
-      <header className="shrink-0 px-3 sm:px-4 py-2 min-h-16 flex items-center justify-between gap-2 border-b border-line bg-surface max-w-full overflow-hidden">
-        <div className="flex items-center gap-2.5 min-w-0 flex-1 overflow-hidden">
+      <header className="shrink-0 px-3 sm:px-4 py-1.5 min-h-[46px] flex items-center justify-between gap-2 border-b border-line bg-surface max-w-full overflow-hidden">
+        <div className="flex items-center gap-2 min-w-0 flex-1 overflow-hidden">
           {onBack && (
             <button
               onClick={onBack}
-              className="md:hidden w-11 h-11 -ml-2 flex items-center justify-center rounded-lg text-ink-2 hover:text-ink hover:bg-surface-2 transition-colors shrink-0"
+              className="md:hidden w-8 h-8 -ml-1 flex items-center justify-center rounded-lg text-ink-2 hover:text-ink hover:bg-surface-2 transition-colors shrink-0"
               title="Back to conversations"
               aria-label="Back to conversations"
             >
-              <ArrowLeft className="w-5 h-5" />
+              <ArrowLeft className="w-4 h-4" />
             </button>
           )}
           <Avatar
             name={displayName}
             seed={conversation.visitor_id}
-            size="md"
+            size="sm"
             online={isOnline}
             muted={!visitor?.name && !visitor?.email}
             className="shrink-0"
           />
-          <div className="min-w-0 flex-1 overflow-hidden">
-            {/* Line 1: customer name (truncated with ellipsis only after 24 characters) & channel */}
-            <div className="flex items-center gap-2 min-w-0 overflow-hidden">
-              <h2
-                className="text-[14px] sm:text-[15px] font-bold tracking-tight text-ink shrink-0 truncate max-w-full"
-                title={displayName}
-              >
-                {truncatedDisplayName}
-              </h2>
-              {conversation.channel && conversation.channel !== 'web' && (
-                <ChannelBadge
-                  channel={conversation.channel}
-                  showLabel={false}
-                  size="xs"
-                />
-              )}
-            </div>
+          <div className="flex items-center gap-1.5 min-w-0 overflow-hidden truncate">
+            <h2
+              className="text-[13.5px] sm:text-[14px] font-bold tracking-tight text-ink shrink-0 truncate"
+              title={displayName}
+            >
+              {truncatedDisplayName}
+            </h2>
+            {conversation.channel && conversation.channel !== 'web' && (
+              <ChannelBadge
+                channel={conversation.channel}
+                showLabel={false}
+                size="xs"
+              />
+            )}
 
-            {/* Line 2: status and sentiment badges, plus visitor details */}
-            <div className="flex items-center gap-1.5 text-[11px] text-ink-3 min-w-0 overflow-hidden truncate mt-0.5">
-              {/* Conversation status badge */}
-              {(() => {
-                const cur = STATUS_OPTIONS.find((s) => s.value === conversation.status) || STATUS_OPTIONS[0];
-                return (
-                  <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded-full text-[10px] font-semibold bg-surface-2 border border-line text-ink-2 shrink-0">
-                    <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: cur.dot }} />
-                    {cur.label}
-                  </span>
-                );
-              })()}
-
-              {/* Sentiment badge: Hide when confidence is low (< 0.7) */}
-              {(conversation.sentiment === 'positive' ||
-                conversation.sentiment === 'negative') &&
-               (conversation.channel_metadata?.sentiment_confidence === undefined ||
-                conversation.channel_metadata?.sentiment_confidence >= 0.7) && (
-                <span
-                  className={cn(
-                    'pill shrink-0 text-[10px] py-0 px-1.5 h-4',
-                    conversation.sentiment === 'positive'
-                      ? 'pill-success'
-                      : 'pill-danger'
-                  )}
-                  title={`Visitor tone: ${conversation.sentiment}${
-                    conversation.channel_metadata?.sentiment_confidence
-                      ? ` (${Math.round(conversation.channel_metadata.sentiment_confidence * 100)}% confidence)`
-                      : ''
-                  }`}
-                >
-                  {conversation.sentiment === 'positive' ? (
-                    <Smile className="w-2.5 h-2.5" />
-                  ) : (
-                    <Frown className="w-2.5 h-2.5" />
-                  )}
-                  {conversation.sentiment === 'positive'
-                    ? 'Positive'
-                    : 'Frustrated'}
-                </span>
-              )}
-
-              {/* Activity status */}
+            {/* Plain text status & location info (No fake button pills) */}
+            <span className="text-[11.5px] text-ink-3 truncate hidden sm:inline-flex items-center gap-1 ml-1">
+              <span>·</span>
               {isOnline ? (
-                <span className="inline-flex items-center gap-1 text-success font-medium shrink-0">
+                <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-medium">
                   <span className="live-dot" />
                   Active now
                 </span>
               ) : (
-                <span className="shrink-0 truncate">
-                  Active{' '}
-                  {formatTimeAgo(visitor?.last_seen || conversation.updated_at)}
-                </span>
+                <span>Active {formatTimeAgo(visitor?.last_seen || conversation.updated_at)}</span>
               )}
-
               {visitorPlace.label && (
                 <>
-                  <span aria-hidden className="shrink-0 text-ink-3">
-                    ·
-                  </span>
-                  <span className="inline-flex items-center gap-1 shrink-0 text-ink-2 font-medium" title={visitorPlace.label}>
+                  <span>·</span>
+                  <span className="inline-flex items-center gap-1 text-ink-3" title={visitorPlace.label}>
                     <CountryFlag
                       flag={visitorPlace.flag}
                       countryCode={visitorPlace.countryCode}
                       className="w-3.5 h-2.5 shrink-0"
                     />
-                    <span className="truncate max-w-[120px]">{visitorPlace.label}</span>
+                    <span className="truncate max-w-[100px]">{visitorPlace.label}</span>
                   </span>
                 </>
               )}
-
               {visitor?.email && (
                 <>
-                  <span aria-hidden className="shrink-0">
-                    ·
-                  </span>
+                  <span>·</span>
                   <a
                     href={`mailto:${visitor.email}`}
                     className="truncate hover:text-accent transition-colors"
@@ -1940,24 +1888,7 @@ export function ChatThread({
                   </a>
                 </>
               )}
-
-              {visitor?.current_url && (
-                <>
-                  <span aria-hidden className="shrink-0 hidden @xl/thread:inline">
-                    ·
-                  </span>
-                  <a
-                    href={visitor.current_url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="hidden @xl/thread:inline-flex items-center gap-1 min-w-0 hover:text-accent transition-colors truncate"
-                  >
-                    <span className="truncate">{visitor.current_url}</span>
-                    <ExternalLink className="w-2.5 h-2.5 shrink-0" />
-                  </a>
-                </>
-              )}
-            </div>
+            </span>
           </div>
         </div>
 
@@ -2120,8 +2051,8 @@ export function ChatThread({
         </div>
       </header>
 
-      {/* ── Toolbar bar: wraps to two lines instead of scrolling horizontally ── */}
-      <div className="shrink-0 px-3 sm:px-4 py-1.5 flex flex-wrap items-center gap-x-2 gap-y-1.5 border-b border-line bg-surface-2 min-h-[38px]">
+      {/* ── Compact Metadata Toolbar: single line ── */}
+      <div className="shrink-0 px-3 sm:px-4 py-1 flex items-center gap-1.5 border-b border-line bg-surface-2/60 min-h-[32px] overflow-x-auto no-scrollbar">
         <Menu<ConversationPriority>
           value={currentPriority}
           options={PRIORITY_OPTIONS}
@@ -2159,12 +2090,12 @@ export function ChatThread({
                 )
               }
               className={cn(
-                'pill shrink-0 transition-all cursor-pointer inline-flex items-center gap-1.5 text-[11px]',
+                'shrink-0 h-6 px-2 rounded-md transition-all cursor-pointer inline-flex items-center gap-1 text-[11px]',
                 isFullAutopilot
-                  ? 'pill-accent font-bold shadow-xs'
+                  ? 'bg-accent text-accent-ink font-semibold shadow-xs'
                   : isWorkspaceFirstReplyOn
                   ? 'bg-accent/15 text-accent border border-accent/30 font-medium'
-                  : 'pill-neutral hover:bg-surface-3'
+                  : 'bg-surface-3 text-ink-3 hover:text-ink hover:bg-surface-3/80 border border-line'
               )}
               title={
                 isFullAutopilot
@@ -2174,12 +2105,12 @@ export function ChatThread({
                   : 'AI Autopilot is OFF (click to activate)'
               }
             >
-              <Bot className={cn('w-3 h-3', isFullAutopilot || isWorkspaceFirstReplyOn ? 'text-accent' : 'text-ink-3')} />
+              <Bot className={cn('w-3 h-3', isFullAutopilot ? 'text-accent-ink' : isWorkspaceFirstReplyOn ? 'text-accent' : 'text-ink-3')} />
               <span>
                 {isFullAutopilot
                   ? 'Autopilot'
                   : isWorkspaceFirstReplyOn
-                  ? 'AI first reply: on'
+                  ? 'AI reply on'
                   : 'Autopilot Off'}
               </span>
             </button>
@@ -2187,19 +2118,19 @@ export function ChatThread({
         })()}
 
         {conversation.status === "snoozed" && conversation.snoozed_until && (
-          <span className="pill pill-warn shrink-0">
+          <span className="inline-flex items-center gap-1 h-6 px-1.5 rounded-md text-[10.5px] font-medium bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 shrink-0">
             <Clock className="w-3 h-3" />
             Snoozed {formatTimeAgo(conversation.snoozed_until)}
           </span>
         )}
 
-        <span className="w-px h-4 bg-line-2 mx-0.5 shrink-0" />
+        <span className="w-px h-3.5 bg-line-2 mx-0.5 shrink-0" />
 
-        <Tag className="w-3.5 h-3.5 text-ink-3 shrink-0" />
+        <Tag className="w-3 h-3 text-ink-3 shrink-0" />
 
         {conversation.tags?.length ? (
           conversation.tags.map((t) => (
-            <span key={t} className="pill pill-accent group shrink-0">
+            <span key={t} className="inline-flex items-center gap-1 h-6 px-1.5 rounded-md text-[10.5px] font-medium bg-accent/10 text-accent border border-accent/20 group shrink-0">
               {t}
               <button
                 onClick={() => handleToggleTag(t)}
@@ -2210,17 +2141,15 @@ export function ChatThread({
               </button>
             </span>
           ))
-        ) : (
-          <span className="text-[11.5px] text-ink-3 shrink-0">No tags</span>
-        )}
+        ) : null}
 
         <div ref={tagPickerRef} className="relative shrink-0">
           <button
             onClick={() => setShowTagPicker((s) => !s)}
-            className="inline-flex items-center gap-1 h-[22px] px-2 rounded-full border border-dashed border-line-2 text-[11px] font-medium text-ink-3 hover:text-ink hover:border-line-3 transition-colors shrink-0"
+            className="inline-flex items-center gap-1 h-6 px-2 rounded-md border border-dashed border-line-2 text-[10.5px] font-medium text-ink-3 hover:text-ink hover:border-line-3 transition-colors shrink-0"
           >
             <Plus className="w-3 h-3" />
-            Add
+            Add Tag
           </button>
 
           {showTagPicker &&
@@ -2280,7 +2209,7 @@ export function ChatThread({
 
         {conversation.csat_rating && (
           <span
-            className="pill pill-warn shrink-0"
+            className="inline-flex items-center gap-1 h-6 px-1.5 rounded-md text-[10.5px] font-medium bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 shrink-0"
             title={
               conversation.csat_feedback
                 ? `CSAT ${conversation.csat_rating}/5 — ${conversation.csat_feedback}`

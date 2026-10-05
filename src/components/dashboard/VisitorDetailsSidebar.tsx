@@ -287,23 +287,16 @@ export function VisitorDetailsSidebar({
           <p className="mt-1 text-[11.5px] text-ink-3">Anonymous visitor</p>
         )}
 
-        <span
-          className={cn(
-            'mt-3 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold border shadow-xs',
-            isOnline
-              ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
-              : 'bg-surface-2 text-ink-3 border-line'
-          )}
-        >
+        <div className="mt-2 flex items-center gap-1.5 text-[12px] text-ink-3">
           {isOnline ? (
             <>
               <span className="live-dot" />
-              Active on website
+              <span className="text-emerald-600 dark:text-emerald-400 font-medium">Active on website</span>
             </>
           ) : (
-            <>Last seen {formatTimeAgo(liveVisitor.last_seen || liveVisitor.last_seen_at)}</>
+            <span>Last seen {formatTimeAgo(liveVisitor.last_seen || liveVisitor.last_seen_at)}</span>
           )}
-        </span>
+        </div>
       </div>
 
       <div className="p-4 space-y-4">

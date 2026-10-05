@@ -224,7 +224,7 @@ const ConversationItem = memo(function ConversationItem({
       }}
       data-selected={isSelected}
       className={cn(
-        'w-full text-left p-2.5 rounded-xl transition-all duration-150 flex items-start gap-2 relative border cursor-pointer group select-none outline-none',
+        'w-full text-left px-2.5 py-1.5 rounded-lg transition-all duration-150 flex items-start gap-2 relative border cursor-pointer group select-none outline-none',
         isSelected
           ? 'bg-accent/[0.08] dark:bg-accent/15 border-accent/40 shadow-xs ring-1 ring-accent/25'
           : hasUnread
@@ -235,7 +235,7 @@ const ConversationItem = memo(function ConversationItem({
     >
       {/* Active Left Indicator Bar */}
       {isSelected && (
-        <span className="absolute left-0 top-2.5 bottom-2.5 w-1 rounded-r-full bg-accent shadow-[0_0_8px_rgba(46,91,255,0.4)]" />
+        <span className="absolute left-0 top-1.5 bottom-1.5 w-1 rounded-r-full bg-accent shadow-[0_0_8px_rgba(46,91,255,0.4)]" />
       )}
 
       {/* Bulk Checkbox */}
@@ -247,7 +247,7 @@ const ConversationItem = memo(function ConversationItem({
             onToggleCheck?.(conv.id);
           }}
           className={cn(
-            'shrink-0 mt-1.5 w-4 h-4 rounded border flex items-center justify-center transition-colors',
+            'shrink-0 mt-1 w-4 h-4 rounded border flex items-center justify-center transition-colors',
             isChecked
               ? 'bg-accent border-accent text-accent-ink'
               : 'border-line-2 bg-surface hover:border-accent'
@@ -262,27 +262,35 @@ const ConversationItem = memo(function ConversationItem({
             e.stopPropagation();
             onToggleCheck?.(conv.id);
           }}
-          className="shrink-0 mt-1.5 opacity-0 group-hover:opacity-60 hover:!opacity-100 transition-opacity"
+          className="shrink-0 mt-1 opacity-0 group-hover:opacity-60 hover:!opacity-100 transition-opacity"
         >
           <div className="w-4 h-4 rounded border border-line-2 bg-surface flex items-center justify-center" />
         </div>
       )}
 
-      {/* Avatar (w-9 h-9) */}
+      {/* Avatar (compact w-8 h-8) */}
       <Avatar
         name={name}
         seed={conv.visitor_id}
         size="sm"
         online={online}
         muted={!conv.visitor?.name && !conv.visitor?.email}
-        className="shrink-0 mt-0.5 w-9 h-9 text-[13px]"
+        className="shrink-0 mt-0.5 w-8 h-8 text-[12px]"
       />
 
       {/* Content */}
       <div className="flex-1 min-w-0">
-        {/* Top Line: Name + Country Flag + Channel + Time */}
-        <div className="flex items-center justify-between gap-1.5">
-          <div className="flex items-center gap-1.5 truncate">
+        {/* Top Line: Unread Dot + Name + Flag/Channel + Status/Priority/Tags + Time */}
+        <div className="flex items-center justify-between gap-1.5 min-w-0">
+          <div className="flex items-center gap-1.5 min-w-0 truncate">
+            {/* Unread indicator dot */}
+            {hasUnread && (
+              <span
+                className="w-2 h-2 rounded-full bg-accent shrink-0"
+                title="Unread conversation"
+              />
+            )}
+
             <span
               className={cn(
                 'text-[12.5px] truncate leading-tight',
@@ -290,11 +298,12 @@ const ConversationItem = memo(function ConversationItem({
                   ? 'font-bold text-ink'
                   : isSelected
                   ? 'font-bold text-accent dark:text-accent-soft'
-                  : 'font-semibold text-ink-2 group-hover:text-ink'
+                  : 'font-medium text-ink-2 group-hover:text-ink'
               )}
             >
               {name}
             </span>
+
             {place.countryCode && (
               <span title={place.label || place.country || undefined} className="inline-flex shrink-0">
                 <CountryFlag
@@ -304,14 +313,52 @@ const ConversationItem = memo(function ConversationItem({
                 />
               </span>
             )}
+
             {conv.channel && conv.channel !== 'web' && (
               <ChannelBadge channel={conv.channel} />
+            )}
+
+            {/* Status / Priority / Tags directly in name line */}
+            {isUrgent ? (
+              <span className="px-1 py-0 text-[8.5px] font-bold rounded bg-red-500/15 text-red-600 dark:text-red-400 border border-red-500/20 shrink-0">
+                Urgent
+              </span>
+            ) : isHigh ? (
+              <span className="px-1 py-0 text-[8.5px] font-bold rounded bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/20 shrink-0">
+                High
+              </span>
+            ) : null}
+
+            {isWaiting && !isResolved && (
+              <span className="inline-flex items-center gap-0.5 px-1 py-0 text-[8.5px] font-semibold rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 shrink-0">
+                <span className="w-1 h-1 rounded-full bg-amber-500 animate-pulse" />
+                Waiting
+              </span>
+            )}
+
+            {isResolved && (
+              <span className="inline-flex items-center gap-0.5 px-1 py-0 text-[8.5px] font-semibold rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 shrink-0">
+                <Check className="w-2.5 h-2.5 stroke-[2.5]" />
+                Resolved
+              </span>
+            )}
+
+            {/* Conversation tags in name line */}
+            {conv.tags && conv.tags.length > 0 && (
+              conv.tags.slice(0, 2).map((t) => (
+                <span
+                  key={t}
+                  className="px-1 py-0 text-[8.5px] font-medium rounded bg-accent/10 text-accent border border-accent/20 truncate max-w-[55px] shrink-0"
+                >
+                  {t}
+                </span>
+              ))
             )}
           </div>
 
           <span
             className={cn(
-              'text-[10.5px] shrink-0 tabular-nums',
+              'text-[10.5px] shrink-0 tabular-nums ml-1',
               hasUnread ? 'text-accent font-bold' : 'text-ink-3'
             )}
           >
@@ -319,76 +366,39 @@ const ConversationItem = memo(function ConversationItem({
           </span>
         </div>
 
-        {/* Middle Line: Last Message Preview (Plain text with consistent sender label) */}
-        <p
-          className={cn(
-            'text-[11.5px] truncate mt-1 leading-snug',
-            hasUnread
-              ? 'font-medium text-ink dark:text-slate-100'
-              : 'text-ink-3 group-hover:text-ink-2'
-          )}
-        >
-          {fromAgent ? (
-            <span className="text-ink-2 font-medium inline-flex items-center gap-0.5 mr-1">
-              <span className="inline-flex items-center">
-                {conv.last_message?.read_at ? (
-                  <CheckCheck className="w-3 h-3 text-blue-500 stroke-[2.5]" />
-                ) : online ? (
-                  <CheckCheck className="w-3 h-3 text-ink-3/70 stroke-[2]" />
-                ) : (
-                  <Check className="w-3 h-3 text-ink-3/70 stroke-[2]" />
-                )}
-              </span>
-              <span>{senderLabel}:</span>
-            </span>
-          ) : fromAi ? (
-            <span className="text-purple-600 dark:text-purple-400 font-medium inline-flex items-center gap-0.5 mr-1">
-              <Sparkles className="w-2.5 h-2.5" />
-              <span>AI:</span>
-            </span>
-          ) : null}
-          {previewText}
-        </p>
-
-        {/* Bottom Line: Meta Badges */}
-        <div className="flex items-center justify-between gap-1.5 mt-1.5">
-          <div className="flex items-center gap-1 flex-wrap min-w-0">
-            {/* Resolved Badge */}
-            {isResolved && (
-              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[9px] font-semibold rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-                <Check className="w-2.5 h-2.5 stroke-[2.5]" />
-                Resolved
-              </span>
+        {/* Line 2: Message preview + right side metadata (Agent / Language / CSAT / Unread count) */}
+        <div className="flex items-center justify-between gap-1.5 mt-0.5">
+          <p
+            className={cn(
+              'text-[11.5px] truncate leading-snug flex-1 min-w-0',
+              hasUnread
+                ? 'font-medium text-ink dark:text-slate-100'
+                : 'text-ink-3 group-hover:text-ink-2'
             )}
-
-            {/* Waiting for reply pill */}
-            {isWaiting && !isResolved && (
-              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[9.5px] font-semibold rounded-md bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
-                <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
-                Waiting
+          >
+            {fromAgent ? (
+              <span className="text-ink-2 font-medium inline-flex items-center gap-0.5 mr-1">
+                <span className="inline-flex items-center">
+                  {conv.last_message?.read_at ? (
+                    <CheckCheck className="w-3 h-3 text-blue-500 stroke-[2.5]" />
+                  ) : online ? (
+                    <CheckCheck className="w-3 h-3 text-ink-3/70 stroke-[2]" />
+                  ) : (
+                    <Check className="w-3 h-3 text-ink-3/70 stroke-[2]" />
+                  )}
+                </span>
+                <span>{senderLabel}:</span>
               </span>
-            )}
-
-            {/* Priority Tag */}
-            {isUrgent ? (
-              <span className="px-1.5 py-0.5 text-[9px] font-bold rounded-md bg-red-500/15 text-red-600 dark:text-red-400 border border-red-500/20">
-                Urgent
-              </span>
-            ) : isHigh ? (
-              <span className="px-1.5 py-0.5 text-[9px] font-bold rounded-md bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/20">
-                High
+            ) : fromAi ? (
+              <span className="text-purple-600 dark:text-purple-400 font-medium inline-flex items-center gap-0.5 mr-1">
+                <Sparkles className="w-2.5 h-2.5" />
+                <span>AI:</span>
               </span>
             ) : null}
+            {previewText}
+          </p>
 
-            {/* Assigned Agent */}
-            {conv.agent && (
-              <span className="inline-flex items-center gap-1 text-[9.5px] text-ink-3 bg-surface-2 px-1.5 py-0.5 rounded-md border border-line">
-                <span className="truncate max-w-[65px]">
-                  {conv.agent.name.split(' ')[0]}
-                </span>
-              </span>
-            )}
-
+          <div className="flex items-center gap-1 shrink-0 ml-1">
             {/* Foreign Language Badge */}
             {(() => {
               const langCode =
@@ -400,7 +410,7 @@ const ConversationItem = memo(function ConversationItem({
                 return (
                   <span
                     title={`Visitor Language: ${langCode.toUpperCase()}`}
-                    className="inline-flex items-center gap-0.5 text-[9px] text-blue-600 dark:text-blue-400 bg-blue-500/10 px-1.5 py-0.5 rounded-md font-bold border border-blue-500/20 uppercase"
+                    className="inline-flex items-center text-[8.5px] text-blue-600 dark:text-blue-400 bg-blue-500/10 px-1 py-0 rounded font-bold border border-blue-500/20 uppercase"
                   >
                     🌐 {langCode}
                   </span>
@@ -409,32 +419,26 @@ const ConversationItem = memo(function ConversationItem({
               return null;
             })()}
 
-            {/* AI Summary Badge */}
-            {conv.summary && (
-              <span
-                title={`AI Summary: ${conv.summary}`}
-                className="inline-flex items-center gap-0.5 text-[9px] text-violet-600 dark:text-violet-400 bg-violet-500/10 px-1.5 py-0.5 rounded-md font-semibold border border-violet-500/20"
-              >
-                <Sparkles className="w-2.5 h-2.5" />
-                AI
+            {conv.agent && !hasUnread && (
+              <span className="text-[9.5px] text-ink-3 truncate max-w-[55px]" title={`Assigned: ${conv.agent.name}`}>
+                {conv.agent.name.split(' ')[0]}
               </span>
             )}
 
-            {/* CSAT Star Badge */}
             {conv.csat_rating && (
-              <span className="inline-flex items-center gap-0.5 text-[9px] text-amber-500 font-bold bg-amber-500/10 px-1.5 py-0.5 rounded-md border border-amber-500/20">
+              <span className="inline-flex items-center gap-0.5 text-[9px] text-amber-500 font-bold bg-amber-500/10 px-1 py-0 rounded border border-amber-500/20">
                 <Star className="w-2.5 h-2.5 fill-current" />
                 {conv.csat_rating}
               </span>
             )}
-          </div>
 
-          {/* Unread Count Badge */}
-          {hasUnread && (
-            <span className="px-1.5 py-0.5 min-w-[18px] text-center text-[9.5px] font-extrabold rounded-full bg-accent text-accent-ink shrink-0 shadow-xs">
-              {conv.unread_count}
-            </span>
-          )}
+            {/* Unread Count Badge */}
+            {hasUnread && (
+              <span className="px-1.5 py-0 min-w-[17px] text-center text-[9.5px] font-extrabold rounded-full bg-accent text-accent-ink shrink-0 shadow-xs">
+                {conv.unread_count}
+              </span>
+            )}
+          </div>
         </div>
       </div>
     </div>
@@ -655,13 +659,16 @@ export function ConversationList({
   // Infinite Scroll scroll position threshold fallback
   const handleScroll = useCallback(
     (e: React.UIEvent<HTMLDivElement>) => {
+      if (showFilters) setShowFilters(false);
+      if (showMoreTabs) setShowMoreTabs(false);
+      if (isAssignMenuOpen) setIsAssignMenuOpen(false);
       if (!hasMore || loadingMore || !onLoadMore) return;
       const target = e.currentTarget;
       if (target.scrollHeight - target.scrollTop - target.clientHeight < 250) {
         onLoadMore();
       }
     },
-    [hasMore, loadingMore, onLoadMore]
+    [showFilters, showMoreTabs, isAssignMenuOpen, hasMore, loadingMore, onLoadMore]
   );
 
   // Bulk Selection Handlers
@@ -778,15 +785,12 @@ export function ConversationList({
   return (
     <div className="w-full h-[var(--app-vvh,100dvh)] flex flex-col border-r border-line bg-surface select-none relative min-w-0">
       {/* 1. Header Toolbar */}
-      <div className="p-3 border-b border-line/80 space-y-2 bg-surface/80 backdrop-blur-xs min-w-0">
+      <div className="p-3 border-b border-line/80 space-y-2 bg-surface relative z-30 min-w-0">
         <div className="flex items-center justify-between gap-1.5 px-0.5 min-w-0">
           <div className="flex items-center gap-2 shrink-0">
             <h2 className="text-[14.5px] font-bold tracking-tight text-ink">
               Inbox
             </h2>
-            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10.5px] font-bold bg-surface-2 text-ink-3 border border-line">
-              {filteredAndSorted.length}
-            </span>
           </div>
 
           <div className="flex items-center gap-1 shrink-0 min-w-0">
@@ -1210,7 +1214,7 @@ export function ConversationList({
       <div
         ref={listContainerRef}
         onScroll={handleScroll}
-        className="flex-1 overflow-y-auto px-2 py-2 space-y-1 scrollbar-thin"
+        className="flex-1 overflow-y-auto px-2 py-2 space-y-1 scrollbar-thin relative z-0"
       >
         {loading ? (
           <ConversationListSkeleton />
