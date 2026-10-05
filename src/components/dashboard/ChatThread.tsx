@@ -45,7 +45,7 @@ import {
   Message,
   Workspace,
 } from '@/types/database';
-import { formatTime, formatTimeAgo, cn } from '@/lib/utils';
+import { formatTime, formatTimeAgo, cn, isGreetingMessage } from '@/lib/utils';
 import { sound } from '@/lib/sound';
 import { Avatar } from '@/components/ui/Avatar';
 import { Menu } from '@/components/ui/Menu';
@@ -1401,8 +1401,9 @@ export function ChatThread({
       return;
     }
 
-    const isAgent = msg.sender_type === 'agent';
-    const isAI = msg.sender_type === 'ai';
+    const isGreeting = isGreetingMessage(msg);
+    const isAgent = msg.sender_type === 'agent' && !isGreeting;
+    const isAI = msg.sender_type === 'ai' || isGreeting;
 
     rendered.push(
       <div
@@ -1416,8 +1417,8 @@ export function ChatThread({
       >
         {!isAgent && (
           <Avatar
-            name={isAI ? 'AI' : displayName}
-            seed={isAI ? 'zen-try-ai' : conversation.visitor_id}
+            name={isGreeting ? 'Bot' : isAI ? 'AI' : displayName}
+            seed={isGreeting ? 'zen-try-bot' : isAI ? 'zen-try-ai' : conversation.visitor_id}
             size="xs"
             className="mt-auto mb-1"
           />
@@ -1493,8 +1494,8 @@ export function ChatThread({
           >
             {isAI && (
               <span className="flex items-center gap-1 mb-1 text-[10.5px] font-bold uppercase tracking-wide text-accent">
-                <Sparkles className="w-3 h-3" />
-                AI
+                {isGreeting ? <Bot className="w-3 h-3" /> : <Sparkles className="w-3 h-3" />}
+                {isGreeting ? 'Bot Greeting' : 'AI'}
               </span>
             )}
             {msg.attachment_url && (
@@ -1783,19 +1784,31 @@ export function ChatThread({
               (isAgent || isAI) && 'justify-end'
             )}
           >
-            {isAgent && (
+            {isGreeting ? (
+              <span className="font-semibold text-purple-600 dark:text-purple-400 inline-flex items-center gap-1">
+                <Bot className="w-3 h-3" />
+                <span>Bot</span>
+                {' ·'}
+              </span>
+            ) : isAgent ? (
               <span className="font-semibold text-ink-2">
                 {msg.sender_id === currentAgent?.id
                   ? 'You'
                   : msg.agent?.name || agentsList.find((a) => a.id === msg.sender_id)?.name || 'Agent'}
                 {' ·'}
               </span>
-            )}
+            ) : isAI ? (
+              <span className="font-semibold text-purple-600 dark:text-purple-400 inline-flex items-center gap-1">
+                <Sparkles className="w-3 h-3" />
+                <span>AI</span>
+                {' ·'}
+              </span>
+            ) : null}
             <span className="tabular-nums">{formatTime(msg.created_at)}</span>
             {msg.metadata?.is_edited && (
               <span className="italic text-[10px] text-ink-3/70 ml-0.5">(edited)</span>
             )}
-            {(isAgent || isAI) && (
+            {isAgent && (
               <MessageTicks
                 status={messageStatusOf(msg)}
                 readAt={msg.read_at}

@@ -21,6 +21,7 @@ import {
   ChevronDown,
   Clock,
   AlertTriangle,
+  Bot,
 } from 'lucide-react';
 import {
   Conversation,
@@ -28,7 +29,7 @@ import {
   ChannelType,
   Agent,
 } from '@/types/database';
-import { formatTimeAgo, cn, stripMarkdown } from '@/lib/utils';
+import { formatTimeAgo, cn, stripMarkdown, isGreetingMessage } from '@/lib/utils';
 import { Avatar } from '@/components/ui/Avatar';
 import { ChannelBadge } from '@/components/ui/ChannelBadge';
 import { CountryFlag } from '@/components/ui/BrandIcon';
@@ -126,8 +127,10 @@ function getLastActivityTime(conv: Conversation): number {
 function isWaitingOnAgent(conv: Conversation): boolean {
   if (conv.status === 'closed' || conv.status === 'snoozed') return false;
   if ((conv.unread_count || 0) > 0) return true;
+  // If the customer actually sent a message, we are waiting on agent
   if (conv.last_message && conv.last_message.sender_type === 'visitor') return true;
-  if (!conv.last_message) return true;
+  // If only a greeting was sent (or no messages yet), we are waiting on the customer, NOT agent
+  if (!conv.last_message || isGreetingMessage(conv.last_message)) return false;
   return false;
 }
 
@@ -141,6 +144,7 @@ export interface SlaInfo {
 function getSlaInfo(conv: Conversation): SlaInfo | null {
   if (conv.status === 'closed' || conv.status === 'snoozed') return null;
   if (!isWaitingOnAgent(conv)) return null;
+  if (!conv.last_message || isGreetingMessage(conv.last_message) || conv.last_message.sender_type !== 'visitor') return null;
 
   const activityTime = getLastActivityTime(conv);
   if (!activityTime) return null;
@@ -251,21 +255,26 @@ const ConversationItem = memo(function ConversationItem({
   const previewText = stripMarkdown(rawPreview);
 
   // Requirement 7: One consistent sender label:
-  // - the agent's name for humans
-  // - "AI" for the bot
-  // - "You" only for the logged-in agent
+  // - "Bot" for automated greetings
+  // - "AI" for AI copilot/autopilot
+  // - "You" only for human agent replies
+  const isBotGreeting = isGreetingMessage(conv.last_message);
+
   const senderLabel = useMemo(() => {
+    if (isBotGreeting) {
+      return 'Bot';
+    }
+    if (fromAi) {
+      return 'AI';
+    }
     if (fromAgent) {
       if (conv.last_message?.sender_id === currentAgent?.id) {
         return 'You';
       }
       return conv.last_message?.agent?.name || conv.agent?.name || 'Agent';
     }
-    if (fromAi) {
-      return 'AI';
-    }
     return null;
-  }, [fromAgent, fromAi, conv.last_message, conv.agent, currentAgent?.id]);
+  }, [isBotGreeting, fromAi, fromAgent, conv.last_message, conv.agent, currentAgent?.id]);
 
   return (
     <div
@@ -409,6 +418,13 @@ const ConversationItem = memo(function ConversationItem({
               </span>
             )}
 
+            {isBotGreeting && !isResolved && !isWaiting && (
+              <span className="inline-flex items-center gap-0.5 px-1 py-0 text-[8.5px] font-medium rounded bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20 shrink-0">
+                <Bot className="w-2.5 h-2.5" />
+                Bot Greeting
+              </span>
+            )}
+
             {isResolved && (
               <span className="inline-flex items-center gap-0.5 px-1 py-0 text-[8.5px] font-semibold rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 shrink-0">
                 <Check className="w-2.5 h-2.5 stroke-[2.5]" />
@@ -449,7 +465,17 @@ const ConversationItem = memo(function ConversationItem({
                 : 'text-ink-3 group-hover:text-ink-2'
             )}
           >
-            {fromAgent ? (
+            {isBotGreeting ? (
+              <span className="text-purple-600 dark:text-purple-400 font-semibold inline-flex items-center gap-0.5 mr-1">
+                <Bot className="w-2.5 h-2.5" />
+                <span>Bot:</span>
+              </span>
+            ) : fromAi ? (
+              <span className="text-purple-600 dark:text-purple-400 font-semibold inline-flex items-center gap-0.5 mr-1">
+                <Sparkles className="w-2.5 h-2.5" />
+                <span>AI:</span>
+              </span>
+            ) : fromAgent ? (
               <span className="text-ink-2 font-medium inline-flex items-center gap-0.5 mr-1">
                 <span className="inline-flex items-center">
                   {conv.last_message?.read_at ? (
@@ -461,11 +487,6 @@ const ConversationItem = memo(function ConversationItem({
                   )}
                 </span>
                 <span>{senderLabel}:</span>
-              </span>
-            ) : fromAi ? (
-              <span className="text-purple-600 dark:text-purple-400 font-medium inline-flex items-center gap-0.5 mr-1">
-                <Sparkles className="w-2.5 h-2.5" />
-                <span>AI:</span>
               </span>
             ) : null}
             {previewText}

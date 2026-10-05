@@ -122,3 +122,35 @@ export function stripMarkdown(markdown: string | null | undefined): string {
     .replace(/\s+/g, ' ')
     .trim();
 }
+
+/**
+ * Detects if a message is an automated greeting/bot message rather than a real agent response.
+ */
+export function isGreetingMessage(
+  msg: { sender_type?: string; sender_id?: string | null; content?: string; metadata?: any } | null | undefined
+): boolean {
+  if (!msg) return false;
+  if (msg.sender_type === 'ai') return true;
+  if (msg.sender_type === 'visitor') return false;
+  if (msg.metadata?.is_greeting || msg.metadata?.auto_greeting || msg.metadata?.is_bot) return true;
+
+  const text = (msg.content || '').trim().toLowerCase();
+  if (
+    text.startsWith('hi there! thanks for reaching out') ||
+    text.startsWith('hi there!') ||
+    text.startsWith('thanks for reaching out') ||
+    text.startsWith('welcome to') ||
+    text.startsWith("we're here to help") ||
+    text.includes('thanks for reaching out. how can i help you today')
+  ) {
+    return true;
+  }
+
+  // System-generated greeting inserted without a human agent id
+  if (msg.sender_type === 'agent' && !msg.sender_id) {
+    return true;
+  }
+
+  return false;
+}
+

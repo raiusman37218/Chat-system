@@ -295,13 +295,14 @@ export default function ChatWidget({
             {
               id: 'auto-greeting',
               conversation_id: conversationId || 'temp',
-              sender_type: 'agent',
+              sender_type: 'ai',
               sender_id: null,
               content: autoGreetingText,
               attachment_url: null,
               created_at: new Date().toISOString(),
               read_at: null,
-            },
+              metadata: { is_greeting: true, auto_greeting: true },
+            } as any,
           ];
         }
         return prev;
@@ -666,43 +667,37 @@ export default function ChatWidget({
         workspace_id: config.workspaceId || null,
       });
 
-      // 2. Ensure conversation is created in database
-      const activeConvId = await ensureConversation();
+      // 2. Prepare welcome greeting locally in widget (do not create DB conversation until visitor sends first message)
+      const rawName = (workspaceName || config.companyName || 'our team')
+        .replace(/^Welcome to\s+/i, '')
+        .replace(/\s*Support\s*$/i, '')
+        .replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}️]+\s*$/u, '')
+        .replace(/^the\s+/i, '')
+        .trim() || (workspaceName || config.companyName || 'our team');
 
-      // 3. Immediately send auto welcome message before user sends any message
-      const { data: existingMsgs } = await supabase
-        .from('messages')
-        .select('id')
-        .eq('conversation_id', activeConvId)
-        .limit(1);
+      const customWelcome = config.welcomeText?.trim();
+      const welcomeContent = customWelcome
+        ? customWelcome.charAt(0).toUpperCase() + customWelcome.slice(1)
+        : `Welcome to ${rawName}`;
 
-      if (!existingMsgs || existingMsgs.length === 0) {
-        const rawName = (workspaceName || config.companyName || 'our team')
-          .replace(/^Welcome to\s+/i, '')
-          .replace(/\s*Support\s*$/i, '')
-          .replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}️]+\s*$/u, '')
-          .replace(/^the\s+/i, '')
-          .trim() || (workspaceName || config.companyName || 'our team');
-
-        const customWelcome = config.welcomeText?.trim();
-        const welcomeContent = customWelcome
-          ? customWelcome.charAt(0).toUpperCase() + customWelcome.slice(1)
-          : `Welcome to ${rawName}`;
-        const { data: savedMsg } = await supabase
-          .from('messages')
-          .insert({
-            conversation_id: activeConvId,
-            sender_type: 'agent',
-            content: welcomeContent,
-            is_internal: false,
-          })
-          .select()
-          .single();
-
-        if (savedMsg) {
-          setMessages([savedMsg]);
+      setMessages((prev) => {
+        if (prev.length === 0) {
+          return [
+            {
+              id: 'welcome-greeting',
+              conversation_id: 'pending',
+              sender_type: 'ai',
+              sender_id: null,
+              content: welcomeContent,
+              attachment_url: null,
+              created_at: new Date().toISOString(),
+              read_at: null,
+              metadata: { is_greeting: true, auto_greeting: true },
+            } as any,
+          ];
         }
-      }
+        return prev;
+      });
     } catch (err) {
       console.error('[ChatWidget] Error during pre-chat submit:', err);
     }
@@ -793,6 +788,37 @@ export default function ChatWidget({
 
     try {
       const activeConvId = await ensureConversation();
+
+      // If conversation has no messages in DB yet, record greeting as AI bot message first
+      const { data: existingMsgs } = await supabase
+        .from('messages')
+        .select('id')
+        .eq('conversation_id', activeConvId)
+        .limit(1);
+
+      if (!existingMsgs || existingMsgs.length === 0) {
+        const rawName = (workspaceName || config.companyName || 'our team')
+          .replace(/^Welcome to\s+/i, '')
+          .replace(/\s*Support\s*$/i, '')
+          .replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}️]+\s*$/u, '')
+          .replace(/^the\s+/i, '')
+          .trim() || (workspaceName || config.companyName || 'our team');
+
+        const customWelcome = config.welcomeText?.trim();
+        const welcomeContent = customWelcome
+          ? customWelcome.charAt(0).toUpperCase() + customWelcome.slice(1)
+          : `Welcome to ${rawName}`;
+
+        await supabase
+          .from('messages')
+          .insert({
+            conversation_id: activeConvId,
+            sender_type: 'ai',
+            content: welcomeContent,
+            is_internal: false,
+            metadata: { is_greeting: true, auto_greeting: true },
+          });
+      }
 
       // Optimistic message update
       const tempId = 'temp-' + Date.now();

@@ -478,6 +478,7 @@ export default function DashboardPage() {
         let unreadCountMap: Record<string, number> = {};
         let latestMessageMap: Record<string, Message> = {};
 
+        const visitorMsgCounts: Record<string, number> = {};
         if (convIds.length > 0) {
           const [unreadRes, recentMsgsRes] = await Promise.all([
             supabase
@@ -501,6 +502,9 @@ export default function DashboardPage() {
 
           if (recentMsgsRes.data) {
             for (const msg of recentMsgsRes.data) {
+              if (msg.sender_type === 'visitor') {
+                visitorMsgCounts[msg.conversation_id] = (visitorMsgCounts[msg.conversation_id] || 0) + 1;
+              }
               if (!latestMessageMap[msg.conversation_id]) {
                 latestMessageMap[msg.conversation_id] = msg as Message;
               }
@@ -508,10 +512,37 @@ export default function DashboardPage() {
           }
         }
 
+        // Auto-close abandoned empty conversations (0 visitor messages after 10 minutes)
+        const abandonedIds: string[] = [];
+        const nowMs = Date.now();
+        fetchedConvs.forEach((c: any) => {
+          if (c.status === 'open' && !visitorMsgCounts[c.id]) {
+            const ageMinutes = (nowMs - new Date(c.created_at || c.updated_at).getTime()) / (1000 * 60);
+            if (ageMinutes >= 10) {
+              abandonedIds.push(c.id);
+            }
+          }
+        });
+
+        if (abandonedIds.length > 0) {
+          supabase
+            .from('conversations')
+            .update({
+              status: 'closed',
+              closed_at: new Date().toISOString(),
+              channel_metadata: { auto_closed_reason: 'no_customer_message_10m' },
+            })
+            .in('id', abandonedIds)
+            .then();
+        }
+
         const enrichedConversations: Conversation[] = fetchedConvs.map((c: any) => {
           const isCurrentlySelected = selectedConversationIdRef.current === c.id;
+          const isAutoClosed = abandonedIds.includes(c.id);
           return {
             ...c,
+            status: isAutoClosed ? 'closed' : c.status,
+            closed_at: isAutoClosed ? (c.closed_at || new Date().toISOString()) : c.closed_at,
             last_message: latestMessageMap[c.id] || null,
             unread_count: isCurrentlySelected ? 0 : (unreadCountMap[c.id] || 0),
           };
