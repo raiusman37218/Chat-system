@@ -2,7 +2,7 @@
 
 import { getWidgetOrigin } from '@/lib/domain';
 import { DEFAULT_MODELS } from '@/lib/ai/models';
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { testAiProviderAction } from '@/app/actions/knowledge';
 import {
   Palette,
@@ -44,6 +44,8 @@ import {
   Eye,
   Search,
   ChevronDown,
+  Info,
+  UploadCloud,
 } from 'lucide-react';
 import { SMTPSettingsSection } from '@/components/admin/SMTPSettingsSection';
 import {
@@ -54,7 +56,15 @@ import {
   AutoAssignmentConfig,
   AISettingsConfig,
   NavbarTriggerConfig,
+  WidgetIconType,
 } from '@/types/database';
+import {
+  WidgetLauncherIcon,
+  SmileBubbleIcon,
+  DoubleBubbleIcon,
+  DotsBubbleIcon,
+  SmileLineBubbleIcon,
+} from '@/components/ui/WidgetLauncherIcon';
 import {
   updateWidgetSettingsAction,
   updateBusinessHoursAction,
@@ -252,6 +262,16 @@ export function AdminSettingsPanel({
   const [showLauncherLogo, setShowLauncherLogo] = useState(
     workspace.show_launcher_logo !== false
   );
+
+  const initialWidgetIcon: WidgetIconType = useMemo(() => {
+    const fromNav = (workspace.navbar_trigger_config as any)?.widget_icon;
+    if (fromNav) return fromNav;
+    if (workspace.show_launcher_logo && workspace.logo_url) return 'custom_logo';
+    return 'smile_bubble';
+  }, [workspace]);
+  const [widgetIcon, setWidgetIcon] = useState<WidgetIconType>(initialWidgetIcon);
+  const logoFileInputRef = useRef<HTMLInputElement>(null);
+
   const [widgetPosition, setWidgetPosition] = useState<'right' | 'left'>(
     workspace.widget_position || 'right'
   );
@@ -286,6 +306,7 @@ export function AdminSettingsPanel({
       brandColor !== (workspace.brand_color || '#2563eb') ||
       logoUrl !== (workspace.logo_url || '') ||
       showLauncherLogo !== (workspace.show_launcher_logo !== false) ||
+      widgetIcon !== initialWidgetIcon ||
       widgetPosition !== (workspace.widget_position || 'right') ||
       greetingTitle !== (workspace.greeting_title || 'Hi there 👋') ||
       greetingMessage !== (workspace.greeting_message || "We're here to help! Send us a message and we'll reply shortly.") ||
@@ -301,6 +322,8 @@ export function AdminSettingsPanel({
     brandColor,
     logoUrl,
     showLauncherLogo,
+    widgetIcon,
+    initialWidgetIcon,
     widgetPosition,
     greetingTitle,
     greetingMessage,
@@ -321,6 +344,7 @@ export function AdminSettingsPanel({
         brand_color: brandColor,
         logo_url: logoUrl,
         show_launcher_logo: showLauncherLogo,
+        widget_icon: widgetIcon,
         widget_position: widgetPosition,
         greeting_title: greetingTitle,
         greeting_message: greetingMessage,
@@ -1399,7 +1423,7 @@ export function AdminSettingsPanel({
               </div>
 
               {/* Step 2: Logo & Floating Launcher Button */}
-              <div className="card p-6 space-y-5 border-2 border-line-2 shadow-xs">
+              <div className="card p-6 space-y-6 border-2 border-line-2 shadow-xs">
                 <div className="flex items-center gap-3 border-b border-line-2 pb-4">
                   <span className="w-7 h-7 rounded-xl bg-accent text-white font-extrabold text-xs flex items-center justify-center shrink-0 shadow-xs">
                     2
@@ -1407,13 +1431,211 @@ export function AdminSettingsPanel({
                   <div>
                     <h4 className="text-[15px] font-bold text-ink">Logo &amp; Floating Launcher Icon</h4>
                     <p className="text-[12.5px] text-ink-2 mt-0.5">
-                      Display your company logo inside the chat and on the website button.
+                      Choose the floating chat button icon for your website and customize your brand logo.
                     </p>
                   </div>
                 </div>
 
-                {/* Logo Image Upload */}
-                <div className="flex items-start gap-4">
+                {/* ── Widget Icon Selector (Matching User Screenshot) ── */}
+                <div className="p-5 rounded-2xl border-2 border-line-2 bg-surface-2/60 space-y-4 shadow-2xs">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h5 className="text-[15px] font-bold text-ink flex items-center gap-2">
+                        <span>Widget Icon</span>
+                      </h5>
+                      <p className="text-[12px] text-ink-2 mt-0.5">
+                        Choose the launcher icon style visitors see before opening chat.
+                      </p>
+                    </div>
+                    <div
+                      title="Select a preset launcher icon or choose the cloud upload button to use your custom company logo."
+                      className="text-ink-3 hover:text-ink cursor-help p-1 rounded-md transition-colors"
+                    >
+                      <Info className="w-4.5 h-4.5" />
+                    </div>
+                  </div>
+
+                  {/* 5 Circular Options in a Horizontal Row with Radio Buttons Underneath */}
+                  <div className="flex items-center gap-4 sm:gap-6 pt-2 pb-1 overflow-x-auto">
+                    {/* Option 1: Smile Bubble */}
+                    <div className="flex flex-col items-center gap-3 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setWidgetIcon('smile_bubble');
+                          setShowLauncherLogo(false);
+                        }}
+                        style={{ backgroundColor: brandColor }}
+                        className={cn(
+                          'w-13 h-13 rounded-full flex items-center justify-center transition-all cursor-pointer relative shadow-sm',
+                          widgetIcon === 'smile_bubble'
+                            ? 'ring-4 ring-purple-500/25 ring-offset-2 ring-offset-surface scale-105 border-2 border-purple-600 dark:border-purple-400'
+                            : 'hover:scale-105 opacity-90 hover:opacity-100'
+                        )}
+                        title="Smile Bubble (Intercom Style)"
+                      >
+                        <SmileBubbleIcon className="w-6.5 h-6.5" color="#ffffff" />
+                      </button>
+                      <label className="cursor-pointer flex items-center justify-center p-1">
+                        <input
+                          type="radio"
+                          name="widget_icon_choice"
+                          checked={widgetIcon === 'smile_bubble'}
+                          onChange={() => {
+                            setWidgetIcon('smile_bubble');
+                            setShowLauncherLogo(false);
+                          }}
+                          className="w-4 h-4 text-accent border-line-2 focus:ring-accent cursor-pointer"
+                        />
+                      </label>
+                    </div>
+
+                    {/* Option 2: Double Cards */}
+                    <div className="flex flex-col items-center gap-3 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setWidgetIcon('double_bubble');
+                          setShowLauncherLogo(false);
+                        }}
+                        style={{ backgroundColor: brandColor }}
+                        className={cn(
+                          'w-13 h-13 rounded-full flex items-center justify-center transition-all cursor-pointer relative shadow-sm',
+                          widgetIcon === 'double_bubble'
+                            ? 'ring-4 ring-purple-500/25 ring-offset-2 ring-offset-surface scale-105 border-2 border-purple-600 dark:border-purple-400'
+                            : 'hover:scale-105 opacity-90 hover:opacity-100'
+                        )}
+                        title="Double Chat Cards"
+                      >
+                        <DoubleBubbleIcon className="w-6.5 h-6.5" color="#ffffff" bgColor={brandColor} />
+                      </button>
+                      <label className="cursor-pointer flex items-center justify-center p-1">
+                        <input
+                          type="radio"
+                          name="widget_icon_choice"
+                          checked={widgetIcon === 'double_bubble'}
+                          onChange={() => {
+                            setWidgetIcon('double_bubble');
+                            setShowLauncherLogo(false);
+                          }}
+                          className="w-4 h-4 text-accent border-line-2 focus:ring-accent cursor-pointer"
+                        />
+                      </label>
+                    </div>
+
+                    {/* Option 3: Chat Dots */}
+                    <div className="flex flex-col items-center gap-3 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setWidgetIcon('dots_bubble');
+                          setShowLauncherLogo(false);
+                        }}
+                        style={{ backgroundColor: brandColor }}
+                        className={cn(
+                          'w-13 h-13 rounded-full flex items-center justify-center transition-all cursor-pointer relative shadow-sm',
+                          widgetIcon === 'dots_bubble'
+                            ? 'ring-4 ring-purple-500/25 ring-offset-2 ring-offset-surface scale-105 border-2 border-purple-600 dark:border-purple-400'
+                            : 'hover:scale-105 opacity-90 hover:opacity-100'
+                        )}
+                        title="Chat Bubble with Dots"
+                      >
+                        <DotsBubbleIcon className="w-6.5 h-6.5" color="#ffffff" />
+                      </button>
+                      <label className="cursor-pointer flex items-center justify-center p-1">
+                        <input
+                          type="radio"
+                          name="widget_icon_choice"
+                          checked={widgetIcon === 'dots_bubble'}
+                          onChange={() => {
+                            setWidgetIcon('dots_bubble');
+                            setShowLauncherLogo(false);
+                          }}
+                          className="w-4 h-4 text-accent border-line-2 focus:ring-accent cursor-pointer"
+                        />
+                      </label>
+                    </div>
+
+                    {/* Option 4: Smile Line */}
+                    <div className="flex flex-col items-center gap-3 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setWidgetIcon('smile_line');
+                          setShowLauncherLogo(false);
+                        }}
+                        style={{ backgroundColor: brandColor }}
+                        className={cn(
+                          'w-13 h-13 rounded-full flex items-center justify-center transition-all cursor-pointer relative shadow-sm',
+                          widgetIcon === 'smile_line'
+                            ? 'ring-4 ring-purple-500/25 ring-offset-2 ring-offset-surface scale-105 border-2 border-purple-600 dark:border-purple-400'
+                            : 'hover:scale-105 opacity-90 hover:opacity-100'
+                        )}
+                        title="Smile Curve Bubble"
+                      >
+                        <SmileLineBubbleIcon className="w-6.5 h-6.5" color="#ffffff" cutoutColor={brandColor} />
+                      </button>
+                      <label className="cursor-pointer flex items-center justify-center p-1">
+                        <input
+                          type="radio"
+                          name="widget_icon_choice"
+                          checked={widgetIcon === 'smile_line'}
+                          onChange={() => {
+                            setWidgetIcon('smile_line');
+                            setShowLauncherLogo(false);
+                          }}
+                          className="w-4 h-4 text-accent border-line-2 focus:ring-accent cursor-pointer"
+                        />
+                      </label>
+                    </div>
+
+                    {/* Option 5: Upload / Custom Logo */}
+                    <div className="flex flex-col items-center gap-3 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setWidgetIcon('custom_logo');
+                          setShowLauncherLogo(true);
+                          if (!logoUrl) {
+                            logoFileInputRef.current?.click();
+                          }
+                        }}
+                        className={cn(
+                          'w-13 h-13 rounded-full flex items-center justify-center transition-all cursor-pointer relative shadow-sm',
+                          widgetIcon === 'custom_logo'
+                            ? 'ring-4 ring-purple-500/25 ring-offset-2 ring-offset-surface scale-105 border-2 border-purple-600 dark:border-purple-400'
+                            : 'hover:scale-105 opacity-90 hover:opacity-100',
+                          logoUrl ? 'p-1 bg-white dark:bg-slate-900 border-2 border-line-2' : 'bg-slate-100 dark:bg-slate-800 text-ink-2'
+                        )}
+                        title={logoUrl ? 'Display uploaded logo on floating launcher' : 'Upload custom logo'}
+                      >
+                        {logoUrl ? (
+                          <img src={logoUrl} alt="Logo" className="w-full h-full object-cover rounded-full" />
+                        ) : (
+                          <UploadCloud className="w-6.5 h-6.5 text-ink-2" />
+                        )}
+                      </button>
+                      <label className="cursor-pointer flex items-center justify-center p-1">
+                        <input
+                          type="radio"
+                          name="widget_icon_choice"
+                          checked={widgetIcon === 'custom_logo'}
+                          onChange={() => {
+                            setWidgetIcon('custom_logo');
+                            setShowLauncherLogo(true);
+                            if (!logoUrl) {
+                              logoFileInputRef.current?.click();
+                            }
+                          }}
+                          className="w-4 h-4 text-accent border-line-2 focus:ring-accent cursor-pointer"
+                        />
+                      </label>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Logo Image Upload Details */}
+                <div className="flex items-start gap-4 pt-1">
                   <div className="w-20 h-20 rounded-2xl border-2 border-line-2 bg-surface-2 flex items-center justify-center overflow-hidden shrink-0 shadow-inner">
                     {logoUrl ? (
                       <img src={logoUrl} alt="Logo" className="w-full h-full object-cover" />
@@ -1427,6 +1649,7 @@ export function AdminSettingsPanel({
                         <Upload className="w-4 h-4 text-accent" />
                         <span>Upload New Logo</span>
                         <input
+                          ref={logoFileInputRef}
                           type="file"
                           accept="image/*"
                           onChange={handleLogoUpload}
@@ -1436,8 +1659,14 @@ export function AdminSettingsPanel({
                       {logoUrl && (
                         <button
                           type="button"
-                          onClick={() => setLogoUrl('')}
-                          className="text-[12px] font-semibold text-rose-500 hover:text-rose-600 hover:underline px-2 py-1"
+                          onClick={() => {
+                            setLogoUrl('');
+                            if (widgetIcon === 'custom_logo') {
+                              setWidgetIcon('smile_bubble');
+                              setShowLauncherLogo(false);
+                            }
+                          }}
+                          className="text-[12px] font-semibold text-rose-500 hover:text-rose-600 hover:underline px-2 py-1 cursor-pointer"
                         >
                           Remove Logo
                         </button>
@@ -1451,99 +1680,10 @@ export function AdminSettingsPanel({
                       className="input text-[12.5px] border-2 border-line-2 focus:border-accent text-ink font-medium"
                     />
                     <p className="text-[11.5px] text-ink-2">
-                      Recommended: 256x256 square PNG, JPG or SVG with a clean transparent or solid background.
+                      {widgetIcon === 'custom_logo'
+                        ? '✓ Uploaded logo is displayed on both the website floating button and chat header.'
+                        : '✓ Uploaded logo is displayed inside the chat header. The floating button uses your selected preset icon above.'}
                     </p>
-                  </div>
-                </div>
-
-                {/* Toggle: Show Logo on Floating Launcher Button */}
-                <div className="p-4.5 rounded-2xl border-2 border-line-2 bg-surface-2/70 space-y-3.5 shadow-2xs">
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5 pr-4">
-                      <div className="flex items-center gap-2.5">
-                        <label
-                          className="text-[14px] font-bold text-ink cursor-pointer"
-                          htmlFor="toggle-launcher-logo"
-                        >
-                          Show Company Logo on Floating Chat Button
-                        </label>
-                        <span
-                          className={`text-[11px] font-extrabold px-2.5 py-0.5 rounded-full shadow-2xs ${
-                            showLauncherLogo
-                              ? 'bg-emerald-600 text-white'
-                              : 'bg-slate-300 dark:bg-slate-700 text-ink'
-                          }`}
-                        >
-                          {showLauncherLogo ? 'ACTIVE (ON)' : 'MUTED (OFF)'}
-                        </span>
-                      </div>
-                      <p className="text-[12px] text-ink-2">
-                        Choose whether visitors see your company logo or a classic chat bubble icon before clicking.
-                      </p>
-                    </div>
-                    <label className="relative inline-flex items-center cursor-pointer shrink-0">
-                      <input
-                        id="toggle-launcher-logo"
-                        type="checkbox"
-                        checked={showLauncherLogo}
-                        onChange={(e) => setShowLauncherLogo(e.target.checked)}
-                        className="sr-only peer"
-                      />
-                      <div className="w-12 h-6.5 bg-line-2 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5.5 after:w-5.5 after:transition-all peer-checked:bg-accent shadow-xs"></div>
-                    </label>
-                  </div>
-
-                  {/* Visual Comparison Cards */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-line-2">
-                    <div
-                      className={cn(
-                        'p-3 rounded-xl border-2 text-xs flex items-center gap-3 transition-all',
-                        showLauncherLogo
-                          ? 'border-emerald-500 bg-emerald-500/10 text-ink font-semibold shadow-xs ring-1 ring-emerald-500/20'
-                          : 'border-line-2 bg-surface opacity-75 text-ink-2'
-                      )}
-                    >
-                      <div
-                        className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 shadow-md ring-2 ring-white/50"
-                        style={{ backgroundColor: brandColor }}
-                      >
-                        {logoUrl ? (
-                          <img src={logoUrl} alt="Logo" className="w-5 h-5 rounded-full object-cover" />
-                        ) : (
-                          <span className="text-[10px] text-white font-extrabold">Logo</span>
-                        )}
-                      </div>
-                      <div className="min-w-0">
-                        <div className="font-bold text-[12px] text-ink flex items-center gap-1.5">
-                          <span>Logo Icon Mode</span>
-                          {showLauncherLogo && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />}
-                        </div>
-                        <div className="text-[11px] text-ink-2 truncate">Displays your uploaded logo</div>
-                      </div>
-                    </div>
-
-                    <div
-                      className={cn(
-                        'p-3 rounded-xl border-2 text-xs flex items-center gap-3 transition-all',
-                        !showLauncherLogo
-                          ? 'border-emerald-500 bg-emerald-500/10 text-ink font-semibold shadow-xs ring-1 ring-emerald-500/20'
-                          : 'border-line-2 bg-surface opacity-75 text-ink-2'
-                      )}
-                    >
-                      <div
-                        className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 shadow-md ring-2 ring-white/50"
-                        style={{ backgroundColor: brandColor }}
-                      >
-                        <MessageSquare className="w-4 h-4 text-white" />
-                      </div>
-                      <div className="min-w-0">
-                        <div className="font-bold text-[12px] text-ink flex items-center gap-1.5">
-                          <span>Classic Bubble Mode</span>
-                          {!showLauncherLogo && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />}
-                        </div>
-                        <div className="text-[11px] text-ink-2 truncate">Standard chat bubble icon</div>
-                      </div>
-                    </div>
                   </div>
                 </div>
               </div>
@@ -2156,17 +2296,17 @@ export function AdminSettingsPanel({
                     >
                       {previewOpen ? (
                         <X className="w-5.5 h-5.5 text-white" />
-                      ) : showLauncherLogo && logoUrl ? (
+                      ) : widgetIcon === 'custom_logo' && logoUrl ? (
                         <img
                           src={logoUrl}
                           alt="Chat"
                           className="w-8.5 h-8.5 rounded-full object-cover bg-white p-0.5 shadow-sm"
                         />
                       ) : (
-                        <img
-                          src="/chat-icon-white.png"
-                          alt="Chat"
-                          className="w-6.5 h-6.5 object-contain"
+                        <WidgetLauncherIcon
+                          type={widgetIcon}
+                          brandColor={brandColor}
+                          className="w-6.5 h-6.5 text-white drop-shadow-sm"
                         />
                       )}
                     </button>

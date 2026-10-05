@@ -29,6 +29,7 @@ interface WidgetConfig {
   helpTabIcon: string;
   logoUrl?: string;
   showLauncherLogo?: boolean;
+  widgetIcon?: string;
   greetingTitle?: string;
   welcomeText?: string;
   businessName?: string;
@@ -256,6 +257,7 @@ class ZentryWidget {
     const urlWs = urlParams?.get('workspaceId') || urlParams?.get('ws') || urlParams?.get('zentry_workspace') || urlParams?.get('chatify_workspace');
     const urlLogo = urlParams?.get('logo') || urlParams?.get('logoUrl') || urlParams?.get('logo_url');
     const urlShowLauncherLogo = urlParams?.get('show_launcher_logo') ?? urlParams?.get('launcher_logo');
+    const urlWidgetIcon = urlParams?.get('widget_icon') || urlParams?.get('icon');
 
     let apiUrl = script?.getAttribute('data-api-url') || '';
     if (!apiUrl && script?.src) {
@@ -281,6 +283,7 @@ class ZentryWidget {
       helpTabIcon: script?.getAttribute('data-help-icon') || '📖',
       logoUrl: urlLogo || script?.getAttribute('data-logo-url') || script?.getAttribute('data-logo') || undefined,
       showLauncherLogo: urlShowLauncherLogo !== null ? urlShowLauncherLogo !== 'false' : (script?.getAttribute('data-show-launcher-logo') !== 'false'),
+      widgetIcon: urlWidgetIcon || script?.getAttribute('data-widget-icon') || script?.getAttribute('data-icon') || undefined,
       welcomeText: script?.getAttribute('data-welcome-text') || undefined,
       businessName: script?.getAttribute('data-business-name') || script?.getAttribute('data-company-name') || undefined,
       customDomain: script?.getAttribute('data-custom-domain') || undefined,
@@ -363,6 +366,11 @@ class ZentryWidget {
         if (data.logo_url) this.config.logoUrl = data.logo_url;
         if (typeof data.show_launcher_logo === 'boolean') {
           this.config.showLauncherLogo = data.show_launcher_logo;
+        }
+        if (data.navbar_trigger_config?.widget_icon) {
+          this.config.widgetIcon = data.navbar_trigger_config.widget_icon;
+        } else if (data.widget_icon) {
+          this.config.widgetIcon = data.widget_icon;
         }
         if (data.greeting_title) this.config.greetingTitle = data.greeting_title;
         if (typeof data.show_help_tab === 'boolean') {
@@ -1620,6 +1628,37 @@ class ZentryWidget {
     this.renderMessages();
   }
 
+  private renderLauncherIconHTML(): string {
+    const isCustom =
+      this.config.widgetIcon === 'custom_logo' ||
+      (!this.config.widgetIcon && this.config.showLauncherLogo !== false && Boolean(this.config.logoUrl));
+    if (isCustom && this.config.logoUrl) {
+      return `<img src="${this.escapeHTML(this.config.logoUrl)}" alt="Chat" class="chatify-launcher-icon chatify-custom-logo" onerror="this.src='${ZENTRY_ICON_DATA_URI || CHATIFY_ICON_DATA_URI}';this.classList.remove('chatify-custom-logo');" />`;
+    }
+    const brandColor = this.config.primaryColor || '#2e5bff';
+    switch (this.config.widgetIcon) {
+      case 'double_bubble':
+        return `<svg viewBox="0 0 28 28" fill="none" class="chatify-launcher-icon" width="28" height="28" style="display:block;">
+          <path d="M9 4.5h11a2.5 2.5 0 012.5 2.5v7a2.5 2.5 0 01-2.5 2.5h-1v2.5a.6.6 0 01-1.02.42L15 16.5H9a2.5 2.5 0 01-2.5-2.5V7A2.5 2.5 0 019 4.5z" fill="#ffffff" opacity="0.88"/>
+          <path d="M5.5 7.5h10.5a2.5 2.5 0 012.5 2.5V17a2.5 2.5 0 01-2.5 2.5h-4.8l-3.2 2.6a.6.6 0 01-.98-.46V19.5H5.5A2.5 2.5 0 013 17v-7a2.5 2.5 0 012.5-2.5z" fill="#ffffff" stroke="${brandColor}" stroke-width="1.2"/>
+        </svg>`;
+      case 'dots_bubble':
+        return `<svg viewBox="0 0 28 28" fill="none" class="chatify-launcher-icon" width="28" height="28" style="display:block;">
+          <path fill-rule="evenodd" clip-rule="evenodd" d="M14 4C7.925 4 3 8.477 3 14c0 2.87 1.34 5.46 3.48 7.31L5.2 24.8a.7.7 0 001 .8l4.2-2c1.14.26 2.34.4 3.6.4 6.075 0 11-4.477 11-10S20.075 4 14 4zm-4.75 11.25a1.5 1.5 0 110-3 1.5 1.5 0 010 3zm4.75 0a1.5 1.5 0 110-3 1.5 1.5 0 010 3zm4.75 0a1.5 1.5 0 110-3 1.5 1.5 0 010 3z" fill="#ffffff"/>
+        </svg>`;
+      case 'smile_line':
+        return `<svg viewBox="0 0 28 28" fill="none" class="chatify-launcher-icon" width="28" height="28" style="display:block;">
+          <path d="M5 4.5h16a2.5 2.5 0 012.5 2.5v10a2.5 2.5 0 01-2.5 2.5h-4.5l-3.5 2.8a.7.7 0 01-1.14-.54V19.5H5A2.5 2.5 0 012.5 17V7A2.5 2.5 0 015 4.5z" fill="#ffffff"/>
+          <path d="M8 12.2c1.5 2.2 5.5 2.4 7.2.2.4-.5 1.1-.3 1.2.2" stroke="${brandColor}" stroke-width="2.2" stroke-linecap="round"/>
+        </svg>`;
+      case 'smile_bubble':
+      default:
+        return `<svg viewBox="0 0 28 28" fill="none" class="chatify-launcher-icon" width="28" height="28" style="display:block;">
+          <path fill-rule="evenodd" clip-rule="evenodd" d="M5 4C3.895 4 3 4.895 3 6v13c0 1.105.895 2 2 2h4.5v3.2a.8.8 0 001.36.57L15 21h8c1.105 0 2-.895 2-2V6c0-1.105-.895-2-2-2H5zm4 10.5a5 5 0 0010 0H9z" fill="#ffffff"/>
+        </svg>`;
+    }
+  }
+
   // 10. DOM & Shadow Root Initialization (Intercom Messenger 2.0)
   private initDOM() {
     this.container = document.createElement('div');
@@ -1699,12 +1738,11 @@ class ZentryWidget {
     launcher.className = this.config.workspaceId ? 'chatify-launcher is-loading' : 'chatify-launcher';
     launcher.id = 'chatifyLauncherBtn';
     launcher.setAttribute('aria-label', 'Open chat');
-    const shouldShowLauncherLogo = this.config.showLauncherLogo !== false && Boolean(this.config.logoUrl);
-    const initialLogo = shouldShowLauncherLogo ? this.config.logoUrl! : (ZENTRY_ICON_DATA_URI || CHATIFY_ICON_DATA_URI);
-    const isCustomLogo = shouldShowLauncherLogo;
     launcher.innerHTML = `
       <div class="chatify-badge" id="chatifyBadge">0</div>
-      <img id="chatifyIconOpen" src="${initialLogo}" alt="Chat" class="chatify-launcher-icon ${isCustomLogo ? 'chatify-custom-logo' : ''}" />
+      <span id="chatifyIconOpen" style="display:flex;align-items:center;justify-content:center;width:100%;height:100%;">
+        ${this.renderLauncherIconHTML()}
+      </span>
       <svg id="chatifyIconClose" style="display:none;" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
         <line x1="18" y1="6" x2="6" y2="18"></line>
         <line x1="6" y1="6" x2="18" y2="18"></line>
@@ -2592,21 +2630,10 @@ class ZentryWidget {
       }
     }
 
-    // Update Launcher Icon with custom logo if configured & enabled
-    const openIcon = this.shadow?.getElementById('chatifyIconOpen') as HTMLImageElement | null;
+    // Update Launcher Icon with custom logo or selected preset icon
+    const openIcon = this.shadow?.getElementById('chatifyIconOpen');
     if (openIcon) {
-      const shouldShowLogo = this.config.showLauncherLogo !== false && Boolean(this.config.logoUrl);
-      if (shouldShowLogo) {
-        openIcon.src = this.config.logoUrl!;
-        openIcon.classList.add('chatify-custom-logo');
-        openIcon.onerror = () => {
-          openIcon.src = ZENTRY_ICON_DATA_URI || CHATIFY_ICON_DATA_URI;
-          openIcon.classList.remove('chatify-custom-logo');
-        };
-      } else {
-        openIcon.src = ZENTRY_ICON_DATA_URI || CHATIFY_ICON_DATA_URI;
-        openIcon.classList.remove('chatify-custom-logo');
-      }
+      openIcon.innerHTML = this.renderLauncherIconHTML();
     }
 
     // Update Header Avatar in Messages Tab
@@ -5351,7 +5378,7 @@ class ZentryWidget {
         }
       } else {
         win.style.display = 'none';
-        openIcon.style.display = 'block';
+        openIcon.style.display = 'flex';
         closeIcon.style.display = 'none';
         this.closeEmojiPicker();
         this.updateUnreadBadge();

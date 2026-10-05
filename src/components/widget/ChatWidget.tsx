@@ -27,12 +27,14 @@ import { Message } from '@/types/database';
 import { getWorkspaceHelpCenterUrl } from '@/lib/domain';
 import { EMOJI_CATEGORIES, ALL_EMOJIS } from '@/lib/emojis';
 import { ChatMarkdown } from '@/components/ui/ChatMarkdown';
+import { WidgetLauncherIcon, WidgetIconType } from '@/components/ui/WidgetLauncherIcon';
 
 export interface WidgetConfig {
   brandColor?: string;
   position?: 'bottom-right' | 'bottom-left';
   logoUrl?: string;
   showLauncherLogo?: boolean;
+  widgetIcon?: WidgetIconType;
   companyName?: string;
   welcomeText?: string;
   autoGreetingDelaySeconds?: number;
@@ -1844,21 +1846,23 @@ export default function ChatWidget({
             {/* Launcher Icon Toggle */}
             {isOpen ? (
               <X className="w-6 h-6 text-white transition-transform duration-200 rotate-90 scale-100" />
-            ) : (config.showLauncherLogo !== false && config.logoUrl) ? (
+            ) : (config.widgetIcon === 'custom_logo' && config.logoUrl) ||
+              (!config.widgetIcon && config.showLauncherLogo !== false && config.logoUrl) ? (
               <img
                 src={config.logoUrl}
                 alt="Chat"
                 className="w-9 h-9 rounded-full object-cover bg-white p-0.5 shadow-sm transition-transform duration-200 hover:scale-105"
                 onError={(e) => {
                   (e.currentTarget as HTMLImageElement).src = '/chat-icon-white.png';
-                  (e.currentTarget as HTMLImageElement).className = 'w-7 h-7 object-contain brightness-0 invert drop-shadow-sm transition-transform duration-200 hover:scale-105';
+                  (e.currentTarget as HTMLImageElement).className =
+                    'w-7 h-7 object-contain brightness-0 invert drop-shadow-sm transition-transform duration-200 hover:scale-105';
                 }}
               />
             ) : (
-              <img
-                src="/chat-icon-white.png"
-                alt="Chat"
-                className="w-7 h-7 object-contain brightness-0 invert drop-shadow-sm transition-transform duration-200 hover:scale-105"
+              <WidgetLauncherIcon
+                type={config.widgetIcon || 'smile_bubble'}
+                brandColor={brandColor}
+                className="w-7 h-7 text-white drop-shadow-sm transition-transform duration-200 hover:scale-105"
               />
             )}
 

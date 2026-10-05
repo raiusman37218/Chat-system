@@ -11,6 +11,7 @@ import {
   AISettingsConfig,
   NavbarTriggerConfig,
   SMTPSettingsConfig,
+  WidgetIconType,
 } from '@/types/database';
 import { generateUniqueWorkspaceSlug } from '@/lib/slug';
 import { getIndustryPreset } from '@/lib/onboarding-presets';
@@ -99,6 +100,7 @@ export async function updateWidgetSettingsAction(
     brand_color?: string;
     logo_url?: string | null;
     show_launcher_logo?: boolean;
+    widget_icon?: WidgetIconType;
     widget_position?: 'right' | 'left';
     greeting_title?: string;
     greeting_message?: string;
@@ -123,7 +125,21 @@ export async function updateWidgetSettingsAction(
     greeting_message: data.greeting_message,
   };
 
-  if (data.show_launcher_logo !== undefined) {
+  if (data.widget_icon !== undefined) {
+    const { data: currentWs } = await supabase
+      .from('workspaces')
+      .select('navbar_trigger_config')
+      .eq('id', workspaceId)
+      .single();
+    const navConfig = (currentWs?.navbar_trigger_config || {}) as any;
+    navConfig.widget_icon = data.widget_icon;
+    updatePayload.navbar_trigger_config = navConfig;
+    if (data.widget_icon === 'custom_logo') {
+      updatePayload.show_launcher_logo = true;
+    } else {
+      updatePayload.show_launcher_logo = false;
+    }
+  } else if (data.show_launcher_logo !== undefined) {
     updatePayload.show_launcher_logo = data.show_launcher_logo;
   }
   if (data.help_center_tab_label !== undefined) {

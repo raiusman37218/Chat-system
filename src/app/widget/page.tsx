@@ -31,6 +31,7 @@ function WidgetFrameContent() {
       ? parseInt(searchParams.get('delay')!, 10)
       : parsedConfig.autoGreetingDelaySeconds;
     const workspaceId = searchParams.get('workspaceId') || parsedConfig.workspaceId;
+    const widgetIcon = (searchParams.get('widgetIcon') || searchParams.get('icon') || parsedConfig.widgetIcon) as any;
 
     setConfig({
       ...parsedConfig,
@@ -41,6 +42,7 @@ function WidgetFrameContent() {
       ...(welcomeText && { welcomeText }),
       ...(autoGreetingDelaySeconds !== undefined && { autoGreetingDelaySeconds }),
       ...(workspaceId && { workspaceId }),
+      ...(widgetIcon && { widgetIcon }),
     });
 
     // 2. Listen to postMessage from parent host window

@@ -335,6 +335,13 @@ export interface RetrievedChunk {
   combined_score: number;
 }
 
+export type WidgetIconType =
+  | 'smile_bubble'
+  | 'double_bubble'
+  | 'dots_bubble'
+  | 'smile_line'
+  | 'custom_logo';
+
 export interface NavbarTriggerConfig {
   enabled: boolean;
   label: string;
@@ -344,6 +351,7 @@ export interface NavbarTriggerConfig {
   position?: 'start' | 'end';
   target_selector?: string;
   dismissed_prompt?: boolean;
+  widget_icon?: WidgetIconType;
 }
 
 export interface PublicWorkspace {
@@ -353,6 +361,7 @@ export interface PublicWorkspace {
   brand_color: string;
   logo_url: string | null;
   widget_position: 'right' | 'left';
+  widget_icon?: WidgetIconType | null;
   greeting_title: string | null;
   greeting_message: string | null;
   help_center_tab_label: string;
@@ -404,6 +413,7 @@ export interface Workspace {
   owner_id: string;
   logo_url?: string | null;
   show_launcher_logo?: boolean | null;
+  widget_icon?: WidgetIconType | null;
   widget_position?: 'right' | 'left';
   business_hours?: BusinessHoursConfig;
   auto_assignment?: AutoAssignmentConfig;
