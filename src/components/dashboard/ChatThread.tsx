@@ -2477,16 +2477,17 @@ export function ChatThread({
           {/* Composer Header Bar */}
           <div
             className={cn(
-              'px-2.5 sm:px-3 pt-2 pb-1.5 flex items-center justify-between gap-1.5 sm:gap-2 border-b border-line/40 bg-surface-2/30 min-w-0',
+              'px-3 py-1.5 flex items-center justify-between gap-2 border-b border-line/40 bg-surface-2/30 min-w-0',
               !replyPreview && 'rounded-t-2xl'
             )}
           >
+            {/* Mode Switcher: Reply vs Internal Note */}
             <div className="inline-flex items-center gap-0.5 p-0.5 rounded-lg bg-surface-2 border border-line/60 shrink-0">
               <button
                 type="button"
                 onClick={() => setComposerMode('reply')}
                 className={cn(
-                  'h-6 px-2 sm:px-2.5 rounded-md text-[11px] sm:text-[11.5px] font-semibold transition-all inline-flex items-center gap-1.5 whitespace-nowrap',
+                  'h-6 px-2.5 rounded-md text-[11.5px] font-semibold transition-all inline-flex items-center gap-1.5 whitespace-nowrap cursor-pointer',
                   composerMode === 'reply'
                     ? 'bg-surface text-ink font-bold shadow-xs'
                     : 'text-ink-3 hover:text-ink'
@@ -2499,197 +2500,28 @@ export function ChatThread({
                 type="button"
                 onClick={() => setComposerMode('internal')}
                 className={cn(
-                  'h-6 px-2 sm:px-2.5 rounded-md text-[11px] sm:text-[11.5px] font-semibold transition-all inline-flex items-center gap-1.5 whitespace-nowrap',
+                  'h-6 px-2.5 rounded-md text-[11.5px] font-semibold transition-all inline-flex items-center gap-1.5 whitespace-nowrap cursor-pointer',
                   composerMode === 'internal'
                     ? 'bg-amber-500/20 text-amber-700 dark:text-amber-300 font-bold shadow-xs'
                     : 'text-ink-3 hover:text-ink'
                 )}
               >
                 <Lock className="w-3 h-3 shrink-0" />
-                <span>Note</span>
+                <span>Internal Note</span>
               </button>
             </div>
 
-            <div className="flex items-center gap-1 sm:gap-1.5 shrink-0 min-w-0">
-              <button
-                type="button"
-                onClick={handleGenerateAiSuggestion}
-                disabled={aiDrafting}
-                className="h-6 px-1.5 sm:px-2 rounded-md text-[11px] font-semibold text-accent hover:bg-accent/10 transition-colors inline-flex items-center justify-center gap-1 cursor-pointer shrink-0 whitespace-nowrap"
-                title="Ask AI Copilot to draft a reply"
-              >
-                <Sparkles className={cn('w-3.5 h-3.5 shrink-0', aiDrafting && 'animate-spin')} />
-                <span className="hidden sm:inline whitespace-nowrap">{aiDrafting ? 'Drafting…' : 'AI Copilot'}</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setShowMacros((s) => !s)}
-                className="h-6 px-1.5 sm:px-2 rounded-md text-[11px] font-medium text-ink-3 hover:text-ink hover:bg-surface-3 transition-colors inline-flex items-center justify-center gap-1 cursor-pointer shrink-0 whitespace-nowrap"
-                title="Saved replies (/)"
-              >
-                <Zap className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-                <span className="hidden sm:inline whitespace-nowrap">Replies</span>
-              </button>
-
-              {/* ── Translation Controls (Side Badge & Safe Popover) ── */}
-              {composerMode === 'reply' && (
-                <div className="relative shrink-0" ref={translateMenuRef}>
-                  <button
-                    type="button"
-                    onClick={() => setShowTranslateMenu((prev) => !prev)}
-                    className={cn(
-                      'h-6 px-1.5 sm:px-2 rounded-md text-[11px] font-medium transition-all inline-flex items-center justify-center gap-1 cursor-pointer shadow-2xs shrink-0 whitespace-nowrap',
-                      autoTranslateEnabled && targetLanguage !== 'en'
-                        ? 'bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/30 hover:bg-blue-500/25 font-bold'
-                        : 'text-ink-3 hover:text-ink hover:bg-surface-3 border border-transparent'
-                    )}
-                    title={`Translation settings: Customer receives replies in ${getLanguageInfo(targetLanguage).name}. Click to view or change.`}
-                  >
-                    <Globe className={cn('w-3.5 h-3.5 shrink-0', autoTranslateEnabled && targetLanguage !== 'en' ? 'text-blue-500' : 'text-ink-3')} />
-                    <span className="hidden sm:inline whitespace-nowrap">
-                      {autoTranslateEnabled && targetLanguage !== 'en'
-                        ? `${getLanguageInfo(targetLanguage).flag || ''} ${getLanguageInfo(targetLanguage).name}`
-                        : 'Translate'}
-                    </span>
-                    {autoTranslateEnabled && targetLanguage !== 'en' && (
-                      <span className="sm:hidden text-[9px] font-bold uppercase ml-0.5">
-                        {targetLanguage.slice(0, 2)}
-                      </span>
-                    )}
-                    <ChevronDown className="w-2.5 h-2.5 opacity-60 shrink-0" />
-                  </button>
-
-                  {/* Popover Dropdown Menu */}
-                  {showTranslateMenu && (
-                    <div className="absolute right-0 bottom-full mb-2 z-50 w-80 max-h-[min(520px,calc(100vh-140px))] overflow-y-auto overscroll-contain bg-surface rounded-2xl border border-line shadow-2xl p-3.5 space-y-3 animate-pop focus:outline-none">
-                      <div className="sticky -top-3.5 -mx-3.5 -mt-3.5 px-3.5 pt-3 pb-2.5 bg-surface/95 backdrop-blur-md border-b border-line/60 flex items-center justify-between z-10 rounded-t-2xl">
-                        <div className="flex items-center gap-1.5 text-[12px] font-bold text-ink">
-                          <Globe className="w-3.5 h-3.5 text-blue-500" />
-                          <span>Translation Settings</span>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => setShowTranslateMenu(false)}
-                          className="text-ink-3 hover:text-ink p-1 rounded-md hover:bg-surface-2 transition-colors cursor-pointer"
-                          title="Close settings"
-                        >
-                          <X className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-
-                      {/* Customer Native Language Status */}
-                      <div className="bg-surface-2/70 rounded-lg p-2.5 space-y-2 border border-line/40">
-                        <div className="flex items-center justify-between text-[11px]">
-                          <span className="text-ink-3 font-medium">Customer speaks:</span>
-                          <span className="font-bold text-ink flex items-center gap-1">
-                            <span>{getLanguageInfo(detectedVisitorLang).flag}</span>
-                            <span>{getLanguageInfo(detectedVisitorLang).name}</span>
-                            {getLanguageInfo(detectedVisitorLang).nativeName && (
-                              <span className="text-ink-3 font-normal">({getLanguageInfo(detectedVisitorLang).nativeName})</span>
-                            )}
-                          </span>
-                        </div>
-
-                        {/* Reset / Lock to Customer Language Button */}
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setTargetLanguage(detectedVisitorLang);
-                            setAutoTranslateEnabled(detectedVisitorLang !== 'en');
-                          }}
-                          className="w-full py-1.5 px-2.5 rounded-lg text-[11px] font-semibold bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/60 dark:hover:bg-blue-900/60 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800 transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
-                        >
-                          <RotateCcw className="w-3 h-3 shrink-0" />
-                          <span>Auto-lock to Customer ({getLanguageInfo(detectedVisitorLang).name})</span>
-                        </button>
-                      </div>
-
-                      {/* Manual Override Dropdown */}
-                      <div className="space-y-1.5">
-                        <div className="flex items-center justify-between text-[11px]">
-                          <label className="font-semibold text-ink">
-                            Customer Receives Replies In:
-                          </label>
-                          {targetLanguage !== detectedVisitorLang && (
-                            <span className="text-[10px] text-amber-600 dark:text-amber-400 font-bold bg-amber-500/10 px-1.5 py-0.5 rounded">
-                              Custom Override
-                            </span>
-                          )}
-                        </div>
-                        <select
-                          value={targetLanguage}
-                          onChange={async (e) => {
-                            const newLang = e.target.value;
-                            setTargetLanguage(newLang);
-                            if (newLang !== 'en') {
-                              setAutoTranslateEnabled(true);
-                            } else {
-                              setAutoTranslateEnabled(false);
-                            }
-                            try {
-                              const supabase = createClient();
-                              const langInfo = getLanguageInfo(newLang);
-                              await supabase
-                                .from('conversations')
-                                .update({
-                                  channel_metadata: {
-                                    ...((conversation.channel_metadata as any) || {}),
-                                    visitor_language: newLang,
-                                    language_name: langInfo.name,
-                                  },
-                                })
-                                .eq('id', conversation.id);
-                            } catch (err) {
-                              console.warn('Failed to update conversation language preference:', err);
-                            }
-                          }}
-                          aria-label="Select Customer Language"
-                          className="w-full text-[11.5px] font-semibold bg-surface border border-line-2 rounded-lg px-2.5 py-1.5 text-ink focus:outline-none focus:ring-2 focus:ring-accent cursor-pointer shadow-2xs"
-                        >
-                          <option value="en">🇬🇧 English (Original / No Translation)</option>
-                          {Object.values(SUPPORTED_LANGUAGES)
-                            .filter((l) => l.code !== 'en')
-                            .sort((a, b) => a.name.localeCompare(b.name))
-                            .map((l) => (
-                              <option key={l.code} value={l.code}>
-                                {l.flag || '🌐'} {l.name} {l.nativeName && l.nativeName !== l.name ? `(${l.nativeName})` : ''}
-                              </option>
-                            ))}
-                        </select>
-                      </div>
-
-                      {/* On / Off Toggle */}
-                      <div className="pt-2 border-t border-line/60 flex items-center justify-between">
-                        <div className="space-y-0.5">
-                          <p className="text-[11px] font-bold text-ink">Auto-Translation</p>
-                          <p className="text-[10px] text-ink-3">Translate agent replies automatically</p>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => setAutoTranslateEnabled(!autoTranslateEnabled)}
-                          className={cn(
-                            'text-[10.5px] px-2.5 py-1 rounded-md font-bold transition-all cursor-pointer shadow-2xs',
-                            autoTranslateEnabled
-                              ? 'bg-blue-600 hover:bg-blue-700 text-white'
-                              : 'bg-surface-2 hover:bg-surface-3 text-ink-2 border border-line'
-                          )}
-                        >
-                          {autoTranslateEnabled ? 'Enabled (ON)' : 'Disabled (OFF)'}
-                        </button>
-                      </div>
-
-                      <div className="text-[10px] text-ink-3 bg-surface-2/40 p-2 rounded-lg border border-line/30 leading-snug">
-                        ✨ <strong>Workflow:</strong> Write in English or any language. The customer receives your reply in {getLanguageInfo(targetLanguage).name}. Customer replies will always appear in English for you.
-                      </div>
-                    </div>
-                  )}
-                </div>
+            {/* Subtle Context / Author info */}
+            <div className="text-[11px] text-ink-3 truncate">
+              {isInternalMode ? (
+                <span className="text-amber-600 dark:text-amber-400 font-medium flex items-center gap-1">
+                  <span>🔒 Only visible to team</span>
+                </span>
+              ) : (
+                <span className="hidden sm:inline text-ink-3/80">
+                  Replying as <strong className="text-ink-2 font-medium">{currentAgent?.name || 'Agent'}</strong>
+                </span>
               )}
-
-              <span className="text-[10.5px] text-ink-3 hidden @3xl/thread:inline shrink-0 truncate max-w-[120px] ml-1">
-                as <strong className="text-ink font-medium">{currentAgent?.name || 'Agent'}</strong>
-              </span>
             </div>
           </div>
 
@@ -2873,8 +2705,234 @@ export function ChatThread({
           )}
 
           {/* Composer Footer Action Bar */}
-          <div className="px-3 py-2 bg-surface-2/40 border-t border-line/40 flex items-center justify-between text-[11px] text-ink-3 rounded-b-2xl">
-            <div className="flex items-center gap-1.5 flex-wrap">
+          <div className="px-3 py-2 bg-surface-2/40 border-t border-line/40 flex items-center justify-between text-[11px] text-ink-3 rounded-b-2xl min-h-[42px] gap-2">
+            {/* Left Action Tools */}
+            <div className="flex items-center gap-1 min-w-0 flex-wrap">
+              {/* Attachment Buttons */}
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isSending}
+                className="w-7 h-7 rounded-lg text-ink-3 hover:text-ink hover:bg-surface-3 transition-colors inline-flex items-center justify-center cursor-pointer shrink-0"
+                title="Attach document or file"
+                aria-label="Attach file"
+              >
+                <Paperclip className="w-3.5 h-3.5" />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => imageInputRef.current?.click()}
+                disabled={isSending}
+                className="w-7 h-7 rounded-lg text-ink-3 hover:text-ink hover:bg-surface-3 transition-colors inline-flex items-center justify-center cursor-pointer shrink-0"
+                title="Attach photo/image (Cloudinary)"
+                aria-label="Attach photo"
+              >
+                <ImageIcon className="w-3.5 h-3.5" />
+              </button>
+
+              {/* Emoji Button */}
+              <button
+                type="button"
+                onClick={() => setShowEmojiPicker((prev) => !prev)}
+                disabled={isSending}
+                className={cn(
+                  'w-7 h-7 rounded-lg transition-colors inline-flex items-center justify-center cursor-pointer shrink-0',
+                  showEmojiPicker
+                    ? 'text-accent bg-accent/15'
+                    : 'text-ink-3 hover:text-ink hover:bg-surface-3'
+                )}
+                title="Insert emoji"
+                aria-label="Insert emoji"
+              >
+                <Smile className="w-3.5 h-3.5" />
+              </button>
+
+              <span className="w-px h-3.5 bg-line-2 mx-1 shrink-0" />
+
+              {/* Canned Replies */}
+              <button
+                type="button"
+                onClick={() => setShowMacros((s) => !s)}
+                className="h-7 px-2 rounded-lg text-[11px] font-medium text-ink-3 hover:text-ink hover:bg-surface-3 transition-colors inline-flex items-center gap-1 cursor-pointer shrink-0 whitespace-nowrap"
+                title="Saved canned responses (/)"
+              >
+                <Zap className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                <span className="hidden sm:inline">Replies</span>
+              </button>
+
+              {/* AI Copilot */}
+              <button
+                type="button"
+                onClick={handleGenerateAiSuggestion}
+                disabled={aiDrafting}
+                className="h-7 px-2 rounded-lg text-[11px] font-semibold text-accent hover:bg-accent/10 transition-colors inline-flex items-center gap-1 cursor-pointer shrink-0 whitespace-nowrap"
+                title="Ask AI Copilot to draft a response"
+              >
+                <Sparkles className={cn('w-3.5 h-3.5 shrink-0', aiDrafting && 'animate-spin')} />
+                <span className="hidden sm:inline">{aiDrafting ? 'Drafting…' : 'AI Copilot'}</span>
+              </button>
+
+              {/* ── Translation Controls (Unified & Sleek) ── */}
+              {composerMode === 'reply' && (
+                <div className="relative shrink-0" ref={translateMenuRef}>
+                  <button
+                    type="button"
+                    onClick={() => setShowTranslateMenu((prev) => !prev)}
+                    className={cn(
+                      'h-7 px-2 rounded-lg text-[11px] font-medium transition-all inline-flex items-center gap-1.5 cursor-pointer shadow-2xs shrink-0 whitespace-nowrap',
+                      autoTranslateEnabled && targetLanguage !== 'en'
+                        ? 'bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/30 hover:bg-blue-500/25 font-bold'
+                        : 'text-ink-3 hover:text-ink hover:bg-surface-3 border border-transparent'
+                    )}
+                    title={
+                      autoTranslateEnabled && targetLanguage !== 'en'
+                        ? `Auto-translating replies to ${getLanguageInfo(targetLanguage).name}. Click to change.`
+                        : `Translate replies into customer's language. Click to enable.`
+                    }
+                  >
+                    <Globe className={cn('w-3.5 h-3.5 shrink-0', autoTranslateEnabled && targetLanguage !== 'en' ? 'text-blue-500' : 'text-ink-3')} />
+                    {autoTranslateEnabled && targetLanguage !== 'en' ? (
+                      <span className="inline-flex items-center gap-1">
+                        <span>{getLanguageInfo(targetLanguage).flag || ''}</span>
+                        <span>{getLanguageInfo(targetLanguage).name}</span>
+                        <ChevronDown className="w-2.5 h-2.5 opacity-60 ml-0.5" />
+                      </span>
+                    ) : (
+                      <span className="hidden sm:inline">Translate</span>
+                    )}
+                  </button>
+
+                  {/* Popover Dropdown Menu (Opens Upward from Toolbar) */}
+                  {showTranslateMenu && (
+                    <div className="absolute left-0 bottom-full mb-2 z-50 w-80 max-h-[min(520px,calc(100vh-140px))] overflow-y-auto overscroll-contain bg-surface rounded-2xl border border-line shadow-2xl p-3.5 space-y-3 animate-pop focus:outline-none">
+                      <div className="sticky -top-3.5 -mx-3.5 -mt-3.5 px-3.5 pt-3 pb-2.5 bg-surface/95 backdrop-blur-md border-b border-line/60 flex items-center justify-between z-10 rounded-t-2xl">
+                        <div className="flex items-center gap-1.5 text-[12px] font-bold text-ink">
+                          <Globe className="w-3.5 h-3.5 text-blue-500" />
+                          <span>Translation Settings</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setShowTranslateMenu(false)}
+                          className="text-ink-3 hover:text-ink p-1 rounded-md hover:bg-surface-2 transition-colors cursor-pointer"
+                          title="Close settings"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+
+                      {/* Customer Native Language Status */}
+                      <div className="bg-surface-2/70 rounded-lg p-2.5 space-y-2 border border-line/40">
+                        <div className="flex items-center justify-between text-[11px]">
+                          <span className="text-ink-3 font-medium">Customer speaks:</span>
+                          <span className="font-bold text-ink flex items-center gap-1">
+                            <span>{getLanguageInfo(detectedVisitorLang).flag}</span>
+                            <span>{getLanguageInfo(detectedVisitorLang).name}</span>
+                            {getLanguageInfo(detectedVisitorLang).nativeName && (
+                              <span className="text-ink-3 font-normal">({getLanguageInfo(detectedVisitorLang).nativeName})</span>
+                            )}
+                          </span>
+                        </div>
+
+                        {/* Reset / Lock to Customer Language Button */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setTargetLanguage(detectedVisitorLang);
+                            setAutoTranslateEnabled(detectedVisitorLang !== 'en');
+                          }}
+                          className="w-full py-1.5 px-2.5 rounded-lg text-[11px] font-semibold bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/60 dark:hover:bg-blue-900/60 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800 transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
+                        >
+                          <RotateCcw className="w-3 h-3 shrink-0" />
+                          <span>Auto-lock to Customer ({getLanguageInfo(detectedVisitorLang).name})</span>
+                        </button>
+                      </div>
+
+                      {/* Manual Override Dropdown */}
+                      <div className="space-y-1.5">
+                        <div className="flex items-center justify-between text-[11px]">
+                          <label className="font-semibold text-ink">
+                            Customer Receives Replies In:
+                          </label>
+                          {targetLanguage !== detectedVisitorLang && (
+                            <span className="text-[10px] text-amber-600 dark:text-amber-400 font-bold bg-amber-500/10 px-1.5 py-0.5 rounded">
+                              Custom Override
+                            </span>
+                          )}
+                        </div>
+                        <select
+                          value={targetLanguage}
+                          onChange={async (e) => {
+                            const newLang = e.target.value;
+                            setTargetLanguage(newLang);
+                            if (newLang !== 'en') {
+                              setAutoTranslateEnabled(true);
+                            } else {
+                              setAutoTranslateEnabled(false);
+                            }
+                            try {
+                              const supabase = createClient();
+                              const langInfo = getLanguageInfo(newLang);
+                              await supabase
+                                .from('conversations')
+                                .update({
+                                  channel_metadata: {
+                                    ...((conversation.channel_metadata as any) || {}),
+                                    visitor_language: newLang,
+                                    language_name: langInfo.name,
+                                  },
+                                })
+                                .eq('id', conversation.id);
+                            } catch (err) {
+                              console.warn('Failed to update conversation language preference:', err);
+                            }
+                          }}
+                          aria-label="Select Customer Language"
+                          className="w-full text-[11.5px] font-semibold bg-surface border border-line-2 rounded-lg px-2.5 py-1.5 text-ink focus:outline-none focus:ring-2 focus:ring-accent cursor-pointer shadow-2xs"
+                        >
+                          <option value="en">🇬🇧 English (Original / No Translation)</option>
+                          {Object.values(SUPPORTED_LANGUAGES)
+                            .filter((l) => l.code !== 'en')
+                            .sort((a, b) => a.name.localeCompare(b.name))
+                            .map((l) => (
+                              <option key={l.code} value={l.code}>
+                                {l.flag || '🌐'} {l.name} {l.nativeName && l.nativeName !== l.name ? `(${l.nativeName})` : ''}
+                              </option>
+                            ))}
+                        </select>
+                      </div>
+
+                      {/* On / Off Toggle */}
+                      <div className="pt-2 border-t border-line/60 flex items-center justify-between">
+                        <div className="space-y-0.5">
+                          <p className="text-[11px] font-bold text-ink">Auto-Translation</p>
+                          <p className="text-[10px] text-ink-3">Translate agent replies automatically</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setAutoTranslateEnabled(!autoTranslateEnabled)}
+                          className={cn(
+                            'text-[10.5px] px-2.5 py-1 rounded-md font-bold transition-all cursor-pointer shadow-2xs',
+                            autoTranslateEnabled
+                              ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                              : 'bg-surface-2 hover:bg-surface-3 text-ink-2 border border-line'
+                          )}
+                        >
+                          {autoTranslateEnabled ? 'Enabled (ON)' : 'Disabled (OFF)'}
+                        </button>
+                      </div>
+
+                      <div className="text-[10px] text-ink-3 bg-surface-2/40 p-2 rounded-lg border border-line/30 leading-snug">
+                        ✨ <strong>Workflow:</strong> Write in English or any language. The customer receives your reply in {getLanguageInfo(targetLanguage).name}. Customer replies will always appear in English for you.
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Right Action Tools: Shortcut Hint & Send Button */}
+            <div className="flex items-center gap-2 shrink-0">
               <button
                 type="button"
                 onClick={() => {
@@ -2886,7 +2944,7 @@ export function ChatThread({
                     return next;
                   });
                 }}
-                className="inline-flex items-center gap-1 text-[11px] text-ink-3 hover:text-ink transition-colors cursor-pointer group"
+                className="hidden sm:inline-flex items-center gap-1 text-[10.5px] text-ink-3 hover:text-ink transition-colors cursor-pointer group"
                 title={
                   sendOnEnter
                     ? "Pressing Enter sends. Click to switch to Ctrl+Enter."
@@ -2894,77 +2952,11 @@ export function ChatThread({
                 }
               >
                 <span>Press</span>
-                <span className="kbd text-[9.5px] group-hover:border-accent group-hover:text-accent transition-colors font-semibold">
+                <span className="kbd text-[9px] group-hover:border-accent group-hover:text-accent transition-colors font-semibold">
                   {sendOnEnter ? '↵' : 'Ctrl ↵'}
                 </span>
                 <span>to send</span>
-                <span className="text-[10px] text-ink-3/70">
-                  {sendOnEnter ? '(Shift+↵ newline)' : '(↵ newline)'}
-                </span>
               </button>
-              <span className="text-ink-3/40">·</span>
-              <span className="kbd text-[9.5px]">/</span>
-              <span>macros</span>
-              {inputText.length > 0 && (
-                <>
-                  <span className="text-ink-3/40">·</span>
-                  <span className="font-mono text-[10px] opacity-70">
-                    {inputText.length} chars
-                  </span>
-                </>
-              )}
-
-              <div className="flex items-center gap-1 ml-1.5 border-l border-line/50 pl-2">
-                <button
-                  type="button"
-                  onClick={() => setShowEmojiPicker((prev) => !prev)}
-                  disabled={isSending}
-                  className={cn(
-                    'h-6 px-2 rounded-md text-[11px] font-medium transition-colors inline-flex items-center gap-1 cursor-pointer',
-                    showEmojiPicker
-                      ? 'text-accent bg-accent/15'
-                      : 'text-ink-3 hover:text-accent hover:bg-accent/10'
-                  )}
-                  title="Insert emoji (WhatsApp style)"
-                >
-                  <Smile className="w-3.5 h-3.5" />
-                  <span>Emoji</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => imageInputRef.current?.click()}
-                  disabled={isSending}
-                  className="h-6 px-2 rounded-md text-[11px] font-medium text-ink-3 hover:text-accent hover:bg-accent/10 transition-colors inline-flex items-center gap-1 cursor-pointer"
-                  title="Attach photo/image (Cloudinary)"
-                >
-                  <ImageIcon className="w-3.5 h-3.5 text-accent" />
-                  <span>Photo</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={isSending}
-                  className="h-6 px-1.5 rounded-md text-[11px] font-medium text-ink-3 hover:text-ink hover:bg-surface-3 transition-colors inline-flex items-center gap-1 cursor-pointer"
-                  title="Attach document/file"
-                >
-                  <Paperclip className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2">
-              {!isInternalMode && autoTranslateEnabled && targetLanguage !== 'en' && (
-                <button
-                  ref={bottomTranslateBtnRef}
-                  type="button"
-                  onClick={() => setShowTranslateMenu((prev) => !prev)}
-                  className="hidden sm:inline-flex items-center gap-1.5 text-[11px] font-semibold text-blue-600 dark:text-blue-400 bg-blue-500/10 hover:bg-blue-500/15 border border-blue-500/25 px-2 py-1 rounded-md cursor-pointer transition-colors shadow-2xs"
-                  title="Click to view or change translation settings"
-                >
-                  <Globe className="w-3 h-3 shrink-0" />
-                  <span>→ {getLanguageInfo(targetLanguage).flag || ''} {getLanguageInfo(targetLanguage).name}</span>
-                </button>
-              )}
 
               <button
                 onClick={handleSend}
