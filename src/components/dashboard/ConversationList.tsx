@@ -18,6 +18,7 @@ import {
   CheckSquare,
   Square,
   Users,
+  ChevronDown,
 } from 'lucide-react';
 import {
   Conversation,
@@ -74,13 +75,21 @@ const SORT_LABELS: Record<SortOption, { label: string; desc: string }> = {
   priority: { label: 'Urgent & High', desc: 'Urgent priority on top' },
 };
 
-const STATUS_TABS: { id: StatusTab; label: string }[] = [
+export const PRIMARY_STATUS_TABS: { id: StatusTab; label: string }[] = [
   { id: 'open', label: 'Open' },
   { id: 'waiting', label: 'Waiting' },
   { id: 'mine', label: 'Mine' },
+];
+
+export const MORE_STATUS_TABS: { id: StatusTab; label: string }[] = [
   { id: 'unassigned', label: 'Unassigned' },
   { id: 'resolved', label: 'Resolved' },
   { id: 'all', label: 'All' },
+];
+
+const STATUS_TABS: { id: StatusTab; label: string }[] = [
+  ...PRIMARY_STATUS_TABS,
+  ...MORE_STATUS_TABS,
 ];
 
 function displayNameFor(conv: Conversation) {
@@ -457,6 +466,7 @@ export function ConversationList({
   const [channelFilter, setChannelFilter] = useState<ChannelType | 'all'>('all');
   const [selectedTagFilter, setSelectedTagFilter] = useState<string | 'all'>('all');
   const [showFilters, setShowFilters] = useState(false);
+  const [showMoreTabs, setShowMoreTabs] = useState(false);
 
   // Requirement 3: Bulk selection state
   const [isSelectionMode, setIsSelectionMode] = useState(false);
@@ -466,6 +476,7 @@ export function ConversationList({
 
   const searchInputRef = useRef<HTMLInputElement>(null);
   const filterRef = useRef<HTMLDivElement>(null);
+  const moreTabsRef = useRef<HTMLDivElement>(null);
   const assignMenuRef = useRef<HTMLDivElement>(null);
   const listContainerRef = useRef<HTMLDivElement>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
@@ -483,9 +494,9 @@ export function ConversationList({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  // Close filter popover on outside click
+  // Close filter & more tabs popover on outside click
   useEffect(() => {
-    if (!showFilters && !isAssignMenuOpen) return;
+    if (!showFilters && !isAssignMenuOpen && !showMoreTabs) return;
     const onDown = (e: MouseEvent) => {
       if (showFilters && !filterRef.current?.contains(e.target as Node)) {
         setShowFilters(false);
@@ -493,10 +504,13 @@ export function ConversationList({
       if (isAssignMenuOpen && !assignMenuRef.current?.contains(e.target as Node)) {
         setIsAssignMenuOpen(false);
       }
+      if (showMoreTabs && !moreTabsRef.current?.contains(e.target as Node)) {
+        setShowMoreTabs(false);
+      }
     };
     document.addEventListener('mousedown', onDown);
     return () => document.removeEventListener('mousedown', onDown);
-  }, [showFilters, isAssignMenuOpen]);
+  }, [showFilters, isAssignMenuOpen, showMoreTabs]);
 
   // Requirement 2: Tab counts
   const counts = useMemo(() => {
@@ -781,11 +795,11 @@ export function ConversationList({
               <button
                 type="button"
                 onClick={onOpenSimulator}
-                title="Send yourself a test chat (Opens simulator)"
-                className="w-7 h-7 xl:w-auto xl:px-2 rounded-lg text-[11px] font-semibold inline-flex items-center justify-center gap-1.5 transition-all border border-line/70 bg-surface-2 text-ink-3 hover:text-accent hover:border-accent/40 hover:bg-accent/10 shadow-2xs shrink-0 whitespace-nowrap cursor-pointer"
+                title="Send test chat (Simulator)"
+                aria-label="Send test chat"
+                className="w-7 h-7 rounded-lg inline-flex items-center justify-center transition-all border border-line/70 bg-surface-2 text-ink-3 hover:text-accent hover:border-accent/40 hover:bg-accent/10 shadow-2xs shrink-0 cursor-pointer"
               >
                 <Sparkles className="w-3.5 h-3.5 text-accent shrink-0" />
-                <span className="hidden xl:inline">Test Chat</span>
               </button>
             )}
 
@@ -801,15 +815,15 @@ export function ConversationList({
                 }
               }}
               title={isSelectionMode ? 'Cancel bulk select' : 'Bulk select conversations'}
+              aria-label="Bulk select conversations"
               className={cn(
-                'w-7 h-7 xl:w-auto xl:px-2 rounded-lg text-[11px] font-semibold inline-flex items-center justify-center gap-1 transition-all border shrink-0 whitespace-nowrap cursor-pointer',
+                'w-7 h-7 rounded-lg inline-flex items-center justify-center transition-all border shrink-0 cursor-pointer',
                 isSelectionMode || selectedIds.size > 0
                   ? 'border-accent bg-accent/10 text-accent font-bold'
                   : 'border-line/70 bg-surface-2 text-ink-3 hover:text-ink hover:bg-surface-3'
               )}
             >
               <CheckSquare className="w-3.5 h-3.5 shrink-0" />
-              <span className="hidden xl:inline">Select</span>
             </button>
 
             {/* Sync / Refresh Button */}
@@ -987,24 +1001,25 @@ export function ConversationList({
           )}
         </div>
 
-        {/* 3. Requirement 2: Status Tabs: Open, Waiting, Mine, Unassigned, Resolved, All */}
-        <div className="flex items-center gap-1 overflow-x-auto p-1 rounded-xl bg-surface-2 border border-line/70 scrollbar-none">
-          {STATUS_TABS.map((tab) => {
+        {/* 3. Requirement 2: Status Tabs: Primary (Open, Waiting, Mine) + More Menu (Unassigned, Resolved, All) */}
+        <div className="flex items-center gap-1 p-1 rounded-xl bg-surface-2 border border-line/70 min-w-0">
+          {PRIMARY_STATUS_TABS.map((tab) => {
             const active = activeTab === tab.id;
             const count = counts[tab.id];
             return (
               <button
                 key={tab.id}
+                type="button"
                 onClick={() => {
                   setActiveTab(tab.id);
                   if (selectedIds.size > 0) setSelectedIds(new Set());
                 }}
                 title={`${tab.label} (${count})`}
                 className={cn(
-                  'h-6 px-2 rounded-lg text-[10.5px] font-medium transition-all flex items-center justify-center gap-1 shrink-0',
+                  'h-6 px-2 rounded-lg text-[10.5px] font-medium transition-all flex items-center justify-center gap-1 shrink-0 cursor-pointer',
                   active
                     ? 'bg-surface text-ink shadow-xs border border-line/60 font-bold'
-                    : 'text-ink-3 hover:text-ink'
+                    : 'text-ink-3 hover:text-ink hover:bg-surface-3/60'
                 )}
               >
                 <span>{tab.label}</span>
@@ -1015,8 +1030,6 @@ export function ConversationList({
                       active
                         ? tab.id === 'waiting'
                           ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
-                          : tab.id === 'resolved'
-                          ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
                           : 'bg-accent/10 text-accent'
                         : 'bg-surface-3 text-ink-3'
                     )}
@@ -1027,6 +1040,67 @@ export function ConversationList({
               </button>
             );
           })}
+
+          {/* More Tabs Dropdown */}
+          {(() => {
+            const isMoreTabActive = MORE_STATUS_TABS.some((t) => t.id === activeTab);
+            const activeMoreTab = MORE_STATUS_TABS.find((t) => t.id === activeTab);
+            const moreTotalCount = MORE_STATUS_TABS.reduce((acc, t) => acc + (counts[t.id] || 0), 0);
+            return (
+              <div className="relative shrink-0 ml-auto" ref={moreTabsRef}>
+                <button
+                  type="button"
+                  onClick={() => setShowMoreTabs((v) => !v)}
+                  title={isMoreTabActive ? `${activeMoreTab?.label} (Click for more tabs)` : 'More status tabs'}
+                  className={cn(
+                    'h-6 px-2 rounded-lg text-[10.5px] font-medium transition-all flex items-center justify-center gap-1 shrink-0 cursor-pointer',
+                    isMoreTabActive
+                      ? 'bg-surface text-ink shadow-xs border border-line/60 font-bold'
+                      : 'text-ink-3 hover:text-ink hover:bg-surface-3/60'
+                  )}
+                >
+                  <span>{isMoreTabActive ? activeMoreTab?.label : 'More'}</span>
+                  {isMoreTabActive && activeMoreTab && counts[activeMoreTab.id] > 0 ? (
+                    <span className="tabular-nums text-[9px] px-1 py-0.1 rounded-full font-bold bg-accent/10 text-accent">
+                      {counts[activeMoreTab.id]}
+                    </span>
+                  ) : !isMoreTabActive && moreTotalCount > 0 ? (
+                    <span className="tabular-nums text-[9px] px-1 py-0.1 rounded-full font-bold bg-surface-3 text-ink-3">
+                      {moreTotalCount}
+                    </span>
+                  ) : null}
+                  <ChevronDown className="w-2.5 h-2.5 opacity-60 shrink-0" />
+                </button>
+
+                {showMoreTabs && (
+                  <div className="absolute right-0 top-[calc(100%+6px)] z-50 w-44 p-1.5 rounded-xl border border-line bg-surface shadow-xl animate-pop text-left space-y-0.5">
+                    {MORE_STATUS_TABS.map((tab) => (
+                      <button
+                        key={tab.id}
+                        type="button"
+                        onClick={() => {
+                          setActiveTab(tab.id);
+                          setShowMoreTabs(false);
+                          if (selectedIds.size > 0) setSelectedIds(new Set());
+                        }}
+                        className={cn(
+                          'w-full px-2.5 py-1.5 rounded-lg text-[11px] font-medium transition-all flex items-center justify-between cursor-pointer',
+                          activeTab === tab.id
+                            ? 'bg-accent/10 text-accent font-bold'
+                            : 'text-ink-2 hover:bg-surface-2'
+                        )}
+                      >
+                        <span>{tab.label}</span>
+                        <span className="tabular-nums text-[10px] px-1.5 py-0.2 rounded-full font-bold bg-surface-2 text-ink-3 border border-line/40">
+                          {counts[tab.id]}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
         </div>
       </div>
 

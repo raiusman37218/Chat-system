@@ -2555,21 +2555,21 @@ export function ChatThread({
                 type="button"
                 onClick={handleGenerateAiSuggestion}
                 disabled={aiDrafting}
-                className="h-6 px-1.5 sm:px-2 rounded-md text-[11px] font-semibold text-accent hover:bg-accent/10 transition-colors inline-flex items-center gap-1 cursor-pointer shrink-0 whitespace-nowrap"
+                className="h-6 px-1.5 sm:px-2 rounded-md text-[11px] font-semibold text-accent hover:bg-accent/10 transition-colors inline-flex items-center justify-center gap-1 cursor-pointer shrink-0 whitespace-nowrap"
                 title="Ask AI Copilot to draft a reply"
               >
-                <Sparkles className={cn('w-3 h-3 shrink-0', aiDrafting && 'animate-spin')} />
-                <span className="whitespace-nowrap">{aiDrafting ? 'Drafting…' : 'AI Copilot'}</span>
+                <Sparkles className={cn('w-3.5 h-3.5 shrink-0', aiDrafting && 'animate-spin')} />
+                <span className="hidden sm:inline whitespace-nowrap">{aiDrafting ? 'Drafting…' : 'AI Copilot'}</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => setShowMacros((s) => !s)}
-                className="h-6 px-1.5 sm:px-2 rounded-md text-[11px] font-medium text-ink-3 hover:text-ink hover:bg-surface-3 transition-colors inline-flex items-center gap-1 cursor-pointer shrink-0 whitespace-nowrap"
+                className="h-6 px-1.5 sm:px-2 rounded-md text-[11px] font-medium text-ink-3 hover:text-ink hover:bg-surface-3 transition-colors inline-flex items-center justify-center gap-1 cursor-pointer shrink-0 whitespace-nowrap"
                 title="Saved replies (/)"
               >
-                <Zap className="w-3 h-3 text-amber-500 shrink-0" />
-                <span className="whitespace-nowrap">Replies</span>
+                <Zap className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                <span className="hidden sm:inline whitespace-nowrap">Replies</span>
               </button>
 
               {/* ── Translation Controls (Side Badge & Safe Popover) ── */}
@@ -2579,19 +2579,24 @@ export function ChatThread({
                     type="button"
                     onClick={() => setShowTranslateMenu((prev) => !prev)}
                     className={cn(
-                      'h-6 px-1.5 sm:px-2 rounded-md text-[11px] font-medium transition-all inline-flex items-center gap-1 cursor-pointer shadow-2xs shrink-0 whitespace-nowrap',
+                      'h-6 px-1.5 sm:px-2 rounded-md text-[11px] font-medium transition-all inline-flex items-center justify-center gap-1 cursor-pointer shadow-2xs shrink-0 whitespace-nowrap',
                       autoTranslateEnabled && targetLanguage !== 'en'
                         ? 'bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/30 hover:bg-blue-500/25 font-bold'
                         : 'text-ink-3 hover:text-ink hover:bg-surface-3 border border-transparent'
                     )}
                     title={`Translation settings: Customer receives replies in ${getLanguageInfo(targetLanguage).name}. Click to view or change.`}
                   >
-                    <Globe className={cn('w-3 h-3 shrink-0', autoTranslateEnabled && targetLanguage !== 'en' ? 'text-blue-500' : 'text-ink-3')} />
-                    <span className="truncate max-w-[80px] sm:max-w-[110px] whitespace-nowrap">
+                    <Globe className={cn('w-3.5 h-3.5 shrink-0', autoTranslateEnabled && targetLanguage !== 'en' ? 'text-blue-500' : 'text-ink-3')} />
+                    <span className="hidden sm:inline whitespace-nowrap truncate max-w-[80px] lg:max-w-[110px]">
                       {autoTranslateEnabled && targetLanguage !== 'en'
                         ? `${getLanguageInfo(targetLanguage).flag || ''} ${getLanguageInfo(targetLanguage).name}`
                         : 'Translate'}
                     </span>
+                    {autoTranslateEnabled && targetLanguage !== 'en' && (
+                      <span className="sm:hidden text-[9px] font-bold uppercase ml-0.5">
+                        {targetLanguage.slice(0, 2)}
+                      </span>
+                    )}
                     <ChevronDown className="w-2.5 h-2.5 opacity-60 shrink-0" />
                   </button>
 
