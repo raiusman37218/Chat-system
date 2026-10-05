@@ -1850,12 +1850,12 @@ export function ChatThread({
             muted={!visitor?.name && !visitor?.email}
             className="shrink-0"
           />
-          <div className="flex items-center gap-1.5 min-w-0 overflow-hidden truncate">
+          <div className="flex items-center gap-1.5 min-w-0 flex-1 overflow-hidden">
             <h2
-              className="text-[13.5px] sm:text-[14px] font-bold tracking-tight text-ink shrink-0 truncate"
+              className="text-[13.5px] sm:text-[14px] font-bold tracking-tight text-ink shrink-0 whitespace-nowrap"
               title={displayName}
             >
-              {truncatedDisplayName}
+              {displayName}
             </h2>
             {conversation.channel && conversation.channel !== 'web' && (
               <ChannelBadge
@@ -1866,20 +1866,20 @@ export function ChatThread({
             )}
 
             {/* Plain text status & location info (No fake button pills) */}
-            <span className="text-[11.5px] text-ink-3 truncate hidden sm:inline-flex items-center gap-1 ml-1">
+            <span className="text-[11.5px] text-ink-3 truncate hidden sm:inline-flex items-center gap-1 ml-1 min-w-0 shrink">
               <span>·</span>
               {isOnline ? (
-                <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-medium">
+                <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-medium shrink-0">
                   <span className="live-dot" />
                   Active now
                 </span>
               ) : (
-                <span>Active {formatTimeAgo(visitor?.last_seen || conversation.updated_at)}</span>
+                <span className="shrink-0">Active {formatTimeAgo(visitor?.last_seen || conversation.updated_at)}</span>
               )}
               {visitorPlace.label && (
                 <>
                   <span>·</span>
-                  <span className="inline-flex items-center gap-1 text-ink-3" title={visitorPlace.label}>
+                  <span className="inline-flex items-center gap-1 text-ink-3 min-w-0 truncate" title={visitorPlace.label}>
                     <CountryFlag
                       flag={visitorPlace.flag}
                       countryCode={visitorPlace.countryCode}
@@ -1906,34 +1906,6 @@ export function ChatThread({
 
         {/* Actions strip in header: keep in one row without shifting or wrapping */}
         <div className="flex items-center gap-1 sm:gap-1.5 shrink-0 ml-auto flex-nowrap">
-          <label
-            className="btn btn-sm btn-secondary relative gap-1 shrink-0 px-2 sm:px-2.5"
-            title={
-              languageOverride
-                ? `Language set manually: ${getLanguageInfo(detectedVisitorLang).name}`
-                : `Detected language: ${getLanguageInfo(detectedVisitorLang).name} — click to correct`
-            }
-          >
-            <Globe className="w-3.5 h-3.5 text-ink-3" />
-            <span className="text-[11px] font-semibold uppercase">{detectedVisitorLang}</span>
-            {languageOverride && <span className="w-1.5 h-1.5 rounded-full bg-accent" aria-hidden />}
-            <select
-              value={languageOverride || 'auto'}
-              onChange={(e) => handleLanguageOverride(e.target.value)}
-              aria-label="Conversation language"
-              className="absolute inset-0 opacity-0 cursor-pointer"
-            >
-              <option value="auto">Auto-detect</option>
-              {Object.values(SUPPORTED_LANGUAGES)
-                .sort((a, b) => a.name.localeCompare(b.name))
-                .map((l) => (
-                  <option key={l.code} value={l.code}>
-                    {l.name}
-                    {l.nativeName && l.nativeName !== l.name ? ` (${l.nativeName})` : ''}
-                  </option>
-                ))}
-            </select>
-          </label>
           <Menu<ConversationStatus>
             value={conversation.status}
             options={STATUS_OPTIONS}
@@ -2068,6 +2040,37 @@ export function ChatThread({
 
       {/* ── Compact Metadata Toolbar: single line ── */}
       <div className="shrink-0 px-3 sm:px-4 py-1 flex items-center gap-1.5 border-b border-line bg-surface-2/60 min-h-[32px] overflow-x-auto no-scrollbar">
+        {/* Language selector chip moved from header to metadata row */}
+        <label
+          className="h-6 px-2 rounded-md bg-surface border border-line hover:border-line-3 text-[11px] font-semibold text-ink flex items-center gap-1 shrink-0 cursor-pointer relative shadow-2xs transition-colors"
+          title={
+            languageOverride
+              ? `Language set manually: ${getLanguageInfo(detectedVisitorLang).name}`
+              : `Detected language: ${getLanguageInfo(detectedVisitorLang).name} — click to correct`
+          }
+        >
+          <Globe className="w-3 h-3 text-ink-3 shrink-0" />
+          <span className="uppercase text-[10.5px]">{detectedVisitorLang}</span>
+          {languageOverride && <span className="w-1.5 h-1.5 rounded-full bg-accent shrink-0" aria-hidden />}
+          <ChevronDown className="w-2.5 h-2.5 text-ink-3 shrink-0 opacity-60" />
+          <select
+            value={languageOverride || 'auto'}
+            onChange={(e) => handleLanguageOverride(e.target.value)}
+            aria-label="Conversation language"
+            className="absolute inset-0 opacity-0 cursor-pointer"
+          >
+            <option value="auto">Auto-detect ({detectedVisitorLang.toUpperCase()})</option>
+            {Object.values(SUPPORTED_LANGUAGES)
+              .sort((a, b) => a.name.localeCompare(b.name))
+              .map((l) => (
+                <option key={l.code} value={l.code}>
+                  {l.name}
+                  {l.nativeName && l.nativeName !== l.name ? ` (${l.nativeName})` : ''}
+                </option>
+              ))}
+          </select>
+        </label>
+
         <Menu<ConversationPriority>
           value={currentPriority}
           options={PRIORITY_OPTIONS}
@@ -2161,10 +2164,10 @@ export function ChatThread({
         <div ref={tagPickerRef} className="relative shrink-0">
           <button
             onClick={() => setShowTagPicker((s) => !s)}
-            className="inline-flex items-center gap-1 h-6 px-2 rounded-md border border-dashed border-line-2 text-[10.5px] font-medium text-ink-3 hover:text-ink hover:border-line-3 transition-colors shrink-0"
+            className="inline-flex items-center gap-1 h-6 px-2 rounded-md border border-dashed border-line-2 text-[10.5px] font-medium text-ink-3 hover:text-ink hover:border-line-3 transition-colors shrink-0 whitespace-nowrap"
           >
-            <Plus className="w-3 h-3" />
-            Add Tag
+            <Plus className="w-3 h-3 shrink-0" />
+            <span className="whitespace-nowrap">Tag</span>
           </button>
 
           {showTagPicker &&
@@ -2531,7 +2534,7 @@ export function ChatThread({
                     title={`Translation settings: Customer receives replies in ${getLanguageInfo(targetLanguage).name}. Click to view or change.`}
                   >
                     <Globe className={cn('w-3.5 h-3.5 shrink-0', autoTranslateEnabled && targetLanguage !== 'en' ? 'text-blue-500' : 'text-ink-3')} />
-                    <span className="hidden sm:inline whitespace-nowrap truncate max-w-[80px] lg:max-w-[110px]">
+                    <span className="hidden sm:inline whitespace-nowrap">
                       {autoTranslateEnabled && targetLanguage !== 'en'
                         ? `${getLanguageInfo(targetLanguage).flag || ''} ${getLanguageInfo(targetLanguage).name}`
                         : 'Translate'}

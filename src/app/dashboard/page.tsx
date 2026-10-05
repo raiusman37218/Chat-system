@@ -1541,6 +1541,7 @@ export default function DashboardPage() {
                 <VisitorDetailsSidebar
                   visitor={activeConversation.visitor}
                   conversation={activeConversation}
+                  workspace={currentWorkspace}
                   currentAgent={currentAgent}
                   onSelectConversation={setSelectedConversationId}
                   onUpdateTags={handleUpdateTags}

@@ -15,6 +15,7 @@ import {
   Visitor,
   Conversation,
   Agent,
+  Workspace,
 } from '@/types/database';
 import { formatTimeAgo, cn } from '@/lib/utils';
 import { Avatar } from '@/components/ui/Avatar';
@@ -37,6 +38,7 @@ import { createClient } from '@/lib/supabase/client';
 interface VisitorDetailsSidebarProps {
   visitor: Visitor | null | undefined;
   conversation: Conversation;
+  workspace?: Workspace | null;
   currentAgent?: Agent | null;
   onSelectConversation?: (id: string) => void;
   onUpdateTags?: (tags: string[]) => Promise<void>;
@@ -101,6 +103,7 @@ function Section({
 export function VisitorDetailsSidebar({
   visitor,
   conversation,
+  workspace,
   currentAgent,
   onSelectConversation,
   onUpdateTags,
@@ -225,12 +228,52 @@ export function VisitorDetailsSidebar({
     ? (Date.now() - new Date(liveVisitor.last_seen).getTime()) / 1000 < 90
     : false;
 
+  const visitorId = liveVisitor.id || conversation.visitor_id || '';
   const displayName =
     liveVisitor.name ||
-    (liveVisitor.email ? liveVisitor.email.split('@')[0] : 'Anonymous Visitor');
+    (liveVisitor.email
+      ? liveVisitor.email.split('@')[0]
+      : conversation.channel_user_id
+      ? `${conversation.channel?.toUpperCase() || 'CHAT'}: ${conversation.channel_user_id}`
+      : visitorId
+      ? `Visitor ${visitorId.slice(0, 6)}`
+      : 'Visitor');
 
-  const liveUrl =
-    liveVisitor.current_page_url || liveVisitor.current_url || '/';
+  // Resolve clean workspace domain and formatted currently viewing URL
+  const rawWebsiteUrl = workspace?.website_url || '';
+  const cleanSiteDomain = rawWebsiteUrl
+    ? rawWebsiteUrl.replace(/^https?:\/\//, '').replace(/\/+$/, '')
+    : '';
+
+  const rawLiveUrl = liveVisitor.current_page_url || liveVisitor.current_url || '/';
+
+  let formattedUrl = rawLiveUrl;
+  let targetHref = rawLiveUrl;
+  let displayPageTitle = liveVisitor.current_page_title || '';
+
+  if (rawLiveUrl === '/' || !rawLiveUrl.trim()) {
+    if (cleanSiteDomain) {
+      formattedUrl = `${cleanSiteDomain}/ (Home)`;
+      targetHref = `https://${cleanSiteDomain}`;
+    } else {
+      formattedUrl = 'Homepage (/)';
+      targetHref = '#';
+    }
+    if (!displayPageTitle) {
+      displayPageTitle = 'Home';
+    }
+  } else if (rawLiveUrl.startsWith('/')) {
+    if (cleanSiteDomain) {
+      formattedUrl = `${cleanSiteDomain}${rawLiveUrl}`;
+      targetHref = `https://${cleanSiteDomain}${rawLiveUrl}`;
+    } else {
+      formattedUrl = rawLiveUrl;
+      targetHref = rawLiveUrl;
+    }
+  } else {
+    targetHref = rawLiveUrl.startsWith('http') ? rawLiveUrl : `https://${rawLiveUrl}`;
+    formattedUrl = rawLiveUrl.replace(/^https?:\/\//, '');
+  }
 
   const [copiedEmail, setCopiedEmail] = useState(false);
 
@@ -256,7 +299,7 @@ export function VisitorDetailsSidebar({
 
         <Avatar
           name={displayName}
-          seed={liveVisitor.id}
+          seed={visitorId}
           size="lg"
           muted={!liveVisitor.name && !liveVisitor.email}
           online={isOnline}
@@ -266,7 +309,7 @@ export function VisitorDetailsSidebar({
           {displayName}
         </h2>
 
-        {liveVisitor.email ? (
+        {liveVisitor.email && (
           <div className="mt-1 flex items-center gap-1.5 max-w-full">
             <a
               href={`mailto:${liveVisitor.email}`}
@@ -283,8 +326,6 @@ export function VisitorDetailsSidebar({
               {copiedEmail ? 'Copied' : 'Copy'}
             </button>
           </div>
-        ) : (
-          <p className="mt-1 text-[11.5px] text-ink-3">Anonymous visitor</p>
         )}
 
         <div className="mt-2 flex items-center gap-1.5 text-[12px] text-ink-3">
@@ -304,23 +345,24 @@ export function VisitorDetailsSidebar({
         <Section title="Currently Viewing">
           <div className="px-3 py-2.5">
             <a
-              href={liveUrl}
+              href={targetHref}
               target="_blank"
               rel="noreferrer"
-              className="flex items-start gap-2 group"
+              className="flex items-start gap-2 group cursor-pointer"
+              title={`Visit ${formattedUrl}`}
             >
               <Globe className="w-3.5 h-3.5 text-accent mt-0.5 shrink-0" />
               <span className="min-w-0 flex-1">
                 <span className="block font-mono text-[11px] leading-relaxed text-accent break-all group-hover:underline">
-                  {liveUrl}
+                  {formattedUrl}
                 </span>
-                {liveVisitor.current_page_title && (
+                {displayPageTitle && (
                   <span className="block text-[10.5px] text-ink-3 truncate mt-0.5">
-                    {liveVisitor.current_page_title}
+                    {displayPageTitle}
                   </span>
                 )}
               </span>
-              <ExternalLink className="w-3 h-3 text-ink-3 mt-0.5 shrink-0" />
+              <ExternalLink className="w-3 h-3 text-ink-3 mt-0.5 shrink-0 group-hover:text-accent transition-colors" />
             </a>
           </div>
         </Section>

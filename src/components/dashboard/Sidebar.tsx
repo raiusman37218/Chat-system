@@ -148,7 +148,7 @@ export function Sidebar({
                 )}
               </div>
               <div className="text-[11px] text-ink-3 truncate flex items-center gap-1 mt-0.5">
-                <span className="truncate">{workspace?.website_url ? workspace.website_url.replace(/^https?:\/\//, '') : 'Workspace Active'}</span>
+                <span className="truncate">{workspace?.website_url ? workspace.website_url.replace(/^https?:\/\//, '').replace(/\/+$/, '') : 'Workspace Active'}</span>
               </div>
             </div>
           </div>
