@@ -39,6 +39,7 @@ import {
   type AdminTab,
 } from '@/components/admin/AdminSettingsPanel';
 import { createClient } from '@/lib/supabase/client';
+import { ThemeToggle } from '@/components/ui/ThemeToggle';
 
 export type SectionId =
   | 'widget'
@@ -741,6 +742,9 @@ export function SettingsHub({
             <span className="hidden sm:inline">Test Live Widget</span>
             <span className="sm:hidden">Test</span>
           </button>
+
+          {/* Theme switcher inside Settings */}
+          <ThemeToggle className="shrink-0" />
         </div>
       </header>
 

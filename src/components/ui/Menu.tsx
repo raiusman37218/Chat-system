@@ -28,6 +28,7 @@ export function Menu<T extends string>({
   className,
   menuClassName,
   label,
+  footer,
 }: {
   value: T;
   options: MenuOption<T>[];
@@ -39,6 +40,7 @@ export function Menu<T extends string>({
   className?: string;
   menuClassName?: string;
   label?: string;
+  footer?: React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -281,6 +283,7 @@ export function Menu<T extends string>({
                 </button>
               );
             })}
+            {footer}
           </div>,
           document.body
         )}

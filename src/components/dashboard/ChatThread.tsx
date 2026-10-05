@@ -120,10 +120,10 @@ const PRIORITY_OPTIONS: { value: ConversationPriority; label: string; dot: strin
   { value: 'urgent', label: 'Urgent', dot: 'var(--ds-danger)' },
 ];
 
-const STATUS_OPTIONS: { value: ConversationStatus; label: string; dot: string }[] = [
-  { value: 'open', label: 'Open', dot: 'var(--ds-success)' },
-  { value: 'pending', label: 'Pending', dot: 'var(--ds-warn)' },
-  { value: 'closed', label: 'Resolved', dot: 'var(--ds-line-3)' },
+const STATUS_OPTIONS: { value: ConversationStatus; label: string; dot: string; description?: string }[] = [
+  { value: 'open', label: 'Open', dot: 'var(--ds-success)', description: 'Needs agent response' },
+  { value: 'pending', label: 'Waiting', dot: 'var(--ds-warn)', description: 'Waiting on customer reply' },
+  { value: 'closed', label: 'Resolved', dot: 'var(--ds-line-3)', description: 'Ticket closed & resolved' },
 ];
 
 /** Groups consecutive messages into calendar days for the date separators. */
@@ -300,6 +300,10 @@ export function ChatThread({
     previewUrl: string;
   } | null>(null);
   const [previewImageModalUrl, setPreviewImageModalUrl] = useState<string | null>(null);
+  const [sendOnEnter, setSendOnEnter] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return true;
+    return localStorage.getItem('zen_send_on_enter') !== 'false';
+  });
 
   const isImageAttachment = (url: string | null | undefined): boolean => {
     if (!url) return false;
@@ -1089,18 +1093,26 @@ export function ChatThread({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    // Cmd+Enter or Ctrl+Enter sends message or note
-    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
-      e.preventDefault();
-      handleSend();
-      return;
-    }
-
-    // Enter without Shift sends message if popups are not active
-    if (e.key === 'Enter' && !e.shiftKey && !showMacros && !showMentions) {
-      e.preventDefault();
-      handleSend();
-      return;
+    // If sendOnEnter is false, only Cmd+Enter / Ctrl+Enter sends
+    if (!sendOnEnter) {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+        e.preventDefault();
+        handleSend();
+        return;
+      }
+    } else {
+      // Default: Enter without Shift sends message if popups are not active
+      if (e.key === 'Enter' && !e.shiftKey && !showMacros && !showMentions) {
+        e.preventDefault();
+        handleSend();
+        return;
+      }
+      // Also allow Cmd/Ctrl+Enter as fallback
+      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+        e.preventDefault();
+        handleSend();
+        return;
+      }
     }
 
     // Escape closes popups or triggers onBack
@@ -1931,16 +1943,16 @@ export function ChatThread({
             trigger={({ active, open }) => (
               <span
                 className={cn(
-                  'btn btn-sm btn-secondary gap-1.5 shrink-0 px-2 sm:px-2.5',
+                  'btn btn-sm btn-secondary gap-1.5 shrink-0 px-2 sm:px-2.5 cursor-pointer',
                   open && 'bg-surface-3'
                 )}
-                title={`Status: ${active?.label ?? ''}`}
+                title={`Status: ${active?.label ?? ''} (Click to change status)`}
               >
                 <span
                   className="w-1.5 h-1.5 rounded-full shrink-0"
                   style={{ background: active?.dot }}
                 />
-                <span className="hidden @2xl/thread:inline">{active?.label}</span>
+                <span className="text-[12px] font-medium text-ink">{active?.label}</span>
                 <ChevronDown
                   className={cn(
                     'w-3.5 h-3.5 text-ink-3 transition-transform duration-150',
@@ -1954,19 +1966,22 @@ export function ChatThread({
           {conversation.status !== 'closed' ? (
             <button
               onClick={() => onUpdateStatus('closed')}
-              className="btn btn-sm btn-primary shadow-xs shrink-0 px-2 sm:px-2.5"
+              className="btn btn-sm btn-primary shadow-xs shrink-0 px-2.5 flex items-center gap-1.5 cursor-pointer"
               title="Close and resolve this conversation"
+              aria-label="Resolve conversation"
             >
               <CheckCircle2 className="w-3.5 h-3.5" />
-              <span className="hidden @2xl/thread:inline">Resolve</span>
+              <span className="text-[12px] font-semibold">Resolve</span>
             </button>
           ) : (
             <button
               onClick={() => onUpdateStatus('open')}
-              className="btn btn-sm btn-secondary shadow-xs shrink-0 px-2 sm:px-2.5"
+              className="btn btn-sm btn-secondary shadow-xs shrink-0 px-2.5 flex items-center gap-1.5 cursor-pointer"
+              title="Reopen this conversation"
+              aria-label="Reopen conversation"
             >
               <RotateCcw className="w-3.5 h-3.5" />
-              <span className="hidden @2xl/thread:inline">Reopen</span>
+              <span className="text-[12px] font-semibold">Reopen</span>
             </button>
           )}
 
@@ -2844,9 +2859,33 @@ export function ChatThread({
           {/* Composer Footer Action Bar */}
           <div className="px-3 py-2 bg-surface-2/40 border-t border-line/40 flex items-center justify-between text-[11px] text-ink-3 rounded-b-2xl">
             <div className="flex items-center gap-1.5 flex-wrap">
-              <span>Press</span>
-              <span className="kbd text-[9.5px]">Ctrl ↵</span>
-              <span>to send</span>
+              <button
+                type="button"
+                onClick={() => {
+                  setSendOnEnter((prev) => {
+                    const next = !prev;
+                    try {
+                      localStorage.setItem('zen_send_on_enter', String(next));
+                    } catch {}
+                    return next;
+                  });
+                }}
+                className="inline-flex items-center gap-1 text-[11px] text-ink-3 hover:text-ink transition-colors cursor-pointer group"
+                title={
+                  sendOnEnter
+                    ? "Pressing Enter sends. Click to switch to Ctrl+Enter."
+                    : "Pressing Ctrl+Enter sends. Click to switch to Enter."
+                }
+              >
+                <span>Press</span>
+                <span className="kbd text-[9.5px] group-hover:border-accent group-hover:text-accent transition-colors font-semibold">
+                  {sendOnEnter ? '↵' : 'Ctrl ↵'}
+                </span>
+                <span>to send</span>
+                <span className="text-[10px] text-ink-3/70">
+                  {sendOnEnter ? '(Shift+↵ newline)' : '(↵ newline)'}
+                </span>
+              </button>
               <span className="text-ink-3/40">·</span>
               <span className="kbd text-[9.5px]">/</span>
               <span>macros</span>

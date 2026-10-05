@@ -19,6 +19,8 @@ import {
   Square,
   Users,
   ChevronDown,
+  Clock,
+  AlertTriangle,
 } from 'lucide-react';
 import {
   Conversation,
@@ -129,6 +131,57 @@ function isWaitingOnAgent(conv: Conversation): boolean {
   return false;
 }
 
+export interface SlaInfo {
+  isBreached: boolean;
+  isWarning: boolean;
+  waitMinutes: number;
+  waitLabel: string;
+}
+
+function getSlaInfo(conv: Conversation): SlaInfo | null {
+  if (conv.status === 'closed' || conv.status === 'snoozed') return null;
+  if (!isWaitingOnAgent(conv)) return null;
+
+  const activityTime = getLastActivityTime(conv);
+  if (!activityTime) return null;
+
+  const waitMs = Date.now() - activityTime;
+  const waitMinutes = Math.max(1, Math.floor(waitMs / (1000 * 60)));
+
+  // SLA Thresholds by priority:
+  // urgent: 15 min limit
+  // high: 30 min limit
+  // normal: 60 min limit
+  // low: 120 min limit
+  const limitMinutes =
+    conv.priority === 'urgent'
+      ? 15
+      : conv.priority === 'high'
+      ? 30
+      : conv.priority === 'low'
+      ? 120
+      : 60;
+
+  const isBreached = waitMinutes >= limitMinutes;
+  const isWarning = !isBreached && waitMinutes >= Math.floor(limitMinutes * 0.7);
+
+  let waitLabel = '';
+  if (waitMinutes < 60) {
+    waitLabel = `${waitMinutes}m`;
+  } else {
+    const h = Math.floor(waitMinutes / 60);
+    const m = waitMinutes % 60;
+    waitLabel = m > 0 ? `${h}h ${m}m` : `${h}h`;
+  }
+
+  return {
+    isBreached,
+    isWarning,
+    waitMinutes,
+    waitLabel,
+  };
+}
+
 function isVisitorOnline(lastSeen?: string, isOnlineFlag?: boolean): boolean {
   if (isOnlineFlag === false) return false;
   if (!lastSeen) return false;
@@ -166,6 +219,7 @@ const ConversationItem = memo(function ConversationItem({
   const fromAi = conv.last_message?.sender_type === 'ai';
   const hasUnread = (conv.unread_count || 0) > 0;
   const isWaiting = isWaitingOnAgent(conv);
+  const sla = useMemo(() => getSlaInfo(conv), [conv]);
   const isUrgent = conv.priority === 'urgent';
   const isHigh = conv.priority === 'high';
   const isResolved = conv.status === 'closed';
@@ -317,6 +371,25 @@ const ConversationItem = memo(function ConversationItem({
             {conv.channel && conv.channel !== 'web' && (
               <ChannelBadge channel={conv.channel} />
             )}
+
+            {/* SLA Overdue / Warning Indicator Badge */}
+            {sla?.isBreached ? (
+              <span
+                className="inline-flex items-center gap-1 px-1.5 py-0 text-[8.5px] font-extrabold rounded bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30 animate-pulse shrink-0"
+                title={`SLA Breached! Customer waiting ${sla.waitLabel} without agent reply`}
+              >
+                <Clock className="w-2.5 h-2.5" />
+                <span>SLA: {sla.waitLabel} overdue</span>
+              </span>
+            ) : sla?.isWarning ? (
+              <span
+                className="inline-flex items-center gap-1 px-1 py-0 text-[8.5px] font-semibold rounded bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 shrink-0"
+                title={`Approaching SLA limit: customer waiting ${sla.waitLabel}`}
+              >
+                <Clock className="w-2.5 h-2.5" />
+                <span>Wait: {sla.waitLabel}</span>
+              </span>
+            ) : null}
 
             {/* Status / Priority / Tags directly in name line */}
             {isUrgent ? (
@@ -594,6 +667,20 @@ export function ConversationList({
     });
 
     return list.sort((a, b) => {
+      // 1. PIN SLA Breached conversations to the very top!
+      const slaA = getSlaInfo(a);
+      const slaB = getSlaInfo(b);
+      const isBreachedA = slaA?.isBreached ? 1 : 0;
+      const isBreachedB = slaB?.isBreached ? 1 : 0;
+
+      if (isBreachedA !== isBreachedB) {
+        return isBreachedB - isBreachedA;
+      }
+      if (isBreachedA && isBreachedB) {
+        // Longest waiting customer gets highest priority on top
+        return (slaB?.waitMinutes || 0) - (slaA?.waitMinutes || 0);
+      }
+
       const timeA = getLastActivityTime(a);
       const timeB = getLastActivityTime(b);
 

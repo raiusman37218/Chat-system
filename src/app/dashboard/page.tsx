@@ -1019,13 +1019,13 @@ export default function DashboardPage() {
       }
     }
 
-    const isFirstAgentReply = !isInternal && target && !target.assigned_agent_id;
+    const shouldAutoAssign = !isInternal && target && (!target.agent_id && !target.assigned_agent_id);
 
-    if (isFirstAgentReply) {
+    if (shouldAutoAssign) {
       setConversations((prev) =>
         prev.map((c) =>
           c.id === targetId
-            ? { ...c, assigned_agent_id: currentAgent.id, agent: currentAgent }
+            ? { ...c, agent_id: currentAgent.id, assigned_agent_id: currentAgent.id, agent: currentAgent }
             : c
         )
       );
@@ -1063,16 +1063,19 @@ export default function DashboardPage() {
 
     if (!isInternal) {
       const now = new Date().toISOString();
+      const newStatus = target?.status === 'closed' ? 'closed' : 'pending';
+
       await supabase
         .from('conversations')
         .update({
           updated_at: now,
+          status: newStatus,
           ai_mode: 'disabled',
           channel_metadata: {
             ...((target?.channel_metadata as Record<string, any>) || {}),
             last_human_reply_at: now,
           },
-          ...(isFirstAgentReply ? { assigned_agent_id: currentAgent.id } : {}),
+          ...(shouldAutoAssign ? { agent_id: currentAgent.id, assigned_agent_id: currentAgent.id } : {}),
         })
         .eq('id', targetId);
 
@@ -1081,13 +1084,14 @@ export default function DashboardPage() {
           c.id === targetId
             ? {
                 ...c,
+                status: newStatus,
                 ai_mode: 'disabled',
                 last_message: (insertedMsg as Message) || c.last_message,
                 channel_metadata: {
                   ...((c.channel_metadata as Record<string, any>) || {}),
                   last_human_reply_at: now,
                 },
-                ...(isFirstAgentReply ? { assigned_agent_id: currentAgent.id } : {}),
+                ...(shouldAutoAssign ? { agent_id: currentAgent.id, assigned_agent_id: currentAgent.id, agent: currentAgent } : {}),
               }
             : c
         )
@@ -1097,7 +1101,7 @@ export default function DashboardPage() {
         .from('conversations')
         .update({
           updated_at: new Date().toISOString(),
-          ...(isFirstAgentReply ? { assigned_agent_id: currentAgent.id } : {}),
+          ...(shouldAutoAssign ? { agent_id: currentAgent.id, assigned_agent_id: currentAgent.id } : {}),
         })
         .eq('id', targetId);
 
@@ -1107,7 +1111,7 @@ export default function DashboardPage() {
             ? {
                 ...c,
                 last_message: (insertedMsg as Message) || c.last_message,
-                ...(isFirstAgentReply ? { assigned_agent_id: currentAgent.id } : {}),
+                ...(shouldAutoAssign ? { agent_id: currentAgent.id, assigned_agent_id: currentAgent.id, agent: currentAgent } : {}),
               }
             : c
         )

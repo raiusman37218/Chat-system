@@ -196,116 +196,138 @@ export function Sidebar({
 
       {/* Footer: Quick controls + Agent Profile */}
       <div className="p-3 border-t border-line/80 space-y-2.5 bg-surface-2/40">
-        <div className="flex items-center justify-between px-1 gap-1.5 flex-wrap">
-          <div className="flex items-center gap-1 shrink-0">
-            <button
-              onClick={toggleSound}
-              title={soundActive ? 'Sound notifications: ON' : 'Sound notifications: MUTED'}
-              aria-label={soundActive ? 'Mute audio' : 'Unmute audio'}
-              className={cn(
-                'w-7 h-7 rounded-lg flex items-center justify-center transition-colors',
-                soundActive
-                  ? 'text-ink-2 hover:text-ink hover:bg-surface-3'
-                  : 'text-ink-3 hover:text-ink hover:bg-surface-3 opacity-60'
-              )}
-            >
-              {soundActive ? (
-                <Volume2 className="w-3.5 h-3.5" />
-              ) : (
-                <VolumeX className="w-3.5 h-3.5" />
-              )}
-            </button>
-            <button
-              onClick={enableNotifications}
-              title="Browser notifications"
-              aria-label="Browser notifications"
-              className="w-7 h-7 rounded-lg flex items-center justify-center text-ink-3 hover:text-ink hover:bg-surface-3 transition-colors"
-            >
-              <Bell className="w-3.5 h-3.5" />
-            </button>
-            {onOpenShortcuts && (
-              <button
-                onClick={onOpenShortcuts}
-                title="Keyboard Shortcuts (?)"
-                aria-label="Keyboard Shortcuts"
-                className="w-7 h-7 rounded-lg flex items-center justify-center text-ink-3 hover:text-ink hover:bg-surface-3 transition-colors text-[11px] font-mono font-bold"
-              >
-                ?
-              </button>
+        {/* 4 Bottom Icon Buttons with Clear Tooltips */}
+        <div className="flex items-center justify-between px-1.5 py-0.5 rounded-lg bg-surface-2/60 border border-line/50">
+          <button
+            onClick={toggleSound}
+            title={soundActive ? 'Sound Alerts: Enabled (click to mute)' : 'Sound Alerts: Muted (click to unmute)'}
+            aria-label={soundActive ? 'Mute audio notifications' : 'Unmute audio notifications'}
+            className={cn(
+              'w-7 h-7 rounded-md flex items-center justify-center transition-colors cursor-pointer',
+              soundActive
+                ? 'text-accent hover:bg-accent/10'
+                : 'text-ink-3 hover:text-ink hover:bg-surface-3 opacity-60'
             )}
-            {onOpenMobileInstall && (
-              <button
-                onClick={onOpenMobileInstall}
-                title="Mobile App / Home Screen Shortcut"
-                aria-label="Mobile App / Home Screen Shortcut"
-                className="w-7 h-7 rounded-lg flex items-center justify-center text-ink-3 hover:text-accent hover:bg-surface-3 transition-colors"
-              >
-                <Smartphone className="w-3.5 h-3.5" />
-              </button>
+          >
+            {soundActive ? (
+              <Volume2 className="w-3.5 h-3.5" />
+            ) : (
+              <VolumeX className="w-3.5 h-3.5" />
             )}
-          </div>
-          <ThemeToggle className="shrink-0" />
+          </button>
+          <button
+            onClick={enableNotifications}
+            title="Browser Push Notifications: Click to grant permission"
+            aria-label="Browser push notifications"
+            className="w-7 h-7 rounded-md flex items-center justify-center text-ink-3 hover:text-accent hover:bg-accent/10 transition-colors cursor-pointer"
+          >
+            <Bell className="w-3.5 h-3.5" />
+          </button>
+          {onOpenShortcuts && (
+            <button
+              onClick={onOpenShortcuts}
+              title="Keyboard Shortcuts Cheat Sheet (Press ?)"
+              aria-label="Keyboard Shortcuts"
+              className="w-7 h-7 rounded-md flex items-center justify-center text-ink-3 hover:text-accent hover:bg-accent/10 transition-colors text-[12px] font-mono font-bold cursor-pointer"
+            >
+              ?
+            </button>
+          )}
+          {onOpenMobileInstall && (
+            <button
+              onClick={onOpenMobileInstall}
+              title="Install Mobile PWA / Add to Home Screen"
+              aria-label="Install Mobile PWA / Add to Home Screen"
+              className="w-7 h-7 rounded-md flex items-center justify-center text-ink-3 hover:text-accent hover:bg-accent/10 transition-colors cursor-pointer"
+            >
+              <Smartphone className="w-3.5 h-3.5" />
+            </button>
+          )}
         </div>
 
-        {/* Agent Profile & Status Card */}
-        <Menu<AgentStatus | 'logout'>
-          value={(currentAgent?.status || 'online') as AgentStatus}
-          side="top"
-          align="start"
-          label="Agent status"
-          menuClassName="left-0 right-0 min-w-0"
-          options={[
-            { value: 'online', label: 'Online', dot: STATUS_TINT.online, description: 'Receiving live chats' },
-            { value: 'away', label: 'Away', dot: STATUS_TINT.away, description: 'Paused assignments' },
-            { value: 'offline', label: 'Offline', dot: STATUS_TINT.offline, description: 'Hidden from visitors' },
-            { value: 'logout', label: 'Log out', danger: true },
-          ]}
-          onChange={(v) => {
-            if (v === 'logout') onLogout();
-            else onUpdateAgentStatus(v as AgentStatus);
-          }}
-          trigger={({ open }) => (
-            <span
-              className={cn(
-                'flex items-center gap-2.5 w-full p-2 rounded-xl border transition-all cursor-pointer shadow-xs',
-                open
-                  ? 'bg-surface border-line-2 ring-2 ring-accent/15'
-                  : 'bg-surface border-line hover:border-line-2 hover:bg-surface-2/60'
-              )}
-            >
-              <Avatar
-                name={currentAgent?.name || 'A'}
-                seed={currentAgent?.id || 'agent'}
-                size="sm"
-                online={currentAgent?.status === 'online'}
-                className="shrink-0"
-              />
-              <span className="min-w-0 flex-1 text-left">
-                <span className="block text-[12.5px] font-bold text-ink truncate leading-tight">
-                  {currentAgent?.name || 'Agent'}
-                </span>
-                <span className="flex items-center gap-1.5 text-[10.5px] text-ink-3 capitalize mt-0.5">
-                  <span
-                    className="w-1.5 h-1.5 rounded-full shrink-0"
-                    style={{
-                      background: STATUS_TINT[currentAgent?.status || 'online'],
-                    }}
-                  />
-                  <span>{currentAgent?.status || 'online'}</span>
-                  {currentAgent?.role && (
-                    <>
-                      <span className="text-ink-3/40">·</span>
-                      <span className="text-[10px] font-medium uppercase text-ink-3">
-                        {currentAgent.role}
-                      </span>
-                    </>
+        {/* Agent Profile & Status Card (Agent's own name & role, with Theme toggle in popover) */}
+        {(() => {
+          const agentDisplayName = (() => {
+            if (currentAgent?.name && currentAgent.name !== workspace?.name) {
+              return currentAgent.name;
+            }
+            if (currentAgent?.email) {
+              const namePart = currentAgent.email.split('@')[0];
+              return namePart.charAt(0).toUpperCase() + namePart.slice(1);
+            }
+            return 'Support Agent';
+          })();
+
+          const agentRoleLabel = (() => {
+            if (currentAgent?.role === 'owner') return 'Owner';
+            if (currentAgent?.role === 'admin') return 'Admin';
+            return 'Support Agent';
+          })();
+
+          return (
+            <Menu<AgentStatus | 'logout'>
+              value={(currentAgent?.status || 'online') as AgentStatus}
+              side="top"
+              align="start"
+              label="Agent status"
+              menuClassName="left-0 right-0 min-w-0"
+              options={[
+                { value: 'online', label: 'Online', dot: STATUS_TINT.online, description: 'Receiving live chats' },
+                { value: 'away', label: 'Away', dot: STATUS_TINT.away, description: 'Paused assignments' },
+                { value: 'offline', label: 'Offline', dot: STATUS_TINT.offline, description: 'Hidden from visitors' },
+                { value: 'logout', label: 'Log out', danger: true },
+              ]}
+              footer={
+                <div className="pt-2 mt-1.5 border-t border-line px-2 pb-1 flex items-center justify-between">
+                  <span className="text-[11.5px] font-medium text-ink-3">Appearance</span>
+                  <ThemeToggle className="scale-90 origin-right" />
+                </div>
+              }
+              onChange={(v) => {
+                if (v === 'logout') onLogout();
+                else onUpdateAgentStatus(v as AgentStatus);
+              }}
+              trigger={({ open }) => (
+                <span
+                  className={cn(
+                    'flex items-center gap-2.5 w-full p-2 rounded-xl border transition-all cursor-pointer shadow-xs',
+                    open
+                      ? 'bg-surface border-line-2 ring-2 ring-accent/15'
+                      : 'bg-surface border-line hover:border-line-2 hover:bg-surface-2/60'
                   )}
+                  title={`${agentDisplayName} (${agentRoleLabel}) — Click to change status or theme`}
+                >
+                  <Avatar
+                    name={agentDisplayName}
+                    seed={currentAgent?.id || 'agent'}
+                    size="sm"
+                    online={currentAgent?.status === 'online'}
+                    className="shrink-0"
+                  />
+                  <span className="min-w-0 flex-1 text-left">
+                    <span className="block text-[12.5px] font-bold text-ink truncate leading-tight">
+                      {agentDisplayName}
+                    </span>
+                    <span className="flex items-center gap-1.5 text-[10.5px] text-ink-3 mt-0.5">
+                      <span
+                        className="w-1.5 h-1.5 rounded-full shrink-0"
+                        style={{
+                          background: STATUS_TINT[currentAgent?.status || 'online'],
+                        }}
+                      />
+                      <span className="capitalize">{currentAgent?.status || 'online'}</span>
+                      <span className="text-ink-3/40">·</span>
+                      <span className="text-[10px] font-semibold text-ink-2 bg-surface-3 px-1.5 py-0.2 rounded border border-line/60">
+                        {agentRoleLabel}
+                      </span>
+                    </span>
+                  </span>
+                  <ChevronsUpDown className="w-3.5 h-3.5 text-ink-3 shrink-0" />
                 </span>
-              </span>
-              <ChevronsUpDown className="w-3.5 h-3.5 text-ink-3 shrink-0" />
-            </span>
-          )}
-        />
+              )}
+            />
+          );
+        })()}
       </div>
     </aside>
   );
