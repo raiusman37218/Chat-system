@@ -771,49 +771,42 @@ export function ChatThread({
       return languageOverride;
     }
 
-    // 1. Scan visitor messages in the thread (most recent first)
-    const visitorMessages = [...displayMessages]
+    // 1. Scan visitor messages in the thread (most recent visitor message determines current language)
+    const lastVisitorMsg = [...displayMessages]
       .reverse()
-      .filter((m) => m.sender_type === 'visitor' && m.content?.trim());
+      .find((m) => m.sender_type === 'visitor' && m.content?.trim());
 
-    if (visitorMessages.length > 0) {
-      for (const msg of visitorMessages) {
-        const text = msg.content.trim();
-        // Skip purely numeric/punctuation messages or empty
-        if (!/[a-zA-Z\u00C0-\uFFFF]/.test(text)) continue;
-
+    if (lastVisitorMsg) {
+      const text = lastVisitorMsg.content.trim();
+      // Skip purely numeric/punctuation messages or empty
+      if (/[a-zA-Z\u00C0-\uFFFF]/.test(text)) {
         const transLang =
-          msg.metadata?.translation?.detected_language ||
-          msg.metadata?.detected_language;
+          lastVisitorMsg.metadata?.translation?.detected_language ||
+          lastVisitorMsg.metadata?.detected_language;
 
         // If explicitly detected and supported
         const normalizedLang = transLang ? normalizeDetectedLanguage(transLang, text) : '';
-        if (normalizedLang && normalizedLang !== 'en' && SUPPORTED_LANGUAGES[normalizedLang]) {
+        if (normalizedLang && SUPPORTED_LANGUAGES[normalizedLang]) {
           return normalizedLang;
         }
 
         const det = detectLanguage(text);
-        if (det.code && det.code !== 'en' && SUPPORTED_LANGUAGES[det.code]) {
-          return det.code;
+        if (det.code && SUPPORTED_LANGUAGES[det.code]) {
+          return normalizeDetectedLanguage(det.code, text);
         }
       }
     }
 
-    // STRICT LOGIC: NEVER detect or fallback language from country, IP, or visitor profile.
-    // If the visitor has not sent any foreign messages in this conversation, language is ALWAYS English ('en').
+    // STRICT LOGIC: Default to English ('en') if no visitor messages or purely numeric
     return 'en';
   }, [displayMessages, languageOverride]);
 
   const handleLanguageOverride = async (code: string) => {
     const next = code === 'auto' ? null : code;
     setLocalLanguageOverrides((prev) => ({ ...prev, [conversation.id]: next }));
-    if (next) {
-      setTargetLanguage(next);
-      setAutoTranslateEnabled(next !== 'en');
-    } else {
-      setTargetLanguage(detectedVisitorLang);
-      setAutoTranslateEnabled(detectedVisitorLang !== 'en');
-    }
+    const effectiveLang = next || detectedVisitorLang;
+    setTargetLanguage(effectiveLang);
+    setAutoTranslateEnabled(effectiveLang !== 'en');
     try {
       const supabase = createClient();
       const meta: Record<string, unknown> = { ...((conversation.channel_metadata as Record<string, unknown>) || {}) };
@@ -823,6 +816,8 @@ export function ChatThread({
         meta.language_name = getLanguageInfo(next).name;
       } else {
         delete meta.language_override;
+        meta.visitor_language = detectedVisitorLang;
+        meta.language_name = getLanguageInfo(detectedVisitorLang).name;
       }
       await supabase.from('conversations').update({ channel_metadata: meta }).eq('id', conversation.id);
     } catch (err) {
@@ -858,26 +853,12 @@ export function ChatThread({
     const isNewConv = prevConvIdRef.current !== conversation.id;
     if (isNewConv) {
       prevConvIdRef.current = conversation.id;
-      if (detectedVisitorLang && detectedVisitorLang !== 'en') {
-        setTargetLanguage(detectedVisitorLang);
-        setAutoTranslateEnabled(true);
-      } else {
-        setTargetLanguage('en');
-        setAutoTranslateEnabled(false);
-      }
-    } else if (detectedVisitorLang && detectedVisitorLang !== 'en') {
-      // Inbound foreign message detected in current thread
-      if (targetLanguage !== detectedVisitorLang) {
-        setTargetLanguage(detectedVisitorLang);
-      }
-      setAutoTranslateEnabled(true);
-    } else if (detectedVisitorLang === 'en' && !languageOverride) {
-      if (targetLanguage !== 'en') {
-        setTargetLanguage('en');
-      }
-      setAutoTranslateEnabled(false);
     }
-  }, [detectedVisitorLang, conversation.id, targetLanguage, languageOverride]);
+    if (!languageOverride) {
+      setTargetLanguage(detectedVisitorLang);
+      setAutoTranslateEnabled(detectedVisitorLang !== 'en');
+    }
+  }, [detectedVisitorLang, conversation.id, languageOverride]);
 
   // Set to track in-flight translation requests so we don't repeat them
   const inFlightTranslationsRef = useRef<Set<string>>(new Set());
@@ -922,9 +903,15 @@ export function ChatThread({
                 isOriginalEnglish: Boolean(data.isOriginalEnglish),
               },
             }));
-            if (data.detectedLanguage && data.detectedLanguage !== 'en' && !languageOverride) {
-              setTargetLanguage(data.detectedLanguage);
-              setAutoTranslateEnabled(true);
+            if (!languageOverride) {
+              const detectedCode = data.detectedLanguage || 'en';
+              const latestVisitor = [...displayMessages]
+                .reverse()
+                .find((dm) => dm.sender_type === 'visitor' && dm.content?.trim());
+              if (!latestVisitor || latestVisitor.id === m.id) {
+                setTargetLanguage(detectedCode);
+                setAutoTranslateEnabled(detectedCode !== 'en');
+              }
             }
           }
         })
@@ -993,8 +980,30 @@ export function ChatThread({
       let finalContentToSend = text;
       let translationMetadata: Record<string, any> | null = null;
 
-      // Determine customer target language (override > targetLanguage > detectedVisitorLang)
-      const effectiveCustomerLang = languageOverride || targetLanguage || detectedVisitorLang || 'en';
+      // Determine customer target language strictly for the specific message being answered
+      const targetVisitorMsg = (replyTo && replyTo.sender_type === 'visitor')
+        ? replyTo
+        : [...displayMessages].reverse().find((m) => m.sender_type === 'visitor' && m.content?.trim());
+
+      let currentCustomerLang = 'en';
+      if (targetVisitorMsg && targetVisitorMsg.content) {
+        const textToInspect = targetVisitorMsg.content.trim();
+        const metaLang =
+          targetVisitorMsg.metadata?.translation?.detected_language ||
+          targetVisitorMsg.metadata?.detected_language;
+
+        if (metaLang && metaLang !== 'auto' && SUPPORTED_LANGUAGES[metaLang]) {
+          currentCustomerLang = normalizeDetectedLanguage(metaLang, textToInspect);
+        } else {
+          const det = detectLanguage(textToInspect);
+          if (det.code && SUPPORTED_LANGUAGES[det.code]) {
+            currentCustomerLang = normalizeDetectedLanguage(det.code, textToInspect);
+          }
+        }
+      }
+
+      // Manual override wins if explicitly set by agent; otherwise STRICTLY match this customer message's language!
+      const effectiveCustomerLang = languageOverride || currentCustomerLang || 'en';
 
       // Check if agent typed in a foreign language (e.g. Urdu, Roman Urdu, Hindi)
       const agentInputLang = detectLanguage(text).code;

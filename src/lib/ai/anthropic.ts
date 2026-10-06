@@ -166,6 +166,9 @@ export function getFallbackNotSureReply(
   if (isRomanUrdu) {
     return `Maazrat${cleanName ? ` ${cleanName}` : ''}, filhal mere paas is bare mein mukammal maloomat nahi hain. Kya main aapko support team ke member se connect kar doon?`;
   }
+  if (langCode === 'hi') {
+    return `क्षमा करें${cleanName ? ` ${cleanName}` : ''}, इस समय हमारे सहायता केंद्र में इस बारे में पूरी जानकारी उपलब्ध नहीं है। क्या आप चाहते हैं कि मैं आपको हमारी सहायता टीम के किसी सदस्य से जोड़ दूँ?`;
+  }
   if (langCode === 'ur') {
     return `معذرت${cleanName ? ` ${cleanName}` : ''}، فی الحال میرے پاس اس بارے میں مکمل معلومات نہیں ہیں۔ کیا میں آپ کو ہماری سپورٹ ٹیم کے ممبر سے منسلک کر دوں؟`;
   }
@@ -307,7 +310,7 @@ export async function generateHelpDeskResponseWithHandover({
         '2. ANSWER EVERY PART: If the visitor asks a multi-part question, answer every single part thoroughly and directly using the information in the chunks.',
         '3. UNCOVERED QUESTIONS: If the provided chunks do not contain the answer (or do not cover part of the question), state clearly in exactly ONE sentence that you do not have that information, and ask one clarifying question or offer to connect them with a human team member. Never recommend or send an unrelated article. Append [NOT_COVERED] at the end.',
         '4. STRICT WORD LIMIT: Keep your entire reply strictly under 120 words.',
-        '5. EXACT LANGUAGE AND SCRIPT: Reply in the EXACT same language AND script the visitor used. If the visitor writes in Roman Urdu (Urdu written in the Latin alphabet, e.g. "account kaisay banayein"), you MUST reply in Roman Urdu in Latin script. Do not switch to Arabic/Urdu script. If the visitor writes in Arabic script, reply in Arabic script. If English, reply in English.',
+        '5. PER-MESSAGE LANGUAGE DYNAMICS (STRICT): You MUST reply in the EXACT language and script of the visitor\'s LATEST message (the final incoming message). If the visitor writes in English, reply in English. If in Hindi, reply in Hindi. If in Urdu (Arabic script or Roman Urdu), reply in Urdu in that exact script. If the visitor switched language from an earlier message in the conversation, you MUST immediately switch your language to match their newest message. NEVER stay in the language of older messages.',
         '6. VISITOR DISPLAY NAME: Never use the visitor\'s display name inside your sentence or greeting if it resembles a greeting word (e.g. "Hi", "Hello", "Hey", "Guest", etc.).',
         '7. LINKS: Add at most ONE "Read more" link to the single most relevant article URL provided in the chunks, formatted as [Read more](url) (or translated, e.g. [Mazeed parhein](url)). Never include more than one link, and never invent a URL.',
         '8. FORMATTING: Output plain text or simple markdown only (bold, bullet lists, links). NEVER use markdown headings (no "#", "##", or "###"). Use **bold** text for titles or emphasis.',

@@ -297,6 +297,9 @@ export function getExpectedReplyTimeNotice(langCode: string, isRomanUrdu: boolea
   if (isRomanUrdu) {
     return 'Hamari team aam tor par 10 se 15 minute mein yahan review karke reply karegi.';
   }
+  if (langCode === 'hi') {
+    return 'हमारी टीम आमतौर पर 10 से 15 मिनट में यहाँ समीक्षा करके उत्तर देगी।';
+  }
   if (langCode === 'ur') {
     return 'ہماری سپورٹ ٹیم عام طور پر 10 سے 15 منٹ میں جائزہ لے کر یہاں جواب دے گی۔';
   }
@@ -349,6 +352,8 @@ export function generateIntentDirectResponse({
   if (intentResult.intent === 'greeting') {
     const replyText = isRomanUrdu
       ? `Salam${cleanName ? ` ${cleanName}` : ''}! ${brand} mein khushamdeed. Main aaj aap ki kya madad kar sakta hoon?`
+      : langCode === 'hi'
+      ? `नमस्ते${cleanName ? ` ${cleanName}` : ''}! ${brand} में आपका स्वागत है। मैं आज आपकी क्या सहायता कर सकता हूँ?`
       : langCode === 'ur'
       ? `السلام علیکم${cleanName ? ` ${cleanName}` : ''}! ${brand} میں خوش آمدید۔ بتائیے میں آج آپ کی کیا مدد کر سکتا ہوں؟`
       : langCode === 'ar'
@@ -365,10 +370,24 @@ export function generateIntentDirectResponse({
     };
   }
 
-  // 2. THANKS OR ACK: reply "You're welcome!" and nothing else. No handover, do not log gap.
+  // 2. THANKS OR ACK: reply in the visitor's matching language. No handover, do not log gap.
   if (intentResult.intent === 'thanks_or_ack') {
+    const replyText = isRomanUrdu
+      ? 'Koi baat nahi! Hum aapki madad ke liye hamesha hazir hain.'
+      : langCode === 'hi'
+      ? 'आपका स्वागत है! हमें आपकी सहायता करके खुशी हुई।'
+      : langCode === 'ur'
+      ? 'کوئی بات نہیں! ہم آپ کی مدد کے لیے ہمیشہ حاضر ہیں۔'
+      : langCode === 'ar'
+      ? 'على الرحب والسعة!'
+      : langCode === 'es'
+      ? '¡De nada! Estamos para ayudarte.'
+      : langCode === 'fr'
+      ? 'Je vous en prie ! Avec plaisir.'
+      : "You're welcome!";
+
     return {
-      replyText: "You're welcome!",
+      replyText,
       shouldHandover: false,
     };
   }
@@ -378,6 +397,8 @@ export function generateIntentDirectResponse({
   if (intentResult.intent === 'wants_human') {
     const replyText = isRomanUrdu
       ? `Maine aapki guftagu hamari support team ko connect kar di hai. ${replyTimeNotice}`
+      : langCode === 'hi'
+      ? `मैंने आपकी बातचीत हमारी सहायता टीम से जोड़ दी है। ${replyTimeNotice}`
       : langCode === 'ur'
       ? `میں نے آپ کی گفتگو ہماری سپورٹ ٹیم کو منتقل کر دی ہے۔ ${replyTimeNotice}`
       : langCode === 'ar'
@@ -414,12 +435,14 @@ export function generateIntentDirectResponse({
 
     if (isMissingDetails) {
       const missingParts: string[] = [];
-      if (!acc) missingParts.push(isRomanUrdu ? 'account number' : 'account number');
-      if (!email) missingParts.push(isRomanUrdu ? 'email' : 'email');
-      const missingStr = missingParts.join(isRomanUrdu ? ' aur ' : ' and ');
+      if (!acc) missingParts.push(isRomanUrdu ? 'account number' : langCode === 'hi' ? 'खाता संख्या (account number)' : 'account number');
+      if (!email) missingParts.push(isRomanUrdu ? 'email' : langCode === 'hi' ? 'ईमेल (email)' : 'email');
+      const missingStr = missingParts.join(isRomanUrdu ? ' aur ' : langCode === 'hi' ? ' और ' : ' and ');
 
       replyText = isRomanUrdu
         ? `Hamari team is issue ko check karegi. Baraye meherbani apna ${missingStr} share kar dein. ${replyTimeNotice}`
+        : langCode === 'hi'
+        ? `हमारी टीम इस समस्या की जांच करेगी। कृपया अपना ${missingStr} साझा करें। ${replyTimeNotice}`
         : langCode === 'ur'
         ? `ہماری سپورٹ ٹیم اس معاملے کی جانچ کرے گی۔ برائے مہربانی اپنا ${missingStr} فراہم کر دیں۔ ${replyTimeNotice}`
         : langCode === 'ar'
@@ -428,6 +451,10 @@ export function generateIntentDirectResponse({
     } else {
       replyText = isRomanUrdu
         ? `Shukriya! Maine aapke account (#${acc}) ki tafseelat note kar li hain aur team check karegi. ${replyTimeNotice}`
+        : langCode === 'hi'
+        ? `धन्यवाद! मैंने आपके खाते (#${acc}) का विवरण नोट कर लिया है और हमारी टीम इसकी जांच करेगी। ${replyTimeNotice}`
+        : langCode === 'ur'
+        ? `شکریہ! میں نے آپ کے اکاؤنٹ (#${acc}) کی تفصیلات درج کر لی ہیں، ہماری ٹیم اس کی جانچ کرے گی۔ ${replyTimeNotice}`
         : langCode === 'ur'
         ? `شکریہ! میں نے آپ کے اکاؤنٹ (#${acc}) کی تفصیلات درج کر لی ہیں، ہماری ٹیم اس کی جانچ کرے گی۔ ${replyTimeNotice}`
         : langCode === 'ar'

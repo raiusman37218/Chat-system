@@ -7,7 +7,7 @@ import {
 } from '@/lib/ai/anthropic';
 import { dispatchOutboundMessage } from '@/lib/channels/dispatcher';
 import { providerConfigFrom, warmHelpIndex, wantsHuman } from '@/lib/ai/help-answer';
-import { detectLanguage, translateToEnglish } from '@/lib/ai/translator';
+import { detectLanguage, translateToEnglish, translateAgentReply } from '@/lib/ai/translator';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://vfjsaynnubxywdbevxtx.supabase.co';
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZmanNheW5udWJ4eXdkYmV2eHR4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgyNTA5MDEsImV4cCI6MjEwMzgyNjkwMX0.YyBCXMqwrOk5BRhQafYLFw8tiM5PC8lc8Yocodw9wf0';
@@ -239,6 +239,32 @@ export async function POST(req: NextRequest) {
         } catch (err) {
           console.warn('[Auto-Respond] Inbound translation error:', err);
         }
+      } else if (detected.code === 'en') {
+        try {
+          await supabase
+            .from('messages')
+            .update({
+              metadata: {
+                ...(visitorMsg.metadata || {}),
+                detected_language: 'en',
+                language_name: 'English',
+              },
+            })
+            .eq('id', visitorMsg.id);
+
+          await supabase
+            .from('conversations')
+            .update({
+              channel_metadata: {
+                ...((conv?.channel_metadata as Record<string, any>) || {}),
+                visitor_language: 'en',
+                language_name: 'English',
+              },
+            })
+            .eq('id', conversation_id);
+        } catch (err) {
+          console.warn('[Auto-Respond] Inbound English sync error:', err);
+        }
       }
     }
 
@@ -344,7 +370,7 @@ export async function POST(req: NextRequest) {
       workspaceName: workspace?.name,
     });
 
-    const aiResponseText = result.replyText;
+    let aiResponseText = result.replyText;
     if (!aiResponseText || !aiResponseText.trim()) {
       return json({ replied: false, reason: 'Empty auto-response generated' });
     }
@@ -383,6 +409,34 @@ export async function POST(req: NextRequest) {
 
     if (freshConv && (freshConv.status === 'closed' || freshConv.ai_mode === 'disabled')) {
       return json({ replied: false, reason: 'Conversation status changed during generation' });
+    }
+
+    // STRICT PER-MESSAGE LANGUAGE GUARANTEE:
+    // Ensure the AI auto-response strictly matches the incoming visitor message's language
+    const currentReplyLang = detectLanguage(aiResponseText).code;
+    if (detected.code === 'en' && currentReplyLang !== 'en') {
+      try {
+        const toEn = await translateToEnglish({
+          text: aiResponseText,
+          detectedLanguage: currentReplyLang,
+          providerConfig: providerConfigFrom(aiSettings),
+        });
+        if (toEn.englishText) aiResponseText = toEn.englishText;
+      } catch (err) {
+        console.warn('[Auto-Respond] Language correction to English failed:', err);
+      }
+    } else if (detected.code !== 'en' && currentReplyLang === 'en') {
+      try {
+        const toTarget = await translateAgentReply({
+          text: aiResponseText,
+          targetLanguageCode: detected.code,
+          providerConfig: providerConfigFrom(aiSettings),
+          businessName: workspace?.name,
+        });
+        if (toTarget.translatedText) aiResponseText = toTarget.translatedText;
+      } catch (err) {
+        console.warn('[Auto-Respond] Language correction to customer language failed:', err);
+      }
     }
 
     // If response was delivered in native language, get English version for agents in dashboard

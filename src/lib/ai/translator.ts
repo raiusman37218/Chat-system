@@ -219,19 +219,29 @@ export async function translateViaFreeApi(
 const ROMAN_URDU_WORDS_REGEX =
   /\b(hum|humein|humay|ham|hamara|hamari|main|mein|me|aap|ap|tum|aapko|apko|aapka|apka|aapki|apki|mera|meri|mere|mujhe|mujhko|mujhy|chahiye|chahye|chahie|shukriya|shukria|theek|thik|hai|hain|hoga|hogi|kya|kia|kaise|kese|kaisay|batao|bataen|bataiye|kitna|kitni|kitne|denge|dainge|karenge|krenge|karen|karo|karein|madad|acha|accha|salam|assalam|walekum|alaikum|nahi|nahin|bhi|kuch|koi|yeh|woh|mil|jayega|jayegi|milega|bhai|bhaia|bhaiya|bro|kab|kahan|kaha|kidhar|kidhr|kyun|kyu|bolo|bolen|bata|sun|suno|yar|yaar|kro|krna|karna|kr|raha|rahi|rahe|mila|miley|mile|lena|lo|lelo|dena|dedo|dein|pohncha|pohnchega|paisa|paise|rupay|rupee|rate|shuru|khatam|pehle|baad|abhi|wapas|return|kharidna|masla|rabta|rabtah|tasweer|cheez|waghera)\b/i;
 
+const ROMAN_HINDI_WORDS_REGEX =
+  /\b(namaste|namaskar|dhanyawad|dhanyavad|kripya|kripaya|kaise ho|kaisi ho|theek hu|theek hoon|pranam|shubh|puchna|pucho)\b/i;
+
 /**
- * Hindi is only ever written in Devanagari by our visitors; Hindi/Urdu typed in
- * Latin script is Roman Urdu. Engines (LLMs, Google) routinely label it "hi", "id", "tl", "sw", or "en".
+ * Normalizes detected language codes with high accuracy for Urdu, Hindi, English, etc.
  */
 export function normalizeDetectedLanguage(code: string, text: string): string {
   const c = (code || '').toLowerCase().split('-')[0];
-  const isRoman = ROMAN_URDU_WORDS_REGEX.test(text || '');
-  const hasArabicUrduScript = /[\u0600-\u06FF]/.test(text || '');
+  const hasDevanagari = /[\u0900-\u097F]/.test(text || '');
+  const isRomanHindi = ROMAN_HINDI_WORDS_REGEX.test(text || '');
+  if (hasDevanagari || isRomanHindi) {
+    return 'hi';
+  }
 
-  if ((c === 'hi' || c === 'id' || c === 'tl' || c === 'sw' || c === 'so' || c === 'en' || !c) && (isRoman || hasArabicUrduScript)) {
+  const isRomanUrdu = ROMAN_URDU_WORDS_REGEX.test(text || '');
+  const hasArabicUrduScript = /[\u0600-\u06FF]/.test(text || '');
+  if (isRomanUrdu || hasArabicUrduScript) {
     return 'ur';
   }
-  if (c === 'hi' && !/[\u0900-\u097F]/.test(text || '')) return 'ur';
+
+  if (c === 'hi') {
+    return hasDevanagari || isRomanHindi ? 'hi' : 'ur';
+  }
   return c || 'en';
 }
 
@@ -249,6 +259,14 @@ export function detectLanguage(text: string): { code: string; name: string } {
     )
   ) {
     return { code: 'en', name: 'English' };
+  }
+
+  // Fast-track Hindi / Urdu greetings
+  if (/^(namaste|namaskar|pranam)$/i.test(trimmed)) {
+    return { code: 'hi', name: 'Hindi' };
+  }
+  if (/^(salam|assalam|assalamu\s+alaikum|walekum\s+assalam)$/i.test(trimmed)) {
+    return { code: 'ur', name: 'Urdu (Roman)' };
   }
 
   // Arabic / Urdu / Persian script detection
@@ -432,6 +450,11 @@ export function detectLanguage(text: string): { code: string; name: string } {
     /[åäö]/i.test(lower)
   ) {
     return { code: 'sv', name: 'Swedish' };
+  }
+
+  // Roman Hindi patterns (Latin script)
+  if (ROMAN_HINDI_WORDS_REGEX.test(lower)) {
+    return { code: 'hi', name: 'Hindi' };
   }
 
   // Roman Urdu / Hindi patterns (Latin script)
