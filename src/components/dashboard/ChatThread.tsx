@@ -799,20 +799,10 @@ export function ChatThread({
       }
     }
 
-    // 2. Check channel_metadata if already known for this conversation
-    const chanMeta = conversation.channel_metadata as Record<string, any> | undefined;
-    if (chanMeta?.visitor_language && chanMeta.visitor_language.toLowerCase() !== 'en' && SUPPORTED_LANGUAGES[chanMeta.visitor_language.toLowerCase()]) {
-      return chanMeta.visitor_language.toLowerCase();
-    }
-
-    // 3. Check visitor profile language
-    if (conversation.visitor?.language && conversation.visitor.language.toLowerCase() !== 'en') {
-      const code = conversation.visitor.language.split('-')[0].toLowerCase();
-      if (SUPPORTED_LANGUAGES[code]) return code;
-    }
-
+    // STRICT LOGIC: NEVER detect or fallback language from country, IP, or visitor profile.
+    // If the visitor has not sent any foreign messages in this conversation, language is ALWAYS English ('en').
     return 'en';
-  }, [conversation, displayMessages, languageOverride]);
+  }, [displayMessages, languageOverride]);
 
   const handleLanguageOverride = async (code: string) => {
     const next = code === 'auto' ? null : code;
@@ -820,6 +810,9 @@ export function ChatThread({
     if (next) {
       setTargetLanguage(next);
       setAutoTranslateEnabled(next !== 'en');
+    } else {
+      setTargetLanguage(detectedVisitorLang);
+      setAutoTranslateEnabled(detectedVisitorLang !== 'en');
     }
     try {
       const supabase = createClient();
@@ -878,8 +871,13 @@ export function ChatThread({
         setTargetLanguage(detectedVisitorLang);
       }
       setAutoTranslateEnabled(true);
+    } else if (detectedVisitorLang === 'en' && !languageOverride) {
+      if (targetLanguage !== 'en') {
+        setTargetLanguage('en');
+      }
+      setAutoTranslateEnabled(false);
     }
-  }, [detectedVisitorLang, conversation.id, targetLanguage]);
+  }, [detectedVisitorLang, conversation.id, targetLanguage, languageOverride]);
 
   // Set to track in-flight translation requests so we don't repeat them
   const inFlightTranslationsRef = useRef<Set<string>>(new Set());
