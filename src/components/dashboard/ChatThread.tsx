@@ -781,6 +781,7 @@ export function ChatThread({
       // Skip purely numeric/punctuation messages or empty
       if (/[a-zA-Z\u00C0-\uFFFF]/.test(text)) {
         const transLang =
+          inboundTranslations[lastVisitorMsg.id]?.detectedLanguage ||
           lastVisitorMsg.metadata?.translation?.detected_language ||
           lastVisitorMsg.metadata?.detected_language;
 
@@ -797,9 +798,15 @@ export function ChatThread({
       }
     }
 
+    // Check conversation channel_metadata if available
+    const convLang = (conversation.channel_metadata as any)?.visitor_language;
+    if (convLang && convLang !== 'auto' && SUPPORTED_LANGUAGES[convLang]) {
+      return convLang;
+    }
+
     // STRICT LOGIC: Default to English ('en') if no visitor messages or purely numeric
     return 'en';
-  }, [displayMessages, languageOverride]);
+  }, [displayMessages, languageOverride, inboundTranslations, conversation.channel_metadata]);
 
   const handleLanguageOverride = async (code: string) => {
     const next = code === 'auto' ? null : code;
@@ -988,7 +995,9 @@ export function ChatThread({
       let currentCustomerLang = 'en';
       if (targetVisitorMsg && targetVisitorMsg.content) {
         const textToInspect = targetVisitorMsg.content.trim();
+        const inboundMeta = inboundTranslations[targetVisitorMsg.id];
         const metaLang =
+          inboundMeta?.detectedLanguage ||
           targetVisitorMsg.metadata?.translation?.detected_language ||
           targetVisitorMsg.metadata?.detected_language;
 
@@ -1002,7 +1011,34 @@ export function ChatThread({
         }
       }
 
-      // Manual override wins if explicitly set by agent; otherwise STRICTLY match this customer message's language!
+      // Check conversation channel_metadata if visitor_language was already established
+      const convVisitorLang = (conversation.channel_metadata as any)?.visitor_language;
+      if (currentCustomerLang === 'en' && convVisitorLang && convVisitorLang !== 'en' && SUPPORTED_LANGUAGES[convVisitorLang]) {
+        currentCustomerLang = convVisitorLang;
+      }
+
+      // Check if our own previous agent reply in this thread was translated to customer's language!
+      // If we already sent a message to this customer in Urdu/Hindi, any consecutive agent messages
+      // MUST stay in that exact customer language until the customer sends a new message in another language!
+      if (currentCustomerLang === 'en') {
+        const lastAgentMsg = [...displayMessages]
+          .reverse()
+          .find((m) => m.sender_type === 'agent' && !m.is_internal && (m.metadata?.translation?.target_language || m.metadata?.target_language));
+        const prevTargetLang = lastAgentMsg?.metadata?.translation?.target_language || lastAgentMsg?.metadata?.target_language;
+        if (prevTargetLang && prevTargetLang !== 'en' && SUPPORTED_LANGUAGES[prevTargetLang]) {
+          currentCustomerLang = prevTargetLang;
+        }
+      }
+
+      // Check detectedVisitorLang or targetLanguage state
+      if (currentCustomerLang === 'en' && detectedVisitorLang && detectedVisitorLang !== 'en') {
+        currentCustomerLang = detectedVisitorLang;
+      }
+      if (currentCustomerLang === 'en' && targetLanguage && targetLanguage !== 'en') {
+        currentCustomerLang = targetLanguage;
+      }
+
+      // Manual override wins if explicitly set by agent; otherwise STRICTLY stay in customer's language!
       const effectiveCustomerLang = languageOverride || currentCustomerLang || 'en';
 
       // Check if agent typed in a foreign language (e.g. Urdu, Roman Urdu, Hindi)
@@ -1079,6 +1115,24 @@ export function ChatThread({
         translationMetadata
       );
       setReplyTo(null);
+      if (!languageOverride) {
+        setTargetLanguage(effectiveCustomerLang);
+        setAutoTranslateEnabled(effectiveCustomerLang !== 'en');
+      }
+
+      // Persist the active customer language in conversation metadata so subsequent messages never lose it
+      if (!isInternal && effectiveCustomerLang !== 'en') {
+        try {
+          const supabase = createClient();
+          await supabase.from('conversations').update({
+            channel_metadata: {
+              ...((conversation.channel_metadata as Record<string, any>) || {}),
+              visitor_language: effectiveCustomerLang,
+              language_name: getLanguageInfo(effectiveCustomerLang).name,
+            },
+          }).eq('id', conversation.id);
+        } catch (_) {}
+      }
 
       // If customer is on WhatsApp, Instagram, Messenger, or LinkedIn, dispatch outbound
       if (!isInternal && conversation.channel && conversation.channel !== 'web') {
