@@ -193,6 +193,18 @@ export function ChatThread({
   const [autoTranslateEnabled, setAutoTranslateEnabled] = useState<boolean>(false);
   const [isTranslating, setIsTranslating] = useState<boolean>(false);
   const [expandedTranslations, setExpandedTranslations] = useState<Record<string, boolean>>({});
+  // Local translation store for immediate optimistic display of translated visitor messages
+  const [inboundTranslations, setInboundTranslations] = useState<
+    Record<
+      string,
+      {
+        englishText: string;
+        detectedLanguage: string;
+        languageName: string;
+        isOriginalEnglish: boolean;
+      }
+    >
+  >({});
   // Agent-chosen language for this conversation; wins over auto-detection.
   // Local picks are keyed by conversation so switching threads never leaks one.
   const [localLanguageOverrides, setLocalLanguageOverrides] = useState<Record<string, string | null>>({});
@@ -723,6 +735,35 @@ export function ChatThread({
     textareaRef.current?.focus();
   };
 
+  // Synchronized messages incorporating instant optimistic inbound translations
+  const displayMessages = useMemo(() => {
+    return messages.map((m) => {
+      const trans = inboundTranslations[m.id];
+      if (!trans) return m;
+
+      const existingMeta = (m.metadata as Record<string, any>) || {};
+      if (existingMeta.translation?.english_text) return m;
+
+      return {
+        ...m,
+        metadata: {
+          ...existingMeta,
+          translation: {
+            is_translated: !trans.isOriginalEnglish,
+            direction: 'visitor_to_agent',
+            original_text: m.content,
+            english_text: trans.englishText,
+            detected_language: trans.detectedLanguage,
+            language_name: trans.languageName,
+          },
+          detected_language: trans.detectedLanguage,
+          language_name: trans.languageName,
+          english_translation: trans.englishText,
+        },
+      };
+    });
+  }, [messages, inboundTranslations]);
+
   // 6. Customer Language Auto-Detection & Sync
   const detectedVisitorLang = useMemo(() => {
     // 0. An agent's manual correction always wins
@@ -731,7 +772,7 @@ export function ChatThread({
     }
 
     // 1. Scan visitor messages in the thread (most recent first)
-    const visitorMessages = [...messages]
+    const visitorMessages = [...displayMessages]
       .reverse()
       .filter((m) => m.sender_type === 'visitor' && m.content?.trim());
 
@@ -747,12 +788,12 @@ export function ChatThread({
 
         // If explicitly detected and supported
         const normalizedLang = transLang ? normalizeDetectedLanguage(transLang, text) : '';
-        if (normalizedLang && SUPPORTED_LANGUAGES[normalizedLang]) {
+        if (normalizedLang && normalizedLang !== 'en' && SUPPORTED_LANGUAGES[normalizedLang]) {
           return normalizedLang;
         }
 
         const det = detectLanguage(text);
-        if (det.code && SUPPORTED_LANGUAGES[det.code]) {
+        if (det.code && det.code !== 'en' && SUPPORTED_LANGUAGES[det.code]) {
           return det.code;
         }
       }
@@ -760,18 +801,18 @@ export function ChatThread({
 
     // 2. Check channel_metadata if already known for this conversation
     const chanMeta = conversation.channel_metadata as Record<string, any> | undefined;
-    if (chanMeta?.visitor_language && SUPPORTED_LANGUAGES[chanMeta.visitor_language.toLowerCase()]) {
+    if (chanMeta?.visitor_language && chanMeta.visitor_language.toLowerCase() !== 'en' && SUPPORTED_LANGUAGES[chanMeta.visitor_language.toLowerCase()]) {
       return chanMeta.visitor_language.toLowerCase();
     }
 
     // 3. Check visitor profile language
-    if (conversation.visitor?.language) {
+    if (conversation.visitor?.language && conversation.visitor.language.toLowerCase() !== 'en') {
       const code = conversation.visitor.language.split('-')[0].toLowerCase();
       if (SUPPORTED_LANGUAGES[code]) return code;
     }
 
     return 'en';
-  }, [conversation, messages, languageOverride]);
+  }, [conversation, displayMessages, languageOverride]);
 
   const handleLanguageOverride = async (code: string) => {
     const next = code === 'auto' ? null : code;
@@ -831,9 +872,11 @@ export function ChatThread({
         setTargetLanguage('en');
         setAutoTranslateEnabled(false);
       }
-    } else if (detectedVisitorLang && detectedVisitorLang !== 'en' && targetLanguage === 'en') {
+    } else if (detectedVisitorLang && detectedVisitorLang !== 'en') {
       // Inbound foreign message detected in current thread
-      setTargetLanguage(detectedVisitorLang);
+      if (targetLanguage !== detectedVisitorLang) {
+        setTargetLanguage(detectedVisitorLang);
+      }
       setAutoTranslateEnabled(true);
     }
   }, [detectedVisitorLang, conversation.id, targetLanguage]);
@@ -843,7 +886,7 @@ export function ChatThread({
 
   // Auto-translate any incoming non-English visitor messages that haven't been translated yet
   useEffect(() => {
-    const untranslated = messages.filter(
+    const untranslated = displayMessages.filter(
       (m) =>
         m.sender_type === 'visitor' &&
         m.content?.trim() &&
@@ -868,12 +911,31 @@ export function ChatThread({
           workspaceId: conversation.workspace_id,
         }),
       })
+        .then(async (res) => {
+          if (!res.ok) throw new Error('Translation failed');
+          const data = await res.json();
+          if (data?.success && data.englishText) {
+            setInboundTranslations((prev) => ({
+              ...prev,
+              [m.id]: {
+                englishText: data.englishText,
+                detectedLanguage: data.detectedLanguage || 'en',
+                languageName: data.languageName || 'English',
+                isOriginalEnglish: Boolean(data.isOriginalEnglish),
+              },
+            }));
+            if (data.detectedLanguage && data.detectedLanguage !== 'en' && !languageOverride) {
+              setTargetLanguage(data.detectedLanguage);
+              setAutoTranslateEnabled(true);
+            }
+          }
+        })
         .catch((e) => {
           inFlightTranslationsRef.current.delete(m.id);
           console.warn('Inbound translation trigger failed:', e);
         });
     });
-  }, [messages, conversation.id, conversation.workspace_id]);
+  }, [displayMessages, conversation.id, conversation.workspace_id, languageOverride]);
 
   const handleSend = async () => {
     if ((!inputText.trim() && !pendingAttachment) || isSending || isTranslating) return;
@@ -933,19 +995,18 @@ export function ChatThread({
       let finalContentToSend = text;
       let translationMetadata: Record<string, any> | null = null;
 
-      // Determine customer target language: controlled strictly by state
-      const effectiveCustomerLang = targetLanguage || 'en';
+      // Determine customer target language (override > targetLanguage > detectedVisitorLang)
+      const effectiveCustomerLang = languageOverride || targetLanguage || detectedVisitorLang || 'en';
 
       // Check if agent typed in a foreign language (e.g. Urdu, Roman Urdu, Hindi)
       const agentInputLang = detectLanguage(text).code;
-      const isAgentWritingForeign = autoTranslateEnabled && effectiveCustomerLang === 'en' && agentInputLang !== 'en';
+      const isAgentWritingForeign = effectiveCustomerLang === 'en' && agentInputLang !== 'en';
 
-      // CRITICAL FIX: Only translate if autoTranslateEnabled is TRUE!
-      // If the agent turns off auto-translation, NEVER translate!
+      // Auto-translate reply if customer speaks a foreign language, OR if agent typed foreign text
+      // Support agents never have to manually toggle — it seamlessly routes in customer's language
       const shouldTranslate =
         !isInternal &&
         text.trim().length > 0 &&
-        autoTranslateEnabled &&
         (effectiveCustomerLang !== 'en' || isAgentWritingForeign);
 
       if (shouldTranslate) {
@@ -1247,8 +1308,8 @@ export function ChatThread({
   // A quote needs the message it points at. The id is all that is stored, so
   // resolve it from the thread already in memory rather than re-fetching.
   const messageById = useMemo(
-    () => new Map(messages.map((m) => [m.id, m])),
-    [messages]
+    () => new Map(displayMessages.map((m) => [m.id, m])),
+    [displayMessages]
   );
 
   const startReply = useCallback((msg: Message) => {
@@ -1285,7 +1346,7 @@ export function ChatThread({
   const rendered: React.ReactNode[] = [];
   let lastDay = '';
 
-  messages.forEach((msg) => {
+  displayMessages.forEach((msg) => {
     const key = dayKey(msg.created_at);
     if (key !== lastDay) {
       lastDay = key;

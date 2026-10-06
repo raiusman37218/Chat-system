@@ -115,8 +115,11 @@ export async function translateWithGoogleGtx(
     const rawDetected = data[2] || s;
     let detected = (rawDetected || 'en').toLowerCase().split('-')[0];
 
-    // Normalize Hindi detection for Roman Urdu text
-    if (detected === 'hi' && (ROMAN_URDU_WORDS_REGEX.test(text.toLowerCase()) || /[\u0600-\u06FF]/.test(text))) {
+    // Normalize Roman Urdu detection (Google GTX often flags as hi, id, tl, sw, so, or en)
+    if (
+      (detected === 'hi' || detected === 'id' || detected === 'tl' || detected === 'sw' || detected === 'so' || detected === 'en') &&
+      (ROMAN_URDU_WORDS_REGEX.test(text.toLowerCase()) || /[\u0600-\u06FF]/.test(text))
+    ) {
       detected = 'ur';
     }
 
@@ -135,8 +138,28 @@ export async function translateWithGoogleGtx(
     }
 
     if (candidate && typeof candidate === 'string' && candidate.trim()) {
+      let finalTrans = decodeHtmlEntities(candidate.trim());
+
+      // If Roman Urdu text was returned untranslated by Google (e.g. "theek hai" -> "theek hai"):
+      if (
+        t === 'en' &&
+        detected === 'ur' &&
+        s !== 'ur' &&
+        (finalTrans.toLowerCase() === text.trim().toLowerCase() || ROMAN_URDU_WORDS_REGEX.test(finalTrans))
+      ) {
+        const urduScript = romanUrduToUrdu(text);
+        if (/[\u0600-\u06FF]/.test(urduScript)) {
+          try {
+            const secondPass = await translateWithGoogleGtx(urduScript, 'en', 'ur');
+            if (secondPass?.translated && secondPass.translated.toLowerCase() !== finalTrans.toLowerCase()) {
+              finalTrans = secondPass.translated;
+            }
+          } catch (_) {}
+        }
+      }
+
       return {
-        translated: decodeHtmlEntities(candidate.trim()),
+        translated: finalTrans,
         detectedLanguage: detected,
       };
     }
@@ -194,16 +217,22 @@ export async function translateViaFreeApi(
 }
 
 const ROMAN_URDU_WORDS_REGEX =
-  /\b(hum|humein|humay|ham|hamara|hamari|main|mein|aap|ap|tum|aapko|apko|aapka|apka|aapki|apki|mera|meri|mere|mujhe|mujhko|mujhy|chahiye|chahye|chahie|shukriya|shukria|theek|thik|hai|hain|hoga|hogi|kya|kia|kaise|kese|kaisay|batao|bataen|bataiye|kitna|kitni|kitne|denge|dainge|karenge|krenge|karen|karo|karein|madad|acha|accha|salam|assalam|walekum|nahi|nahin|bhi|kuch|koi|yeh|woh|mil|jayega|jayegi|milega)\b/i;
+  /\b(hum|humein|humay|ham|hamara|hamari|main|mein|me|aap|ap|tum|aapko|apko|aapka|apka|aapki|apki|mera|meri|mere|mujhe|mujhko|mujhy|chahiye|chahye|chahie|shukriya|shukria|theek|thik|hai|hain|hoga|hogi|kya|kia|kaise|kese|kaisay|batao|bataen|bataiye|kitna|kitni|kitne|denge|dainge|karenge|krenge|karen|karo|karein|madad|acha|accha|salam|assalam|walekum|alaikum|nahi|nahin|bhi|kuch|koi|yeh|woh|mil|jayega|jayegi|milega|bhai|bhaia|bhaiya|bro|kab|kahan|kaha|kidhar|kidhr|kyun|kyu|bolo|bolen|bata|sun|suno|yar|yaar|kro|krna|karna|kr|raha|rahi|rahe|mila|miley|mile|lena|lo|lelo|dena|dedo|dein|pohncha|pohnchega|paisa|paise|rupay|rupee|rate|shuru|khatam|pehle|baad|abhi|wapas|return|kharidna|masla|rabta|rabtah|tasweer|cheez|waghera)\b/i;
 
 /**
  * Hindi is only ever written in Devanagari by our visitors; Hindi/Urdu typed in
- * Latin script is Roman Urdu. Engines (LLMs, Google) routinely label it "hi".
+ * Latin script is Roman Urdu. Engines (LLMs, Google) routinely label it "hi", "id", "tl", "sw", or "en".
  */
 export function normalizeDetectedLanguage(code: string, text: string): string {
   const c = (code || '').toLowerCase().split('-')[0];
+  const isRoman = ROMAN_URDU_WORDS_REGEX.test(text || '');
+  const hasArabicUrduScript = /[\u0600-\u06FF]/.test(text || '');
+
+  if ((c === 'hi' || c === 'id' || c === 'tl' || c === 'sw' || c === 'so' || c === 'en' || !c) && (isRoman || hasArabicUrduScript)) {
+    return 'ur';
+  }
   if (c === 'hi' && !/[\u0900-\u097F]/.test(text || '')) return 'ur';
-  return c;
+  return c || 'en';
 }
 
 /**
@@ -608,6 +637,49 @@ const ROMAN_URDU_DICTIONARY: Record<string, string> = {
   keemat: 'قیمت',
   order: 'آرڈر',
   delivery: 'ڈلیوری',
+  bhai: 'بھائی',
+  bhaia: 'بھائی',
+  bhaiya: 'بھائی',
+  bro: 'بھائی',
+  kab: 'کب',
+  kahan: 'کہاں',
+  kidhar: 'کدھر',
+  kyun: 'کیوں',
+  kyu: 'کیوں',
+  yar: 'یار',
+  yaar: 'یار',
+  bolo: 'بولیں',
+  bolen: 'بولیں',
+  bata: 'بتائیں',
+  sun: 'سنیں',
+  suno: 'سنیں',
+  krna: 'کرنا',
+  kro: 'کریں',
+  kr: 'کر',
+  raha: 'رہا',
+  rahi: 'رہی',
+  rahe: 'رہے',
+  mila: 'ملا',
+  mile: 'ملے',
+  miley: 'ملے',
+  lena: 'لینا',
+  lo: 'لیں',
+  lelo: 'لیں',
+  dena: 'دینا',
+  dedo: 'دیں',
+  dein: 'دیں',
+  pohncha: 'پہنچا',
+  pohnchega: 'پہنچے گا',
+  paisa: 'پیسہ',
+  paise: 'پیسے',
+  rupay: 'روپے',
+  rupee: 'روپے',
+  rs: 'روپے',
+  alaikum: 'وعلیکم السلام',
+  wapas: 'واپس',
+  kharidna: 'خریدنا',
+  masla: 'مسئلہ',
+  rabta: 'رابطہ',
 };
 
 export function romanUrduToUrdu(text: string): string {

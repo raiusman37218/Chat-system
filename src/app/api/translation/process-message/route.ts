@@ -115,22 +115,33 @@ export async function POST(req: NextRequest) {
         .maybeSingle();
 
       if (conv) {
+        const existingChanMeta = (conv.channel_metadata as Record<string, any>) || {};
+        const existingLang = existingChanMeta.visitor_language;
+        // Do not overwrite an existing foreign language with English if the message was short/neutral
+        const shouldPreserveExistingForeign =
+          !isNonEnglish &&
+          existingLang &&
+          existingLang !== 'en';
+
+        const updatedLanguage = shouldPreserveExistingForeign ? existingLang : finalDetectedCode;
+        const updatedLangName = shouldPreserveExistingForeign ? (existingChanMeta.language_name || 'English') : res.sourceLanguage;
+
         await supabase
           .from('conversations')
           .update({
             channel_metadata: {
-              ...((conv.channel_metadata as Record<string, any>) || {}),
-              visitor_language: finalDetectedCode,
-              language_name: res.sourceLanguage,
+              ...existingChanMeta,
+              visitor_language: updatedLanguage,
+              language_name: updatedLangName,
             },
             updated_at: new Date().toISOString(),
           })
           .eq('id', conversationId);
 
-        if (conv.visitor_id && isNonEnglish) {
+        if (conv.visitor_id && (isNonEnglish || shouldPreserveExistingForeign)) {
           await supabase
             .from('visitors')
-            .update({ language: finalDetectedCode })
+            .update({ language: updatedLanguage })
             .eq('id', conv.visitor_id);
         }
       }
