@@ -1452,19 +1452,7 @@ class ZentryWidget {
       }
     }
 
-    // Trigger automatic translation so support agents receive it in English
-    if (content.trim()) {
-      fetch(`${this.config.apiUrl || ''}/api/translation/process-message`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          messageId: data?.id,
-          conversationId: convId,
-          text: content.trim(),
-          workspaceId: this.config.workspaceId,
-        }),
-      }).catch(() => {});
-    }
+    // Auto-translation trigger disabled per user request
 
     // Every visitor message gets a chance at an AI reply. The route decides
     // whether the assistant is on for this conversation, and skips it when not.

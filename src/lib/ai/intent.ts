@@ -42,9 +42,14 @@ const GREETING_OR_GENERIC_NAMES = new Set([
   'heya',
   'hola',
   'bonjour',
+  'salut',
+  'ciao',
+  'namaste',
   'hallo',
   'salam',
   'salom',
+  'hlw',
+  'hlo',
   'assalam',
   'assalamu',
   'aloha',
@@ -71,12 +76,12 @@ export function cleanVisitorDisplayName(name?: string | null): string | null {
   if (!trimmed) return null;
   const normalized = trimmed.toLowerCase().replace(/[^a-z0-9]/g, '');
   if (GREETING_OR_GENERIC_NAMES.has(normalized)) return null;
-  if (/^(hi+|hello+|hey+|yo+|salam|hola|test)$/i.test(trimmed)) return null;
+  if (/^(hi+|hello+|hey+|yo+|salam|hola|salut|ciao|namaste|hlw|hlo|test)$/i.test(trimmed)) return null;
   return trimmed;
 }
 
 const GREETING_REGEX =
-  /^\s*(hi+|hello+|hey+|hiya|heya|hola|bonjour|hallo|aloha|yo|good\s+(?:morning|afternoon|evening|day)|as-salamu\s+alaykum|assalamu\s+alaikum|assalam\s*o\s*alaikum|salaam\s*walekum|salam|kese\s*ho|kia\s*hal\s*hai)[\s!.,؟?]*$/i;
+  /^\s*(hi+|hello+|hey+|hiya|heya|hola|bonjour|salut|ciao|namaste|hlw|hlo|hallo|aloha|yo|good\s+(?:morning|afternoon|evening|day)|as-salamu\s+alaykum|assalamu\s+alaikum|assalam\s*o\s*alaikum|salaam\s*walekum|salam|kese\s*ho|kia\s*hal\s*hai)[\s!.,؟?]*$/i;
 
 const THANKS_OR_ACK_REGEX =
   /^\s*(thanks+|thank\s*you|thx|ty|ok|okay|got\s*it|shukriya|theek\s*hai|understood|alright|all\s*good|perfect|cool|great|nice|noted|k|kk|done|ok\s+thanks|okay\s+thank\s+you|thanks\s+a\s+lot|thank\s+you\s+so\s+much|shukriya\s+bhai|bohot\s+shukriya)[\s!.,؟?]*$/i;

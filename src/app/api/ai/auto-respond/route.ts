@@ -384,7 +384,7 @@ export async function POST(req: NextRequest) {
         visitorMessageId: targetVisitorMsgId,
         reason: result.handoverReason || 'Inquiry not covered in Help Desk documentation.',
         channel: conv.channel || 'web',
-        disableAi: result.disableAi ?? true,
+        disableAi: Boolean(result.disableAi),
         internalNote: result.internalNote,
         priority: result.priority || 'high',
       });

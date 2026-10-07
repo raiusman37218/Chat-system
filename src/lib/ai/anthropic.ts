@@ -479,7 +479,7 @@ export async function executeHandoverToHuman({
   reason,
   channel = 'web',
   visitorMessageId,
-  disableAi = true,
+  disableAi = false,
   internalNote,
   priority = 'high',
 }: {
