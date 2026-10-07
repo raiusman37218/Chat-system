@@ -216,7 +216,7 @@ export async function translateWithGoogleGtx(
     // Normalize Roman Urdu detection (Google GTX often flags as hi, id, tl, sw, so, or en)
     if (
       (detected === 'hi' || detected === 'id' || detected === 'tl' || detected === 'sw' || detected === 'so' || detected === 'en') &&
-      (ROMAN_URDU_WORDS_REGEX.test(text.toLowerCase()) || /[\u0600-\u06FF]/.test(text))
+      ROMAN_URDU_WORDS_REGEX.test(text.toLowerCase())
     ) {
       detected = 'ur';
     }
@@ -321,26 +321,73 @@ const ROMAN_HINDI_WORDS_REGEX =
   /\b(namaste|namaskar|dhanyawad|dhanyavad|kripya|kripaya|kaise ho|kaisi ho|theek hu|theek hoon|pranam|shubh|puchna|pucho)\b/i;
 
 /**
- * Normalizes detected language codes with high accuracy for Urdu, Hindi, English, etc.
+ * Normalizes detected language codes with high accuracy for Arabic, Urdu, Persian, Hindi, English, etc.
  */
 export function normalizeDetectedLanguage(code: string, text: string): string {
   const c = (code || '').toLowerCase().split('-')[0];
-  const hasDevanagari = /[\u0900-\u097F]/.test(text || '');
-  const isRomanHindi = ROMAN_HINDI_WORDS_REGEX.test(text || '');
-  if (hasDevanagari || isRomanHindi) {
+  const trimmed = (text || '').trim();
+
+  // 1. If text has Devanagari script, it is Hindi (hi)
+  if (/[\u0900-\u097F]/.test(trimmed)) {
     return 'hi';
   }
 
-  const isRomanUrdu = ROMAN_URDU_WORDS_REGEX.test(text || '');
-  const hasArabicUrduScript = /[\u0600-\u06FF]/.test(text || '');
-  if (isRomanUrdu || hasArabicUrduScript) {
+  // 2. If text is Roman Hindi (Latin transliteration)
+  if (ROMAN_HINDI_WORDS_REGEX.test(trimmed)) {
+    return 'hi';
+  }
+
+  // 3. If text is Roman Urdu (Latin transliteration like "kya haal hai", "mujhe discount chahiye")
+  if (ROMAN_URDU_WORDS_REGEX.test(trimmed)) {
     return 'ur';
   }
 
-  if (c === 'hi') {
-    return hasDevanagari || isRomanHindi ? 'hi' : 'ur';
+  // 4. If text contains Arabic/Persian/Urdu script ([\u0600-\u06FF])
+  if (/[\u0600-\u06FF]/.test(trimmed)) {
+    // If explicitly identified as Arabic, Persian, Pashto, Sindhi, Uyghur, or Kurdish, respect that code:
+    if (c === 'ar' || c === 'fa' || c === 'ps' || c === 'sd' || c === 'ug' || c === 'ckb') {
+      return c;
+    }
+    if (c === 'ur') {
+      // Check if it's true Urdu or Arabic misclassified as Urdu
+      if (
+        /[ٹڈڑںے]/.test(trimmed) ||
+        /\b(کیا|ہیں|ہے|نہیں|آپ|کیوں|کیسے|شکریہ|چاہیے|بتائیں|بتائیے|ہوں|ہوگا|ہوگی|تھا|تھی|تھے|مجھے|مجھکو|ہماری|ہمارا|ہمارے|کرو|کریں|کرنا)\b/.test(trimmed)
+      ) {
+        return 'ur';
+      }
+      // If it contains common Arabic words, it is Arabic (not Urdu)
+      if (/\b(مرحبا|أهلا|اهلا|كيف|حالك|سعر|شكرا|أريد|اريد|هذا|هذه|من فضلك|لو سمحت|السلام عليكم|نعم|لا|ماذا|لماذا|اين|أين|متى|كم|معلومات|خدمة)\b/.test(trimmed)) {
+        return 'ar';
+      }
+      return 'ur';
+    }
+
+    // If code was misdetected as 'en', 'sw', 'id', 'so', etc., identify by alphabet/lexicon:
+    if (
+      /[ٹڈڑںے]/.test(trimmed) ||
+      /\b(کیا|ہیں|ہے|نہیں|آپ|کیوں|کیسے|شکریہ|چاہیے|بتائیں|بتائیے|ہوں|ہوگا|ہوگی|تھا|تھی|تھے|مجھے|مجھکو|ہماری|ہمارا|ہمارے|کرو|کریں|کرنا)\b/.test(trimmed)
+    ) {
+      return 'ur';
+    }
+    if (/[گچپژ]/.test(trimmed)) {
+      return 'fa';
+    }
+    if (/[ښځڅډړڼږ]/.test(trimmed)) {
+      return 'ps';
+    }
+    if (/[ٻڄݙڳڱ]/.test(trimmed)) {
+      return 'sd';
+    }
+    return 'ar';
   }
-  return c || 'en';
+
+  // 5. If code is a valid supported language in SUPPORTED_LANGUAGES, keep it!
+  if (c && SUPPORTED_LANGUAGES[c]) {
+    return c;
+  }
+
+  return 'en';
 }
 
 /**
@@ -367,19 +414,28 @@ export function detectLanguage(text: string): { code: string; name: string } {
     return { code: 'ur', name: 'Urdu (Roman)' };
   }
 
-  // Arabic / Urdu / Persian script detection
+  // Arabic / Urdu / Persian / Pashto script detection
   if (/[\u0600-\u06FF]/.test(trimmed)) {
-    // Urdu-specific letters or common words
+    // Urdu-specific letters (ٹڈڑںے) or Urdu-unique grammar words
     if (
-      /[ٹڈڑںےھچپگ]/.test(trimmed) ||
-      /\b(کیا|ہیں|ہے|نہیں|آپ|کیوں|کیسے|سلام|شکریہ|معلومات|ضرورت|چاہیے|قیمت)\b/.test(trimmed)
+      /[ٹڈڑںے]/.test(trimmed) ||
+      /\b(کیا|ہیں|ہے|نہیں|آپ|کیوں|کیسے|شکریہ|چاہیے|بتائیں|بتائیے|ہوں|ہوگا|ہوگی|تھا|تھی|تھے|مجھے|مجھکو|ہماری|ہمارا|ہمارے|کرو|کریں|کرنا)\b/.test(trimmed)
     ) {
       return { code: 'ur', name: 'Urdu' };
+    }
+    // Pashto specific: ښځڅډړڼږ
+    if (/[ښځڅډړڼږ]/.test(trimmed)) {
+      return { code: 'ps', name: 'Pashto' };
+    }
+    // Sindhi specific: ٻڄݙڳڱ
+    if (/[ٻڄݙڳڱ]/.test(trimmed)) {
+      return { code: 'sd', name: 'Sindhi' };
     }
     // Persian specific: گچپژ
     if (/[گچپژ]/.test(trimmed)) {
       return { code: 'fa', name: 'Persian' };
     }
+    // Standard Arabic
     return { code: 'ar', name: 'Arabic' };
   }
 
@@ -451,12 +507,22 @@ export function detectLanguage(text: string): { code: string; name: string } {
     return { code: 'ru', name: 'Russian' };
   }
 
-  // Vietnamese diacritics
-  if (/[àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ]/i.test(trimmed)) {
+  // Vietnamese diacritics (authentic Vietnamese letters: đ, ư, ơ, ă, or specific Vietnamese tone marks)
+  if (/[đươă]/i.test(trimmed) || /[ầấậẩẫằắặẳẵềếệểễồốộổỗờớợởỡừứựửữỳỵỷỹạảãẹẻẽịỉĩọỏõụủũ]/i.test(trimmed)) {
     return { code: 'vi', name: 'Vietnamese' };
   }
 
   const lower = trimmed.toLowerCase();
+
+  // Turkish patterns (check before French to avoid 'ü' or 'ç' collisions)
+  if (
+    /\b(merhaba|selam|nasil|nasilsiniz|fiyat|fiyatı|ucret|yardim|tesekkur|tesekkür|lutfen|lütfen|kadar|urun|ürün|ürünün)\b/i.test(
+      lower
+    ) ||
+    /[ğışİ]/.test(trimmed)
+  ) {
+    return { code: 'tr', name: 'Turkish' };
+  }
 
   // Italian patterns (check before Roman Urdu to avoid collisions like 'ho', 'carta', etc.)
   if (
@@ -469,42 +535,32 @@ export function detectLanguage(text: string): { code: string; name: string } {
 
   // Spanish patterns
   if (
-    /\b(hola|por favor|gracias|buenos|dias|noches|cuanto|cuesta|precio|ayuda|ayudar|ayudarle|podemos|puedo|necesito|quiero|donde|cuando|orden|pedido|descuento)\b/i.test(
+    /\b(hola|por favor|gracias|buenos|dias|noches|cuanto|cuánto|cuesta|precio|ayuda|ayudar|ayudarle|podemos|puedo|necesito|quiero|donde|dónde|cuando|cuándo|orden|pedido|descuento|este|esta|producto)\b/i.test(
       lower
     ) ||
-    /[¿¡áéíóúñ]/.test(lower)
+    /[¿¡ñ]/.test(lower)
   ) {
     return { code: 'es', name: 'Spanish' };
   }
 
   // French patterns
   if (
-    /\b(bonjour|bonsoir|merci|combien|coute|prix|aide|aider|pouvons|besoin|ou|quand|comment|salut|commande)\b/i.test(
+    /\b(bonjour|bonsoir|merci|combien|coute|coûte|prix|aide|aider|pouvons|besoin|ou|où|quand|comment|salut|commande)\b/i.test(
       lower
     ) ||
-    /[éàèùâêîôûçëïüœ]/.test(lower)
+    /[éàèùâêîôûëïœæç]/.test(lower)
   ) {
     return { code: 'fr', name: 'French' };
   }
 
   // German patterns
   if (
-    /\b(hallo|guten|morgen|tag|danke|bitte|wieviel|kostet|preis|hilfe|helfen|können|brauche|wo|wann|wie|bestellung|rabatt)\b/i.test(
+    /\b(hallo|guten|morgen|tag|danke|bitte|wieviel|kostet|preis|hilfe|helfen|können|brauche|wo|wann|wie|bestellung|rabatt|dieses|produkt)\b/i.test(
       lower
     ) ||
     /[äöüß]/.test(lower)
   ) {
     return { code: 'de', name: 'German' };
-  }
-
-  // Turkish patterns
-  if (
-    /\b(merhaba|selam|nasil|nasilsiniz|fiyat|ucret|yardim|tesekkur|tesekkür|lutfen|lütfen)\b/i.test(
-      lower
-    ) ||
-    /[çğıöşü]/.test(lower)
-  ) {
-    return { code: 'tr', name: 'Turkish' };
   }
 
   // Portuguese patterns
