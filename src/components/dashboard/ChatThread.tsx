@@ -771,42 +771,39 @@ export function ChatThread({
       return languageOverride;
     }
 
-    // 1. Scan visitor messages in the thread (most recent visitor message determines current language)
-    const lastVisitorMsg = [...displayMessages]
+    // 1. Scan visitor messages in the thread (most recent visitor message with linguistic content determines current language)
+    const visitorMsgs = [...displayMessages].filter(
+      (m) => m.sender_type === 'visitor' && m.content?.trim()
+    );
+
+    const lastWithLetters = [...visitorMsgs]
       .reverse()
-      .find((m) => m.sender_type === 'visitor' && m.content?.trim());
+      .find((m) => /[a-zA-Z\u00C0-\uFFFF]/.test(m.content.trim()));
 
-    if (lastVisitorMsg) {
-      const text = lastVisitorMsg.content.trim();
-      // Skip purely numeric/punctuation messages or empty
-      if (/[a-zA-Z\u00C0-\uFFFF]/.test(text)) {
-        const transLang =
-          inboundTranslations[lastVisitorMsg.id]?.detectedLanguage ||
-          lastVisitorMsg.metadata?.translation?.detected_language ||
-          lastVisitorMsg.metadata?.detected_language;
+    const targetMsg = lastWithLetters || visitorMsgs[visitorMsgs.length - 1];
 
-        // If explicitly detected and supported
-        const normalizedLang = transLang ? normalizeDetectedLanguage(transLang, text) : '';
-        if (normalizedLang && SUPPORTED_LANGUAGES[normalizedLang]) {
-          return normalizedLang;
-        }
+    if (targetMsg) {
+      const text = targetMsg.content.trim();
+      const transLang =
+        inboundTranslations[targetMsg.id]?.detectedLanguage ||
+        targetMsg.metadata?.translation?.detected_language ||
+        targetMsg.metadata?.detected_language;
 
-        const det = detectLanguage(text);
-        if (det.code && SUPPORTED_LANGUAGES[det.code]) {
-          return normalizeDetectedLanguage(det.code, text);
-        }
+      // If explicitly detected and supported
+      const normalizedLang = transLang ? normalizeDetectedLanguage(transLang, text) : '';
+      if (normalizedLang && SUPPORTED_LANGUAGES[normalizedLang]) {
+        return normalizedLang;
       }
-    }
 
-    // Check conversation channel_metadata if available
-    const convLang = (conversation.channel_metadata as any)?.visitor_language;
-    if (convLang && convLang !== 'auto' && SUPPORTED_LANGUAGES[convLang]) {
-      return convLang;
+      const det = detectLanguage(text);
+      if (det.code && SUPPORTED_LANGUAGES[det.code]) {
+        return normalizeDetectedLanguage(det.code, text);
+      }
     }
 
     // STRICT LOGIC: Default to English ('en') if no visitor messages or purely numeric
     return 'en';
-  }, [displayMessages, languageOverride, inboundTranslations, conversation.channel_metadata]);
+  }, [displayMessages, languageOverride, inboundTranslations]);
 
   const handleLanguageOverride = async (code: string) => {
     const next = code === 'auto' ? null : code;
@@ -988,9 +985,21 @@ export function ChatThread({
       let translationMetadata: Record<string, any> | null = null;
 
       // Determine customer target language strictly for the specific message being answered
-      const targetVisitorMsg = (replyTo && replyTo.sender_type === 'visitor')
+      let targetVisitorMsg = (replyTo && replyTo.sender_type === 'visitor')
         ? replyTo
-        : [...displayMessages].reverse().find((m) => m.sender_type === 'visitor' && m.content?.trim());
+        : undefined;
+
+      if (!targetVisitorMsg) {
+        const visitorMsgs = [...displayMessages].filter(
+          (m) => m.sender_type === 'visitor' && m.content?.trim()
+        );
+        // Find most recent visitor message with linguistic words
+        const lastWithLetters = [...visitorMsgs]
+          .reverse()
+          .find((m) => /[a-zA-Z\u00C0-\uFFFF]/.test(m.content.trim()));
+
+        targetVisitorMsg = lastWithLetters || visitorMsgs[visitorMsgs.length - 1];
+      }
 
       let currentCustomerLang = 'en';
       if (targetVisitorMsg && targetVisitorMsg.content) {
@@ -1011,34 +1020,8 @@ export function ChatThread({
         }
       }
 
-      // Check conversation channel_metadata if visitor_language was already established
-      const convVisitorLang = (conversation.channel_metadata as any)?.visitor_language;
-      if (currentCustomerLang === 'en' && convVisitorLang && convVisitorLang !== 'en' && SUPPORTED_LANGUAGES[convVisitorLang]) {
-        currentCustomerLang = convVisitorLang;
-      }
-
-      // Check if our own previous agent reply in this thread was translated to customer's language!
-      // If we already sent a message to this customer in Urdu/Hindi, any consecutive agent messages
-      // MUST stay in that exact customer language until the customer sends a new message in another language!
-      if (currentCustomerLang === 'en') {
-        const lastAgentMsg = [...displayMessages]
-          .reverse()
-          .find((m) => m.sender_type === 'agent' && !m.is_internal && (m.metadata?.translation?.target_language || m.metadata?.target_language));
-        const prevTargetLang = lastAgentMsg?.metadata?.translation?.target_language || lastAgentMsg?.metadata?.target_language;
-        if (prevTargetLang && prevTargetLang !== 'en' && SUPPORTED_LANGUAGES[prevTargetLang]) {
-          currentCustomerLang = prevTargetLang;
-        }
-      }
-
-      // Check detectedVisitorLang or targetLanguage state
-      if (currentCustomerLang === 'en' && detectedVisitorLang && detectedVisitorLang !== 'en') {
-        currentCustomerLang = detectedVisitorLang;
-      }
-      if (currentCustomerLang === 'en' && targetLanguage && targetLanguage !== 'en') {
-        currentCustomerLang = targetLanguage;
-      }
-
       // Manual override wins if explicitly set by agent; otherwise STRICTLY stay in customer's language!
+      // If customer writes in English -> currentCustomerLang is 'en'. NEVER override English to Hindi or another language!
       const effectiveCustomerLang = languageOverride || currentCustomerLang || 'en';
 
       // Check if agent typed in a foreign language (e.g. Urdu, Roman Urdu, Hindi)
@@ -1120,8 +1103,8 @@ export function ChatThread({
         setAutoTranslateEnabled(effectiveCustomerLang !== 'en');
       }
 
-      // Persist the active customer language in conversation metadata so subsequent messages never lose it
-      if (!isInternal && effectiveCustomerLang !== 'en') {
+      // Persist the active customer language in conversation metadata so subsequent messages reflect it
+      if (!isInternal) {
         try {
           const supabase = createClient();
           await supabase.from('conversations').update({

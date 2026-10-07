@@ -213,8 +213,10 @@ export async function translateWithGoogleGtx(
     const rawDetected = data[2] || s;
     let detected = (rawDetected || 'en').toLowerCase().split('-')[0];
 
-    // Normalize Roman Urdu detection (Google GTX often flags as hi, id, tl, sw, so, or en)
-    if (
+    // English priority safeguard:
+    if (isLikelyEnglishText(text)) {
+      detected = 'en';
+    } else if (
       (detected === 'hi' || detected === 'id' || detected === 'tl' || detected === 'sw' || detected === 'so' || detected === 'en') &&
       ROMAN_URDU_WORDS_REGEX.test(text.toLowerCase())
     ) {
@@ -314,11 +316,43 @@ export async function translateViaFreeApi(
   return null;
 }
 
+export function isLikelyEnglishText(text: string): boolean {
+  if (!text || !text.trim()) return true;
+  const trimmed = text.trim();
+
+  // If text contains non-Latin scripts (Arabic, Devanagari, Cyrillic, Chinese, etc.), it's not English
+  if (
+    /[\u0600-\u06FF\u0900-\u097F\u0400-\u04FF\u4E00-\u9FFF\u3040-\u30FF\uAC00-\uD7AF\u0E00-\u0E7F\u0590-\u05FF]/.test(
+      trimmed
+    )
+  ) {
+    return false;
+  }
+
+  // Count distinct English grammar/vocabulary words
+  const ENGLISH_WORDS_REGEX =
+    /\b(the|is|are|am|was|were|be|been|being|have|has|had|do|does|did|will|would|shall|should|can|could|may|might|must|i|you|he|she|it|we|they|my|your|his|her|its|our|their|what|which|who|whom|whose|where|when|why|how|a|an|in|on|at|to|for|with|from|by|about|into|through|after|over|between|out|against|during|without|before|under|around|among|this|that|these|those|there|here|and|but|or|if|because|as|until|while|of|so|then|than|no|not|only|own|same|too|very|just|now|also|any|some|all|both|each|few|more|most|other|such|account|accounts|problem|issue|help|support|please|thanks|thank|sir|madam|hello|hi|hey|good|morning|evening|afternoon|night|yes|okay|ok|price|prices|cost|rule|rules|loss|losses|drawdown|time|credentials|access|failed|showing|consistency|balance|trading|trade|trades|profit|payout|status|check|update|updated|deposit|withdrawal|funded|instant|holding|amount|minimum|maximum|limit|limits|number|server|platform|login|password|email|link|site|page|step|challenge|percent|percentage|cant|cannot|don't|dont|doesnt|doesn't|wont|won't|want|need|give|take|get|tell|ask|buy|bought|order|service)\b/gi;
+
+  const matches = trimmed.match(ENGLISH_WORDS_REGEX);
+  if (matches && matches.length >= 2) {
+    return true;
+  }
+
+  if (matches && matches.length >= 1) {
+    const words = trimmed.split(/\s+/).filter(Boolean);
+    if (words.length <= 4 && matches.length >= Math.ceil(words.length / 2)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 const ROMAN_URDU_WORDS_REGEX =
-  /\b(hum|humein|humay|ham|hamara|hamari|main|mein|me|aap|ap|tum|aapko|apko|aapka|apka|aapki|apki|mera|meri|mere|mujhe|mujhko|mujhy|chahiye|chahye|chahie|shukriya|shukria|theek|thik|hai|hain|hoga|hogi|kya|kia|kaise|kese|kaisay|batao|bataen|bataiye|kitna|kitni|kitne|denge|dainge|karenge|krenge|karen|karo|karein|madad|acha|accha|salam|assalam|walekum|alaikum|nahi|nahin|bhi|kuch|koi|yeh|woh|mil|jayega|jayegi|milega|bhai|bhaia|bhaiya|bro|kab|kahan|kaha|kidhar|kidhr|kyun|kyu|bolo|bolen|bata|sun|suno|yar|yaar|kro|krna|karna|kr|raha|rahi|rahe|mila|miley|mile|lena|lo|lelo|dena|dedo|dein|pohncha|pohnchega|paisa|paise|rupay|rupee|rate|shuru|khatam|pehle|baad|abhi|wapas|return|kharidna|masla|rabta|rabtah|tasweer|cheez|waghera)\b/i;
+  /\b(humein|humay|hamara|hamari|mein|aap|aapko|apko|aapka|apka|aapki|apki|mera|meri|mere|mujhe|mujhko|mujhy|chahiye|chahye|chahie|shukriya|shukria|theek|thik|hoga|hogi|kya|kaise|kese|kaisay|batao|bataen|bataiye|kitna|kitni|kitne|denge|dainge|karenge|krenge|karen|karo|karein|madad|acha|accha|salam|assalam|walekum|alaikum|nahi|nahin|jayega|jayegi|milega|kidhar|kidhr|kyun|kyu|bolo|bolen|suno|kro|krna|karna|raha|rahi|rahe|pohnchega|paisa|paise|rupay|rupee|kharidna|rabta|rabtah|waghera)\b/i;
 
 const ROMAN_HINDI_WORDS_REGEX =
-  /\b(namaste|namaskar|dhanyawad|dhanyavad|kripya|kripaya|kaise ho|kaisi ho|theek hu|theek hoon|pranam|shubh|puchna|pucho)\b/i;
+  /\b(namaste|namaskar|dhanyawad|dhanyavad|kripya|kripaya|kaise ho|kaisi ho|theek hu|theek hoon|pranam|puchna|pucho)\b/i;
 
 /**
  * Normalizes detected language codes with high accuracy for Arabic, Urdu, Persian, Hindi, English, etc.
@@ -330,6 +364,12 @@ export function normalizeDetectedLanguage(code: string, text: string): string {
   // 1. If text has Devanagari script, it is Hindi (hi)
   if (/[\u0900-\u097F]/.test(trimmed)) {
     return 'hi';
+  }
+
+  // 1b. PRIORITY ENGLISH CHECK: If the text is clearly English Latin text, ALWAYS return 'en'!
+  // Never let country/browser or misdetected 'hi' / 'ur' override authentic English.
+  if (isLikelyEnglishText(trimmed)) {
+    return 'en';
   }
 
   // 2. If text is Roman Hindi (Latin transliteration)
@@ -382,7 +422,17 @@ export function normalizeDetectedLanguage(code: string, text: string): string {
     return 'ar';
   }
 
-  // 5. If code is a valid supported language in SUPPORTED_LANGUAGES, keep it!
+  // 5. If code was 'hi' but text has NO Devanagari script and NO Roman Hindi, it's NOT Hindi!
+  if (c === 'hi' && !/[\u0900-\u097F]/.test(trimmed)) {
+    return 'en';
+  }
+
+  // 6. If code was 'ur' but text has NO Arabic script and NO Roman Urdu, it's NOT Urdu!
+  if (c === 'ur' && !/[\u0600-\u06FF]/.test(trimmed)) {
+    return 'en';
+  }
+
+  // 7. If code is a valid supported language in SUPPORTED_LANGUAGES, keep it!
   if (c && SUPPORTED_LANGUAGES[c]) {
     return c;
   }
@@ -403,6 +453,11 @@ export function detectLanguage(text: string): { code: string; name: string } {
       trimmed
     )
   ) {
+    return { code: 'en', name: 'English' };
+  }
+
+  // Fast-track English text
+  if (isLikelyEnglishText(trimmed)) {
     return { code: 'en', name: 'English' };
   }
 

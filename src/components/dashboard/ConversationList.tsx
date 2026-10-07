@@ -497,10 +497,9 @@ const ConversationItem = memo(function ConversationItem({
             {(() => {
               const langCode =
                 (conv.channel_metadata as any)?.visitor_language ||
-                conv.visitor?.language ||
                 conv.last_message?.metadata?.translation?.detected_language ||
                 conv.last_message?.metadata?.detected_language;
-              if (langCode && langCode !== 'en') {
+              if (langCode && langCode !== 'en' && !langCode.startsWith('en')) {
                 return (
                   <span
                     title={`Visitor Language: ${langCode.toUpperCase()}`}
