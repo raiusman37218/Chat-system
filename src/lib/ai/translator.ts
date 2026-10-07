@@ -19,6 +19,7 @@ export interface LanguageInfo {
 }
 
 export const SUPPORTED_LANGUAGES: Record<string, LanguageInfo> = {
+  ab: { code: 'ab', name: 'Abkhazian', nativeName: 'Аҧсшәа', flag: '🇬🇪' },
   af: { code: 'af', name: 'Afrikaans', nativeName: 'Afrikaans', flag: '🇿🇦' },
   ak: { code: 'ak', name: 'Twi', nativeName: 'Twi', flag: '🇬🇭' },
   am: { code: 'am', name: 'Amharic', nativeName: 'አማርኛ', flag: '🇪🇹' },
@@ -422,6 +423,78 @@ export function normalizeDetectedLanguage(code: string, text: string): string {
     return 'ar';
   }
 
+  // 4b. Cyrillic scripts distinction
+  if (/[\u0400-\u052F]/.test(trimmed)) {
+    const CYR_BOUND = '(?:^|[^a-zA-Z\\u0400-\\u052F])';
+    const CYR_END = '(?:$|[^a-zA-Z\\u0400-\\u052F])';
+
+    // 1. Ukrainian (check before Kazakh because of shared 'і')
+    if (
+      /[їєґЇЄҐ]/.test(trimmed) ||
+      new RegExp(CYR_BOUND + '(привіт|вітаю|дякую|будь ласка|як справи|доброго|дня)' + CYR_END, 'i').test(trimmed) ||
+      (/[іІ]/.test(trimmed) && !/[әғқңөұүһӘҒҚҢӨҰҮҺ]/.test(trimmed))
+    ) {
+      return 'uk';
+    }
+
+    // 2. Abkhazian specific letters: ԥ, ҟ, ӡ, ҵ, ҷ, ҭ (NOT in Kazakh/Uzbek)
+    if (
+      /[ԥҟӡҵҷҭԤҞӠҴҶҬ]/.test(trimmed) ||
+      new RegExp(CYR_BOUND + '(шәшԥаҟоу|бзиала|итабуп)' + CYR_END, 'i').test(trimmed)
+    ) {
+      return 'ab';
+    }
+
+    // 3. Uzbek specific letters & vocabulary: ў, or Uzbek vocabulary words
+    if (
+      /[ўЎ]/.test(trimmed) ||
+      new RegExp(CYR_BOUND + '(салом|ассалому|алайкум|қандайсиз|қалайсиз|хайр|ёрдам|беринг|рахмат|раҳмат|илтимос|нархи|қанча|пул|мен|сиз|биз|нима|керак|яхши|бу)' + CYR_END, 'i').test(trimmed)
+    ) {
+      return 'uz';
+    }
+
+    // 4. Kazakh specific letters: ә, ғ, қ, ң, ө, ұ, ү, һ
+    if (
+      /[әғқңөұүһӘҒҚҢӨҰҮҺ]/.test(trimmed) ||
+      new RegExp(CYR_BOUND + '(сәлем|сәлеметсіз|қалайсыз|рахмет|көмек)' + CYR_END, 'i').test(trimmed)
+    ) {
+      return 'kk';
+    }
+
+    // 5. Belarusian: ў
+    if (/[ўЎ]/.test(trimmed)) {
+      return 'be';
+    }
+
+    // 6. Tajik: ӣ, ӯ, ҷ
+    if (/[ӣӯҷӢӮҶ]/.test(trimmed)) {
+      return 'tg';
+    }
+
+    // 7. Serbian / Macedonian
+    if (/[ђћџљњјЂЋЏЉЊЈ]/.test(trimmed)) {
+      return 'sr';
+    }
+    if (/[ѓѕќЃЅЌ]/.test(trimmed)) {
+      return 'mk';
+    }
+
+    // 8. Bulgarian
+    if (new RegExp(CYR_BOUND + '(здравейте|здрасти|благодаря|моля|как сте|колко)' + CYR_END, 'i').test(trimmed)) {
+      return 'bg';
+    }
+  }
+
+  // 4c. Uzbek Latin words
+  if (
+    /\b(salom|assalomu\s+alaykum|qandaysiz|qalaysiz|yordam|bering|rahmat|iltimos|narxi|qancha|hisob|kerak|yaxshi)\b/i.test(
+      trimmed
+    ) ||
+    /[oʻgʻOʻGʻ]/.test(trimmed)
+  ) {
+    return 'uz';
+  }
+
   // 5. If code was 'hi' but text has NO Devanagari script and NO Roman Hindi, it's NOT Hindi!
   if (c === 'hi' && !/[\u0900-\u097F]/.test(trimmed)) {
     return 'en';
@@ -554,11 +627,68 @@ export function detectLanguage(text: string): { code: string; name: string } {
     return { code: 'zh', name: 'Chinese' };
   }
 
-  // Cyrillic (Russian / Ukrainian)
-  if (/[\u0400-\u04FF]/.test(trimmed)) {
-    if (/[іїєґ]/i.test(trimmed)) {
+  // Cyrillic scripts (Abkhaz, Uzbek, Kazakh, Kyrgyz, Tajik, Ukrainian, Belarusian, Serbian, Macedonian, Bulgarian, Russian)
+  if (/[\u0400-\u052F]/.test(trimmed)) {
+    const CYR_BOUND = '(?:^|[^a-zA-Z\\u0400-\\u052F])';
+    const CYR_END = '(?:$|[^a-zA-Z\\u0400-\\u052F])';
+
+    // 1. Ukrainian (check before Kazakh because of shared 'і')
+    if (
+      /[їєґЇЄҐ]/.test(trimmed) ||
+      new RegExp(CYR_BOUND + '(привіт|вітаю|дякую|будь ласка|як справи|доброго|дня)' + CYR_END, 'i').test(trimmed) ||
+      (/[іІ]/.test(trimmed) && !/[әғқңөұүһӘҒҚҢӨҰҮҺ]/.test(trimmed))
+    ) {
       return { code: 'uk', name: 'Ukrainian' };
     }
+
+    // 2. Abkhazian specific letters: ԥ, ҟ, ӡ, ҵ, ҷ, ҭ (NOT in Kazakh/Uzbek)
+    if (
+      /[ԥҟӡҵҷҭԤҞӠҴҶҬ]/.test(trimmed) ||
+      new RegExp(CYR_BOUND + '(шәшԥаҟоу|бзиала|итабуп)' + CYR_END, 'i').test(trimmed)
+    ) {
+      return { code: 'ab', name: 'Abkhazian' };
+    }
+
+    // 3. Uzbek specific letters & vocabulary: ў, or Uzbek vocabulary words
+    if (
+      /[ўЎ]/.test(trimmed) ||
+      new RegExp(CYR_BOUND + '(салом|ассалому|алайкум|қандайсиз|қалайсиз|хайр|ёрдам|беринг|рахмат|раҳмат|илтимос|нархи|қанча|пул|мен|сиз|биз|нима|керак|яхши|бу)' + CYR_END, 'i').test(trimmed)
+    ) {
+      return { code: 'uz', name: 'Uzbek' };
+    }
+
+    // 4. Kazakh specific letters: ә, ғ, қ, ң, ө, ұ, ү, һ
+    if (
+      /[әғқңөұүһӘҒҚҢӨҰҮҺ]/.test(trimmed) ||
+      new RegExp(CYR_BOUND + '(сәлем|сәлеметсіз|қалайсыз|рахмет|көмек)' + CYR_END, 'i').test(trimmed)
+    ) {
+      return { code: 'kk', name: 'Kazakh' };
+    }
+
+    // 5. Belarusian: ў
+    if (/[ўЎ]/.test(trimmed)) {
+      return { code: 'be', name: 'Belarusian' };
+    }
+
+    // 6. Tajik: ӣ, ӯ, ҷ
+    if (/[ӣӯҷӢӮҶ]/.test(trimmed)) {
+      return { code: 'tg', name: 'Tajik' };
+    }
+
+    // 7. Serbian / Macedonian
+    if (/[ђћџљњјЂЋЏЉЊЈ]/.test(trimmed)) {
+      return { code: 'sr', name: 'Serbian' };
+    }
+    if (/[ѓѕќЃЅЌ]/.test(trimmed)) {
+      return { code: 'mk', name: 'Macedonian' };
+    }
+
+    // 8. Bulgarian
+    if (new RegExp(CYR_BOUND + '(здравейте|здрасти|благодаря|моля|как сте|колко)' + CYR_END, 'i').test(trimmed)) {
+      return { code: 'bg', name: 'Bulgarian' };
+    }
+
+    // 9. Default Cyrillic to Russian
     return { code: 'ru', name: 'Russian' };
   }
 
@@ -568,6 +698,16 @@ export function detectLanguage(text: string): { code: string; name: string } {
   }
 
   const lower = trimmed.toLowerCase();
+
+  // Uzbek patterns (Latin script)
+  if (
+    /\b(salom|assalomu\s+alaykum|qandaysiz|qalaysiz|yordam|bering|rahmat|iltimos|narxi|qancha|hisob|kerak|yaxshi)\b/i.test(
+      lower
+    ) ||
+    /[oʻgʻOʻGʻ]/.test(trimmed)
+  ) {
+    return { code: 'uz', name: 'Uzbek' };
+  }
 
   // Turkish patterns (check before French to avoid 'ü' or 'ç' collisions)
   if (
@@ -751,7 +891,7 @@ export async function translateToEnglish({
   }
 
   // 2. High-speed Google GTX translation & language auto-detection
-  const googleRes = await translateWithGoogleGtx(trimmed, 'en', detectedLanguage || 'auto');
+  const googleRes = await translateWithGoogleGtx(trimmed, 'en', 'auto');
   if (googleRes) {
     const code = normalizeDetectedLanguage(googleRes.detectedLanguage || 'en', trimmed);
     const langInfo = getLanguageInfo(code);
