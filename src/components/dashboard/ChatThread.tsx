@@ -810,7 +810,7 @@ export function ChatThread({
     setLocalLanguageOverrides((prev) => ({ ...prev, [conversation.id]: next }));
     const effectiveLang = next || detectedVisitorLang;
     setTargetLanguage(effectiveLang);
-    setAutoTranslateEnabled(effectiveLang !== 'en');
+    setAutoTranslateEnabled(false);
     try {
       const supabase = createClient();
       const meta: Record<string, unknown> = { ...((conversation.channel_metadata as Record<string, unknown>) || {}) };
@@ -860,71 +860,17 @@ export function ChatThread({
     }
     if (!languageOverride) {
       setTargetLanguage(detectedVisitorLang);
-      setAutoTranslateEnabled(detectedVisitorLang !== 'en');
+      setAutoTranslateEnabled(false);
     }
   }, [detectedVisitorLang, conversation.id, languageOverride]);
 
   // Set to track in-flight translation requests so we don't repeat them
   const inFlightTranslationsRef = useRef<Set<string>>(new Set());
 
-  // Auto-translate any incoming non-English visitor messages that haven't been translated yet
+  // Auto-translation of incoming messages disabled per user request
   useEffect(() => {
-    const untranslated = displayMessages.filter(
-      (m) =>
-        m.sender_type === 'visitor' &&
-        m.content?.trim() &&
-        !inFlightTranslationsRef.current.has(m.id) &&
-        (!m.metadata?.translation?.is_translated ||
-          !m.metadata?.translation?.english_text ||
-          (m.metadata?.translation?.detected_language !== 'en' &&
-            m.metadata?.translation?.english_text === m.content))
-    );
-
-    if (untranslated.length === 0) return;
-
-    untranslated.forEach((m) => {
-      inFlightTranslationsRef.current.add(m.id);
-      fetch('/api/translation/process-message', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          messageId: m.id,
-          conversationId: conversation.id,
-          text: m.content,
-          workspaceId: conversation.workspace_id,
-        }),
-      })
-        .then(async (res) => {
-          if (!res.ok) throw new Error('Translation failed');
-          const data = await res.json();
-          if (data?.success && data.englishText) {
-            setInboundTranslations((prev) => ({
-              ...prev,
-              [m.id]: {
-                englishText: data.englishText,
-                detectedLanguage: data.detectedLanguage || 'en',
-                languageName: data.languageName || 'English',
-                isOriginalEnglish: Boolean(data.isOriginalEnglish),
-              },
-            }));
-            if (!languageOverride) {
-              const detectedCode = data.detectedLanguage || 'en';
-              const latestVisitor = [...displayMessages]
-                .reverse()
-                .find((dm) => dm.sender_type === 'visitor' && dm.content?.trim());
-              if (!latestVisitor || latestVisitor.id === m.id) {
-                setTargetLanguage(detectedCode);
-                setAutoTranslateEnabled(detectedCode !== 'en');
-              }
-            }
-          }
-        })
-        .catch((e) => {
-          inFlightTranslationsRef.current.delete(m.id);
-          console.warn('Inbound translation trigger failed:', e);
-        });
-    });
-  }, [displayMessages, conversation.id, conversation.workspace_id, languageOverride]);
+    // Disabled
+  }, []);
 
   const handleSend = async () => {
     if ((!inputText.trim() && !pendingAttachment) || isSending || isTranslating) return;
@@ -1028,12 +974,8 @@ export function ChatThread({
       const agentInputLang = detectLanguage(text).code;
       const isAgentWritingForeign = effectiveCustomerLang === 'en' && agentInputLang !== 'en';
 
-      // Auto-translate reply if customer speaks a foreign language, OR if agent typed foreign text
-      // Support agents never have to manually toggle — it seamlessly routes in customer's language
-      const shouldTranslate =
-        !isInternal &&
-        text.trim().length > 0 &&
-        (effectiveCustomerLang !== 'en' || isAgentWritingForeign);
+      // Auto-translate disabled per user request: Agent replies are sent exactly as typed
+      const shouldTranslate = false;
 
       if (shouldTranslate) {
         setIsTranslating(true);
@@ -1100,7 +1042,7 @@ export function ChatThread({
       setReplyTo(null);
       if (!languageOverride) {
         setTargetLanguage(effectiveCustomerLang);
-        setAutoTranslateEnabled(effectiveCustomerLang !== 'en');
+        setAutoTranslateEnabled(false);
       }
 
       // Persist the active customer language in conversation metadata so subsequent messages reflect it

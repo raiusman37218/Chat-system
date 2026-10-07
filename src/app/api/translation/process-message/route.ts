@@ -1,10 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { serviceClient } from '@/lib/supabase/service';
-import { providerConfigFrom } from '@/lib/ai/help-answer';
-import {
-  detectLanguage,
-  translateToEnglish,
-} from '@/lib/ai/translator';
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -21,9 +15,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const {
       messageId,
-      conversationId,
       text,
-      workspaceId,
     } = body;
 
     if (!messageId && !text) {
@@ -35,116 +27,21 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ skipped: true, reason: 'Empty text' }, { headers: CORS_HEADERS });
     }
 
-    const detected = detectLanguage(messageText);
-    const supabase = serviceClient();
-
-    let providerConfig = null;
-    let convWorkspaceId = workspaceId;
-
-    if (!convWorkspaceId && conversationId) {
-      const { data: conv } = await supabase
-        .from('conversations')
-        .select('workspace_id, channel_metadata, visitor_id')
-        .eq('id', conversationId)
-        .maybeSingle();
-
-      if (conv) {
-        convWorkspaceId = conv.workspace_id;
-      }
-    }
-
-    if (convWorkspaceId) {
-      const { data: ws } = await supabase
-        .from('workspaces')
-        .select('ai_settings')
-        .eq('id', convWorkspaceId)
-        .maybeSingle();
-
-      if (ws) {
-        providerConfig = providerConfigFrom(ws.ai_settings);
-      }
-    }
-
-    // Translate to English
-    const res = await translateToEnglish({
-      text: messageText,
-      detectedLanguage: detected.code !== 'en' ? detected.code : undefined,
-      providerConfig,
-    });
-
-    const finalDetectedCode = res.detectedLanguageCode || detected.code || 'en';
-    const isNonEnglish = finalDetectedCode !== 'en' && !res.isOriginalEnglish;
-
-    // If messageId provided, update message row in database
-    if (messageId) {
-      const { data: existingMsg } = await supabase
-        .from('messages')
-        .select('metadata')
-        .eq('id', messageId)
-        .maybeSingle();
-
-      const existingMeta = (existingMsg?.metadata as Record<string, any>) || {};
-
-      await supabase
-        .from('messages')
-        .update({
-          metadata: {
-            ...existingMeta,
-            translation: {
-              is_translated: isNonEnglish,
-              direction: 'visitor_to_agent',
-              original_text: messageText,
-              english_text: res.englishText,
-              detected_language: finalDetectedCode,
-              language_name: res.sourceLanguage,
-            },
-            detected_language: finalDetectedCode,
-            language_name: res.sourceLanguage,
-            english_translation: res.englishText,
-          },
-        })
-        .eq('id', messageId);
-    }
-
-    // Update conversation visitor language
-    if (conversationId) {
-      const { data: conv } = await supabase
-        .from('conversations')
-        .select('channel_metadata, visitor_id')
-        .eq('id', conversationId)
-        .maybeSingle();
-
-      if (conv) {
-        const existingChanMeta = (conv.channel_metadata as Record<string, any>) || {};
-
-        await supabase
-          .from('conversations')
-          .update({
-            channel_metadata: {
-              ...existingChanMeta,
-              visitor_language: isNonEnglish ? finalDetectedCode : 'en',
-              language_name: isNonEnglish ? res.sourceLanguage : 'English',
-            },
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', conversationId);
-      }
-    }
-
+    // Auto-translation is disabled per user request
     return NextResponse.json(
       {
-        success: true,
-        detectedLanguage: finalDetectedCode,
-        languageName: res.sourceLanguage,
-        isOriginalEnglish: !isNonEnglish,
-        englishText: res.englishText,
+        skipped: true,
+        reason: 'Auto-translation is disabled',
+        englishText: messageText,
+        detectedLanguage: 'en',
+        languageName: 'English',
+        isOriginalEnglish: true,
       },
       { headers: CORS_HEADERS }
     );
-  } catch (error: any) {
-    console.error('[Process Message Translation Error]:', error);
+  } catch (err: any) {
     return NextResponse.json(
-      { error: error.message || 'Processing failed' },
+      { error: err?.message || 'Internal server error' },
       { status: 500, headers: CORS_HEADERS }
     );
   }

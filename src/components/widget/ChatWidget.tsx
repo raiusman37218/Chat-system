@@ -856,19 +856,7 @@ export default function ChatWidget({
           prev.map((m) => (m.id === tempId ? savedMsg : m))
         );
 
-        // Trigger automatic translation so agents receive it in English
-        if (text) {
-          fetch('/api/translation/process-message', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              messageId: savedMsg.id,
-              conversationId: activeConvId,
-              text,
-              workspaceId: config.workspaceId,
-            }),
-          }).catch((err) => console.warn('[ChatWidget] Translation trigger error:', err));
-        }
+        // Auto-translation trigger disabled per user request
 
         // Every visitor message gets a chance at an AI reply. The route decides
         // whether the assistant is on for this conversation.

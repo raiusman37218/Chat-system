@@ -193,79 +193,10 @@ export async function POST(req: NextRequest) {
 
     const aiSettings = workspace?.ai_settings;
 
-    // Automatic Language Detection & English Translation for Support Agents
+    // Language detection without auto-translation (auto-translation is disabled per user request)
     let detected = { code: 'en', name: 'English' };
     if (visitorMsg && visitorMsg.content) {
       detected = detectLanguage(visitorMsg.content);
-      if (detected.code !== 'en' && (!visitorMsg.metadata?.english_translation && !visitorMsg.metadata?.translation?.english_text)) {
-        try {
-          const trans = await translateToEnglish({
-            text: visitorMsg.content,
-            detectedLanguage: detected.code,
-            providerConfig: providerConfigFrom(aiSettings),
-          });
-          const englishTranslation = trans.englishText;
-
-          await supabase
-            .from('messages')
-            .update({
-              metadata: {
-                ...(visitorMsg.metadata || {}),
-                translation: {
-                  is_translated: true,
-                  direction: 'visitor_to_agent',
-                  original_text: visitorMsg.content,
-                  english_text: englishTranslation,
-                  detected_language: detected.code,
-                  language_name: trans.sourceLanguage,
-                },
-                detected_language: detected.code,
-                language_name: trans.sourceLanguage,
-                english_translation: englishTranslation,
-              },
-            })
-            .eq('id', visitorMsg.id);
-
-          await supabase
-            .from('conversations')
-            .update({
-              channel_metadata: {
-                ...((conv?.channel_metadata as Record<string, any>) || {}),
-                visitor_language: detected.code,
-                language_name: trans.sourceLanguage,
-              },
-            })
-            .eq('id', conversation_id);
-        } catch (err) {
-          console.warn('[Auto-Respond] Inbound translation error:', err);
-        }
-      } else if (detected.code === 'en') {
-        try {
-          await supabase
-            .from('messages')
-            .update({
-              metadata: {
-                ...(visitorMsg.metadata || {}),
-                detected_language: 'en',
-                language_name: 'English',
-              },
-            })
-            .eq('id', visitorMsg.id);
-
-          await supabase
-            .from('conversations')
-            .update({
-              channel_metadata: {
-                ...((conv?.channel_metadata as Record<string, any>) || {}),
-                visitor_language: 'en',
-                language_name: 'English',
-              },
-            })
-            .eq('id', conversation_id);
-        } catch (err) {
-          console.warn('[Auto-Respond] Inbound English sync error:', err);
-        }
-      }
     }
 
     if (aiSettings && (!aiSettings.enabled || !aiSettings.auto_response_enabled)) {
@@ -411,48 +342,8 @@ export async function POST(req: NextRequest) {
       return json({ replied: false, reason: 'Conversation status changed during generation' });
     }
 
-    // STRICT PER-MESSAGE LANGUAGE GUARANTEE:
-    // Ensure the AI auto-response strictly matches the incoming visitor message's language
-    const currentReplyLang = detectLanguage(aiResponseText).code;
-    if (detected.code === 'en' && currentReplyLang !== 'en') {
-      try {
-        const toEn = await translateToEnglish({
-          text: aiResponseText,
-          detectedLanguage: currentReplyLang,
-          providerConfig: providerConfigFrom(aiSettings),
-        });
-        if (toEn.englishText) aiResponseText = toEn.englishText;
-      } catch (err) {
-        console.warn('[Auto-Respond] Language correction to English failed:', err);
-      }
-    } else if (detected.code !== 'en' && currentReplyLang === 'en') {
-      try {
-        const toTarget = await translateAgentReply({
-          text: aiResponseText,
-          targetLanguageCode: detected.code,
-          providerConfig: providerConfigFrom(aiSettings),
-          businessName: workspace?.name,
-        });
-        if (toTarget.translatedText) aiResponseText = toTarget.translatedText;
-      } catch (err) {
-        console.warn('[Auto-Respond] Language correction to customer language failed:', err);
-      }
-    }
-
-    // If response was delivered in native language, get English version for agents in dashboard
-    let aiEnglishTranslation = aiResponseText;
-    if (detected.code !== 'en') {
-      try {
-        const transAi = await translateToEnglish({
-          text: aiResponseText,
-          detectedLanguage: detected.code,
-          providerConfig: providerConfigFrom(aiSettings),
-        });
-        aiEnglishTranslation = transAi.englishText;
-      } catch {
-        aiEnglishTranslation = aiResponseText;
-      }
-    }
+    // Auto-translation disabled per user request: AI response is sent directly without translation
+    const aiEnglishTranslation = aiResponseText;
 
     // 4. Insert message as 'ai' sender with idempotency keys
     const { data: insertedMsg, error: msgErr } = await supabase
