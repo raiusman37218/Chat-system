@@ -28,6 +28,7 @@ export async function POST(req: NextRequest) {
       targetLanguage,
       sourceLanguage,
       workspaceId,
+      romanize,
     } = body;
 
     if (!text || !text.trim()) {
@@ -89,6 +90,7 @@ export async function POST(req: NextRequest) {
         sourceLanguageCode: sourceLanguage,
         providerConfig,
         businessName,
+        romanize: Boolean(romanize),
       });
 
       return NextResponse.json(

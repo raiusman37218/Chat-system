@@ -64,6 +64,7 @@ import {
   detectLanguage,
   SUPPORTED_LANGUAGES,
   getLanguageInfo,
+  isLikelyEnglishText,
   normalizeDetectedLanguage,
 } from '@/lib/ai/translator';
 
@@ -202,6 +203,7 @@ export function ChatThread({
         detectedLanguage: string;
         languageName: string;
         isOriginalEnglish: boolean;
+        isRoman?: boolean;
       }
     >
   >({});
@@ -755,6 +757,7 @@ export function ChatThread({
             english_text: trans.englishText,
             detected_language: trans.detectedLanguage,
             language_name: trans.languageName,
+            is_roman: Boolean(trans.isRoman),
           },
           detected_language: trans.detectedLanguage,
           language_name: trans.languageName,
@@ -776,9 +779,16 @@ export function ChatThread({
       (m) => m.sender_type === 'visitor' && m.content?.trim()
     );
 
-    const lastWithLetters = [...visitorMsgs]
+    const withLetters = [...visitorMsgs]
       .reverse()
-      .find((m) => /[a-zA-Z\u00C0-\uFFFF]/.test(m.content.trim()));
+      .filter((m) => /[a-zA-Z\u00C0-\uFFFF]/.test(m.content.trim()));
+    // "ok" or "thanks" after a conversation in Spanish is not a switch to
+    // English: skip one- and two-word English acknowledgements when an
+    // earlier message says more.
+    const isShortEnglish = (m: Message) =>
+      m.content.trim().split(/\s+/).length <= 2 &&
+      (m.metadata?.translation?.detected_language || detectLanguage(m.content).code) === 'en';
+    const lastWithLetters = withLetters.find((m) => !isShortEnglish(m)) || withLetters[0];
 
     const targetMsg = lastWithLetters || visitorMsgs[visitorMsgs.length - 1];
 
@@ -810,7 +820,7 @@ export function ChatThread({
     setLocalLanguageOverrides((prev) => ({ ...prev, [conversation.id]: next }));
     const effectiveLang = next || detectedVisitorLang;
     setTargetLanguage(effectiveLang);
-    setAutoTranslateEnabled(false);
+    setAutoTranslateEnabled(effectiveLang !== 'en');
     try {
       const supabase = createClient();
       const meta: Record<string, unknown> = { ...((conversation.channel_metadata as Record<string, unknown>) || {}) };
@@ -858,19 +868,63 @@ export function ChatThread({
     if (isNewConv) {
       prevConvIdRef.current = conversation.id;
     }
-    if (!languageOverride) {
-      setTargetLanguage(detectedVisitorLang);
-      setAutoTranslateEnabled(false);
-    }
+    // Replies go out in the customer's language by default; the agent can
+    // still switch it off for this conversation from the Translate menu.
+    const lang = languageOverride || detectedVisitorLang;
+    setTargetLanguage(lang);
+    setAutoTranslateEnabled(lang !== 'en');
   }, [detectedVisitorLang, conversation.id, languageOverride]);
 
   // Set to track in-flight translation requests so we don't repeat them
   const inFlightTranslationsRef = useRef<Set<string>>(new Set());
 
-  // Auto-translation of incoming messages disabled per user request
+  // Every visitor message is shown to agents in English. The server usually
+  // translates it as soon as it arrives; this catches anything it missed
+  // (older messages, other channels). Messages already processed — English
+  // ones included — carry metadata.translation and are skipped, so reopening
+  // a thread does not translate it all over again.
   useEffect(() => {
-    // Disabled
-  }, []);
+    const untranslated = displayMessages.filter(
+      (m) =>
+        m.sender_type === 'visitor' &&
+        m.content?.trim() &&
+        !m.id.startsWith('temp') &&
+        !inFlightTranslationsRef.current.has(m.id) &&
+        !m.metadata?.translation?.english_text &&
+        // Plainly English text needs no round trip.
+        !isLikelyEnglishText(m.content)
+    );
+
+    untranslated.forEach((m) => {
+      inFlightTranslationsRef.current.add(m.id);
+      fetch('/api/translation/process-message', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messageId: m.id }),
+      })
+        .then(async (res) => {
+          if (!res.ok) throw new Error('Translation failed');
+          const data = await res.json();
+          if (data?.success && data.englishText) {
+            setInboundTranslations((prev) => ({
+              ...prev,
+              [m.id]: {
+                englishText: data.englishText,
+                detectedLanguage: data.detectedLanguage || 'en',
+                languageName: data.languageName || 'English',
+                isOriginalEnglish: Boolean(data.isOriginalEnglish),
+                isRoman: Boolean(data.isRoman),
+              },
+            }));
+          }
+        })
+        .catch((e) => {
+          // Allow a later retry (e.g. the next render after a network blip).
+          setTimeout(() => inFlightTranslationsRef.current.delete(m.id), 15_000);
+          console.warn('Inbound translation failed:', e);
+        });
+    });
+  }, [displayMessages]);
 
   const handleSend = async () => {
     if ((!inputText.trim() && !pendingAttachment) || isSending || isTranslating) return;
@@ -970,12 +1024,28 @@ export function ChatThread({
       // If customer writes in English -> currentCustomerLang is 'en'. NEVER override English to Hindi or another language!
       const effectiveCustomerLang = languageOverride || currentCustomerLang || 'en';
 
-      // Check if agent typed in a foreign language (e.g. Urdu, Roman Urdu, Hindi)
-      const agentInputLang = detectLanguage(text).code;
-      const isAgentWritingForeign = effectiveCustomerLang === 'en' && agentInputLang !== 'en';
+      // The language picked in the Translate menu is what the composer
+      // promises ("Translate & Send"), so it is what the customer gets.
+      const replyLang = autoTranslateEnabled ? targetLanguage || effectiveCustomerLang : 'en';
 
-      // Auto-translate disabled per user request: Agent replies are sent exactly as typed
-      const shouldTranslate = false;
+      // Check if agent typed in a foreign language (e.g. Urdu, Roman Urdu, Hindi)
+      const agentInputLang = text ? detectLanguage(text).code : 'en';
+      const isAgentWritingForeign = replyLang === 'en' && agentInputLang !== 'en' && !isLikelyEnglishText(text);
+
+      // A customer who types Urdu/Hindi in Latin letters gets the reply in
+      // Latin letters too, not in a script they did not use.
+      const customerWritesRoman = Boolean(
+        targetVisitorMsg &&
+          (targetVisitorMsg.metadata?.translation?.is_roman ||
+            inboundTranslations[targetVisitorMsg.id]?.isRoman ||
+            (['ur', 'hi'].includes(replyLang) &&
+              /^[\p{Script=Latin}\P{L}]*$/u.test(targetVisitorMsg.content || '')))
+      );
+
+      const shouldTranslate =
+        !isInternal &&
+        text.trim().length > 0 &&
+        (replyLang !== 'en' || isAgentWritingForeign);
 
       if (shouldTranslate) {
         setIsTranslating(true);
@@ -986,8 +1056,9 @@ export function ChatThread({
             body: JSON.stringify({
               direction: 'agent_reply',
               text,
-              targetLanguage: effectiveCustomerLang,
+              targetLanguage: replyLang,
               workspaceId: conversation.workspace_id,
+              romanize: customerWritesRoman && replyLang !== 'en',
             }),
           });
           if (transRes.ok) {
@@ -1001,7 +1072,7 @@ export function ChatThread({
               finalContentToSend = data.translatedText.trim();
               const englishText = data.englishText?.trim() || text;
               const detectedLang = data.detectedSourceLanguage || 'en';
-              const langInfo = getLanguageInfo(effectiveCustomerLang);
+              const langInfo = getLanguageInfo(replyLang);
               translationMetadata = {
                 translation: {
                   is_translated: true,
@@ -1011,14 +1082,14 @@ export function ChatThread({
                   english_text: englishText,
                   original_english: englishText,
                   translated_text: finalContentToSend,
-                  target_language: effectiveCustomerLang,
+                  target_language: replyLang,
                   target_language_name: langInfo.name,
                 },
                 english_text: englishText,
                 original_english: englishText,
                 original_agent_input: text,
                 translated_text: finalContentToSend,
-                target_language: effectiveCustomerLang,
+                target_language: replyLang,
               };
             }
           }
@@ -1040,24 +1111,10 @@ export function ChatThread({
         translationMetadata
       );
       setReplyTo(null);
-      if (!languageOverride) {
-        setTargetLanguage(effectiveCustomerLang);
-        setAutoTranslateEnabled(false);
-      }
-
-      // Persist the active customer language in conversation metadata so subsequent messages reflect it
-      if (!isInternal) {
-        try {
-          const supabase = createClient();
-          await supabase.from('conversations').update({
-            channel_metadata: {
-              ...((conversation.channel_metadata as Record<string, any>) || {}),
-              visitor_language: effectiveCustomerLang,
-              language_name: getLanguageInfo(effectiveCustomerLang).name,
-            },
-          }).eq('id', conversation.id);
-        } catch (_) {}
-      }
+      // The conversation's language is kept by the server as visitor messages
+      // are translated. Writing channel_metadata from here would overwrite it
+      // with this component's stale copy — including the last_human_reply_at
+      // the send handler has just saved.
 
       // If customer is on WhatsApp, Instagram, Messenger, or LinkedIn, dispatch outbound
       if (!isInternal && conversation.channel && conversation.channel !== 'web') {
@@ -2885,6 +2942,7 @@ export function ChatThread({
                         <button
                           type="button"
                           onClick={() => {
+                            if (languageOverride) handleLanguageOverride('auto');
                             setTargetLanguage(detectedVisitorLang);
                             setAutoTranslateEnabled(detectedVisitorLang !== 'en');
                           }}
@@ -2909,30 +2967,11 @@ export function ChatThread({
                         </div>
                         <select
                           value={targetLanguage}
-                          onChange={async (e) => {
-                            const newLang = e.target.value;
-                            setTargetLanguage(newLang);
-                            if (newLang !== 'en') {
-                              setAutoTranslateEnabled(true);
-                            } else {
-                              setAutoTranslateEnabled(false);
-                            }
-                            try {
-                              const supabase = createClient();
-                              const langInfo = getLanguageInfo(newLang);
-                              await supabase
-                                .from('conversations')
-                                .update({
-                                  channel_metadata: {
-                                    ...((conversation.channel_metadata as any) || {}),
-                                    visitor_language: newLang,
-                                    language_name: langInfo.name,
-                                  },
-                                })
-                                .eq('id', conversation.id);
-                            } catch (err) {
-                              console.warn('Failed to update conversation language preference:', err);
-                            }
+                          onChange={(e) => {
+                            // Saved as the conversation's language override, so
+                            // the choice survives a reload and is not undone by
+                            // the next detected visitor message.
+                            handleLanguageOverride(e.target.value);
                           }}
                           aria-label="Select Customer Language"
                           className="w-full text-[11.5px] font-semibold bg-surface border border-line-2 rounded-lg px-2.5 py-1.5 text-ink focus:outline-none focus:ring-2 focus:ring-accent cursor-pointer shadow-2xs"

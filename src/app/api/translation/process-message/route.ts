@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { translateVisitorMessage } from '@/lib/ai/inbound-translation';
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -10,38 +11,26 @@ export async function OPTIONS() {
   return new NextResponse(null, { status: 204, headers: CORS_HEADERS });
 }
 
+/** Translates a stored visitor message into English for the agents. */
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const {
-      messageId,
-      text,
-    } = body;
+    const messageId: string | undefined = body.messageId || body.message_id;
 
-    if (!messageId && !text) {
-      return NextResponse.json({ error: 'Missing required parameters' }, { status: 400, headers: CORS_HEADERS });
+    if (!messageId) {
+      return NextResponse.json({ error: 'Missing messageId' }, { status: 400, headers: CORS_HEADERS });
     }
 
-    const messageText = (text || '').trim();
-    if (!messageText) {
-      return NextResponse.json({ skipped: true, reason: 'Empty text' }, { headers: CORS_HEADERS });
+    const result = await translateVisitorMessage(messageId);
+    if (!result) {
+      return NextResponse.json({ skipped: true, reason: 'Not a visitor message' }, { headers: CORS_HEADERS });
     }
 
-    // Auto-translation is disabled per user request
+    return NextResponse.json({ success: true, ...result }, { headers: CORS_HEADERS });
+  } catch (error: any) {
+    console.error('[Process Message Translation Error]:', error);
     return NextResponse.json(
-      {
-        skipped: true,
-        reason: 'Auto-translation is disabled',
-        englishText: messageText,
-        detectedLanguage: 'en',
-        languageName: 'English',
-        isOriginalEnglish: true,
-      },
-      { headers: CORS_HEADERS }
-    );
-  } catch (err: any) {
-    return NextResponse.json(
-      { error: err?.message || 'Internal server error' },
+      { error: error?.message || 'Processing failed' },
       { status: 500, headers: CORS_HEADERS }
     );
   }

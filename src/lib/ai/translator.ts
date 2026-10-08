@@ -157,10 +157,14 @@ export const SUPPORTED_LANGUAGES: Record<string, LanguageInfo> = {
 
 export function getLanguageInfo(code: string): LanguageInfo {
   const normalized = (code || 'en').toLowerCase().trim();
-  return SUPPORTED_LANGUAGES[normalized] || {
-    code: normalized,
-    name: normalized.toUpperCase(),
-  };
+  if (SUPPORTED_LANGUAGES[normalized]) return SUPPORTED_LANGUAGES[normalized];
+  // Google can detect languages the picker does not list; name them properly
+  // instead of showing a bare code.
+  let name = normalized.toUpperCase();
+  try {
+    name = new Intl.DisplayNames(['en'], { type: 'language' }).of(normalized) || name;
+  } catch {}
+  return { code: normalized, name };
 }
 
 export function isLanguageRtl(code: string): boolean {
@@ -183,15 +187,71 @@ export function decodeHtmlEntities(str: string): string {
 }
 
 
+/** True when the text has letters and every one of them is Latin. */
+export function isLatinScript(text: string): boolean {
+  const letters = (text || '').replace(/[^\p{L}]/gu, '');
+  if (!letters) return false;
+  return /^[\p{Script=Latin}]+$/u.test(letters);
+}
+
+/**
+ * Everyday Roman Urdu / Roman Hindi words. Several of them ("ka", "ki", "se")
+ * are too short to prove anything alone, so callers count distinct hits rather
+ * than trusting a single match. Words that are also common English ("he",
+ * "the", "do", "main", "me", "to") are left out on purpose.
+ */
+const ROMAN_URDU_TOKENS = new Set([
+  'hai', 'hain', 'hy', 'ha', 'ka', 'ki', 'ke', 'ko', 'se', 'ne', 'mein', 'mai', 'mjhe',
+  'mera', 'meri', 'mere', 'tera', 'teri', 'apna', 'apni', 'apne', 'nahi', 'nahin', 'nai', 'nhi',
+  'kya', 'kia', 'kyun', 'kyu', 'kiun', 'kaise', 'kese', 'kaisa', 'kaisay', 'kab', 'kb', 'kahan',
+  'kidhar', 'kidhr', 'aur', 'or', 'bhi', 'tha', 'thi', 'gaya', 'gya', 'gayi', 'gai', 'kar', 'kr',
+  'karo', 'kro', 'krna', 'karna', 'karein', 'karen', 'krein', 'kardo', 'krdo', 'krdein', 'ho',
+  'hoga', 'hogi', 'hoti', 'hota', 'hua', 'hui', 'raha', 'rha', 'rahi', 'rhi', 'rahe', 'rhe',
+  'sakta', 'skta', 'sakti', 'skti', 'sakte', 'skte', 'wala', 'wali', 'wale', 'abhi', 'jaldi',
+  'bohat', 'bahut', 'bht', 'boht', 'bohot', 'theek', 'thik', 'thek', 'acha', 'accha', 'ap',
+  'aap', 'apko', 'aapko', 'apka', 'aapka', 'apki', 'aapki', 'tum', 'hum', 'hm', 'mujhe',
+  'mujhy', 'muje', 'humein', 'hamein', 'hume', 'chahiye', 'chahye', 'chaiye', 'chahie',
+  'dein', 'dena', 'lena', 'wapas', 'paise', 'paisa', 'yar', 'yaar', 'bhai', 'ji', 'jee',
+  'haan', 'han', 'kuch', 'koi', 'sab', 'yeh', 'ye', 'woh', 'wo', 'iska', 'uska', 'isko',
+  'usko', 'kiya', 'diya', 'liya', 'mila', 'mili', 'bata', 'batao', 'btao', 'bataen',
+  'bataiye', 'samjh', 'samajh', 'masla', 'maslay', 'shukriya', 'shukria', 'salam', 'assalam',
+  'alaikum', 'walekum', 'kitna', 'kitni', 'kitne', 'milega', 'milegi', 'jayega', 'jayegi',
+  'ayega', 'aayega', 'denge', 'karenge', 'krenge', 'madad', 'zaroor', 'zarur', 'lekin',
+  'magar', 'phir', 'fir', 'jab', 'tab', 'agar', 'kyunke', 'kyunki', 'pehle', 'baad',
+]);
+
+/** Number of distinct Roman Urdu words in the text. */
+export function romanUrduScore(text: string): number {
+  if (!text || !isLatinScript(text)) return 0;
+  const seen = new Set<string>();
+  for (const raw of text.toLowerCase().split(/[^a-z]+/)) {
+    if (raw && ROMAN_URDU_TOKENS.has(raw)) seen.add(raw);
+  }
+  return seen.size;
+}
+
+/** Roman Urdu / Roman Hindi written in Latin letters. */
+export function isRomanUrdu(text: string): boolean {
+  if (!text || !isLatinScript(text)) return false;
+  const score = romanUrduScore(text);
+  if (score >= 2) return !isLikelyEnglishText(text);
+  // One strong word ("shukriya", "chahiye") is enough in a short message.
+  return score >= 1 && ROMAN_URDU_WORDS_REGEX.test(text) && text.trim().split(/\s+/).length <= 4;
+}
+
 /**
  * Primary free translation & auto-detection engine via Google Translate GTX API.
  * High-speed, zero API keys required, handles Roman Urdu, Italian, Arabic, Spanish, French, etc.
+ *
+ * With `romanize`, the result is the Latin transliteration of the translation
+ * ("aap ka order kal aa jayega") — what a visitor typing Roman Urdu can read.
  */
 export async function translateWithGoogleGtx(
   text: string,
   targetLang: string = 'en',
-  sourceLang: string = 'auto'
-): Promise<{ translated: string; detectedLanguage: string } | null> {
+  sourceLang: string = 'auto',
+  options: { romanize?: boolean } = {}
+): Promise<{ translated: string; detectedLanguage: string; romanizedSource?: boolean } | null> {
   if (!text || !text.trim()) return null;
   const s = sourceLang || 'auto';
   const t = targetLang || 'en';
@@ -199,7 +259,7 @@ export async function translateWithGoogleGtx(
   try {
     const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${encodeURIComponent(
       s
-    )}&tl=${encodeURIComponent(t)}&dt=t&q=${encodeURIComponent(text.trim())}`;
+    )}&tl=${encodeURIComponent(t)}&dt=t${options.romanize ? '&dt=rm' : ''}&q=${encodeURIComponent(text.trim())}`;
     const res = await fetch(url, {
       signal: AbortSignal.timeout(6000),
       headers: {
@@ -210,18 +270,34 @@ export async function translateWithGoogleGtx(
     });
     if (!res.ok) return null;
     const data = await res.json();
-    const candidate = data[0]?.map((x: any) => x[0]).filter(Boolean).join('');
+    const segments: any[] = Array.isArray(data?.[0]) ? data[0] : [];
+    const candidate = segments
+      .filter((x: any) => typeof x?.[0] === 'string')
+      .map((x: any) => x[0])
+      .join('');
+    // With dt=rm, Google appends a segment whose 3rd field is the Latin
+    // transliteration of the translated text.
+    const romanized = options.romanize
+      ? segments
+          .filter((x: any) => x?.[0] == null && typeof x?.[2] === 'string')
+          .map((x: any) => x[2])
+          .join(' ')
+          .trim()
+      : '';
     const rawDetected = data[2] || s;
     let detected = (rawDetected || 'en').toLowerCase().split('-')[0];
+    // e.g. ["hi-Latn"]: Google recognised Hindi/Urdu typed in Latin letters.
+    const detectedScripts: string[] = Array.isArray(data?.[8]?.[3]) ? data[8][3] : [];
+    const romanizedSource = detectedScripts.some((d) => /^(hi|ur)-latn$/i.test(String(d)));
 
     // English priority safeguard:
     if (isLikelyEnglishText(text)) {
       detected = 'en';
-    } else if (
-      (detected === 'hi' || detected === 'id' || detected === 'tl' || detected === 'sw' || detected === 'so' || detected === 'en') &&
-      ROMAN_URDU_WORDS_REGEX.test(text.toLowerCase())
-    ) {
-      detected = 'ur';
+    } else if (romanizedSource || isRomanUrdu(text)) {
+      // Roman Hindi and Roman Urdu are the same spoken language in Latin
+      // letters; Google labels both "hi". Only an unmistakably Hindi greeting
+      // keeps the Hindi label.
+      detected = ROMAN_HINDI_WORDS_REGEX.test(text) ? 'hi' : 'ur';
     }
 
     // Tagalog false-detection safeguard:
@@ -239,14 +315,14 @@ export async function translateWithGoogleGtx(
     }
 
     if (candidate && typeof candidate === 'string' && candidate.trim()) {
-      let finalTrans = decodeHtmlEntities(candidate.trim());
+      let finalTrans = decodeHtmlEntities((romanized || candidate).trim());
 
       // If Roman Urdu text was returned untranslated by Google (e.g. "theek hai" -> "theek hai"):
       if (
         t === 'en' &&
         detected === 'ur' &&
         s !== 'ur' &&
-        (finalTrans.toLowerCase() === text.trim().toLowerCase() || ROMAN_URDU_WORDS_REGEX.test(finalTrans))
+        (finalTrans.toLowerCase() === text.trim().toLowerCase() || romanUrduScore(finalTrans) >= 2)
       ) {
         const urduScript = romanUrduToUrdu(text);
         if (/[\u0600-\u06FF]/.test(urduScript)) {
@@ -262,6 +338,7 @@ export async function translateWithGoogleGtx(
       return {
         translated: finalTrans,
         detectedLanguage: detected,
+        romanizedSource,
       };
     }
   } catch (err) {
@@ -330,6 +407,18 @@ export function isLikelyEnglishText(text: string): boolean {
     return false;
   }
 
+  // Roman Urdu borrows English nouns freely ("mera account ka problem hai
+  // please help kro"), so nouns like "account" or "help" are no evidence of
+  // English. Only English grammar words can outvote Urdu grammar words.
+  const urduScore = romanUrduScore(trimmed);
+  if (urduScore >= 2) {
+    const englishGrammar =
+      trimmed.match(
+        /\b(the|is|are|am|was|were|i|you|it|we|they|this|that|what|how|why|when|where|which|to|for|with|and|of|my|your|can|could|would|will|have|has|do|does|did|not|an|a|in|on|at|be|been|there|here|if|but)\b/gi
+      ) || [];
+    if (urduScore >= englishGrammar.length) return false;
+  }
+
   // Count distinct English grammar/vocabulary words
   const ENGLISH_WORDS_REGEX =
     /\b(the|is|are|am|was|were|be|been|being|have|has|had|do|does|did|will|would|shall|should|can|could|may|might|must|i|you|he|she|it|we|they|my|your|his|her|its|our|their|what|which|who|whom|whose|where|when|why|how|a|an|in|on|at|to|for|with|from|by|about|into|through|after|over|between|out|against|during|without|before|under|around|among|this|that|these|those|there|here|and|but|or|if|because|as|until|while|of|so|then|than|no|not|only|own|same|too|very|just|now|also|any|some|all|both|each|few|more|most|other|such|account|accounts|problem|issue|help|support|please|thanks|thank|sir|madam|hello|hi|hey|good|morning|evening|afternoon|night|yes|okay|ok|price|prices|cost|rule|rules|loss|losses|drawdown|time|credentials|access|failed|showing|consistency|balance|trading|trade|trades|profit|payout|status|check|update|updated|deposit|withdrawal|funded|instant|holding|amount|minimum|maximum|limit|limits|number|server|platform|login|password|email|link|site|page|step|challenge|percent|percentage|cant|cannot|don't|dont|doesnt|doesn't|wont|won't|want|need|give|take|get|tell|ask|buy|bought|order|service)\b/gi;
@@ -379,7 +468,13 @@ export function normalizeDetectedLanguage(code: string, text: string): string {
   }
 
   // 3. If text is Roman Urdu (Latin transliteration like "kya haal hai", "mujhe discount chahiye")
-  if (ROMAN_URDU_WORDS_REGEX.test(trimmed)) {
+  if (ROMAN_URDU_WORDS_REGEX.test(trimmed) || isRomanUrdu(trimmed)) {
+    return 'ur';
+  }
+
+  // 3b. A detector that already said Hindi/Urdu for Latin text, with at least
+  // one Urdu word to back it up, is describing Roman Urdu.
+  if ((c === 'hi' || c === 'ur') && isLatinScript(trimmed) && romanUrduScore(trimmed) >= 1) {
     return 'ur';
   }
 
@@ -490,7 +585,7 @@ export function normalizeDetectedLanguage(code: string, text: string): string {
     /\b(salom|assalomu\s+alaykum|qandaysiz|qalaysiz|yordam|bering|rahmat|iltimos|narxi|qancha|hisob|kerak|yaxshi)\b/i.test(
       trimmed
     ) ||
-    /[oʻgʻOʻGʻ]/.test(trimmed)
+    /[oOgG][ʻ‘]/.test(trimmed)
   ) {
     return 'uz';
   }
@@ -699,12 +794,18 @@ export function detectLanguage(text: string): { code: string; name: string } {
 
   const lower = trimmed.toLowerCase();
 
+  // Roman Urdu before the European word lists: "wo" is German, "se" is
+  // Spanish and "come" is Italian, but "wo kab aayega" is none of those.
+  if (romanUrduScore(lower) >= 2 && !ROMAN_HINDI_WORDS_REGEX.test(lower)) {
+    return { code: 'ur', name: 'Urdu (Roman)' };
+  }
+
   // Uzbek patterns (Latin script)
   if (
     /\b(salom|assalomu\s+alaykum|qandaysiz|qalaysiz|yordam|bering|rahmat|iltimos|narxi|qancha|hisob|kerak|yaxshi)\b/i.test(
       lower
     ) ||
-    /[oʻgʻOʻGʻ]/.test(trimmed)
+    /[oOgG][ʻ‘]/.test(trimmed)
   ) {
     return { code: 'uz', name: 'Uzbek' };
   }
@@ -844,8 +945,10 @@ export async function translateToEnglish({
 
   const trimmed = text.trim();
 
-  // If text has only numbers, punctuation, or emojis (e.g. "5000", "???")
-  if (!/[a-zA-Z\u00C0-\uFFFF]/.test(trimmed)) {
+  // If text has only numbers, punctuation, or emojis (e.g. "5000", "???"),
+  // or is plainly English, there is nothing to translate \u2014 and no reason to
+  // spend a model call finding that out.
+  if (!/[a-zA-Z\u00C0-\uFFFF]/.test(trimmed) || isLikelyEnglishText(trimmed)) {
     return {
       englishText: trimmed,
       sourceLanguage: 'English',
@@ -853,6 +956,9 @@ export async function translateToEnglish({
       isOriginalEnglish: true,
     };
   }
+
+  const nameFor = (code: string) =>
+    code === 'ur' && isLatinScript(trimmed) ? 'Roman Urdu' : getLanguageInfo(code).name;
 
   // 1. Try AI provider if configured in workspace
   if (isConfigured(providerConfig)) {
@@ -876,10 +982,9 @@ export async function translateToEnglish({
         const parsed = JSON.parse(jsonMatch[0]);
         if (parsed.english_text) {
           const code = normalizeDetectedLanguage(parsed.detected_language || 'en', trimmed);
-          const langInfo = getLanguageInfo(code);
           return {
             englishText: parsed.english_text.trim(),
-            sourceLanguage: langInfo.name,
+            sourceLanguage: nameFor(code),
             detectedLanguageCode: code,
             isOriginalEnglish: Boolean(parsed.is_original_english || (code === 'en' && parsed.english_text.trim() === trimmed)),
           };
@@ -893,13 +998,14 @@ export async function translateToEnglish({
   // 2. High-speed Google GTX translation & language auto-detection
   const googleRes = await translateWithGoogleGtx(trimmed, 'en', 'auto');
   if (googleRes) {
-    const code = normalizeDetectedLanguage(googleRes.detectedLanguage || 'en', trimmed);
-    const langInfo = getLanguageInfo(code);
+    const code = googleRes.romanizedSource
+      ? googleRes.detectedLanguage
+      : normalizeDetectedLanguage(googleRes.detectedLanguage || 'en', trimmed);
     const isNonEnglish = code !== 'en';
 
     return {
       englishText: googleRes.translated,
-      sourceLanguage: langInfo.name,
+      sourceLanguage: nameFor(code),
       detectedLanguageCode: code,
       isOriginalEnglish: !isNonEnglish,
     };
@@ -1088,12 +1194,15 @@ export async function translateAgentReply({
   sourceLanguageCode,
   providerConfig,
   businessName,
+  romanize = false,
 }: {
   text: string;
   targetLanguageCode: string;
   sourceLanguageCode?: string;
   providerConfig?: ProviderConfig | null;
   businessName?: string;
+  /** The visitor writes this language in Latin letters (Roman Urdu / Hindi). */
+  romanize?: boolean;
 }): Promise<AgentReplyTranslationResult> {
   if (!text || !text.trim()) {
     const target = targetLanguageCode || 'en';
@@ -1110,6 +1219,10 @@ export async function translateAgentReply({
 
   const targetLang = targetLanguageCode || 'en';
   const targetLangInfo = getLanguageInfo(targetLang);
+  const romanTarget = romanize && targetLang !== 'en';
+  const targetLabel = romanTarget
+    ? `${targetLangInfo.name} written in Latin/English letters (Roman ${targetLangInfo.name}, e.g. "aap ka order kal tak pohanch jayega") — never use the native script`
+    : targetLangInfo.name;
 
   // 1. Try AI provider if configured in workspace
   if (isConfigured(providerConfig)) {
@@ -1119,9 +1232,9 @@ export async function translateAgentReply({
         system:
           `You are an expert real-time multilingual customer support translation system${brandContext}.\n` +
           `A support agent wrote a reply to a customer in their preferred language (could be English, Roman Urdu, Urdu, Hindi, Spanish, French, Arabic, German, etc.).\n` +
-          `The customer speaks: ${targetLangInfo.name} (language code: "${targetLang}").\n\n` +
+          `The customer speaks: ${targetLabel} (language code: "${targetLang}").\n\n` +
           `Your task:\n` +
-          `1. "customer_text": Translate the agent's message into natural, polite, respectful, and friendly ${targetLangInfo.name} for the customer. If target is English, provide clear English.\n` +
+          `1. "customer_text": Translate the agent's message into natural, polite, respectful, and friendly ${targetLabel} for the customer. If target is English, provide clear English.\n` +
           `2. "english_text": Translate the agent's message into clear, natural, professional English for the support agent's dashboard. If the agent typed in English, keep it in English.\n` +
           `3. "detected_source_language": The 2-letter ISO code of the language the agent wrote in.\n\n` +
           `Important:\n` +
@@ -1164,14 +1277,15 @@ export async function translateAgentReply({
   let englishText = text;
   let detectedSourceLang = sourceLanguageCode || 'en';
 
-  const enRes = await translateWithGoogleGtx(text, 'en', sourceLanguageCode || 'auto');
+  const enRes = isLikelyEnglishText(text)
+    ? { translated: text, detectedLanguage: 'en' }
+    : await translateWithGoogleGtx(text, 'en', sourceLanguageCode || 'auto');
   if (enRes) {
     englishText = enRes.translated;
     detectedSourceLang = enRes.detectedLanguage || 'en';
   } else {
     // Fallback: Check if Roman Urdu
-    const isRoman = ROMAN_URDU_WORDS_REGEX.test(text.toLowerCase());
-    if (isRoman) {
+    if (isRomanUrdu(text) || ROMAN_URDU_WORDS_REGEX.test(text)) {
       const urduScript = romanUrduToUrdu(text);
       const toEn = await translateViaFreeApi(urduScript, 'ur', 'en');
       if (toEn) englishText = toEn;
@@ -1183,11 +1297,12 @@ export async function translateAgentReply({
   let customerText = text;
   if (targetLang === 'en') {
     customerText = englishText;
-  } else if (targetLang === detectedSourceLang) {
+  } else if (targetLang === detectedSourceLang && isLatinScript(text) === romanTarget) {
+    // The agent already wrote in the customer's language and script.
     customerText = text;
   } else {
     // Pivot from englishText to customer's target language for maximum accuracy
-    const targetRes = await translateWithGoogleGtx(englishText, targetLang, 'en');
+    const targetRes = await translateWithGoogleGtx(englishText, targetLang, 'en', { romanize: romanTarget });
     if (targetRes?.translated) {
       customerText = targetRes.translated;
     } else {

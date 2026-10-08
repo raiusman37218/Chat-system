@@ -1020,40 +1020,21 @@ class ZentryWidget {
       console.warn('[Zen-try] Visitor tracking error:', e);
     }
 
-    // 2. Fetch accurate city & country in background with fallbacks and update
+    // 2. City & country from the visitor's IP, worked out by our own server.
+    // Browser-side lookups (ipwho.is, ipapi.co) are blocked by ad blockers and
+    // rate-limited, which left visitors with a wrong timezone-based guess.
     (async () => {
       try {
-        let city = '';
-        let country = '';
-
-        // Provider 1: ipwho.is (fast, HTTPS enabled, generous free tier)
-        try {
-          const res = await fetch('https://ipwho.is/', { signal: AbortSignal.timeout(2500) });
-          if (res.ok) {
-            const d = await res.json();
-            if (d.success !== false && d.country) {
-              city = d.city || '';
-              country = d.country || '';
-            }
-          }
-        } catch {}
-
-        // Provider 2: ipapi.co fallback
-        if (!country) {
-          try {
-            const res = await fetch('https://ipapi.co/json/', { signal: AbortSignal.timeout(2500) });
-            if (res.ok) {
-              const d = await res.json();
-              if (d.country_name) {
-                city = d.city || '';
-                country = d.country_name || '';
-              }
-            }
-          } catch {}
-        }
-
-        if (country) {
-          const refinedLocation = city ? `${city}, ${country}` : country;
+        const res = await fetch(`${this.config.apiUrl || ''}/api/visitor/geo`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ visitor_id: this.visitorId }),
+          signal: AbortSignal.timeout(6000),
+        });
+        const d = res.ok ? await res.json() : null;
+        if (d?.location) {
+          // The upsert writes the location column too; send the real place so
+          // it does not keep the timezone written above.
           await this.supabase.rpc('fn_upsert_visitor', {
             p_id: this.visitorId,
             p_name: this.visitorName || null,
@@ -1061,7 +1042,7 @@ class ZentryWidget {
             p_current_url: window.location.href,
             p_user_agent: navigator.userAgent,
             p_ip_address: null,
-            p_location: refinedLocation,
+            p_location: d.location,
             p_workspace_id: this.config.workspaceId || null,
           });
         }

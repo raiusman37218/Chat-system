@@ -198,6 +198,7 @@ export async function generateHelpDeskResponseWithHandover({
   turns,
   helpCenterUrl,
   workspaceName,
+  hasHumanReplied = false,
 }: {
   workspaceId: string;
   conversationId: string;
@@ -209,6 +210,8 @@ export async function generateHelpDeskResponseWithHandover({
   turns?: { role: 'user' | 'assistant'; content: string }[];
   helpCenterUrl?: string | null;
   workspaceName?: string | null;
+  /** A human agent has already replied in the current exchange. */
+  hasHumanReplied?: boolean;
 }): Promise<HelpDeskResponseResult> {
   const brand = workspaceName?.trim() || 'our team';
   const detected = detectLanguage(incomingMessage);
@@ -231,13 +234,6 @@ export async function generateHelpDeskResponseWithHandover({
     ...priorTurns,
     { role: 'user' as const, content: incomingMessage },
   ].slice(-15);
-
-  const hasHumanReplied = (turns || []).some(
-    (t) =>
-      t.content.includes('[Human Agent]') ||
-      t.content.includes('[Agent]') ||
-      t.content.includes('[Internal Team Note]')
-  );
 
   // 2. Intent step before retrieval: Classify message into one of 7 intents
   const intentResult = await classifyVisitorIntent({
@@ -359,14 +355,18 @@ export async function generateHelpDeskResponseWithHandover({
             );
           }
           const baseReply = text || getFallbackNotSureReply(langCode, incomingMessage, cleanName);
-          const fullReply = complaintApology
-            ? `${complaintApology} ${baseReply} ${replyTimeNotice}`
-            : `${baseReply} ${replyTimeNotice}`;
+          // With a human already on the thread there is nobody new to hand
+          // over to, and no reply-time promise to make.
+          const notice = hasHumanReplied ? '' : replyTimeNotice;
+          const fullReply = (complaintApology
+            ? `${complaintApology} ${baseReply} ${notice}`
+            : `${baseReply} ${notice}`
+          ).trim();
 
           return {
             replyText: fullReply,
-            shouldHandover: true,
-            handoverReason: 'Inquiry not covered in knowledge base.',
+            shouldHandover: !hasHumanReplied,
+            handoverReason: hasHumanReplied ? undefined : 'Inquiry not covered in knowledge base.',
             canAnswerFromDocs: false,
             intent: intentResult.intent,
             disableAi: false, // Handover Rule 1: A failed answer must NOT turn the bot off!
@@ -429,9 +429,7 @@ export async function generateHelpDeskResponseWithHandover({
     );
   }
 
-  const baseReply = hasHumanReplied
-    ? `I have reviewed our help documentation, but could not locate specific details regarding "${incomingMessage}".`
-    : getFallbackNotSureReply(langCode, incomingMessage, cleanName);
+  const baseReply = getFallbackNotSureReply(langCode, incomingMessage, cleanName);
   const fullReply = complaintApology
     ? `${complaintApology} ${baseReply} ${hasHumanReplied ? '' : replyTimeNotice}`
     : `${baseReply} ${hasHumanReplied ? '' : replyTimeNotice}`;
@@ -510,20 +508,54 @@ export async function executeHandoverToHuman({
       }
     }
 
+    // 0b. One visible handover per exchange. A visitor who asks three
+    // uncovered questions in a row should not be told three times that they
+    // were passed to the team; agents are already notified.
+    const [{ data: recent }, { data: convRow }] = await Promise.all([
+      supabase
+        .from('messages')
+        .select('sender_type, is_internal, sender_id, metadata, created_at')
+        .eq('conversation_id', conversationId)
+        .order('created_at', { ascending: false })
+        .limit(30),
+      supabase.from('conversations').select('*').eq('id', conversationId).maybeSingle(),
+    ]);
+    const resolvedAt = Date.parse((convRow as any)?.last_resolved_at || '') || -Infinity;
+    const alreadyHandedOver = (() => {
+      for (const m of recent || []) {
+        // Earlier exchanges (before the last resolution) do not count.
+        if (Date.parse(m.created_at) <= resolvedAt) return false;
+        // A human reply since the last handover means this is a new handover.
+        if (m.sender_type === 'agent' && !m.is_internal && m.sender_id) return false;
+        if (m.metadata?.system_event === 'handover' || m.metadata?.is_handover) return true;
+      }
+      return false;
+    })();
+
     // 1. Escalate conversation in Supabase
+    const now = new Date().toISOString();
     const updatePayload: Record<string, any> = {
       status: 'open',
       priority,
-      updated_at: new Date().toISOString(),
+      updated_at: now,
     };
     if (disableAi) {
       updatePayload.ai_mode = 'disabled'; // Disables AI auto-replies on this conversation
+      // Recorded so a later resolution knows the switch-off predates it.
+      updatePayload.channel_metadata = {
+        ...(((convRow as any)?.channel_metadata as Record<string, any>) || {}),
+        ai_disabled_at: now,
+      };
     }
 
     await supabase
       .from('conversations')
       .update(updatePayload)
       .eq('id', conversationId);
+
+    if (alreadyHandedOver && !disableAi) {
+      return;
+    }
 
     // 2. Insert private internal note for human support agents with visitor message reference
     const noteContent =

@@ -1548,6 +1548,7 @@ export default function DashboardPage() {
                   const metaUpdate = {
                     ...((activeConversation?.channel_metadata as Record<string, any>) || {}),
                     ...(mode === 'autopilot' ? { autopilot_enabled_at: now } : {}),
+                    ...(mode === 'disabled' ? { ai_disabled_at: now } : {}),
                   };
                   await supabase
                     .from('conversations')

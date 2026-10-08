@@ -119,6 +119,30 @@ export function isConfigured(config: ProviderConfig | null | undefined): boolean
   return true;
 }
 
+/**
+ * Chat threads rarely alternate cleanly: a thread usually opens with the
+ * assistant's welcome line, and visitors send several messages in a row.
+ * Anthropic and Gemini reject a conversation that starts with the assistant,
+ * and Gemini rejects repeated roles, so turns are merged by role and the
+ * conversation always starts with the user.
+ */
+function normalizeTurns(messages: ChatRequest['messages']): ChatRequest['messages'] {
+  const out: ChatRequest['messages'] = [];
+  for (const m of messages) {
+    const content = (m.content || '').trim();
+    if (!content) continue;
+    const prev = out[out.length - 1];
+    if (prev && prev.role === m.role) {
+      prev.content = `${prev.content}\n${content}`;
+    } else {
+      out.push({ role: m.role, content });
+    }
+  }
+  while (out.length && out[0].role === 'assistant') out.shift();
+  if (!out.length) out.push({ role: 'user', content: '(no message)' });
+  return out;
+}
+
 export async function chat(
   config: ProviderConfig,
   req: ChatRequest
@@ -134,6 +158,7 @@ export async function chat(
   }
 
   const timeoutMs = req.timeoutMs ?? 25_000;
+  req = { ...req, messages: normalizeTurns(req.messages) };
 
   switch (config.provider) {
     case 'anthropic':

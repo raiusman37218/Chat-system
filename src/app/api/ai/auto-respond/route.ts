@@ -1,18 +1,52 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse, after } from 'next/server';
 import { serviceClient } from '@/lib/supabase/service';
 import {
-  generateAutoFirstResponse,
   generateHelpDeskResponseWithHandover,
   executeHandoverToHuman,
 } from '@/lib/ai/anthropic';
 import { dispatchOutboundMessage } from '@/lib/channels/dispatcher';
 import { providerConfigFrom, warmHelpIndex, wantsHuman } from '@/lib/ai/help-answer';
-import { detectLanguage, translateToEnglish, translateAgentReply } from '@/lib/ai/translator';
-
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://vfjsaynnubxywdbevxtx.supabase.co';
-const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZmanNheW5udWJ4eXdkYmV2eHR4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgyNTA5MDEsImV4cCI6MjEwMzgyNjkwMX0.YyBCXMqwrOk5BRhQafYLFw8tiM5PC8lc8Yocodw9wf0';
-
+import {
+  detectLanguage,
+  getLanguageInfo,
+  isLatinScript,
+  isLikelyEnglishText,
+  normalizeDetectedLanguage,
+  translateAgentReply,
+  translateToEnglish,
+  translateWithGoogleGtx,
+} from '@/lib/ai/translator';
+import { translateVisitorMessage } from '@/lib/ai/inbound-translation';
 import { getWorkspaceHelpCenterUrl } from '@/lib/domain';
+
+/**
+ * The language the visitor wrote in. The word-list detector is instant but
+ * only knows a few dozen languages and calls everything else English, so text
+ * it cannot place is checked with Google's detector.
+ */
+async function visitorLanguageOf(text: string): Promise<{ code: string; roman: boolean }> {
+  if (!text || !/[\p{L}]/u.test(text) || isLikelyEnglishText(text)) {
+    return { code: 'en', roman: false };
+  }
+  let code = normalizeDetectedLanguage(detectLanguage(text).code, text);
+  if (code === 'en') {
+    const g = await translateWithGoogleGtx(text, 'en', 'auto').catch(() => null);
+    if (g?.detectedLanguage) {
+      code = g.romanizedSource ? g.detectedLanguage : normalizeDetectedLanguage(g.detectedLanguage, text);
+    }
+  }
+  return { code, roman: code !== 'en' && isLatinScript(text) && ['ur', 'hi'].includes(code) };
+}
+
+/** Epoch ms of the latest of several optional timestamps; -Infinity if none. */
+function latest(...values: (string | null | undefined)[]): number {
+  let best = -Infinity;
+  for (const v of values) {
+    const t = v ? Date.parse(v) : NaN;
+    if (!Number.isNaN(t) && t > best) best = t;
+  }
+  return best;
+}
 
 /**
  * Where the customer can read the full article.
@@ -59,6 +93,16 @@ export async function POST(req: NextRequest) {
       return json({ error: 'Missing conversation_id or workspace_id' }, { status: 400 });
     }
 
+    // Agents read every visitor message in English. This runs whether or not
+    // the assistant answers, and after the response so it never slows a reply.
+    if (requested_message_id) {
+      after(() =>
+        translateVisitorMessage(requested_message_id).catch((err) =>
+          console.warn('[Auto-Respond] Inbound translation failed:', err)
+        )
+      );
+    }
+
     if (requested_message_id && inFlightMessages.has(requested_message_id)) {
       return json({ replied: false, reason: 'Auto-response already in progress for this message' });
     }
@@ -90,7 +134,9 @@ export async function POST(req: NextRequest) {
         .single(),
       supabase
         .from('conversations')
-        .select('id, workspace_id, status, closed_at, ai_mode, channel, channel_metadata, visitor:visitors(name)')
+        // '*' rather than a column list, so the route keeps working before
+        // the last_resolved_at migration has been run.
+        .select('*, visitor:visitors(name)')
         .eq('id', conversation_id)
         .single(),
       // Only the recent end of the thread is ever used below.
@@ -193,12 +239,6 @@ export async function POST(req: NextRequest) {
 
     const aiSettings = workspace?.ai_settings;
 
-    // Language detection without auto-translation (auto-translation is disabled per user request)
-    let detected = { code: 'en', name: 'English' };
-    if (visitorMsg && visitorMsg.content) {
-      detected = detectLanguage(visitorMsg.content);
-    }
-
     if (aiSettings && (!aiSettings.enabled || !aiSettings.auto_response_enabled)) {
       return json({ replied: false, reason: 'AI auto-first-response disabled' });
     }
@@ -207,51 +247,47 @@ export async function POST(req: NextRequest) {
       return json({ replied: false, reason: 'Conversation not found or workspace mismatch' });
     }
 
-    // Handover Rule 3: "When a human replies, the bot stays silent until the conversation is resolved or the agent turns autopilot back on."
-    // If the conversation was previously resolved/closed, reopen it so the bot can help with new questions.
-    if (conv.status === 'closed') {
+    // Handover rule: "When a human replies, the bot stays silent until the
+    // conversation is resolved or the agent turns autopilot back on."
+    //
+    // closed_at cannot tell us about a resolution: the visitor's own message
+    // reopens the conversation and clears it before this route runs. The
+    // last_resolved_at column (never cleared) and channel_metadata carry the
+    // history instead.
+    const meta = ((conv.channel_metadata as Record<string, any>) || {}) as Record<string, any>;
+    const lastHumanReply = [...msgs]
+      .reverse()
+      .find((m) => m.sender_type === 'agent' && !m.is_internal && m.sender_id != null);
+
+    const resolvedAt = latest(conv.last_resolved_at, conv.closed_at, meta.last_resolved_at);
+    const lastHumanAt = latest(lastHumanReply?.created_at, meta.last_human_reply_at);
+    const autopilotAt = latest(meta.autopilot_enabled_at);
+    // When the assistant was switched off: by a human reply, by hand, or by a handover.
+    const disabledAt = latest(lastHumanReply?.created_at, meta.last_human_reply_at, meta.ai_disabled_at);
+
+    const humanActive =
+      lastHumanAt > -Infinity && autopilotAt < lastHumanAt && resolvedAt < lastHumanAt;
+
+    // A conversation resolved after the assistant was switched off starts a
+    // new exchange, so the assistant gets its turn back.
+    let aiDisabled = conv.ai_mode === 'disabled';
+    if (aiDisabled && resolvedAt > -Infinity && resolvedAt > disabledAt) {
+      aiDisabled = false;
+      conv.ai_mode = 'autopilot';
       await supabase
         .from('conversations')
-        .update({
-          status: 'open',
-          ai_mode: 'autopilot',
-          closed_at: null,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', conversation_id);
-      conv.status = 'open';
-      conv.ai_mode = 'autopilot';
+        .update({ ai_mode: 'autopilot' })
+        .eq('id', conversation_id)
+        .eq('ai_mode', 'disabled');
     }
-
-    // Check if a human agent has replied in this conversation
-    const humanAgentReplies = msgs.filter(
-      (m) => m.sender_type === 'agent' && !m.is_internal && m.sender_id != null
-    );
-    const lastHumanReply =
-      humanAgentReplies.length > 0
-        ? humanAgentReplies.sort((a, b) => Date.parse(a.created_at) - Date.parse(b.created_at))[
-            humanAgentReplies.length - 1
-          ]
-        : null;
-
-    const autopilotEnabledAt = (conv.channel_metadata as any)?.autopilot_enabled_at;
-    const isAutopilotTurnedOnAfterHuman =
-      autopilotEnabledAt &&
-      lastHumanReply &&
-      Date.parse(autopilotEnabledAt) > Date.parse(lastHumanReply.created_at);
-
-    const hasHumanRepliedAndActive =
-      Boolean(lastHumanReply) &&
-      !isAutopilotTurnedOnAfterHuman &&
-      (!conv.closed_at || (lastHumanReply ? Date.parse(lastHumanReply.created_at) > Date.parse(conv.closed_at) : false));
 
     // "wants_human: confirm the handover to the visitor and notify agents. This must work even after a previous handover."
     const isAskingForHuman = wantsHuman(visitorMsg.content);
 
-    if ((hasHumanRepliedAndActive || conv.ai_mode === 'disabled') && !isAskingForHuman) {
+    if ((humanActive || aiDisabled) && !isAskingForHuman) {
       return json({
         replied: false,
-        reason: hasHumanRepliedAndActive
+        reason: humanActive
           ? 'Human agent has replied. Bot stays silent until resolved or autopilot is turned back on.'
           : 'AI disabled on this conversation',
       });
@@ -270,10 +306,13 @@ export async function POST(req: NextRequest) {
 
     const history = [...burstContext, ...earlier].slice(0, 4);
 
+    const targetAt = Date.parse(visitorMsg.created_at);
     const turns = msgs
       .filter(
         (m) =>
           m.id !== targetVisitorMsgId &&
+          // Only what came before the message being answered.
+          Date.parse(m.created_at) <= targetAt &&
           !m.is_internal &&
           ['visitor', 'agent', 'ai'].includes(m.sender_type) &&
           typeof m.content === 'string' &&
@@ -299,6 +338,9 @@ export async function POST(req: NextRequest) {
       turns,
       helpCenterUrl: helpCenterUrlFor(workspace),
       workspaceName: workspace?.name,
+      // A human took part in this exchange (they replied after the last
+      // resolution): the assistant should not repeat a handover line.
+      hasHumanReplied: lastHumanAt > -Infinity && lastHumanAt > resolvedAt,
     });
 
     let aiResponseText = result.replyText;
@@ -342,8 +384,49 @@ export async function POST(req: NextRequest) {
       return json({ replied: false, reason: 'Conversation status changed during generation' });
     }
 
-    // Auto-translation disabled per user request: AI response is sent directly without translation
-    const aiEnglishTranslation = aiResponseText;
+    // The reply must be in the language of the visitor's latest message. The
+    // model is told so, but the documentation it quotes is usually English,
+    // and the no-provider fallback answers straight from that documentation —
+    // so check, and translate when the reply came out in the wrong language.
+    const visitorText = (visitorMsg.content || '').trim();
+    const visitorLang = await visitorLanguageOf(visitorText);
+    const replyLang = isLikelyEnglishText(aiResponseText) ? 'en' : detectLanguage(aiResponseText).code;
+    const providerConfig = providerConfigFrom(aiSettings);
+    let aiEnglishTranslation = aiResponseText;
+
+    if (visitorLang.code !== 'en' && replyLang === 'en') {
+      try {
+        const t = await translateAgentReply({
+          text: aiResponseText,
+          targetLanguageCode: visitorLang.code,
+          sourceLanguageCode: 'en',
+          providerConfig,
+          businessName: workspace?.name,
+          romanize: visitorLang.roman,
+        });
+        if (t.translatedText?.trim()) {
+          aiEnglishTranslation = aiResponseText;
+          aiResponseText = t.translatedText.trim();
+        }
+      } catch (err) {
+        console.warn('[Auto-Respond] Reply translation failed, sending as written:', err);
+      }
+    } else if (visitorLang.code === 'en' && replyLang !== 'en') {
+      try {
+        const t = await translateToEnglish({ text: aiResponseText, providerConfig });
+        if (t.englishText?.trim()) aiResponseText = t.englishText.trim();
+        aiEnglishTranslation = aiResponseText;
+      } catch (err) {
+        console.warn('[Auto-Respond] Reply translation to English failed:', err);
+      }
+    } else if (visitorLang.code !== 'en') {
+      // Already in the visitor's language: keep an English copy for agents.
+      try {
+        const t = await translateToEnglish({ text: aiResponseText, providerConfig });
+        if (t.englishText?.trim()) aiEnglishTranslation = t.englishText.trim();
+      } catch {}
+    }
+    const detected = { code: visitorLang.code, name: getLanguageInfo(visitorLang.code).name };
 
     // 4. Insert message as 'ai' sender with idempotency keys
     const { data: insertedMsg, error: msgErr } = await supabase

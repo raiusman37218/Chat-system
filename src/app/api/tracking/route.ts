@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { geoFromRequest } from '@/lib/geo';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://vfjsaynnubxywdbevxtx.supabase.co';
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZmanNheW5udWJ4eXdkYmV2eHR4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgyNTA5MDEsImV4cCI6MjEwMzgyNjkwMX0.YyBCXMqwrOk5BRhQafYLFw8tiM5PC8lc8Yocodw9wf0';
@@ -67,6 +68,12 @@ export async function POST(req: NextRequest) {
           visit_count = 1,
         } = body;
 
+        // The server's own IP geolocation beats whatever the browser managed
+        // to look up (often nothing, behind an ad blocker).
+        const geo = await geoFromRequest(req.headers);
+        const city = geo.country ? geo.city : ip_location_city;
+        const country = geo.country || ip_location_country;
+
         // Upsert into visitors table
         const { error: visitorErr } = await supabase.from('visitors').upsert({
           id: visitor_id,
@@ -76,8 +83,8 @@ export async function POST(req: NextRequest) {
           device: device || null,
           browser: browser || null,
           os: os || null,
-          ip_location_city: ip_location_city || null,
-          ip_location_country: ip_location_country || null,
+          ip_location_city: city || null,
+          ip_location_country: country || null,
           ip_address: clientIp,
           visit_count: Number(visit_count) || 1,
           is_online: true,

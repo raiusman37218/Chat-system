@@ -243,13 +243,32 @@ const TIMEZONE_TO_COUNTRY: Record<string, { city: string; country: string; code:
   'africa/yaounde': { city: 'Yaoundé', country: 'Cameroon', code: 'CM' },
 };
 
+/** English country name → ISO code for every region Intl knows, built once. */
+let intlCountryCodes: Record<string, string> | null = null;
+function intlCountryCode(key: string): string | null {
+  if (!intlCountryCodes) {
+    intlCountryCodes = {};
+    try {
+      const names = new Intl.DisplayNames(['en'], { type: 'region' });
+      for (let a = 65; a <= 90; a++) {
+        for (let b = 65; b <= 90; b++) {
+          const code = String.fromCharCode(a, b);
+          const name = names.of(code);
+          if (name && name !== code) intlCountryCodes[name.toLowerCase()] = code;
+        }
+      }
+    } catch {}
+  }
+  return intlCountryCodes[key] || null;
+}
+
 export function countryCodeFor(country: string | null | undefined): string | null {
   if (!country) return null;
   const key = country.trim().toLowerCase();
   if (COUNTRY_CODES[key]) return COUNTRY_CODES[key];
   // Already an ISO-3166 alpha-2 code.
   if (/^[a-z]{2}$/.test(key)) return key.toUpperCase();
-  return null;
+  return intlCountryCode(key);
 }
 
 /** ISO code → regional-indicator flag emoji. */
@@ -291,7 +310,8 @@ export function parseLocation(
   if (looksLikeTimezone && !c && !k) {
     const tzMatch = TIMEZONE_TO_COUNTRY[value.toLowerCase()];
     if (tzMatch) {
-      c = tzMatch.city;
+      // A timezone names a country, not a city: every visitor on
+      // Asia/Karachi is not in Karachi. Show only what it actually tells us.
       k = tzMatch.country;
       countryCode = tzMatch.code;
     }
