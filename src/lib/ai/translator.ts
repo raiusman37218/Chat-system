@@ -460,6 +460,19 @@ export async function translateWithGoogleGtx(
         }
       }
 
+      // Translated to English and came back identical: it was English all
+      // along. Google labels lone English words oddly ("purposefully" →
+      // Zulu), which used to make the assistant answer in that language.
+      if (
+        targetCode === 'en' &&
+        detected !== 'en' &&
+        !romanizedSource &&
+        isLatinScript(text) &&
+        finalTrans.trim().toLowerCase() === text.trim().toLowerCase()
+      ) {
+        detected = 'en';
+      }
+
       return {
         translated: finalTrans,
         detectedLanguage: detected,

@@ -838,6 +838,12 @@ export function ChatThread({
 
     if (targetMsg) {
       const text = targetMsg.content.trim();
+      const storedEnglish: string | undefined = targetMsg.metadata?.translation?.english_text;
+      // A "translation" identical to the message means it was English after
+      // all, whatever language code a detector attached to it.
+      if (storedEnglish && storedEnglish.trim().toLowerCase() === text.toLowerCase()) {
+        return 'en';
+      }
       const transLang =
         inboundTranslations[targetMsg.id]?.detectedLanguage ||
         targetMsg.metadata?.translation?.detected_language ||
@@ -1805,26 +1811,13 @@ export function ChatThread({
                   <div className="space-y-1.5">
                     <ChatMarkdown content={isExpanded ? aiDelivered : aiEnglish} />
                     {isAiForeign && (
-                      <div className="pt-1.5 border-t border-purple-500/20 flex items-center justify-between gap-2 text-[11px] select-none">
-                        <span className="inline-flex items-center gap-1.5 font-bold px-2 py-0.5 rounded-md bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20 shadow-2xs">
-                          <Globe className="w-3.5 h-3.5 shrink-0" />
-                          {isExpanded
-                            ? `Delivered to customer in ${deliveredLangInfo?.name || deliveredLangCode || 'Customer Language'}`
-                            : `Delivered in ${deliveredLangInfo?.name || deliveredLangCode || 'Customer Language'}`}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setExpandedTranslations((prev) => ({
-                              ...prev,
-                              [msg.id]: !prev[msg.id],
-                            }))
-                          }
-                          className="px-2 py-0.5 rounded-md bg-surface-2 border border-line-2 hover:border-purple-500 text-ink font-bold text-[11px] transition-all cursor-pointer ml-auto hover:text-purple-600"
-                        >
-                          {isExpanded ? 'Show English' : `View ${deliveredLangInfo?.name || 'Customer Language'}`}
-                        </button>
-                      </div>
+                      <TranslationToggle
+                        tone="ai"
+                        label={`Sent in ${deliveredLangInfo?.name || deliveredLangCode || 'customer language'}`}
+                        showText="View sent"
+                        showingOriginal={Boolean(isExpanded)}
+                        onToggle={() => setExpandedTranslations((prev) => ({ ...prev, [msg.id]: !prev[msg.id] }))}
+                      />
                     )}
                   </div>
                 );
@@ -1858,30 +1851,17 @@ export function ChatThread({
                 // If translation exists and was translated to customer's foreign language
                 if (wasActuallyTranslatedToForeign) {
                   return (
-                    <div className="space-y-2">
+                    <div>
                       <p className="whitespace-pre-wrap leading-relaxed">
                         {isExpanded ? translatedForeign : englishText}
                       </p>
-                      <div className="pt-2 border-t border-white/25 flex items-center justify-between gap-2 text-[11px] select-none">
-                        <span className="inline-flex items-center gap-1.5 font-bold px-2 py-0.5 rounded-md bg-white/20 text-white border border-white/30 shadow-2xs">
-                          <Globe className="w-3.5 h-3.5 shrink-0" />
-                          {isExpanded
-                            ? `Delivered to customer in ${targetLangInfo?.name || targetCode}`
-                            : `Delivered in ${targetLangInfo?.name || targetCode}`}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setExpandedTranslations((prev) => ({
-                              ...prev,
-                              [msg.id]: !prev[msg.id],
-                            }))
-                          }
-                          className="px-2 py-0.5 rounded-md bg-white/15 hover:bg-white/25 text-white font-bold text-[11px] underline transition-all cursor-pointer ml-auto"
-                        >
-                          {isExpanded ? 'Show English' : `View ${targetLangInfo?.name || 'Translation'}`}
-                        </button>
-                      </div>
+                      <TranslationToggle
+                        tone="out"
+                        label={`Sent in ${targetLangInfo?.name || targetCode}`}
+                        showText="View sent"
+                        showingOriginal={Boolean(isExpanded)}
+                        onToggle={() => setExpandedTranslations((prev) => ({ ...prev, [msg.id]: !prev[msg.id] }))}
+                      />
                     </div>
                   );
                 }
@@ -1889,28 +1869,17 @@ export function ChatThread({
                 // If agent typed in Urdu / Roman Urdu / etc. and customer received in English
                 if (englishText && originalInput && originalInput !== englishText) {
                   return (
-                    <div className="space-y-1.5">
+                    <div>
                       <p className="whitespace-pre-wrap leading-relaxed">
                         {isExpanded ? originalInput : englishText}
                       </p>
-                      <div className="pt-1.5 border-t border-white/20 flex items-center justify-between gap-2 text-[10.5px] opacity-90 select-none">
-                        <span className="inline-flex items-center gap-1 font-medium">
-                          <Globe className="w-3 h-3 shrink-0" />
-                          {isExpanded ? 'Your original input' : 'English preview'}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setExpandedTranslations((prev) => ({
-                              ...prev,
-                              [msg.id]: !prev[msg.id],
-                            }))
-                          }
-                          className="underline font-semibold hover:opacity-100 opacity-80 transition-opacity cursor-pointer ml-auto"
-                        >
-                          {isExpanded ? 'Show English' : 'Show my input'}
-                        </button>
-                      </div>
+                      <TranslationToggle
+                        tone="out"
+                        label="Sent in English"
+                        showText="My input"
+                        showingOriginal={Boolean(isExpanded)}
+                        onToggle={() => setExpandedTranslations((prev) => ({ ...prev, [msg.id]: !prev[msg.id] }))}
+                      />
                     </div>
                   );
                 }
@@ -1938,51 +1907,39 @@ export function ChatThread({
                 const langInfo = getLanguageInfo(sourceCode);
                 const isExpanded = expandedTranslations[msg.id];
 
-                if (sourceCode !== 'en' || hasEnglishTranslation || translationMeta?.is_translated) {
-                  return (
-                    <div className="space-y-2">
-                      {englishText ? (
-                        <p className="whitespace-pre-wrap leading-relaxed font-normal">
-                          {/* Original is the message exactly as the visitor sent it. */}
-                          {isExpanded ? msg.content : englishText}
-                        </p>
-                      ) : (
-                        <div>
-                          <p className="whitespace-pre-wrap leading-relaxed">{msg.content}</p>
-                          <span className="inline-flex items-center gap-1.5 text-[11.5px] text-accent mt-1.5 font-bold animate-pulse px-2 py-0.5 rounded-md bg-accent/10 border border-accent/20">
-                            <Globe className="w-3.5 h-3.5 shrink-0 animate-spin" />
-                            Auto-translating to English...
-                          </span>
-                        </div>
-                      )}
+                // Processed, and the "translation" is the same text (an English
+                // word such as "purposefully" that a detector labelled Zulu):
+                // nothing to translate, so no translation UI.
+                if (translationMeta?.english_text && !hasEnglishTranslation) {
+                  return msg.content;
+                }
 
-                      {englishText && (
-                        <div className="mt-2 pt-2 border-t-2 border-line-2 flex items-center justify-between gap-2 text-[11.5px] select-none">
-                          <span className="inline-flex items-center gap-1.5 font-bold px-2 py-0.5 rounded-md bg-accent/15 text-accent border border-accent/25">
-                            <Globe className="w-3.5 h-3.5 text-accent shrink-0" />
-                            {isExpanded
-                              ? `Original (${langInfo.name})`
-                              : `Auto-translated from ${langInfo.name}`}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setExpandedTranslations((prev) => ({
-                                ...prev,
-                                [msg.id]: !prev[msg.id],
-                              }))
-                            }
-                            className="px-2.5 py-0.5 rounded-md bg-surface-2 border border-line-2 hover:border-accent text-ink font-bold text-[11px] transition-all cursor-pointer ml-auto shadow-2xs hover:text-accent"
-                          >
-                            {isExpanded ? 'Show English' : `Show Original (${langInfo.name})`}
-                          </button>
-                        </div>
-                      )}
+                if (!englishText) {
+                  // Still on its way from the server.
+                  return (
+                    <div>
+                      <p className="whitespace-pre-wrap leading-relaxed">{msg.content}</p>
+                      <span className="mt-1 inline-flex items-center gap-1 text-[11px] text-ink-3">
+                        <Globe className="w-3 h-3 shrink-0 animate-pulse" />
+                        Translating…
+                      </span>
                     </div>
                   );
                 }
 
-                return englishText || msg.content;
+                return (
+                  <div>
+                    {/* Original is the message exactly as the visitor sent it. */}
+                    <p className="whitespace-pre-wrap leading-relaxed font-normal">
+                      {isExpanded ? msg.content : englishText}
+                    </p>
+                    <TranslationToggle
+                      label={translationMeta?.language_name || langInfo.name}
+                      showingOriginal={Boolean(isExpanded)}
+                      onToggle={() => setExpandedTranslations((prev) => ({ ...prev, [msg.id]: !prev[msg.id] }))}
+                    />
+                  </div>
+                );
               })()
             )}
           </div>
@@ -3024,8 +2981,11 @@ export function ChatThread({
                     <Globe className={cn('w-3.5 h-3.5 shrink-0', autoTranslateEnabled && targetLanguage !== 'en' ? 'text-blue-500' : 'text-ink-3')} />
                     {autoTranslateEnabled && targetLanguage !== 'en' ? (
                       <span className="inline-flex items-center gap-1">
-                        <span>{getLanguageInfo(targetLanguage).flag || ''}</span>
-                        <span>{getLanguageInfo(targetLanguage).name}</span>
+                        {/* Narrow composer (phones): the code only, so the
+                            button never runs under the Send button. */}
+                        <span className="uppercase @min-[520px]:hidden">{targetLanguage}</span>
+                        <span className="hidden @min-[520px]:inline">{getLanguageInfo(targetLanguage).flag || ''}</span>
+                        <span className="hidden @min-[520px]:inline max-w-[120px] truncate">{getLanguageInfo(targetLanguage).name}</span>
                         <ChevronDown className="w-2.5 h-2.5 opacity-60 ml-0.5" />
                       </span>
                     ) : (
@@ -3181,7 +3141,7 @@ export function ChatThread({
                     : 'Send reply (Ctrl+Enter)'
                 }
                 className={cn(
-                  'h-7 px-3 rounded-lg flex items-center gap-1.5 text-[11.5px] font-bold transition-all shadow-xs cursor-pointer',
+                  'h-8 md:h-7 px-3 rounded-lg flex items-center shrink-0 whitespace-nowrap gap-1.5 text-[11.5px] font-bold transition-all shadow-xs cursor-pointer',
                   (!inputText.trim() && !pendingAttachment) || isSending || isTranslating || replyLocked
                     ? 'bg-surface-3 text-ink-3 cursor-not-allowed opacity-50'
                     : isInternalMode
@@ -3209,7 +3169,8 @@ export function ChatThread({
                 ) : autoTranslateEnabled && targetLanguage !== 'en' ? (
                   <>
                     <Globe className="w-3 h-3" />
-                    <span>Translate &amp; Send</span>
+                    <span className="hidden @min-[520px]:inline">Translate &amp; Send</span>
+                    <span className="@min-[520px]:hidden">Send</span>
                   </>
                 ) : (
                   <>
@@ -3491,6 +3452,56 @@ export function ChatThread({
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * One quiet line under a translated message: which language it was in, and a
+ * link to flip between the English and the original. It used to be two
+ * boxed pills that wrapped onto three lines on a phone and dwarfed the
+ * message itself.
+ */
+function TranslationToggle({
+  label,
+  showingOriginal,
+  onToggle,
+  tone = 'in',
+  showText = 'Original',
+}: {
+  /** e.g. "Zulu", "Sent in Arabic". */
+  label: string;
+  showingOriginal: boolean;
+  onToggle: () => void;
+  /** Link text while the English is shown ("Original", "View Arabic"). */
+  showText?: string;
+  /** 'out' sits on the agent's coloured bubble. */
+  tone?: 'in' | 'out' | 'ai';
+}) {
+  return (
+    <div
+      className={cn(
+        'mt-1.5 pt-1.5 border-t flex items-center gap-1.5 text-[11px] leading-4 select-none min-w-0',
+        tone === 'out'
+          ? 'border-white/20 text-white/75'
+          : tone === 'ai'
+          ? 'border-purple-500/15 text-ink-3'
+          : 'border-line text-ink-3'
+      )}
+    >
+      <Globe className="w-3 h-3 shrink-0" />
+      <span className="truncate min-w-0">{label}</span>
+      <span aria-hidden className="shrink-0">·</span>
+      <button
+        type="button"
+        onClick={onToggle}
+        className={cn(
+          'shrink-0 font-semibold underline-offset-2 hover:underline cursor-pointer',
+          tone === 'out' ? 'text-white' : tone === 'ai' ? 'text-purple-600 dark:text-purple-400' : 'text-accent'
+        )}
+      >
+        {showingOriginal ? 'English' : showText}
+      </button>
     </div>
   );
 }
