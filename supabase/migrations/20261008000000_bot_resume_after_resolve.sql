@@ -56,3 +56,20 @@ EXECUTE FUNCTION public.fn_conversation_resolution_bookkeeping();
 
 CREATE INDEX IF NOT EXISTS idx_conversations_last_resolved_at
   ON public.conversations (last_resolved_at);
+
+-- ============================================================================
+-- Live visitor updates in the dashboard
+--
+-- The dashboard subscribes to visitors (online status, current page, location)
+-- but the table was never added to the realtime publication, so those changes
+-- only appeared after a manual refresh.
+-- ============================================================================
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables
+    WHERE pubname = 'supabase_realtime' AND schemaname = 'public' AND tablename = 'visitors'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.visitors;
+  END IF;
+END $$;

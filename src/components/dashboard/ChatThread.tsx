@@ -424,31 +424,69 @@ export function ChatThread({
     });
   }, [cannedResponses, conversation.workspace_id]);
 
-  const scrollToBottom = useCallback((smooth = false) => {
-    const scroll = () => {
-      if (messagesContainerRef.current) {
-        messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
-      }
-      messagesEndRef.current?.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto', block: 'end' });
-    };
+  // Whether the agent is reading the latest messages. Only then does the thread
+  // follow new messages down; an agent scrolled up to read history is left
+  // where they are, with a "new messages" button instead of being yanked away.
+  const stickToBottomRef = useRef(true);
+  const [showJumpToLatest, setShowJumpToLatest] = useState(false);
+  const [unseenCount, setUnseenCount] = useState(0);
+  const lastMessageIdRef = useRef<string | null>(null);
 
+  const scrollToBottom = useCallback((smooth = false) => {
+    const el = messagesContainerRef.current;
+    if (!el) return;
+    stickToBottomRef.current = true;
+    setShowJumpToLatest(false);
+    setUnseenCount(0);
+    const scroll = () => {
+      // Re-checked on each pass: if the agent scrolled up while images were
+      // still loading, the later passes must not drag them back down.
+      if (!stickToBottomRef.current || !messagesContainerRef.current) return;
+      const c = messagesContainerRef.current;
+      c.scrollTo({ top: c.scrollHeight, behavior: smooth ? 'smooth' : 'auto' });
+    };
     scroll();
     requestAnimationFrame(scroll);
-    setTimeout(scroll, 50);
-    setTimeout(scroll, 200);
+    // Late layout (images, markdown) can grow the thread after the first pass.
+    setTimeout(scroll, 120);
   }, []);
 
-  // Jump to bottom immediately on conversation open or switch (like WhatsApp)
+  const handleMessagesScroll = useCallback(() => {
+    const el = messagesContainerRef.current;
+    if (!el) return;
+    const distance = el.scrollHeight - el.scrollTop - el.clientHeight;
+    const atBottom = distance < 80;
+    stickToBottomRef.current = atBottom;
+    setShowJumpToLatest(!atBottom && distance > 240);
+    if (atBottom) setUnseenCount(0);
+  }, []);
+
+  // Opening or switching a conversation always starts at the latest message.
   useEffect(() => {
+    lastMessageIdRef.current = null;
+    stickToBottomRef.current = true;
     scrollToBottom(false);
   }, [conversation?.id, scrollToBottom]);
 
-  // Jump to bottom when messages load or change
+  // A new message at the end of the thread: follow it if the agent is at the
+  // bottom or sent it themselves; otherwise count it. Edits to existing
+  // messages (translations, read receipts) never move the view.
   useEffect(() => {
-    if (messages.length > 0) {
-      scrollToBottom(false);
+    const last = messages[messages.length - 1];
+    if (!last) return;
+    const isNew = last.id !== lastMessageIdRef.current;
+    const isFirstLoad = lastMessageIdRef.current === null;
+    lastMessageIdRef.current = last.id;
+    if (!isNew) return;
+
+    const mine = last.sender_type === 'agent' && last.sender_id === currentAgent?.id;
+    if (isFirstLoad || mine || stickToBottomRef.current) {
+      scrollToBottom(!isFirstLoad);
+    } else {
+      setUnseenCount((n) => n + 1);
+      setShowJumpToLatest(true);
     }
-  }, [messages, scrollToBottom]);
+  }, [messages, currentAgent?.id, scrollToBottom]);
 
   // Jump to bottom when loading finishes
   useEffect(() => {
@@ -1969,7 +2007,9 @@ export function ChatThread({
           />
           <div className="flex items-center gap-1.5 min-w-0 flex-1 overflow-hidden">
             <h2
-              className="text-[13.5px] sm:text-[14px] font-bold tracking-tight text-ink shrink-0 whitespace-nowrap"
+              // Long visitor names end in an ellipsis instead of being cut
+              // off mid-letter by the action buttons.
+              className="text-[13.5px] sm:text-[14px] font-bold tracking-tight text-ink min-w-0 truncate"
               title={displayName}
             >
               {displayName}
@@ -2377,14 +2417,33 @@ export function ChatThread({
       )}
 
       {/* ── Messages ── */}
-      <div ref={messagesContainerRef} className="flex-1 overflow-y-auto px-5 py-5 space-y-3.5">
-        <div className="flex justify-center">
-          <span className="pill pill-neutral">
-            Conversation opened {formatTimeAgo(conversation.created_at)}
-          </span>
+      <div className="relative flex-1 min-h-0 flex flex-col">
+        <div
+          ref={messagesContainerRef}
+          onScroll={handleMessagesScroll}
+          className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-5 pt-6 pb-5 space-y-3.5"
+        >
+          <div className="flex justify-center">
+            <span className="pill pill-neutral">
+              Conversation opened {formatTimeAgo(conversation.created_at)}
+            </span>
+          </div>
+          {rendered}
+          <div ref={messagesEndRef} />
         </div>
-        {rendered}
-        <div ref={messagesEndRef} />
+
+        {showJumpToLatest && (
+          <button
+            type="button"
+            onClick={() => scrollToBottom(true)}
+            className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 h-8 pl-3 pr-3.5 rounded-full bg-surface border border-line shadow-lg text-[12px] font-semibold text-ink hover:border-accent hover:text-accent transition-colors inline-flex items-center gap-1.5 cursor-pointer animate-pop"
+          >
+            <ChevronDown className="w-3.5 h-3.5" />
+            {unseenCount > 0
+              ? `${unseenCount} new message${unseenCount === 1 ? '' : 's'}`
+              : 'Jump to latest'}
+          </button>
+        )}
       </div>
 
       {/* ── Composer ── */}
@@ -2809,9 +2868,9 @@ export function ChatThread({
           )}
 
           {/* Composer Footer Action Bar */}
-          <div className="px-3 py-2 bg-surface-2/40 border-t border-line/40 flex items-center justify-between text-[11px] text-ink-3 rounded-b-2xl min-h-[42px] gap-2">
+          <div className="@container px-3 py-2 bg-surface-2/40 border-t border-line/40 flex items-center justify-between text-[11px] text-ink-3 rounded-b-2xl min-h-[42px] gap-2">
             {/* Left Action Tools */}
-            <div className="flex items-center gap-1 min-w-0 flex-wrap">
+            <div className="flex items-center gap-1 min-w-0 flex-nowrap">
               {/* Attachment Buttons */}
               <button
                 type="button"
@@ -2862,7 +2921,7 @@ export function ChatThread({
                 title="Saved canned responses (/)"
               >
                 <Zap className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-                <span className="hidden sm:inline">Replies</span>
+                <span className="hidden @min-[520px]:inline">Replies</span>
               </button>
 
               {/* AI Copilot */}
@@ -2874,7 +2933,7 @@ export function ChatThread({
                 title="Ask AI Copilot to draft a response"
               >
                 <Sparkles className={cn('w-3.5 h-3.5 shrink-0', aiDrafting && 'animate-spin')} />
-                <span className="hidden sm:inline">{aiDrafting ? 'Drafting…' : 'AI Copilot'}</span>
+                <span className="hidden @min-[520px]:inline">{aiDrafting ? 'Drafting…' : 'AI Copilot'}</span>
               </button>
 
               {/* ── Translation Controls (Unified & Sleek) ── */}
@@ -2903,7 +2962,7 @@ export function ChatThread({
                         <ChevronDown className="w-2.5 h-2.5 opacity-60 ml-0.5" />
                       </span>
                     ) : (
-                      <span className="hidden sm:inline">Translate</span>
+                      <span className="hidden @min-[520px]:inline">Translate</span>
                     )}
                   </button>
 
@@ -3030,7 +3089,7 @@ export function ChatThread({
                     return next;
                   });
                 }}
-                className="hidden sm:inline-flex items-center gap-1 text-[10.5px] text-ink-3 hover:text-ink transition-colors cursor-pointer group"
+                className="hidden @min-[640px]:inline-flex items-center gap-1 text-[10.5px] text-ink-3 hover:text-ink transition-colors cursor-pointer group"
                 title={
                   sendOnEnter
                     ? "Pressing Enter sends. Click to switch to Ctrl+Enter."

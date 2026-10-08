@@ -55,7 +55,11 @@ export interface HelpAnswer {
  */
 const indexCache = new Map<string, { index: HelpIndex; builtAt: number }>();
 const rebuilding = new Map<string, Promise<HelpIndex>>();
-const INDEX_TTL_MS = 60_000;
+// Kept short so an edited article is what the assistant answers from within
+// seconds. Past STALE_LIMIT_MS the old copy is not served at all: the question
+// waits for the rebuild rather than being answered from outdated content.
+const INDEX_TTL_MS = 15_000;
+const STALE_LIMIT_MS = 120_000;
 
 export function invalidateHelpIndex(workspaceId: string) {
   indexCache.delete(workspaceId);
@@ -76,7 +80,7 @@ function loadIndex(workspaceId: string): Promise<HelpIndex> {
     rebuilding.set(workspaceId, pending);
     pending.catch(() => {});
   }
-  return cached ? Promise.resolve(cached.index) : pending;
+  return cached && Date.now() - cached.builtAt < STALE_LIMIT_MS ? Promise.resolve(cached.index) : pending;
 }
 
 async function buildWorkspaceIndex(workspaceId: string): Promise<HelpIndex> {
@@ -373,7 +377,16 @@ export async function buildModelContext(
     helpCenterUrl?: string | null;
   } = {}
 ): Promise<ModelContext & { rewrittenQuery?: string; queryEmbedding?: number[] | null; chunks?: RetrievedChunk[]; belowThreshold?: boolean }> {
+  // The live keyword index reads the published articles and the team's
+  // assistant notes straight from the database, so it always reflects the
+  // help centre as it is now. It runs alongside semantic search: it is the
+  // fallback when semantic search finds nothing (no embedding key, chunks not
+  // synced yet), and the only source for team notes, which have no chunks.
+  const indexPromise = loadIndex(workspaceId).catch(() => null);
+
   // 1. Primary: Semantic Retrieval with pgvector & query rewriting
+  let rewrittenQuery: string | undefined;
+  let queryEmbedding: number[] | null | undefined;
   try {
     const messages = options.recentMessages || options.turns || (options.history || []).map((h) => ({ role: 'user', content: h }));
     const semantic = await buildSemanticModelContext({
@@ -384,29 +397,50 @@ export async function buildModelContext(
       limit: options.limit ?? 6,
       helpCenterUrl: options.helpCenterUrl,
     });
+    rewrittenQuery = semantic.rewrittenQuery;
+    queryEmbedding = semantic.queryEmbedding;
 
-    return {
-      text: semantic.text,
-      used: semantic.used,
-      rewrittenQuery: semantic.rewrittenQuery,
-      queryEmbedding: semantic.queryEmbedding,
-      chunks: semantic.chunks,
-      belowThreshold: semantic.belowThreshold,
-    };
+    if (!semantic.belowThreshold && semantic.text) {
+      // Add team notes that match, which semantic search cannot see.
+      const index = await indexPromise;
+      const noteHits = index
+        ? search(index, `${rewrittenQuery || ''}\n${question}`, { history: options.history, limit: 4 })
+            .filter((h) => h.article.id.startsWith('note:') && h.score >= 1)
+            .slice(0, 2)
+        : [];
+      const noteBlocks = noteHits.map((h, i) =>
+        [`[TEAM NOTE ${i + 1}]`, `Title: ${h.article.title}`, '', h.article.content].join('\n')
+      );
+      return {
+        text: [semantic.text, ...noteBlocks].join('\n\n---\n\n'),
+        used: [
+          ...semantic.used,
+          ...noteHits.map((h) => ({ id: h.article.id, title: h.article.title, source: 'note' as KnowledgeSource })),
+        ],
+        rewrittenQuery,
+        queryEmbedding,
+        chunks: semantic.chunks,
+        belowThreshold: false,
+      };
+    }
   } catch (err) {
     console.warn('[Semantic Retrieval] buildModelContext fallback to keyword index:', err);
   }
 
-  // 2. Fallback to keyword index only if semantic retrieval threw an unexpected error
-  const index = await loadIndex(workspaceId);
-  const hits = search(index, question, {
+  // 2. Keyword index: semantic search found nothing usable.
+  const index = await indexPromise;
+  if (!index) return { text: '', used: [], belowThreshold: true, rewrittenQuery, queryEmbedding };
+  // Search with the English rewrite as well as the visitor's own words, so a
+  // question in Roman Urdu or Spanish still meets English articles.
+  const searchText = rewrittenQuery && rewrittenQuery !== question ? `${rewrittenQuery}\n${question}` : question;
+  const hits = search(index, searchText, {
     history: options.history,
     limit: options.limit ?? 4,
   });
 
   // Only what plausibly relates
   const relevant = hits.filter((h) => h.score >= 1);
-  if (relevant.length === 0) return { text: '', used: [], belowThreshold: true };
+  if (relevant.length === 0) return { text: '', used: [], belowThreshold: true, rewrittenQuery, queryEmbedding };
 
   const budgets = [MODEL_CONTEXT_TOP_CHARS, ...Array(relevant.length).fill(MODEL_CONTEXT_OTHER_CHARS)];
 
@@ -441,7 +475,7 @@ export async function buildModelContext(
     return lines.join('\n');
   });
 
-  return { text: blocks.join('\n\n---\n\n'), used, belowThreshold: false };
+  return { text: blocks.join('\n\n---\n\n'), used, belowThreshold: false, rewrittenQuery, queryEmbedding };
 }
 
 

@@ -126,6 +126,14 @@ export default function DashboardPage() {
   const currentWorkspaceRef = useRef<Workspace | null>(null);
   currentWorkspaceRef.current = currentWorkspace;
 
+  const conversationsRef = useRef<Conversation[]>([]);
+  conversationsRef.current = conversations;
+
+  // Bumped to tear down and re-open the realtime channels after a dropped
+  // connection (laptop sleep, network change, server restart).
+  const [realtimeEpoch, setRealtimeEpoch] = useState(0);
+  const realtimeHealthyRef = useRef(true);
+
   // Dynamically update favicon badge and title count when unread conversations change
   useEffect(() => {
     const unreadTotal = conversations.reduce(
@@ -512,30 +520,56 @@ export default function DashboardPage() {
           }
         }
 
-        // Auto-close abandoned empty conversations (0 visitor messages after 10 minutes)
-        const abandonedIds: string[] = [];
+        // Auto-close abandoned empty conversations (0 visitor messages after 10 minutes).
+        // The batch above is capped by the API (1,000 rows), so a busy page can
+        // be missing older conversations' messages entirely. Absence there is
+        // not proof: candidates are re-checked with a query of their own before
+        // anything is closed.
+        let abandonedIds: string[] = [];
         const nowMs = Date.now();
-        fetchedConvs.forEach((c: any) => {
-          if (c.status === 'open' && !visitorMsgCounts[c.id]) {
+        const candidates = fetchedConvs
+          .filter((c: any) => {
+            if (c.status !== 'open' || visitorMsgCounts[c.id]) return false;
             const ageMinutes = (nowMs - new Date(c.created_at || c.updated_at).getTime()) / (1000 * 60);
-            if (ageMinutes >= 10) {
-              abandonedIds.push(c.id);
-            }
-          }
-        });
+            return ageMinutes >= 10;
+          })
+          .map((c: any) => c.id as string);
 
-        if (abandonedIds.length > 0) {
-          supabase
-            .from('conversations')
-            .update({
-              status: 'closed',
-              closed_at: new Date().toISOString(),
-              channel_metadata: { auto_closed_reason: 'no_customer_message_10m' },
-            })
-            .in('id', abandonedIds)
-            .then();
+        if (candidates.length > 0) {
+          const { data: withVisitorMsgs } = await supabase
+            .from('messages')
+            .select('conversation_id')
+            .in('conversation_id', candidates)
+            .eq('sender_type', 'visitor')
+            .limit(1000);
+          const spoken = new Set((withVisitorMsgs || []).map((r: any) => r.conversation_id));
+          abandonedIds = candidates.filter((id: string) => !spoken.has(id));
         }
 
+        if (abandonedIds.length > 0) {
+          const closedAt = new Date().toISOString();
+          // Per conversation, so each keeps its own channel_metadata (language
+          // override, autopilot history) instead of all being replaced.
+          for (const c of fetchedConvs.filter((fc: any) => abandonedIds.includes(fc.id))) {
+            supabase
+              .from('conversations')
+              .update({
+                status: 'closed',
+                closed_at: closedAt,
+                channel_metadata: {
+                  ...((c.channel_metadata as Record<string, any>) || {}),
+                  auto_closed_reason: 'no_customer_message_10m',
+                },
+              })
+              .eq('id', c.id)
+              .eq('status', 'open')
+              .then();
+          }
+        }
+
+        const knownLastMessage = new Map(
+          conversationsRef.current.map((c) => [c.id, c.last_message] as const)
+        );
         const enrichedConversations: Conversation[] = fetchedConvs.map((c: any) => {
           const isCurrentlySelected = selectedConversationIdRef.current === c.id;
           const isAutoClosed = abandonedIds.includes(c.id);
@@ -543,7 +577,8 @@ export default function DashboardPage() {
             ...c,
             status: isAutoClosed ? 'closed' : c.status,
             closed_at: isAutoClosed ? (c.closed_at || new Date().toISOString()) : c.closed_at,
-            last_message: latestMessageMap[c.id] || null,
+            // Missing from the capped batch is not "no messages": keep what we had.
+            last_message: latestMessageMap[c.id] || knownLastMessage.get(c.id) || null,
             unread_count: isCurrentlySelected ? 0 : (unreadCountMap[c.id] || 0),
           };
         });
@@ -711,6 +746,25 @@ export default function DashboardPage() {
   // 5. Supabase Realtime Subscriptions
   useEffect(() => {
     const channelSuffix = `${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+    let cancelled = false;
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+    // A channel that errors, times out or closes is re-opened a few seconds
+    // later; once it is back, one refresh picks up whatever was missed.
+    const onStatus = (status: string) => {
+      if (cancelled) return;
+      if (status === 'SUBSCRIBED') {
+        if (!realtimeHealthyRef.current) {
+          realtimeHealthyRef.current = true;
+          refreshConversations();
+        }
+      } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+        realtimeHealthyRef.current = false;
+        if (!reconnectTimer) {
+          reconnectTimer = setTimeout(() => setRealtimeEpoch((n) => n + 1), 3000);
+        }
+      }
+    };
+
     const messagesChannel = supabase
       .channel(`zen-try-dashboard-messages-${channelSuffix}`)
       .on(
@@ -881,11 +935,7 @@ export default function DashboardPage() {
           refreshConversations();
         }
       )
-      .subscribe((status: any) => {
-        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-          refreshConversations();
-        }
-      });
+      .subscribe(onStatus);
 
     const conversationsChannel = supabase
       .channel(`zen-try-dashboard-conversations-${channelSuffix}`)
@@ -951,7 +1001,7 @@ export default function DashboardPage() {
           }
         }
       )
-      .subscribe();
+      .subscribe(onStatus);
 
     const visitorsChannel = supabase
       .channel(`zen-try-dashboard-visitors-${channelSuffix}`)
@@ -987,7 +1037,7 @@ export default function DashboardPage() {
           );
         }
       )
-      .subscribe();
+      .subscribe(onStatus);
 
     const internalNotesChannel = supabase
       .channel(`zen-try-dashboard-internal-notes-${channelSuffix}`)
@@ -1010,15 +1060,52 @@ export default function DashboardPage() {
           }
         }
       )
-      .subscribe();
+      .subscribe(onStatus);
 
     return () => {
+      cancelled = true;
+      if (reconnectTimer) clearTimeout(reconnectTimer);
       supabase.removeChannel(messagesChannel);
       supabase.removeChannel(conversationsChannel);
       supabase.removeChannel(visitorsChannel);
       supabase.removeChannel(internalNotesChannel);
     };
-  }, [supabase]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [supabase, realtimeEpoch]);
+
+  // Realtime events are lost while a laptop sleeps or a tab is frozen in the
+  // background, without any error being raised. Coming back to the tab, or
+  // back online, re-syncs the list and the open thread; a slow heartbeat
+  // covers the rest (faster while realtime is known to be down).
+  useEffect(() => {
+    let lastSync = Date.now();
+    const sync = (minGapMs: number) => {
+      if (document.visibilityState !== 'visible') return;
+      if (Date.now() - lastSync < minGapMs) return;
+      if (!currentWorkspaceIdRef.current) return;
+      lastSync = Date.now();
+      refreshConversations();
+    };
+    const onVisible = () => sync(5_000);
+    const onOnline = () => {
+      realtimeHealthyRef.current = false;
+      setRealtimeEpoch((n) => n + 1);
+      sync(0);
+    };
+    const heartbeat = setInterval(
+      () => sync(realtimeHealthyRef.current ? 120_000 : 15_000),
+      15_000
+    );
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('focus', onVisible);
+    window.addEventListener('online', onOnline);
+    return () => {
+      clearInterval(heartbeat);
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('focus', onVisible);
+      window.removeEventListener('online', onOnline);
+    };
+  }, [refreshConversations]);
 
   // 6. Action Handlers
   /**

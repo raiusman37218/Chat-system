@@ -292,6 +292,28 @@ async function generateOpenAiEmbeddings(
 }
 
 /**
+ * Embeddings when a Google/OpenAI key is available; otherwise nulls.
+ *
+ * Chunks are stored either way: hybrid search also ranks by keywords, so an
+ * article without a vector is still found. Throwing here used to mean that a
+ * workspace on Anthropic or DeepSeek (no embedding API) stored no chunks at
+ * all, and the assistant answered "I don't have that information" about
+ * articles that were right there.
+ */
+async function embedOrNothing(
+  texts: string[],
+  providerConfig?: ProviderConfig | null
+): Promise<(number[] | null)[]> {
+  try {
+    const out = await generateEmbeddings(texts, providerConfig);
+    if (out.length === texts.length) return out;
+  } catch (err) {
+    console.warn('[Semantic Retrieval] Embeddings unavailable, storing keyword-only chunks:', (err as Error)?.message);
+  }
+  return texts.map(() => null);
+}
+
+/**
  * Re-embeds an article automatically when created, edited, published or unpublished.
  */
 export async function syncArticleChunks(articleId: string, workspaceId: string): Promise<void> {
@@ -346,7 +368,7 @@ export async function syncArticleChunks(articleId: string, workspaceId: string):
 
   // 4. Generate embeddings
   const texts = chunks.map((c) => c.content);
-  const embeddings = await generateEmbeddings(texts, providerConfig);
+  const embeddings = await embedOrNothing(texts, providerConfig);
 
   // 5. Replace existing chunks for this article atomically
   await supabase.from('article_chunks').delete().eq('article_id', articleId);
@@ -416,7 +438,7 @@ export async function syncWorkspaceArticleEmbeddings(
   if (allChunks.length === 0) return { indexedArticles: 0, totalChunks: 0 };
 
   const texts = allChunks.map((c) => c.content);
-  const embeddings = await generateEmbeddings(texts, providerConfig);
+  const embeddings = await embedOrNothing(texts, providerConfig);
 
   // Clear existing workspace chunks and insert fresh ones
   await supabase.from('article_chunks').delete().eq('workspace_id', workspaceId);

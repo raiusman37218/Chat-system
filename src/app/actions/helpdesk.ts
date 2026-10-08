@@ -8,6 +8,26 @@ import {
   syncWorkspaceArticleEmbeddings,
 } from '@/lib/ai/semantic-retrieval';
 import { generateSlug } from '@/lib/slug';
+import { after } from 'next/server';
+import { invalidateHelpIndex } from '@/lib/ai/help-answer';
+
+/**
+ * Brings the assistant's knowledge up to date after a help-centre change.
+ *
+ * Run with after() rather than fire-and-forget: a serverless function is
+ * frozen once the action returns, which used to cut the re-embedding off
+ * halfway and leave the assistant answering from the old article.
+ */
+function refreshKnowledge(workspaceId: string, task: () => Promise<unknown>) {
+  invalidateHelpIndex(workspaceId);
+  after(async () => {
+    try {
+      await task();
+    } catch (err) {
+      console.error('[Help Desk] Knowledge sync failed:', err);
+    }
+  });
+}
 
 /**
  * Ensures the requesting user is authenticated and belongs to the specified workspace.
@@ -375,7 +395,7 @@ export async function updateHelpSectionAction(
       .eq('workspace_id', workspaceId);
 
     // Re-sync article chunks with updated section name in background
-    void syncWorkspaceArticleEmbeddings(workspaceId).catch(console.error);
+    refreshKnowledge(workspaceId, () => syncWorkspaceArticleEmbeddings(workspaceId));
   }
 
   return { success: true, section: updated as HelpSection };
@@ -449,7 +469,7 @@ export async function deleteHelpSectionAction(
       if (moveErr) throw new Error(moveErr.message);
 
       // Re-sync article embeddings in background
-      void syncWorkspaceArticleEmbeddings(workspaceId).catch(console.error);
+      refreshKnowledge(workspaceId, () => syncWorkspaceArticleEmbeddings(workspaceId));
     } else {
       // Check if other sections exist
       const { data: otherSections } = await supabase
@@ -587,7 +607,7 @@ export async function migrateHelpDeskArticlesAction(workspaceId: string) {
   }
 
   if (migratedCount > 0) {
-    void syncWorkspaceArticleEmbeddings(workspaceId).catch(console.error);
+    refreshKnowledge(workspaceId, () => syncWorkspaceArticleEmbeddings(workspaceId));
   }
 
   return {
@@ -677,7 +697,7 @@ export async function createArticleAction(
   if (error) throw new Error(error.message);
 
   if (inserted.status === 'published') {
-    void syncArticleChunks(inserted.id, workspaceId).catch(console.error);
+    refreshKnowledge(workspaceId, () => syncArticleChunks(inserted.id, workspaceId));
   }
 
   return { success: true, article: inserted as Article };
@@ -798,9 +818,9 @@ export async function updateArticleAction(
   if (error) throw new Error(error.message);
 
   if (updated.status === 'published') {
-    void syncArticleChunks(articleId, workspaceId).catch(console.error);
+    refreshKnowledge(workspaceId, () => syncArticleChunks(articleId, workspaceId));
   } else {
-    void deleteArticleChunks(articleId).catch(console.error);
+    refreshKnowledge(workspaceId, () => deleteArticleChunks(articleId));
   }
 
   return { success: true, article: updated as Article };
@@ -841,7 +861,7 @@ export async function deleteArticleAction(workspaceId: string, articleId: string
     .eq('workspace_id', workspaceId);
 
   if (error) throw new Error(error.message);
-  void deleteArticleChunks(articleId).catch(console.error);
+  refreshKnowledge(workspaceId, () => deleteArticleChunks(articleId));
   return { success: true };
 }
 
@@ -864,9 +884,9 @@ export async function toggleArticleStatusAction(
   if (error) throw new Error(error.message);
 
   if (newStatus === 'published') {
-    void syncArticleChunks(articleId, workspaceId).catch(console.error);
+    refreshKnowledge(workspaceId, () => syncArticleChunks(articleId, workspaceId));
   } else {
-    void deleteArticleChunks(articleId).catch(console.error);
+    refreshKnowledge(workspaceId, () => deleteArticleChunks(articleId));
   }
 
   return { success: true, article: updated as Article };

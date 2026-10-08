@@ -686,6 +686,15 @@
    ========================================================================== */
 
 @layer utilities {
+  /* Scrolls, but without a visible bar (toolbars that overflow on narrow panes). */
+  .no-scrollbar {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
   .u-container {
     width: 100%;
     max-width: 1200px;
