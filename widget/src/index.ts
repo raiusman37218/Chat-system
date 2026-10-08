@@ -1,6 +1,7 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { CHATIFY_ICON_DATA_URI, ZENTRY_ICON_DATA_URI } from './icon';
 import { EMOJI_CATEGORIES, ALL_EMOJIS } from '../../src/lib/emojis';
+import { looksLikeImage, uploadChatImage } from '../../src/lib/image-upload';
 
 const DEFAULT_SUPABASE_URL = 'https://vfjsaynnubxywdbevxtx.supabase.co';
 const DEFAULT_SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZmanNheW5udWJ4eXdkYmV2eHR4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgyNTA5MDEsImV4cCI6MjEwMzgyNjkwMX0.YyBCXMqwrOk5BRhQafYLFw8tiM5PC8lc8Yocodw9wf0';
@@ -1929,7 +1930,7 @@ class ZentryWidget {
         </div>
 
         <!-- Hidden input for picture upload -->
-        <input type="file" id="chatifyImageInput" accept="image/*" style="display:none;" />
+        <input type="file" id="chatifyImageInput" accept="image/*,.heic,.heif" style="display:none;" />
 
         <div class="chatify-footer" id="chatifyFooter" style="${!this.isPreChatCompleted ? 'display:none;' : 'display:flex;'}">
           <div class="chatify-footer-actions">
@@ -2222,12 +2223,15 @@ class ZentryWidget {
   }
 
   private handleSelectImage(file: File) {
-    if (file.size > 15 * 1024 * 1024) {
-      alert('File size exceeds maximum 15MB limit.');
+    // Large camera photos are fine: they are shrunk on the device before
+    // upload. This only stops files no phone photo comes close to.
+    if (file.size > 40 * 1024 * 1024) {
+      alert('This picture is too large. Please choose a smaller one.');
       return;
     }
-    if (!file.type.startsWith('image/')) {
-      alert('Please select an image file (JPEG, PNG, WEBP, GIF, etc.).');
+    // Accepts HEIC and photos that arrive with no MIME type (some Android galleries).
+    if (!looksLikeImage(file)) {
+      alert('Please select a picture (JPEG, PNG, HEIC, WEBP or GIF).');
       return;
     }
     if (this.pendingAttachment?.previewUrl) {
@@ -5048,24 +5052,11 @@ class ZentryWidget {
       }
 
       try {
-        const formData = new FormData();
-        formData.append('file', this.pendingAttachment.file);
-
-        const apiUrl = this.config.apiUrl || '';
-        const res = await fetch(`${apiUrl}/api/upload`, {
-          method: 'POST',
-          body: formData,
-        });
-
-        if (!res.ok) {
-          const errData = await res.json().catch(() => ({}));
-          throw new Error(errData.error || 'Failed to upload image to Cloudinary');
-        }
-
-        const data = await res.json();
-        attachmentUrl = data.url;
+        // Shrinks the photo on the device and uploads it straight to
+        // Cloudinary, so camera photos are not stopped by a size limit.
+        attachmentUrl = await uploadChatImage(this.pendingAttachment.file, this.config.apiUrl || '');
       } catch (err: any) {
-        alert(`Image upload error: ${err.message}`);
+        alert(err?.message || "Couldn't send the picture. Please try again.");
         if (sendBtn) {
           sendBtn.disabled = false;
           sendBtn.innerHTML = `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>`;

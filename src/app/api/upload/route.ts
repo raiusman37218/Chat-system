@@ -9,9 +9,18 @@ const ALLOWED_TYPES = new Set([
   'image/gif',
   'image/svg+xml',
   'image/bmp',
+  'image/heic',
+  'image/heif',
+  'image/avif',
   'application/pdf',
   'text/plain',
 ]);
+
+/** Some phones send a photo with no MIME type (often HEIC); go by the name. */
+const TYPE_BY_EXTENSION: Record<string, string> = {
+  jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp', gif: 'image/gif',
+  bmp: 'image/bmp', heic: 'image/heic', heif: 'image/heif', avif: 'image/avif', pdf: 'application/pdf', txt: 'text/plain',
+};
 
 const MAX_FILE_SIZE = 15 * 1024 * 1024; // 15MB
 
@@ -47,9 +56,11 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (!ALLOWED_TYPES.has(file.type)) {
+    const ext = (file.name || '').split('.').pop()?.toLowerCase() || '';
+    const mimeType = file.type || TYPE_BY_EXTENSION[ext] || '';
+    if (!ALLOWED_TYPES.has(mimeType)) {
       return NextResponse.json(
-        { error: `File type ${file.type} not permitted. Supported: images, PDF, and TXT.` },
+        { error: `File type ${mimeType || 'unknown'} not permitted. Supported: images, PDF, and TXT.` },
         { status: 400, headers: CORS_HEADERS }
       );
     }
@@ -67,7 +78,7 @@ export async function POST(req: NextRequest) {
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
 
-    const isImage = file.type.startsWith('image/');
+    const isImage = mimeType.startsWith('image/');
     const result = await uploadToCloudinary(buffer, {
       folder: 'chat_attachments',
       filename: file.name,
@@ -76,11 +87,12 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json(
       {
-        url: result.secure_url,
+        // HEIC is stored as-is; the .jpg URL makes Cloudinary deliver it as JPEG.
+        url: isImage ? result.secure_url.replace(/\.(heic|heif|avif|bmp|tiff?)$/i, '.jpg') : result.secure_url,
         publicId: result.public_id,
         filename: file.name,
         size: result.bytes || file.size,
-        mimeType: file.type,
+        mimeType,
         isImage,
         width: result.width,
         height: result.height,

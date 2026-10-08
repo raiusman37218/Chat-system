@@ -58,6 +58,7 @@ import {
 } from '@/components/ui/MessageTicks';
 import { CountryFlag } from '@/components/ui/BrandIcon';
 import { parseLocation } from '@/lib/visitor-meta';
+import { looksLikeImage, uploadChatImage } from '@/lib/image-upload';
 import { createClient } from '@/lib/supabase/client';
 import { EMOJI_CATEGORIES, ALL_EMOJIS } from '@/lib/emojis';
 import { ChatMarkdown } from '@/components/ui/ChatMarkdown';
@@ -330,14 +331,14 @@ export function ChatThread({
   };
 
   const handleSelectFile = (file: File) => {
-    if (file.size > 15 * 1024 * 1024) {
-      alert('File size exceeds maximum 15MB limit.');
+    if (file.size > 40 * 1024 * 1024) {
+      alert('This file is too large. Please choose a smaller one.');
       return;
     }
     if (pendingAttachment?.previewUrl) {
       URL.revokeObjectURL(pendingAttachment.previewUrl);
     }
-    const isImg = file.type.startsWith('image/');
+    const isImg = looksLikeImage(file);
     const previewUrl = isImg ? URL.createObjectURL(file) : '';
     setPendingAttachment({ file, isImage: isImg, previewUrl });
   };
@@ -992,18 +993,9 @@ export function ChatThread({
     let attachmentUrl: string | null = null;
     if (pendingAttachment) {
       try {
-        const formData = new FormData();
-        formData.append('file', pendingAttachment.file);
-        const res = await fetch('/api/upload', {
-          method: 'POST',
-          body: formData,
-        });
-        if (!res.ok) {
-          const errData = await res.json().catch(() => ({}));
-          throw new Error(errData.error || 'Failed to upload image to Cloudinary');
-        }
-        const data = await res.json();
-        attachmentUrl = data.url;
+        // Pictures are shrunk and sent straight to Cloudinary (no 4.5 MB
+        // request limit); documents go through /api/upload.
+        attachmentUrl = await uploadChatImage(pendingAttachment.file);
       } catch (err: any) {
         setSendError(err.message || 'Image upload failed');
         setIsSending(false);
@@ -2721,7 +2713,7 @@ export function ChatThread({
               if (file) handleSelectFile(file);
             }}
             className="hidden"
-            accept="image/*"
+            accept="image/*,.heic,.heif"
           />
           <input
             type="file"

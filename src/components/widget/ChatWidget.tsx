@@ -25,6 +25,7 @@ import {
 import { createClient } from '@/lib/supabase/client';
 import { Message } from '@/types/database';
 import { getWorkspaceHelpCenterUrl } from '@/lib/domain';
+import { looksLikeImage, uploadChatImage } from '@/lib/image-upload';
 import { EMOJI_CATEGORIES, ALL_EMOJIS } from '@/lib/emojis';
 import { ChatMarkdown } from '@/components/ui/ChatMarkdown';
 import { WidgetLauncherIcon, WidgetIconType } from '@/components/ui/WidgetLauncherIcon';
@@ -716,14 +717,14 @@ export default function ChatWidget({
 
   // Handle selecting or dropping a file / photo
   const handleSelectFile = (file: File) => {
-    if (file.size > 15 * 1024 * 1024) {
-      alert('File size exceeds maximum 15MB limit.');
+    if (file.size > 40 * 1024 * 1024) {
+      alert('This file is too large. Please choose a smaller one.');
       return;
     }
     if (pendingAttachment?.previewUrl) {
       URL.revokeObjectURL(pendingAttachment.previewUrl);
     }
-    const isImg = file.type.startsWith('image/');
+    const isImg = looksLikeImage(file);
     const previewUrl = isImg ? URL.createObjectURL(file) : '';
     setPendingAttachment({ file, isImage: isImg, previewUrl });
   };
@@ -752,22 +753,11 @@ export default function ChatWidget({
     if (!finalAttachmentUrl && pendingAttachment) {
       setIsUploading(true);
       try {
-        const formData = new FormData();
-        formData.append('file', pendingAttachment.file);
-        const res = await fetch('/api/upload', {
-          method: 'POST',
-          body: formData,
-        });
-
-        if (!res.ok) {
-          const errData = await res.json().catch(() => ({}));
-          throw new Error(errData.error || 'Failed to upload image to Cloudinary');
-        }
-
-        const data = await res.json();
-        finalAttachmentUrl = data.url;
+        // Shrinks camera photos on the device and uploads them straight to
+        // Cloudinary, past the 4.5 MB request limit of our own API.
+        finalAttachmentUrl = await uploadChatImage(pendingAttachment.file);
       } catch (err: any) {
-        alert(`Upload error: ${err.message}`);
+        alert(err?.message || "Couldn't send the picture. Please try again.");
         setIsUploading(false);
         return;
       } finally {
@@ -1734,7 +1724,7 @@ export default function ChatWidget({
                     ref={imageInputRef}
                     onChange={handleFileUpload}
                     className="hidden"
-                    accept="image/*"
+                    accept="image/*,.heic,.heif"
                   />
 
                   {/* Document/File Attachment Hidden Input */}
