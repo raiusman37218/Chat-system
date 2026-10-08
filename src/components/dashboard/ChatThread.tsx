@@ -29,6 +29,7 @@ import {
   Smile,
   Frown,
   CornerUpLeft,
+  Copy,
   Image as ImageIcon,
   Paperclip,
   Pencil,
@@ -1423,6 +1424,37 @@ export function ChatThread({
     return () => window.removeEventListener('keydown', onKey, true);
   }, [replyTo]);
 
+  // Copy puts on the clipboard the text the agent is looking at: the English
+  // translation while that is shown, the original once "Show original" is open.
+  const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
+  const copyMessage = useCallback(
+    async (msg: Message) => {
+      const t = msg.metadata?.translation;
+      const english: string | undefined = t?.english_text || msg.metadata?.english_translation;
+      const showingEnglish =
+        Boolean(english) && Boolean(t?.is_translated) && !expandedTranslations[msg.id];
+      const text =
+        (showingEnglish ? english : msg.content)?.trim() || msg.attachment_url || '';
+      if (!text) return;
+      try {
+        await navigator.clipboard.writeText(text);
+      } catch {
+        // Older browsers / non-secure contexts: fall back to a hidden textarea.
+        const el = document.createElement('textarea');
+        el.value = text;
+        el.style.position = 'fixed';
+        el.style.opacity = '0';
+        document.body.appendChild(el);
+        el.select();
+        document.execCommand('copy');
+        el.remove();
+      }
+      setCopiedMessageId(msg.id);
+      window.setTimeout(() => setCopiedMessageId((c) => (c === msg.id ? null : c)), 1500);
+    },
+    [expandedTranslations]
+  );
+
   const jumpToMessage = useCallback((id: string) => {
     const node = document.getElementById(`msg-${id}`);
     if (!node) return;
@@ -1469,6 +1501,20 @@ export function ChatThread({
               {msg.metadata?.is_edited && (
                 <span className="text-[10px] text-amber-700/70 dark:text-amber-300/70 italic">(edited)</span>
               )}
+              <button
+                type="button"
+                title={copiedMessageId === msg.id ? 'Copied' : 'Copy note'}
+                aria-label="Copy note"
+                onClick={() => copyMessage(msg)}
+                className={cn(
+                  'transition-opacity p-0.5 cursor-pointer',
+                  copiedMessageId === msg.id
+                    ? 'opacity-100 text-emerald-600'
+                    : 'opacity-0 group-hover/note:opacity-100 text-amber-700/70 hover:text-amber-800 dark:text-amber-300/70 dark:hover:text-amber-200'
+                )}
+              >
+                {copiedMessageId === msg.id ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+              </button>
               <button
                 type="button"
                 title="Edit note"
@@ -1592,13 +1638,26 @@ export function ChatThread({
             />
           )}
 
-          {/* Message Action Toolbar (Reply, Edit, Delete) */}
+          {/* Message Action Toolbar (Copy, Reply, Edit, Delete) */}
           <div
             className={cn(
-              'absolute top-0 z-10 flex items-center gap-0.5 rounded-full border border-line bg-surface p-0.5 shadow-sm opacity-0 transition-opacity focus-within:opacity-100 group-hover/msg:opacity-100 backdrop-blur-sm',
-              isAgent ? '-left-24' : '-right-9'
+              'absolute top-0 z-10 flex items-center gap-0.5 rounded-full border border-line bg-surface p-0.5 shadow-sm transition-opacity focus-within:opacity-100 group-hover/msg:opacity-100 backdrop-blur-sm',
+              copiedMessageId === msg.id ? 'opacity-100' : 'opacity-0',
+              isAgent ? '-left-[7.75rem]' : '-right-[4.25rem]'
             )}
           >
+            <button
+              type="button"
+              title={copiedMessageId === msg.id ? 'Copied' : 'Copy message'}
+              aria-label="Copy message"
+              onClick={() => copyMessage(msg)}
+              className={cn(
+                'w-6 h-6 grid place-items-center rounded-full hover:bg-surface-2 transition-colors cursor-pointer',
+                copiedMessageId === msg.id ? 'text-emerald-600' : 'text-ink-3 hover:text-ink'
+              )}
+            >
+              {copiedMessageId === msg.id ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+            </button>
             <button
               type="button"
               title="Reply to this message"
