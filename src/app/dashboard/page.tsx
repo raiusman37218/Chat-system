@@ -126,6 +126,12 @@ export default function DashboardPage() {
   const currentWorkspaceRef = useRef<Workspace | null>(null);
   currentWorkspaceRef.current = currentWorkspace;
 
+  // Arms audio so the agent's first click anywhere unlocks it; otherwise the
+  // browser silently drops alerts until they happen to interact.
+  useEffect(() => {
+    sound.prime();
+  }, []);
+
   const conversationsRef = useRef<Conversation[]>([]);
   conversationsRef.current = conversations;
 
@@ -1052,7 +1058,7 @@ export default function DashboardPage() {
             note.mentioned_agent_ids?.includes(agentId) &&
             note.agent_id !== agentId
           ) {
-            sound.playIncomingMessage();
+            sound.playMention();
             sendBrowserNotification(
               'You were @mentioned in a conversation',
               note.content

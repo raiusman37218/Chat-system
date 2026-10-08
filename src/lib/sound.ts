@@ -42,7 +42,58 @@ class SoundManager {
     if (this.ctx && this.ctx.state === 'suspended') {
       this.ctx.resume();
     }
+    this.armUnlock();
     return this.ctx;
+  }
+
+  /**
+   * Browsers keep audio muted until the page has had a click or key press. An
+   * agent who opens the inbox and just watches it would otherwise never hear
+   * the first customer message, so the first interaction anywhere unlocks it.
+   */
+  private unlockArmed = false;
+  private armUnlock() {
+    if (this.unlockArmed || typeof window === 'undefined') return;
+    this.unlockArmed = true;
+    const unlock = () => {
+      const ctx = this.ctx;
+      if (ctx && ctx.state === 'suspended') ctx.resume().catch(() => {});
+      if (!ctx || ctx.state === 'running') {
+        window.removeEventListener('pointerdown', unlock, true);
+        window.removeEventListener('keydown', unlock, true);
+      }
+    };
+    window.addEventListener('pointerdown', unlock, true);
+    window.addEventListener('keydown', unlock, true);
+  }
+
+  /** Call once on page load so audio is unlocked by the agent's first click. */
+  public prime() {
+    this.hydrate();
+    this.getContext();
+  }
+
+  /** Several messages arriving together play one alert, not a pile-up. */
+  private lastAlertAt = 0;
+
+  /** A bright bell note: a sine plus a quieter octave for a clear, cutting tone. */
+  private bell(ctx: AudioContext, out: AudioNode, freq: number, start: number, peak: number, length: number) {
+    for (const [mult, level, type] of [
+      [1, 1, 'sine'],
+      [2, 0.35, 'triangle'],
+    ] as const) {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = type;
+      osc.frequency.setValueAtTime(freq * mult, start);
+      gain.gain.setValueAtTime(0, start);
+      gain.gain.linearRampToValueAtTime(peak * level, start + 0.012);
+      gain.gain.exponentialRampToValueAtTime(0.0001, start + length);
+      osc.connect(gain);
+      gain.connect(out);
+      osc.start(start);
+      osc.stop(start + length + 0.02);
+    }
   }
 
   public toggleSound(enable?: boolean): boolean {
@@ -65,39 +116,38 @@ class SoundManager {
   /** Server snapshot: matches the default so hydration stays consistent. */
   public isEnabledServer = (): boolean => true;
 
-  // Dual tone gentle notification chime for incoming messages
+  /**
+   * A customer message: a loud, bright "ding-dong" played twice, so it is
+   * heard across the room and never confused with the softer chime for a
+   * visitor arriving on the site.
+   */
   public playIncomingMessage() {
     if (!this.soundEnabled) return;
     const ctx = this.getContext();
     if (!ctx) return;
+    if (Date.now() - this.lastAlertAt < 700) return;
+    this.lastAlertAt = Date.now();
+
+    // Compressor + master gain: loud, without the harsh clipping that two
+    // overlapping notes at full level would cause.
+    const master = ctx.createGain();
+    master.gain.value = 0.9;
+    const comp = ctx.createDynamicsCompressor();
+    comp.threshold.value = -10;
+    comp.ratio.value = 6;
+    master.connect(comp);
+    comp.connect(ctx.destination);
 
     const now = ctx.currentTime;
-    
-    // Note 1: E5 (659.25 Hz)
-    const osc1 = ctx.createOscillator();
-    const gain1 = ctx.createGain();
-    osc1.type = 'sine';
-    osc1.frequency.setValueAtTime(659.25, now);
-    gain1.gain.setValueAtTime(0, now);
-    gain1.gain.linearRampToValueAtTime(0.15, now + 0.02);
-    gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
-    osc1.connect(gain1);
-    gain1.connect(ctx.destination);
-    osc1.start(now);
-    osc1.stop(now + 0.25);
+    for (const offset of [0, 0.42]) {
+      this.bell(ctx, master, 1046.5, now + offset, 0.7, 0.35); // C6
+      this.bell(ctx, master, 1567.98, now + offset + 0.11, 0.6, 0.5); // G6
+    }
+  }
 
-    // Note 2: B5 (987.77 Hz)
-    const osc2 = ctx.createOscillator();
-    const gain2 = ctx.createGain();
-    osc2.type = 'sine';
-    osc2.frequency.setValueAtTime(987.77, now + 0.08);
-    gain2.gain.setValueAtTime(0, now + 0.08);
-    gain2.gain.linearRampToValueAtTime(0.2, now + 0.1);
-    gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
-    osc2.connect(gain2);
-    gain2.connect(ctx.destination);
-    osc2.start(now + 0.08);
-    osc2.stop(now + 0.45);
+  /** An @mention of the agent: the message alert, it is just as urgent. */
+  public playMention() {
+    this.playIncomingMessage();
   }
 
   // Soft click/pop sound when agent sends a message
