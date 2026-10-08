@@ -1,6 +1,9 @@
 import { serviceClient } from '@/lib/supabase/service';
 import { providerConfigFrom } from './help-answer';
-import { translateToEnglish } from './translator';
+import { isLikelyEnglishText, isRomanizedText, translateToEnglish } from './translator';
+
+/** Bumped when detection improves, so results stored as "English" get a second look. */
+const TRANSLATION_ENGINE_VERSION = 2;
 
 export interface InboundTranslation {
   englishText: string;
@@ -34,8 +37,17 @@ export async function translateVisitorMessage(messageId: string): Promise<Inboun
   const existingMeta = (msg.metadata as Record<string, any>) || {};
   const messageText = (msg.content || '').trim();
 
-  // Already done: answer from what is stored.
-  if (existingMeta.translation?.english_text) {
+  // Already done: answer from what is stored. A message an older version
+  // stored as "English" when it plainly is not (Hebrew came back as Google's
+  // code "iw" and was dropped; romanized Arabic was left untranslated) is
+  // translated again, once, by the current engine.
+  const stored = existingMeta.translation;
+  const storedIsTrustworthy =
+    stored?.english_text &&
+    (stored.is_translated ||
+      (stored.engine_version ?? 1) >= TRANSLATION_ENGINE_VERSION ||
+      isLikelyEnglishText(messageText));
+  if (storedIsTrustworthy) {
     const t = existingMeta.translation;
     return {
       englishText: t.english_text,
@@ -70,9 +82,9 @@ export async function translateVisitorMessage(messageId: string): Promise<Inboun
     detectedCode !== 'en' &&
     !res.isOriginalEnglish &&
     res.englishText.trim().toLowerCase() !== messageText.toLowerCase();
-  // Latin-script Urdu/Hindi: replies to this visitor should come back in
-  // Latin letters too, not in Urdu/Devanagari script.
-  const isRoman = isNonEnglish && /^[\p{Script=Latin}\P{L}]*$/u.test(messageText);
+  // A script language typed in Latin letters (Roman Urdu, Arabizi, Roman
+  // Russian...): replies to this visitor come back in Latin letters too.
+  const isRoman = isNonEnglish && isRomanizedText(detectedCode, messageText);
 
   const result: InboundTranslation = {
     englishText: isNonEnglish ? res.englishText : messageText,
@@ -95,6 +107,7 @@ export async function translateVisitorMessage(messageId: string): Promise<Inboun
           detected_language: result.detectedLanguage,
           language_name: result.languageName,
           is_roman: isRoman,
+          engine_version: TRANSLATION_ENGINE_VERSION,
         },
         detected_language: result.detectedLanguage,
         language_name: result.languageName,

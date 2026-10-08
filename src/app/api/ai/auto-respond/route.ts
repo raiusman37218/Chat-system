@@ -10,6 +10,7 @@ import {
   detectLanguage,
   getLanguageInfo,
   isLatinScript,
+  isRomanizedText,
   isLikelyEnglishText,
   normalizeDetectedLanguage,
   translateAgentReply,
@@ -35,7 +36,7 @@ async function visitorLanguageOf(text: string): Promise<{ code: string; roman: b
       code = g.romanizedSource ? g.detectedLanguage : normalizeDetectedLanguage(g.detectedLanguage, text);
     }
   }
-  return { code, roman: code !== 'en' && isLatinScript(text) && ['ur', 'hi'].includes(code) };
+  return { code, roman: code !== 'en' && isRomanizedText(code, text) };
 }
 
 /** Epoch ms of the latest of several optional timestamps; -Infinity if none. */

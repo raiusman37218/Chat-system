@@ -155,6 +155,117 @@ export const SUPPORTED_LANGUAGES: Record<string, LanguageInfo> = {
   zu: { code: 'zu', name: 'Zulu', nativeName: 'isiZulu', flag: '🇿🇦' },
 };
 
+/**
+ * Every language Google Translate offers (translate_a/l, 249 entries), in
+ * Google's own codes. Anything here and not above is added to
+ * SUPPORTED_LANGUAGES below, so detection, the dashboard picker and reply
+ * translation all cover the full list.
+ */
+const GOOGLE_LANGUAGES: Record<string, string> = {"ab":"Abkhaz","ace":"Acehnese","ach":"Acholi","aa":"Afar","af":"Afrikaans","sq":"Albanian","alz":"Alur","am":"Amharic","ar":"Arabic","hy":"Armenian","as":"Assamese","av":"Avar","awa":"Awadhi","ay":"Aymara","az":"Azerbaijani","ban":"Balinese","bal":"Baluchi","bm":"Bambara","bci":"Baoulé","ba":"Bashkir","eu":"Basque","btx":"Batak Karo","bts":"Batak Simalungun","bbc":"Batak Toba","be":"Belarusian","bem":"Bemba","bn":"Bengali","bew":"Betawi","bho":"Bhojpuri","bik":"Bikol","bs":"Bosnian","br":"Breton","bg":"Bulgarian","bua":"Buryat","yue":"Cantonese","ca":"Catalan","ceb":"Cebuano","ch":"Chamorro","ce":"Chechen","ny":"Chichewa","zh-CN":"Chinese (Simplified)","zh-TW":"Chinese (Traditional)","chk":"Chuukese","cv":"Chuvash","co":"Corsican","crh":"Crimean Tatar (Cyrillic)","crh-Latn":"Crimean Tatar (Latin)","hr":"Croatian","cs":"Czech","da":"Danish","fa-AF":"Dari","dv":"Dhivehi","din":"Dinka","doi":"Dogri","dov":"Dombe","nl":"Dutch","dyu":"Dyula","dz":"Dzongkha","en":"English","eo":"Esperanto","et":"Estonian","ee":"Ewe","fo":"Faroese","fj":"Fijian","tl":"Filipino","fi":"Finnish","fon":"Fon","fr":"French","fr-CA":"French (Canada)","fy":"Frisian","fur":"Friulian","ff":"Fulani","gaa":"Ga","gl":"Galician","ka":"Georgian","de":"German","el":"Greek","gn":"Guarani","gu":"Gujarati","ht":"Haitian Creole","cnh":"Hakha Chin","ha":"Hausa","haw":"Hawaiian","iw":"Hebrew","hil":"Hiligaynon","hi":"Hindi","hmn":"Hmong","hu":"Hungarian","hrx":"Hunsrik","iba":"Iban","is":"Icelandic","ig":"Igbo","ilo":"Ilocano","id":"Indonesian","iu-Latn":"Inuktut (Latin)","iu":"Inuktut (Syllabics)","ga":"Irish","it":"Italian","jam":"Jamaican Patois","ja":"Japanese","jw":"Javanese","kac":"Jingpo","kl":"Kalaallisut","kn":"Kannada","kr":"Kanuri","pam":"Kapampangan","kk":"Kazakh","kha":"Khasi","km":"Khmer","cgg":"Kiga","kg":"Kikongo","rw":"Kinyarwanda","ktu":"Kituba","trp":"Kokborok","kv":"Komi","gom":"Konkani","ko":"Korean","kri":"Krio","ku":"Kurdish (Kurmanji)","ckb":"Kurdish (Sorani)","ky":"Kyrgyz","lo":"Lao","ltg":"Latgalian","la":"Latin","lv":"Latvian","lij":"Ligurian","li":"Limburgish","ln":"Lingala","lt":"Lithuanian","lmo":"Lombard","lg":"Luganda","luo":"Luo","lb":"Luxembourgish","mk":"Macedonian","mad":"Madurese","mai":"Maithili","mak":"Makassar","mg":"Malagasy","ms":"Malay","ms-Arab":"Malay (Jawi)","ml":"Malayalam","mt":"Maltese","mam":"Mam","gv":"Manx","mi":"Maori","mr":"Marathi","mh":"Marshallese","mwr":"Marwadi","mfe":"Mauritian Creole","chm":"Meadow Mari","mni-Mtei":"Meiteilon (Manipuri)","min":"Minang","lus":"Mizo","mn":"Mongolian","my":"Myanmar (Burmese)","nhe":"Nahuatl (Eastern Huasteca)","ndc-ZW":"Ndau","nr":"Ndebele (South)","new":"Nepalbhasa (Newari)","ne":"Nepali","bm-Nkoo":"NKo","no":"Norwegian","nus":"Nuer","oc":"Occitan","or":"Odia (Oriya)","om":"Oromo","os":"Ossetian","pag":"Pangasinan","pap":"Papiamento","ps":"Pashto","fa":"Persian","pl":"Polish","pt":"Portuguese (Brazil)","pt-PT":"Portuguese (Portugal)","pa":"Punjabi (Gurmukhi)","pa-Arab":"Punjabi (Shahmukhi)","qu":"Quechua","kek":"Qʼeqchiʼ","rom":"Romani","ro":"Romanian","rn":"Rundi","ru":"Russian","se":"Sami (North)","sm":"Samoan","sg":"Sango","sa":"Sanskrit","sat-Latn":"Santali (Latin)","sat":"Santali (Ol Chiki)","gd":"Scots Gaelic","nso":"Sepedi","sr":"Serbian","st":"Sesotho","crs":"Seychellois Creole","shn":"Shan","sn":"Shona","scn":"Sicilian","szl":"Silesian","sd":"Sindhi","si":"Sinhala","sk":"Slovak","sl":"Slovenian","so":"Somali","es":"Spanish","su":"Sundanese","sus":"Susu","sw":"Swahili","ss":"Swati","sv":"Swedish","ty":"Tahitian","tg":"Tajik","ber-Latn":"Tamazight","ber":"Tamazight (Tifinagh)","ta":"Tamil","tt":"Tatar","te":"Telugu","tet":"Tetum","th":"Thai","bo":"Tibetan","ti":"Tigrinya","tiv":"Tiv","tpi":"Tok Pisin","to":"Tongan","lua":"Tshiluba","ts":"Tsonga","tn":"Tswana","tcy":"Tulu","tum":"Tumbuka","tr":"Turkish","tk":"Turkmen","tyv":"Tuvan","ak":"Twi","udm":"Udmurt","uk":"Ukrainian","ur":"Urdu","ug":"Uyghur","uz":"Uzbek","ve":"Venda","vec":"Venetian","vi":"Vietnamese","war":"Waray","cy":"Welsh","wo":"Wolof","xh":"Xhosa","sah":"Yakut","yi":"Yiddish","yo":"Yoruba","yua":"Yucatec Maya","zap":"Zapotec","zu":"Zulu"};
+
+/** Google still uses a few retired ISO codes; these are ours → Google's. */
+const OUR_TO_GOOGLE: Record<string, string> = { he: 'iw', jv: 'jw', zh: 'zh-CN', 'zh-tw': 'zh-TW' };
+const GOOGLE_TO_OUR: Record<string, string> = {
+  iw: 'he', jw: 'jv', in: 'id', ji: 'yi', 'zh-cn': 'zh', 'zh-hans': 'zh', 'zh-hant': 'zh-tw', 'zh-hk': 'zh-tw', fil: 'tl', nb: 'no', nn: 'no',
+};
+
+/** Any language code (ours, Google's, BCP-47 like "pt-BR") → our lowercase code. */
+export function canonicalLanguageCode(code: string | null | undefined): string {
+  const c = (code || '').trim().toLowerCase().replace(/_/g, '-');
+  if (!c) return 'en';
+  if (GOOGLE_TO_OUR[c]) return GOOGLE_TO_OUR[c];
+  if (SUPPORTED_LANGUAGES[c]) return c;
+  // "pt-br", "ar-latn", "es-419": the base language is what matters.
+  const base = c.split('-')[0];
+  if (GOOGLE_TO_OUR[base]) return GOOGLE_TO_OUR[base];
+  return base;
+}
+
+/** Our code → the code Google's endpoints expect ("he" → "iw", "pt-pt" → "pt-PT"). */
+export function toGoogleLanguageCode(code: string): string {
+  const c = canonicalLanguageCode(code);
+  if (OUR_TO_GOOGLE[c]) return OUR_TO_GOOGLE[c];
+  const [lang, sub] = c.split('-');
+  if (!sub) return lang;
+  return `${lang}-${sub.length === 2 ? sub.toUpperCase() : sub[0].toUpperCase() + sub.slice(1)}`;
+}
+
+for (const [gCode, name] of Object.entries(GOOGLE_LANGUAGES)) {
+  const ours = GOOGLE_TO_OUR[gCode.toLowerCase()] || gCode.toLowerCase();
+  if (!SUPPORTED_LANGUAGES[ours]) {
+    SUPPORTED_LANGUAGES[ours] = { code: ours, name };
+  }
+}
+for (const code of ['ar', 'fa', 'ur', 'ps', 'sd', 'ug', 'ckb', 'he', 'yi', 'dv', 'pa-arab', 'ms-arab', 'bal']) {
+  if (SUPPORTED_LANGUAGES[code]) SUPPORTED_LANGUAGES[code].isRtl = true;
+}
+
+/**
+ * Languages normally written in a non-Latin script. A visitor who types one of
+ * them in Latin letters ("kifak", "privet", "aap kaise hain") is writing it
+ * romanized, and should be answered in Latin letters too.
+ */
+const NON_LATIN_LANGUAGES = new Set([
+  'ab', 'am', 'ar', 'as', 'av', 'awa', 'ba', 'be', 'bg', 'bho', 'bn', 'bo', 'bua', 'ce', 'chm', 'ckb',
+  'cv', 'doi', 'dv', 'dz', 'el', 'fa', 'fa-af', 'gom', 'gu', 'he', 'hi', 'hy', 'iu', 'ja', 'ka', 'kk',
+  'km', 'kn', 'ko', 'kv', 'ky', 'lo', 'mai', 'mk', 'ml', 'mn', 'mni-mtei', 'mr', 'ms-arab', 'mwr', 'my',
+  'ne', 'new', 'or', 'os', 'pa', 'pa-arab', 'ps', 'ru', 'sa', 'sah', 'sat', 'sd', 'shn', 'si', 'sr',
+  'ta', 'tcy', 'te', 'tg', 'th', 'ti', 'tt', 'tyv', 'udm', 'ug', 'uk', 'ur', 'yi', 'yue', 'zh', 'zh-tw',
+  'bal', 'ber', 'crh', 'bm-nkoo',
+]);
+
+export function isNonLatinLanguage(code: string | null | undefined): boolean {
+  return NON_LATIN_LANGUAGES.has(canonicalLanguageCode(code));
+}
+
+/** True when text in this language is written in Latin letters, i.e. romanized. */
+export function isRomanizedText(code: string | null | undefined, text: string): boolean {
+  return isNonLatinLanguage(code) && isLatinScript(text);
+}
+
+/** Google Input Tools transliteration ids (Latin → native script). */
+const TRANSLITERATION_IDS: Record<string, string> = {
+  zh: 'zh-t-i0-pinyin',
+  'zh-tw': 'zh-hant-t-i0-und',
+};
+
+/**
+ * Turns romanized text back into the language's own script ("kifak" →
+ * "كيفك"), which Google can then translate. Google Translate itself leaves
+ * most romanized languages untranslated; Hindi is the exception.
+ */
+export async function transliterateToNative(text: string, code: string): Promise<string | null> {
+  const c = canonicalLanguageCode(code);
+  const itc = TRANSLITERATION_IDS[c] || `${c.split('-')[0]}-t-i0-und`;
+
+  const one = async (piece: string): Promise<string | null> => {
+    try {
+      const url =
+        `https://inputtools.google.com/request?itc=${encodeURIComponent(itc)}&num=1&cp=0&cs=1&ie=utf-8&oe=utf-8` +
+        `&text=${encodeURIComponent(piece)}`;
+      const res = await fetch(url, { signal: AbortSignal.timeout(5000) });
+      if (!res.ok) return null;
+      const data = await res.json();
+      if (data?.[0] !== 'SUCCESS') return null;
+      const out = data?.[1]?.[0]?.[1]?.[0];
+      return typeof out === 'string' && out.trim() ? out.trim() : null;
+    } catch {
+      return null;
+    }
+  };
+
+  // The service stops at the first punctuation mark ("kifak, badde..." came
+  // back as just "كيفك"), so each run of words goes separately and the
+  // punctuation is put back between them.
+  const parts = text.trim().split(/([^\p{L}\p{N}\s']+)/u);
+  const converted = await Promise.all(
+    parts.map((p, i) => (i % 2 === 1 || !p.trim() ? Promise.resolve(p) : one(p.trim()).then((r) => (r ? ` ${r} ` : null))))
+  );
+  if (converted.some((p) => p === null)) return null;
+  const out = converted.join('').replace(/\s+/g, ' ').trim();
+  return out && !isLatinScript(out) ? out : null;
+}
+
 export function getLanguageInfo(code: string): LanguageInfo {
   const normalized = (code || 'en').toLowerCase().trim();
   if (SUPPORTED_LANGUAGES[normalized]) return SUPPORTED_LANGUAGES[normalized];
@@ -241,10 +352,15 @@ export function isRomanUrdu(text: string): boolean {
 
 /**
  * Primary free translation & auto-detection engine via Google Translate GTX API.
- * High-speed, zero API keys required, handles Roman Urdu, Italian, Arabic, Spanish, French, etc.
+ * High-speed, zero API keys required, covers every language Google offers.
  *
  * With `romanize`, the result is the Latin transliteration of the translation
- * ("aap ka order kal aa jayega") — what a visitor typing Roman Urdu can read.
+ * ("aap ka order kal aa jayega", "sawf yasil talabuk ghadan") — what a visitor
+ * who types their language in Latin letters can read.
+ *
+ * Romanized input ("kifak", "privet kak dela", "ami tomake bhalobashi") is
+ * recognised by Google but mostly left untranslated, so it is converted back
+ * to the language's own script first and translated from there.
  */
 export async function translateWithGoogleGtx(
   text: string,
@@ -253,8 +369,9 @@ export async function translateWithGoogleGtx(
   options: { romanize?: boolean } = {}
 ): Promise<{ translated: string; detectedLanguage: string; romanizedSource?: boolean } | null> {
   if (!text || !text.trim()) return null;
-  const s = sourceLang || 'auto';
-  const t = targetLang || 'en';
+  const s = !sourceLang || sourceLang === 'auto' ? 'auto' : toGoogleLanguageCode(sourceLang);
+  const t = toGoogleLanguageCode(targetLang || 'en');
+  const targetCode = canonicalLanguageCode(targetLang || 'en');
 
   try {
     const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${encodeURIComponent(
@@ -284,20 +401,24 @@ export async function translateWithGoogleGtx(
           .join(' ')
           .trim()
       : '';
-    const rawDetected = data[2] || s;
-    let detected = (rawDetected || 'en').toLowerCase().split('-')[0];
-    // e.g. ["hi-Latn"]: Google recognised Hindi/Urdu typed in Latin letters.
+    // Google answers with its own codes ("iw", "jw", "zh-CN"); ours are ISO.
+    let detected = canonicalLanguageCode(data?.[2] || (s === 'auto' ? 'en' : s));
+    // e.g. ["ar-Latn"]: Google recognised Arabic typed in Latin letters.
     const detectedScripts: string[] = Array.isArray(data?.[8]?.[3]) ? data[8][3] : [];
-    const romanizedSource = detectedScripts.some((d) => /^(hi|ur)-latn$/i.test(String(d)));
+    const latnTag = detectedScripts.map(String).find((d) => /-latn$/i.test(d));
+    if (latnTag && isNonLatinLanguage(latnTag)) detected = canonicalLanguageCode(latnTag);
+    const romanizedSource = isRomanizedText(detected, text) || isRomanUrdu(text);
 
     // English priority safeguard:
     if (isLikelyEnglishText(text)) {
       detected = 'en';
-    } else if (romanizedSource || isRomanUrdu(text)) {
+    } else if ((detected === 'hi' || detected === 'ur') && isLatinScript(text)) {
       // Roman Hindi and Roman Urdu are the same spoken language in Latin
       // letters; Google labels both "hi". Only an unmistakably Hindi greeting
       // keeps the Hindi label.
       detected = ROMAN_HINDI_WORDS_REGEX.test(text) ? 'hi' : 'ur';
+    } else if (isRomanUrdu(text)) {
+      detected = 'ur';
     }
 
     // Tagalog false-detection safeguard:
@@ -317,34 +438,48 @@ export async function translateWithGoogleGtx(
     if (candidate && typeof candidate === 'string' && candidate.trim()) {
       let finalTrans = decodeHtmlEntities((romanized || candidate).trim());
 
-      // If Roman Urdu text was returned untranslated by Google (e.g. "theek hai" -> "theek hai"):
+      // Romanized text that came back (mostly) unchanged was not translated:
+      // write it in its own script and translate that instead.
       if (
-        t === 'en' &&
-        detected === 'ur' &&
-        s !== 'ur' &&
-        (finalTrans.toLowerCase() === text.trim().toLowerCase() || romanUrduScore(finalTrans) >= 2)
+        detected !== 'en' &&
+        detected !== targetCode &&
+        s === 'auto' &&
+        romanizedSource &&
+        mostlyUnchanged(text, finalTrans)
       ) {
-        const urduScript = romanUrduToUrdu(text);
-        if (/[\u0600-\u06FF]/.test(urduScript)) {
+        const native =
+          (await transliterateToNative(text, detected)) ||
+          (detected === 'ur' ? romanUrduToUrdu(text) : null);
+        if (native && !isLatinScript(native)) {
           try {
-            const secondPass = await translateWithGoogleGtx(urduScript, 'en', 'ur');
-            if (secondPass?.translated && secondPass.translated.toLowerCase() !== finalTrans.toLowerCase()) {
+            const secondPass = await translateWithGoogleGtx(native, targetLang, detected, options);
+            if (secondPass?.translated && !mostlyUnchanged(text, secondPass.translated)) {
               finalTrans = secondPass.translated;
             }
-          } catch (_) {}
+          } catch {}
         }
       }
 
       return {
         translated: finalTrans,
         detectedLanguage: detected,
-        romanizedSource,
+        romanizedSource: romanizedSource && detected !== 'en',
       };
     }
   } catch (err) {
     console.warn('[translateWithGoogleGtx] fetch error:', err);
   }
   return null;
+}
+
+/** True when most words of the output are words of the input: nothing was translated. */
+function mostlyUnchanged(input: string, output: string): boolean {
+  const words = (v: string) => v.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(Boolean);
+  const inSet = new Set(words(input));
+  const out = words(output);
+  if (!out.length) return true;
+  const kept = out.filter((w) => inSet.has(w)).length;
+  return kept / out.length >= 0.6;
 }
 
 /**
@@ -412,10 +547,9 @@ export function isLikelyEnglishText(text: string): boolean {
   // English. Only English grammar words can outvote Urdu grammar words.
   const urduScore = romanUrduScore(trimmed);
   if (urduScore >= 2) {
-    const englishGrammar =
-      trimmed.match(
-        /\b(the|is|are|am|was|were|i|you|it|we|they|this|that|what|how|why|when|where|which|to|for|with|and|of|my|your|can|could|would|will|have|has|do|does|did|not|an|a|in|on|at|be|been|there|here|if|but)\b/gi
-      ) || [];
+    const englishGrammar = unicodeWords(trimmed).filter((w) =>
+      /^(the|is|are|am|was|were|i|you|it|we|they|this|that|what|how|why|when|where|which|to|for|with|and|of|my|your|can|could|would|will|have|has|do|does|did|not|an|a|in|on|at|be|been|there|here|if|but)$/.test(w)
+    );
     if (urduScore >= englishGrammar.length) return false;
   }
 
@@ -423,19 +557,34 @@ export function isLikelyEnglishText(text: string): boolean {
   const ENGLISH_WORDS_REGEX =
     /\b(the|is|are|am|was|were|be|been|being|have|has|had|do|does|did|will|would|shall|should|can|could|may|might|must|i|you|he|she|it|we|they|my|your|his|her|its|our|their|what|which|who|whom|whose|where|when|why|how|a|an|in|on|at|to|for|with|from|by|about|into|through|after|over|between|out|against|during|without|before|under|around|among|this|that|these|those|there|here|and|but|or|if|because|as|until|while|of|so|then|than|no|not|only|own|same|too|very|just|now|also|any|some|all|both|each|few|more|most|other|such|account|accounts|problem|issue|help|support|please|thanks|thank|sir|madam|hello|hi|hey|good|morning|evening|afternoon|night|yes|okay|ok|price|prices|cost|rule|rules|loss|losses|drawdown|time|credentials|access|failed|showing|consistency|balance|trading|trade|trades|profit|payout|status|check|update|updated|deposit|withdrawal|funded|instant|holding|amount|minimum|maximum|limit|limits|number|server|platform|login|password|email|link|site|page|step|challenge|percent|percentage|cant|cannot|don't|dont|doesnt|doesn't|wont|won't|want|need|give|take|get|tell|ask|buy|bought|order|service)\b/gi;
 
-  const matches = trimmed.match(ENGLISH_WORDS_REGEX);
-  if (matches && matches.length >= 2) {
+  // Whole words only. A \b regex treats accented letters as word breaks, so
+  // Vietnamese "tôi" and "của" used to count as the English words "i" and "a".
+  const tokens = unicodeWords(trimmed);
+  const wholeWord = new RegExp(`^(?:${ENGLISH_WORDS_REGEX.source.replace(/^\\b\(|\)\\b$/g, '')})$`, 'i');
+  const matches = tokens.filter((w) => wholeWord.test(w));
+
+  // Text where most words are not English vocabulary and that carries
+  // non-English letters (é, ñ, ơ, ß...) is not English.
+  if (/[^\x00-\x7F]/.test(trimmed) && matches.length * 2 < tokens.length) {
+    return false;
+  }
+
+  if (matches.length >= 2) {
     return true;
   }
 
-  if (matches && matches.length >= 1) {
-    const words = trimmed.split(/\s+/).filter(Boolean);
-    if (words.length <= 4 && matches.length >= Math.ceil(words.length / 2)) {
+  if (matches.length >= 1) {
+    if (tokens.length <= 4 && matches.length >= Math.ceil(tokens.length / 2)) {
       return true;
     }
   }
 
   return false;
+}
+
+/** Words split on anything that is not a letter, digit or apostrophe, in any script. */
+function unicodeWords(text: string): string[] {
+  return text.toLowerCase().split(/[^\p{L}\p{N}']+/u).filter(Boolean);
 }
 
 const ROMAN_URDU_WORDS_REGEX =
@@ -448,12 +597,14 @@ const ROMAN_HINDI_WORDS_REGEX =
  * Normalizes detected language codes with high accuracy for Arabic, Urdu, Persian, Hindi, English, etc.
  */
 export function normalizeDetectedLanguage(code: string, text: string): string {
-  const c = (code || '').toLowerCase().split('-')[0];
+  // Google's legacy codes ("iw" Hebrew, "jw" Javanese, "zh-CN") map to ours;
+  // a script tag ("ar-Latn") is dropped, the language kept.
+  const c = canonicalLanguageCode(code);
   const trimmed = (text || '').trim();
 
-  // 1. If text has Devanagari script, it is Hindi (hi)
+  // 1. Devanagari script: Hindi, unless the detector named another Devanagari language.
   if (/[\u0900-\u097F]/.test(trimmed)) {
-    return 'hi';
+    return ['mr', 'ne', 'sa', 'mai', 'bho', 'doi', 'gom', 'awa', 'mwr', 'new'].includes(c) ? c : 'hi';
   }
 
   // 1b. PRIORITY ENGLISH CHECK: If the text is clearly English Latin text, ALWAYS return 'en'!
@@ -481,7 +632,7 @@ export function normalizeDetectedLanguage(code: string, text: string): string {
   // 4. If text contains Arabic/Persian/Urdu script ([\u0600-\u06FF])
   if (/[\u0600-\u06FF]/.test(trimmed)) {
     // If explicitly identified as Arabic, Persian, Pashto, Sindhi, Uyghur, or Kurdish, respect that code:
-    if (c === 'ar' || c === 'fa' || c === 'ps' || c === 'sd' || c === 'ug' || c === 'ckb') {
+    if (['ar', 'fa', 'fa-af', 'ps', 'sd', 'ug', 'ckb', 'pa-arab', 'ms-arab', 'bal'].includes(c)) {
       return c;
     }
     if (c === 'ur') {
@@ -590,19 +741,22 @@ export function normalizeDetectedLanguage(code: string, text: string): string {
     return 'uz';
   }
 
-  // 5. If code was 'hi' but text has NO Devanagari script and NO Roman Hindi, it's NOT Hindi!
-  if (c === 'hi' && !/[\u0900-\u097F]/.test(trimmed)) {
-    return 'en';
+  // 5-6. Hindi/Urdu reported for Latin text that is not English (checked in
+  // 1b) is Roman Urdu/Hindi \u2014 the same spoken language, labelled Urdu here.
+  // Anything that is not even Latin letters was misdetected.
+  if ((c === 'hi' || c === 'ur') && !/[\u0900-\u097F\u0600-\u06FF]/.test(trimmed)) {
+    return isLatinScript(trimmed) ? 'ur' : 'en';
   }
 
-  // 6. If code was 'ur' but text has NO Arabic script and NO Roman Urdu, it's NOT Urdu!
-  if (c === 'ur' && !/[\u0600-\u06FF]/.test(trimmed)) {
-    return 'en';
-  }
-
-  // 7. If code is a valid supported language in SUPPORTED_LANGUAGES, keep it!
+  // 7. Any language Google can translate is kept as detected. (Unknown codes
+  // used to collapse to English here, which is why Hebrew — reported by
+  // Google as "iw" — was never translated.)
   if (c && SUPPORTED_LANGUAGES[c]) {
     return c;
+  }
+  const base = c.split('-')[0];
+  if (base && SUPPORTED_LANGUAGES[base]) {
+    return base;
   }
 
   return 'en';
@@ -957,8 +1111,9 @@ export async function translateToEnglish({
     };
   }
 
+  // "Roman Urdu", "Roman Arabic", "Roman Russian": the language, typed in Latin letters.
   const nameFor = (code: string) =>
-    code === 'ur' && isLatinScript(trimmed) ? 'Roman Urdu' : getLanguageInfo(code).name;
+    isRomanizedText(code, trimmed) ? `Roman ${getLanguageInfo(code).name}` : getLanguageInfo(code).name;
 
   // 1. Try AI provider if configured in workspace
   if (isConfigured(providerConfig)) {
@@ -967,8 +1122,9 @@ export async function translateToEnglish({
         system:
           'You are a professional real-time customer support translator.\n' +
           'Translate the customer message into clear, natural, accurate English so the support agent can easily understand their issue or question.\n' +
+          'The message may be in any language, including a language typed in Latin letters (Roman Urdu/Hindi, Arabizi such as "kifak 3amel", transliterated Russian, Bengali, Persian, Greek, Hebrew, etc.) — translate those too, and report the language itself (e.g. "ar" for Arabizi).\n' +
           'Preserve all numbers, proper nouns, emails, and links exactly as they are.\n' +
-          'Respond with ONLY a JSON object: {"english_text": "...", "detected_language": "2-letter ISO code", "is_original_english": boolean}',
+          'Respond with ONLY a JSON object: {"english_text": "...", "detected_language": "ISO 639-1 code", "is_original_english": boolean}',
         messages: [{ role: 'user', content: trimmed }],
         maxTokens: 500,
         temperature: 0,
@@ -1219,9 +1375,11 @@ export async function translateAgentReply({
 
   const targetLang = targetLanguageCode || 'en';
   const targetLangInfo = getLanguageInfo(targetLang);
-  const romanTarget = romanize && targetLang !== 'en';
+  // Only meaningful for languages with their own script (Arabic, Hindi,
+  // Russian, Bengali, Hebrew, Greek...); Spanish is Latin already.
+  const romanTarget = romanize && isNonLatinLanguage(targetLang);
   const targetLabel = romanTarget
-    ? `${targetLangInfo.name} written in Latin/English letters (Roman ${targetLangInfo.name}, e.g. "aap ka order kal tak pohanch jayega") — never use the native script`
+    ? `${targetLangInfo.name} written in Latin/English letters (Roman ${targetLangInfo.name}, the way the customer types it — e.g. Roman Urdu "aap ka order kal tak pohanch jayega", Arabizi "talabak rah yousal bokra") — never use the native script`
     : targetLangInfo.name;
 
   // 1. Try AI provider if configured in workspace

@@ -65,6 +65,7 @@ import {
   SUPPORTED_LANGUAGES,
   getLanguageInfo,
   isLikelyEnglishText,
+  isRomanizedText,
   normalizeDetectedLanguage,
 } from '@/lib/ai/translator';
 
@@ -782,7 +783,11 @@ export function ChatThread({
       if (!trans) return m;
 
       const existingMeta = (m.metadata as Record<string, any>) || {};
-      if (existingMeta.translation?.english_text) return m;
+      // A stored real translation wins; a stored "not translated" does not
+      // when a fresh result says otherwise.
+      if (existingMeta.translation?.english_text && (existingMeta.translation.is_translated || trans.isOriginalEnglish)) {
+        return m;
+      }
 
       return {
         ...m,
@@ -928,7 +933,11 @@ export function ChatThread({
         m.content?.trim() &&
         !m.id.startsWith('temp') &&
         !inFlightTranslationsRef.current.has(m.id) &&
-        !m.metadata?.translation?.english_text &&
+        // Not processed yet — or stored as "English" by an older engine that
+        // dropped languages such as Hebrew; the server re-checks those once.
+        (!m.metadata?.translation?.english_text ||
+          (!m.metadata.translation.is_translated &&
+            (m.metadata.translation.engine_version ?? 1) < 2)) &&
         // Plainly English text needs no round trip.
         !isLikelyEnglishText(m.content)
     );
@@ -1076,8 +1085,7 @@ export function ChatThread({
         targetVisitorMsg &&
           (targetVisitorMsg.metadata?.translation?.is_roman ||
             inboundTranslations[targetVisitorMsg.id]?.isRoman ||
-            (['ur', 'hi'].includes(replyLang) &&
-              /^[\p{Script=Latin}\P{L}]*$/u.test(targetVisitorMsg.content || '')))
+            isRomanizedText(replyLang, targetVisitorMsg.content || ''))
       );
 
       const shouldTranslate =
