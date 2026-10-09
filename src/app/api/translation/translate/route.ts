@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { guardMember } from '@/lib/team/route-guard';
 import { serviceClient } from '@/lib/supabase/service';
 import { providerConfigFrom } from '@/lib/ai/help-answer';
 import {
@@ -21,6 +22,8 @@ export async function OPTIONS() {
 
 export async function POST(req: NextRequest) {
   try {
+    const guard = await guardMember('view');
+    if (!guard.ok) return guard.response;
     const body = await req.json();
     const {
       text,

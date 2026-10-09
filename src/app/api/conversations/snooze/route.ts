@@ -1,12 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://vfjsaynnubxywdbevxtx.supabase.co';
-const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZmanNheW5udWJ4eXdkYmV2eHR4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgyNTA5MDEsImV4cCI6MjEwMzgyNjkwMX0.YyBCXMqwrOk5BRhQafYLFw8tiM5PC8lc8Yocodw9wf0';
-
-function getSupabase() {
-  return createClient(SUPABASE_URL, SUPABASE_KEY);
-}
+import { hasServiceRole, serviceClient } from '@/lib/supabase/service';
+import { guardConversation } from '@/lib/team/route-guard';
 
 /**
  * POST /api/conversations/snooze
@@ -20,7 +14,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Missing conversation_id' }, { status: 400 });
     }
 
-    const supabase = getSupabase();
+    const guard = await guardConversation(conversation_id, 'edit_ticket');
+    if (!guard.ok) return guard.response;
+    const supabase = guard.access.supabase;
     const until = snoozed_until ? new Date(snoozed_until).toISOString() : null;
 
     const { error } = await supabase
@@ -52,9 +48,15 @@ export async function POST(req: NextRequest) {
  * GET /api/conversations/snooze
  * Checks and auto-reopens all conversations whose snoozed_until timestamp has passed.
  */
-export async function GET() {
+export async function GET(req: NextRequest) {
+  // Reopening runs across every workspace, so only the scheduler may trigger it.
+  const secret = process.env.CRON_SECRET;
+  if (!secret || req.headers.get('authorization') !== `Bearer ${secret}`) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+  if (!hasServiceRole()) return NextResponse.json({ error: 'SUPABASE_SERVICE_ROLE_KEY is not set' }, { status: 500 });
   try {
-    const supabase = getSupabase();
+    const supabase = serviceClient();
     const now = new Date().toISOString();
 
     // Query overdue snoozed conversations

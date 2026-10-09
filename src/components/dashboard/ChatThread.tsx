@@ -179,7 +179,10 @@ export function ChatThread({
   const [isSending, setIsSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
   const [noteErrorToast, setNoteErrorToast] = useState<string | null>(null);
-  const [composerMode, setComposerMode] = useState<'reply' | 'internal'>('reply');
+  const [chosenComposerMode, setComposerMode] = useState<'reply' | 'internal'>('reply');
+  // Light agents can only add internal notes (the database refuses anything else).
+  const isLightAgent = currentAgent?.role === 'light_agent';
+  const composerMode: 'reply' | 'internal' = isLightAgent ? 'internal' : chosenComposerMode;
   const [showMacros, setShowMacros] = useState(false);
   const [macroSearch, setMacroSearch] = useState('');
   const [showTagPicker, setShowTagPicker] = useState(false);
@@ -2662,6 +2665,7 @@ export function ChatThread({
           >
             {/* Mode Switcher: Reply vs Internal Note */}
             <div className="inline-flex items-center gap-0.5 p-0.5 rounded-lg bg-surface-2 border border-line/60 shrink-0">
+              {!isLightAgent && (
               <button
                 type="button"
                 onClick={() => setComposerMode('reply')}
@@ -2675,6 +2679,7 @@ export function ChatThread({
                 <Send className="w-3 h-3 shrink-0" />
                 <span>Reply</span>
               </button>
+              )}
               <button
                 type="button"
                 onClick={() => setComposerMode('internal')}

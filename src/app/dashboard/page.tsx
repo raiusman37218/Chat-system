@@ -241,6 +241,15 @@ export default function DashboardPage() {
         }
       }
 
+      // A deactivated agent keeps their account but loses the workspace.
+      if (agent && agent.is_active === false && !agent.is_super_admin) {
+        await supabase.auth.signOut();
+        router.replace(
+          `/login?error=${encodeURIComponent('Your access to this workspace was deactivated. Contact a workspace admin to get it back.')}`
+        );
+        return;
+      }
+
       setIsViewingAsSuperAdmin(viewingSuperAdmin);
 
       if (!workspace && agent?.workspace_id) {
@@ -313,8 +322,9 @@ export default function DashboardPage() {
       await refreshConversations(workspace.id);
       await refreshVisitors(workspace.id);
 
-      // Trigger auto-close rule for stale inactive conversations
+      // Trigger auto-close rule for stale inactive conversations (light agents cannot change conversations)
       try {
+        if (agent?.role === 'light_agent') throw new Error('skip');
         const autoCloseDays = (workspace?.auto_assignment as any)?.auto_close_inactive_days || workspace?.auto_close_days || 7;
         fetch('/api/conversations/auto-close', {
           method: 'POST',

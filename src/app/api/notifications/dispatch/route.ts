@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { guardConversation, guardMember } from '@/lib/team/route-guard';
 import { createClient } from '@supabase/supabase-js';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://vfjsaynnubxywdbevxtx.supabase.co';
@@ -17,6 +18,13 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const { event, conversation_id, message, workspace_id } = body;
+
+    // Webhook tests are settings; everything else concerns one conversation.
+    const guard =
+      event === 'test_slack' || !conversation_id
+        ? await guardMember(event === 'test_slack' ? 'manage_settings' : 'view')
+        : await guardConversation(conversation_id, 'view');
+    if (!guard.ok) return guard.response;
 
     const supabase = getSupabase();
     const appBaseUrl = (process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || '').replace(/\/+$/, '');

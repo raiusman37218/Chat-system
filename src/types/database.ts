@@ -1,5 +1,5 @@
 export type AgentStatus = 'online' | 'away' | 'offline';
-export type AgentRole = 'admin' | 'agent' | 'owner';
+export type AgentRole = 'owner' | 'admin' | 'agent' | 'light_agent';
 export type ConversationStatus = 'open' | 'closed' | 'snoozed' | 'pending';
 export type ConversationPriority = 'low' | 'normal' | 'high' | 'urgent';
 export type SenderType = 'visitor' | 'agent' | 'system' | 'ai';
@@ -58,6 +58,11 @@ export interface Agent {
   created_at: string;
   workspace_id?: string | null;
   is_super_admin?: boolean;
+  /** False once an admin has deactivated them: no access, history kept. */
+  is_active?: boolean;
+  deactivated_at?: string | null;
+  /** Most New + Open tickets round-robin and auto-assignment will give them; null for no limit. */
+  max_open_tickets?: number | null;
 }
 
 export interface SuperAdminAuditLog {
@@ -651,6 +656,8 @@ export interface TicketGroup {
   workspace_id: string;
   name: string;
   description: string | null;
+  /** New tickets in the group go to its next available member. */
+  round_robin?: boolean;
   created_at: string;
 }
 

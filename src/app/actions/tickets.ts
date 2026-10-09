@@ -11,6 +11,8 @@
  */
 
 import { createClient } from '@/lib/supabase/server';
+import { getWorkspaceAccess } from '@/lib/team/access';
+import { roleCan, type Capability, type Role } from '@/lib/team/permissions';
 import { isValidEmail, sendSmtpEmail } from '@/lib/email/smtp';
 import { sanitizeTicketPatch, type TicketPatch } from '@/lib/tickets/patch';
 import {
@@ -29,7 +31,6 @@ import {
   type ViewDefinition,
 } from '@/lib/tickets/views';
 import type {
-  Agent,
   Message,
   SMTPSettingsConfig,
   Ticket,
@@ -55,30 +56,23 @@ const PAGE_SIZE = 50;
 
 interface Caller {
   supabase: Supabase;
-  agent: Pick<Agent, 'id' | 'name' | 'role' | 'workspace_id' | 'is_super_admin'>;
+  agent: { id: string; name: string };
+  role: Role;
   isAdmin: boolean;
 }
 
-/** Membership as the database sees it (fn_ticket_member), plus the role. */
-async function assertTicketAccess(workspaceId: string): Promise<Caller> {
-  if (!UUID.test(workspaceId || '')) throw new Error('Unknown workspace.');
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error('Unauthorized: sign in again.');
-
-  const [{ data: agent }, { data: ws }] = await Promise.all([
-    supabase.from('agents').select('id, name, role, workspace_id, is_super_admin').eq('id', user.id).maybeSingle(),
-    supabase.from('workspaces').select('id, owner_id').eq('id', workspaceId).maybeSingle(),
-  ]);
-  const isOwner = ws?.owner_id === user.id;
-  const isMember = isOwner || agent?.workspace_id === workspaceId || Boolean(agent?.is_super_admin);
-  if (!agent || !isMember) throw new Error('Forbidden: this workspace is not yours.');
-
-  const isAdmin =
-    isOwner || Boolean(agent.is_super_admin) || (agent.workspace_id === workspaceId && ['owner', 'admin'].includes(agent.role));
-  return { supabase, agent, isAdmin };
+/**
+ * The caller must be an active member whose role allows `capability`
+ * (src/lib/team/permissions.ts). The database checks the same again.
+ */
+async function assertTicketAccess(workspaceId: string, capability: Capability = 'view'): Promise<Caller> {
+  const { supabase, agent, role } = await getWorkspaceAccess(workspaceId, capability);
+  return {
+    supabase: supabase as Supabase,
+    agent: { id: agent.id, name: agent.name || 'Agent' },
+    role,
+    isAdmin: roleCan(role, 'manage_groups'),
+  };
 }
 
 function dbError(error: { message?: string } | null | undefined, fallback: string): Error {
@@ -108,9 +102,20 @@ const LIST_COLUMNS =
   'id, number, subject, status, priority, type, channel, tags, assignee_id, group_id, created_at, updated_at, solved_at, requester:visitors(id, name, email)';
 
 export interface TicketsBootstrap {
-  me: { id: string; name: string; isAdmin: boolean };
-  agents: { id: string; name: string; avatar_url: string | null; status: string }[];
-  groups: TicketGroup[];
+  me: { id: string; name: string; isAdmin: boolean; role: Role };
+  /** Everyone in the workspace, deactivated people included so old tickets still show their name. */
+  agents: {
+    id: string;
+    name: string;
+    avatar_url: string | null;
+    status: string;
+    role: Role;
+    is_active: boolean;
+    max_open_tickets: number | null;
+    /** New and Open tickets assigned to them right now (what capacity counts). */
+    open_tickets: number;
+  }[];
+  groups: (TicketGroup & { member_ids: string[] })[];
   views: ViewDefinition[];
   counts: Record<string, number>;
 }
@@ -148,16 +153,32 @@ async function countViews(caller: Caller, workspaceId: string, views: ViewDefini
 
 export async function getTicketsBootstrapAction(workspaceId: string): Promise<TicketsBootstrap> {
   const caller = await assertTicketAccess(workspaceId);
-  const [{ data: agents }, { data: groups }, saved] = await Promise.all([
-    caller.supabase.from('agents').select('id, name, avatar_url, status').eq('workspace_id', workspaceId).order('name'),
+  const [{ data: agents }, { data: groups }, { data: members }, { data: openRows }, saved] = await Promise.all([
+    caller.supabase
+      .from('agents')
+      .select('id, name, avatar_url, status, role, is_active, max_open_tickets')
+      .eq('workspace_id', workspaceId)
+      .order('name'),
     caller.supabase.from('ticket_groups').select('*').eq('workspace_id', workspaceId).order('name'),
+    caller.supabase.from('ticket_group_members').select('group_id, agent_id').eq('workspace_id', workspaceId),
+    caller.supabase.from('tickets').select('assignee_id').eq('workspace_id', workspaceId).in('status', ['new', 'open']).not('assignee_id', 'is', null),
     savedViews(caller, workspaceId),
   ]);
   const views = [...SYSTEM_VIEWS, ...saved];
+  const memberRows = (members as { group_id: string; agent_id: string }[] | null) || [];
+  const openCounts = new Map<string, number>();
+  for (const t of (openRows as { assignee_id: string }[] | null) || []) openCounts.set(t.assignee_id, (openCounts.get(t.assignee_id) || 0) + 1);
   return {
-    me: { id: caller.agent.id, name: caller.agent.name, isAdmin: caller.isAdmin },
-    agents: agents || [],
-    groups: (groups as TicketGroup[]) || [],
+    me: { id: caller.agent.id, name: caller.agent.name, isAdmin: caller.isAdmin, role: caller.role },
+    agents: ((agents as Omit<TicketsBootstrap['agents'][number], 'open_tickets'>[] | null) || []).map((a) => ({
+      ...a,
+      is_active: a.is_active !== false,
+      open_tickets: openCounts.get(a.id) || 0,
+    })),
+    groups: ((groups as TicketGroup[] | null) || []).map((g) => ({
+      ...g,
+      member_ids: memberRows.filter((m) => m.group_id === g.id).map((m) => m.agent_id),
+    })),
     views,
     counts: await countViews(caller, workspaceId, views),
   };
@@ -223,29 +244,6 @@ export async function deleteTicketViewAction(workspaceId: string, viewId: string
   const caller = await assertTicketAccess(workspaceId);
   const { error } = await caller.supabase.from('ticket_views').delete().eq('id', viewId).eq('workspace_id', workspaceId);
   if (error) throw dbError(error, 'Could not delete the view.');
-}
-
-/* ── Groups ───────────────────────────────────────────────────────────── */
-
-export async function createTicketGroupAction(workspaceId: string, name: string): Promise<TicketGroup> {
-  const caller = await assertTicketAccess(workspaceId);
-  if (!caller.isAdmin) throw new Error('Only admins can manage groups.');
-  const clean = (name || '').trim().slice(0, 60);
-  if (!clean) throw new Error('Give the group a name.');
-  const { data, error } = await caller.supabase
-    .from('ticket_groups')
-    .insert({ workspace_id: workspaceId, name: clean })
-    .select('*')
-    .single();
-  if (error || !data) throw dbError(error, 'Could not create the group.');
-  return data as TicketGroup;
-}
-
-export async function deleteTicketGroupAction(workspaceId: string, groupId: string): Promise<void> {
-  const caller = await assertTicketAccess(workspaceId);
-  if (!caller.isAdmin) throw new Error('Only admins can manage groups.');
-  const { error } = await caller.supabase.from('ticket_groups').delete().eq('id', groupId).eq('workspace_id', workspaceId);
-  if (error) throw dbError(error, 'Could not delete the group.');
 }
 
 /* ── One ticket ───────────────────────────────────────────────────────── */
@@ -366,7 +364,7 @@ async function assertReferences(caller: Caller, workspaceId: string, patch: Tick
 }
 
 export async function updateTicketAction(workspaceId: string, ticketId: string, patch: TicketPatch): Promise<Ticket> {
-  const caller = await assertTicketAccess(workspaceId);
+  const caller = await assertTicketAccess(workspaceId, 'edit_ticket');
   const clean = sanitizeTicketPatch(patch);
   if (!Object.keys(clean).length) throw new Error('Nothing to change.');
   await assertReferences(caller, workspaceId, clean);
@@ -392,7 +390,11 @@ export async function replyToTicketAction(
   ticketId: string,
   input: { body: string; internal: boolean; submitAs?: TicketStatus }
 ): Promise<{ emailed: boolean; emailError?: string }> {
-  const caller = await assertTicketAccess(workspaceId);
+  // Internal notes are open to light agents; customer replies and status changes are not.
+  const caller = await assertTicketAccess(workspaceId, input.internal ? 'add_note' : 'reply');
+  if (input.submitAs && !roleCan(caller.role, 'edit_ticket')) {
+    throw new Error('Forbidden: your role cannot change a ticket’s status.');
+  }
   const body = (input.body || '').trim();
   if (!body) throw new Error('Write something first.');
   if (body.length > 20_000) throw new Error('That reply is too long.');
@@ -475,7 +477,7 @@ export async function createTicketAction(
     tags?: string[];
   }
 ): Promise<Ticket> {
-  const caller = await assertTicketAccess(workspaceId);
+  const caller = await assertTicketAccess(workspaceId, 'edit_ticket');
   const { supabase } = caller;
   const email = (input.requesterEmail || '').trim().toLowerCase();
   const subject = (input.subject || '').trim();
@@ -571,7 +573,7 @@ export async function bulkUpdateTicketsAction(
   ticketIds: string[],
   change: BulkChange
 ): Promise<{ updated: number; skipped: { id: string; number?: number; reason: string }[] }> {
-  const caller = await assertTicketAccess(workspaceId);
+  const caller = await assertTicketAccess(workspaceId, 'edit_ticket');
   const ids = Array.from(new Set(ticketIds.filter((id) => UUID.test(id)))).slice(0, 200);
   if (!ids.length) throw new Error('Select some tickets first.');
 
@@ -616,7 +618,7 @@ export async function bulkUpdateTicketsAction(
 }
 
 export async function mergeTicketsAction(workspaceId: string, targetId: string, sourceIds: string[]): Promise<Ticket> {
-  const caller = await assertTicketAccess(workspaceId);
+  const caller = await assertTicketAccess(workspaceId, 'edit_ticket');
   const sources = Array.from(new Set(sourceIds.filter((id) => UUID.test(id) && id !== targetId)));
   if (!UUID.test(targetId) || !sources.length) throw new Error('Choose a ticket to merge into and at least one other.');
   const { data, error } = await caller.supabase.rpc('fn_merge_tickets', { p_target_id: targetId, p_source_ids: sources });
@@ -652,4 +654,62 @@ export async function searchTicketsAction(
       .map((m) => (byId.has(m.ticket_id) ? { ...byId.get(m.ticket_id)!, matched_on: m.matched_on } : null))
       .filter((t): t is TicketListItem & { matched_on: string } => t !== null),
   };
+}
+
+/* ── Presence (collision detection) ───────────────────────────────────── */
+
+export type PresenceState = 'viewing' | 'replying' | 'noting';
+
+export interface TicketPresence {
+  agent_id: string;
+  name: string;
+  avatar_url: string | null;
+  state: PresenceState;
+  updated_at: string;
+}
+
+/** A heartbeat older than this means the agent has gone (closed the tab, lost connection). */
+const PRESENCE_TTL_MS = 45_000;
+
+/**
+ * Records what the caller is doing on a ticket (or that they left, with
+ * `null`) and returns who else is on it right now.
+ */
+export async function setTicketPresenceAction(
+  workspaceId: string,
+  ticketId: string,
+  state: PresenceState | null
+): Promise<TicketPresence[]> {
+  const caller = await assertTicketAccess(workspaceId);
+  if (!UUID.test(ticketId || '')) throw new Error('Ticket not found.');
+  if (state === null) {
+    await caller.supabase.from('ticket_presence').delete().eq('ticket_id', ticketId).eq('agent_id', caller.agent.id);
+    return [];
+  }
+  const safeState: PresenceState = state === 'replying' && !roleCan(caller.role, 'reply') ? 'noting' : state;
+  const { error } = await caller.supabase
+    .from('ticket_presence')
+    .upsert({ ticket_id: ticketId, agent_id: caller.agent.id, workspace_id: workspaceId, state: safeState }, { onConflict: 'ticket_id,agent_id' });
+  if (error) throw dbError(error, 'Could not update presence.');
+  return othersOnTicket(caller, workspaceId, ticketId);
+}
+
+async function othersOnTicket(caller: Caller, workspaceId: string, ticketId: string): Promise<TicketPresence[]> {
+  const since = new Date(Date.now() - PRESENCE_TTL_MS).toISOString();
+  const { data } = await caller.supabase
+    .from('ticket_presence')
+    .select('agent_id, state, updated_at, agent:agents(name, avatar_url)')
+    .eq('workspace_id', workspaceId)
+    .eq('ticket_id', ticketId)
+    .neq('agent_id', caller.agent.id)
+    .gte('updated_at', since)
+    .order('updated_at', { ascending: false });
+  type Row = { agent_id: string; state: PresenceState; updated_at: string; agent: { name: string | null; avatar_url: string | null } | null };
+  return ((data as unknown as Row[]) || []).map((r) => ({
+    agent_id: r.agent_id,
+    name: r.agent?.name || 'Another agent',
+    avatar_url: r.agent?.avatar_url ?? null,
+    state: r.state,
+    updated_at: r.updated_at,
+  }));
 }

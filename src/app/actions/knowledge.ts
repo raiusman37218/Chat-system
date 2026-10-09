@@ -1,9 +1,10 @@
 'use server';
 
-import { createClient } from '@/lib/supabase/server';
 import { invalidateHelpIndex } from '@/lib/ai/help-answer';
 import { testProvider, type ProviderConfig } from '@/lib/ai/provider';
 import { hasServiceRole } from '@/lib/supabase/service';
+import { getWorkspaceAccess } from '@/lib/team/access';
+import type { Capability } from '@/lib/team/permissions';
 
 /**
  * Internal team knowledge, and the questions the help centre could not answer.
@@ -38,29 +39,9 @@ export interface UnansweredQuestion {
   embedding?: number[] | null;
 }
 
-async function assertAgent(workspaceId: string) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error('Unauthorized: sign in again.');
-
-  const { data: agent } = await supabase
-    .from('agents')
-    .select('id, workspace_id')
-    .eq('id', user.id)
-    .maybeSingle();
-
-  if (agent?.workspace_id === workspaceId) return { supabase, agentId: user.id };
-
-  const { data: ws } = await supabase
-    .from('workspaces')
-    .select('owner_id')
-    .eq('id', workspaceId)
-    .maybeSingle();
-
-  if (ws?.owner_id === user.id) return { supabase, agentId: user.id };
-  throw new Error('Forbidden: this workspace is not yours.');
+async function assertAgent(workspaceId: string, capability: Capability) {
+  const { supabase, user } = await getWorkspaceAccess(workspaceId, capability);
+  return { supabase, agentId: user.id };
 }
 
 /* ── Notes ────────────────────────────────────────────────────────────── */
@@ -68,7 +49,7 @@ async function assertAgent(workspaceId: string) {
 export async function listKnowledgeNotesAction(
   workspaceId: string
 ): Promise<KnowledgeNote[]> {
-  const { supabase } = await assertAgent(workspaceId);
+  const { supabase } = await assertAgent(workspaceId, 'view');
   const { data, error } = await supabase
     .from('knowledge_notes')
     .select('*')
@@ -89,7 +70,7 @@ export async function saveKnowledgeNoteAction(
     visibility?: 'agent_only' | 'assistant';
   }
 ): Promise<KnowledgeNote> {
-  const { supabase, agentId } = await assertAgent(workspaceId);
+  const { supabase, agentId } = await assertAgent(workspaceId, 'edit_content');
 
   const title = note.title.trim();
   if (!title) throw new Error('Give the note a title.');
@@ -126,7 +107,7 @@ export async function deleteKnowledgeNoteAction(
   workspaceId: string,
   noteId: string
 ): Promise<void> {
-  const { supabase } = await assertAgent(workspaceId);
+  const { supabase } = await assertAgent(workspaceId, 'edit_content');
   const { error } = await supabase
     .from('knowledge_notes')
     .delete()
@@ -143,7 +124,7 @@ export async function listUnansweredQuestionsAction(
   workspaceId: string,
   status: 'open' | 'answered' | 'ignored' | 'all' = 'open'
 ): Promise<UnansweredQuestion[]> {
-  const { supabase } = await assertAgent(workspaceId);
+  const { supabase } = await assertAgent(workspaceId, 'view');
 
   let query = supabase
     .from('unanswered_questions')
@@ -167,7 +148,7 @@ export async function updateUnansweredStatusAction(
   status: 'open' | 'answered' | 'ignored',
   resolved?: { articleId?: string; noteId?: string }
 ): Promise<void> {
-  const { supabase } = await assertAgent(workspaceId);
+  const { supabase } = await assertAgent(workspaceId, 'edit_content');
   const { error } = await supabase
     .from('unanswered_questions')
     .update({
@@ -195,7 +176,7 @@ export async function saveAiProviderAction(
     system_prompt?: string | null;
   }
 ): Promise<void> {
-  const { supabase } = await assertAgent(workspaceId);
+  const { supabase } = await assertAgent(workspaceId, 'manage_settings');
 
   const { data: existing } = await supabase
     .from('workspaces')
@@ -242,7 +223,7 @@ export async function testAiProviderAction(
   workspaceId: string,
   override?: Partial<ProviderConfig>
 ): Promise<{ ok: boolean; model?: string; error?: string; warning?: string }> {
-  const { supabase } = await assertAgent(workspaceId);
+  const { supabase } = await assertAgent(workspaceId, 'manage_settings');
 
   const { data } = await supabase
     .from('workspaces')

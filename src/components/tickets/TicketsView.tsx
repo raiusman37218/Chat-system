@@ -1,14 +1,12 @@
 'use client';
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Pencil, Plus, Search, Users, X } from 'lucide-react';
+import { Pencil, Plus, Search, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { createClient } from '@/lib/supabase/client';
 import {
   bulkUpdateTicketsAction,
   createTicketAction,
-  createTicketGroupAction,
-  deleteTicketGroupAction,
   deleteTicketViewAction,
   getTicketsBootstrapAction,
   getViewCountsAction,
@@ -22,7 +20,8 @@ import {
 import type { TicketSort, ViewDefinition } from '@/lib/tickets/views';
 import { TicketList } from './TicketList';
 import { TicketDetail } from './TicketDetail';
-import { GroupsDialog, NewTicketDialog, ViewEditor } from './TicketDialogs';
+import { NewTicketDialog, ViewEditor } from './TicketDialogs';
+import { roleCan } from '@/lib/team/permissions';
 import { inputClass } from './TicketBits';
 
 const DEFAULT_VIEW = 'system:all_open';
@@ -33,6 +32,8 @@ const DEFAULT_VIEW = 'system:all_open';
  */
 export function TicketsView({ workspaceId }: { workspaceId: string }) {
   const [boot, setBoot] = useState<TicketsBootstrap | null>(null);
+  // Light agents read tickets and add notes; creating and bulk changes are for the other roles.
+  const canEdit = roleCan(boot?.me.role, 'edit_ticket');
   const [viewId, setViewId] = useState(DEFAULT_VIEW);
   const [sortOverride, setSortOverride] = useState<TicketSort | null>(null);
   const [page, setPage] = useState(0);
@@ -52,7 +53,6 @@ export function TicketsView({ workspaceId }: { workspaceId: string }) {
   const [message, setMessage] = useState<string | null>(null);
   const [editing, setEditing] = useState<ViewDefinition | 'new' | null>(null);
   const [creating, setCreating] = useState(false);
-  const [managingGroups, setManagingGroups] = useState(false);
 
   const view = boot?.views.find((v) => v.id === viewId) ?? null;
   const sort = sortOverride ?? view?.sort ?? { field: 'updated_at', direction: 'desc' };
@@ -193,9 +193,11 @@ export function TicketsView({ workspaceId }: { workspaceId: string }) {
       <nav className="w-[230px] shrink-0 border-r border-line flex-col hidden md:flex" aria-label="Ticket views">
         <div className="h-14 px-4 flex items-center justify-between border-b border-line">
           <h1 className="text-[15px] font-bold text-ink">Tickets</h1>
-          <button type="button" className="btn btn-accent btn-xs" onClick={() => setCreating(true)}>
-            <Plus className="w-3.5 h-3.5" /> New
-          </button>
+          {canEdit && (
+            <button type="button" className="btn btn-accent btn-xs" onClick={() => setCreating(true)}>
+              <Plus className="w-3.5 h-3.5" /> New
+            </button>
+          )}
         </div>
         <div className="flex-1 overflow-y-auto p-2">
           <ul className="space-y-0.5">{systemViews.map(viewButton)}</ul>
@@ -211,13 +213,6 @@ export function TicketsView({ workspaceId }: { workspaceId: string }) {
             <ul className="space-y-0.5">{savedViews.map(viewButton)}</ul>
           )}
         </div>
-        {boot?.me.isAdmin && (
-          <div className="p-2 border-t border-line">
-            <button type="button" className="btn btn-ghost btn-sm w-full justify-start" onClick={() => setManagingGroups(true)}>
-              <Users className="w-3.5 h-3.5" /> Groups ({boot.groups.length})
-            </button>
-          </div>
-        )}
       </nav>
 
       {openId ? (
@@ -227,6 +222,7 @@ export function TicketsView({ workspaceId }: { workspaceId: string }) {
           ticketId={openId}
           agents={boot?.agents ?? []}
           groups={boot?.groups ?? []}
+          me={boot?.me ?? null}
           onBack={() => setOpenId(null)}
           onOpenTicket={setOpenId}
           onChanged={afterChange}
@@ -271,9 +267,11 @@ export function TicketsView({ workspaceId }: { workspaceId: string }) {
                 </button>
               )}
             </form>
-            <button type="button" className="btn btn-accent btn-sm md:hidden" onClick={() => setCreating(true)}>
-              <Plus className="w-3.5 h-3.5" />
-            </button>
+            {canEdit && (
+              <button type="button" className="btn btn-accent btn-sm md:hidden" onClick={() => setCreating(true)} aria-label="New ticket">
+                <Plus className="w-3.5 h-3.5" />
+              </button>
+            )}
           </header>
 
           {/* Views as a select on small screens, where the rail is hidden. */}
@@ -303,6 +301,7 @@ export function TicketsView({ workspaceId }: { workspaceId: string }) {
           )}
 
           <TicketList
+            canEdit={canEdit}
             tickets={list.tickets}
             total={list.total}
             page={page}
@@ -377,20 +376,6 @@ export function TicketsView({ workspaceId }: { workspaceId: string }) {
             const ticket = await createTicketAction(workspaceId, input);
             afterChange();
             setOpenId(ticket.id);
-          }}
-        />
-      )}
-      {managingGroups && boot && (
-        <GroupsDialog
-          groups={boot.groups}
-          onClose={() => setManagingGroups(false)}
-          onCreate={async (name) => {
-            await createTicketGroupAction(workspaceId, name);
-            setBootTick((t) => t + 1);
-          }}
-          onDelete={async (id) => {
-            await deleteTicketGroupAction(workspaceId, id);
-            setBootTick((t) => t + 1);
           }}
         />
       )}

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { guardConversation } from '@/lib/team/route-guard';
 import { providerConfigFrom } from '@/lib/ai/help-answer';
 import { serviceClient } from '@/lib/supabase/service';
 import {
@@ -14,6 +15,10 @@ export async function POST(req: NextRequest) {
     if (!conversation_id || !workspace_id) {
       return NextResponse.json({ error: 'Missing conversation_id or workspace_id' }, { status: 400 });
     }
+
+    const guard = await guardConversation(conversation_id, 'edit_ticket');
+    if (!guard.ok) return guard.response;
+    if (guard.workspaceId !== workspace_id) return NextResponse.json({ error: 'Conversation not found' }, { status: 404 });
 
     const supabase = serviceClient();
 
