@@ -220,3 +220,22 @@ export async function ticketOf(db: Db, conversationId: string): Promise<TicketRo
 export async function ticket(db: Db, id: string): Promise<TicketRow> {
   return db.one<TicketRow>('SELECT * FROM tickets WHERE id = $1', [id]);
 }
+
+export type MemberRole = 'owner' | 'admin' | 'agent' | 'light_agent';
+
+/** Adds another member to a workspace: offline, active, no capacity limit unless given. */
+export async function addMember(
+  db: Db,
+  workspaceId: string,
+  role: MemberRole,
+  opts: { name?: string; status?: 'online' | 'away' | 'offline'; maxOpen?: number | null; active?: boolean } = {}
+): Promise<string> {
+  const id = uid();
+  await db.q('INSERT INTO auth.users (id, email) VALUES ($1, $2)', [id, `${id}@example.test`]);
+  await db.q(
+    `INSERT INTO agents (id, name, email, role, status, workspace_id, max_open_tickets, is_active, deactivated_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, CASE WHEN $8 THEN NULL ELSE now() END)`,
+    [id, opts.name ?? `${role} ${id.slice(0, 4)}`, `${id}@example.test`, role, opts.status ?? 'offline', workspaceId, opts.maxOpen ?? null, opts.active ?? true]
+  );
+  return id;
+}
