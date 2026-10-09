@@ -46,13 +46,14 @@ export function TeamSettings({ workspaceId }: { workspaceId: string }) {
 
   return (
     <section className="space-y-5" aria-labelledby="team-heading">
-      <header className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h2 id="team-heading" className="text-[16px] font-semibold text-ink">
-            Team members &amp; roles
-          </h2>
-          <p className="text-[12.5px] text-ink-3 mt-0.5">Invite people, set what they can do, and manage who is on the team.</p>
-        </div>
+      <header className="flex flex-wrap items-center justify-between gap-3">
+        {/* The settings page already shows the title; this names the region for screen readers. */}
+        <h2 id="team-heading" className="sr-only">
+          Team members
+        </h2>
+        <p className="text-[12.5px] text-ink-3 min-w-0 flex-1 basis-56">
+          {team ? `${active.length} active member${active.length === 1 ? '' : 's'}${inactive.length ? `, ${inactive.length} deactivated` : ''}.` : 'Invite people, set what they can do, and manage who is on the team.'}
+        </p>
         {team && (
           <button type="button" className="btn btn-sm btn-primary" onClick={() => setInviting(true)}>
             <Plus className="w-3.5 h-3.5" /> Invite member
@@ -203,7 +204,13 @@ function MemberRow({
   const atCapacity = m.max_open_tickets !== null && m.open_tickets >= m.max_open_tickets;
 
   return (
-    <li className={cn('p-3 rounded-xl border border-line bg-surface flex flex-wrap items-center gap-x-4 gap-y-3', !m.is_active && 'opacity-70')}>
+    <li
+      className={cn(
+        'p-3 rounded-xl border border-line bg-surface flex flex-wrap items-center gap-x-4 gap-y-3',
+        'lg:grid lg:grid-cols-[minmax(0,1.4fr)_9.5rem_9rem_minmax(0,1fr)_auto]',
+        !m.is_active && 'opacity-70'
+      )}
+    >
       <div className="flex items-center gap-3 min-w-0 flex-1 basis-56">
         <Avatar name={m.name} seed={m.id} size="md" online={m.is_active && m.status === 'online'} />
         <div className="min-w-0">

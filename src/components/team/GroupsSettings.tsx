@@ -39,15 +39,13 @@ export function GroupsSettings({ workspaceId }: { workspaceId: string }) {
 
   return (
     <section className="space-y-5" aria-labelledby="groups-heading">
-      <header className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h2 id="groups-heading" className="text-[16px] font-semibold text-ink">
-            Groups &amp; routing
-          </h2>
-          <p className="text-[12.5px] text-ink-3 mt-0.5 max-w-xl">
-            Groups such as Billing or Technical collect tickets for the people who handle them. A ticket in a group can only be assigned to one of its members.
-          </p>
-        </div>
+      <header className="flex flex-wrap items-center justify-between gap-3">
+        <h2 id="groups-heading" className="sr-only">
+          Groups
+        </h2>
+        <p className="text-[12.5px] text-ink-3 min-w-0 flex-1 basis-72 max-w-xl">
+          Groups such as Billing or Technical collect tickets for the people who handle them. A ticket in a group can only be assigned to one of its members.
+        </p>
         {team && (
           <button type="button" className="btn btn-sm btn-primary" onClick={() => setCreating(true)}>
             <Plus className="w-3.5 h-3.5" /> New group
