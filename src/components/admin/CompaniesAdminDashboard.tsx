@@ -44,16 +44,20 @@ import {
   AlertCircle,
   Flame,
 } from 'lucide-react';
+import Link from 'next/link';
 import { Workspace, Agent } from '@/types/database';
 import { getWorkspaceHelpCenterUrl } from '@/lib/domain';
 import {
   getPlatformCompaniesAction,
   getPlatformAnalyticsAction,
+  getPlatformOverviewAction,
   getCompanyDrilldownAction,
   createCompanyAction,
   switchWorkspaceAction,
   suspendCompanyAction,
+  suspendWorkspaceAction,
   reactivateCompanyAction,
+  reactivateWorkspaceAction,
   softDeleteCompanyAction,
   restoreCompanyAction,
   assignWorkspaceOwnerAction,
@@ -62,6 +66,7 @@ import {
   resyncCustomDomainsAction,
   PlatformCompaniesData,
   PlatformAnalyticsData,
+  PlatformOverviewData,
   CompanyMetricItem,
   CompanyPlanLimits,
   PlatformDataIssues,
@@ -167,7 +172,7 @@ export function CompaniesAdminDashboard({
   };
 
   const [searchQuery, setSearchQuery] = useState('');
-  const [sortBy, setSortBy] = useState<'conversations' | 'visitors' | 'agents' | 'newest'>('newest');
+  const [sortBy, setSortBy] = useState<'conversations' | 'visitors' | 'agents' | 'newest' | 'tickets_30d' | 'last_activity'>('newest');
   const [filterType, setFilterType] = useState<
     'all' | 'health_issues' | 'active' | 'conversations' | 'helpdesk' | 'no_owner' | 'duplicates'
   >('all');
@@ -182,10 +187,12 @@ export function CompaniesAdminDashboard({
 
   // Management modals state (Requirements 1 - 5)
   const [suspendModalCompany, setSuspendModalCompany] = useState<CompanyMetricItem | null>(null);
+  const [reactivateModalCompany, setReactivateModalCompany] = useState<CompanyMetricItem | null>(null);
   const [deleteModalCompany, setDeleteModalCompany] = useState<CompanyMetricItem | null>(null);
   const [changeOwnerModalCompany, setChangeOwnerModalCompany] = useState<CompanyMetricItem | null>(null);
   const [editCompanyModalCompany, setEditCompanyModalCompany] = useState<CompanyMetricItem | null>(null);
   const [mergeModalCompany, setMergeModalCompany] = useState<CompanyMetricItem | null>(null);
+  const [platformOverview, setPlatformOverview] = useState<PlatformOverviewData | null>(null);
 
   // Drilldown modal state (Requirement 2 & 3)
   const [selectedCompanyId, setSelectedCompanyId] = useState<string | null>(null);
@@ -230,8 +237,12 @@ export function CompaniesAdminDashboard({
   const loadAnalytics = async (days: 7 | 30 | 90) => {
     try {
       setAnalyticsLoading(true);
-      const res = await getPlatformAnalyticsAction(days);
-      setPlatformAnalytics(res);
+      const [analyticsRes, overviewRes] = await Promise.all([
+        getPlatformAnalyticsAction(days),
+        getPlatformOverviewAction(days),
+      ]);
+      setPlatformAnalytics(analyticsRes);
+      setPlatformOverview(overviewRes);
     } catch (err: any) {
       console.error('Failed to load platform analytics:', err);
       showToast(err.message || 'Failed to load platform analytics');
@@ -244,12 +255,14 @@ export function CompaniesAdminDashboard({
     try {
       if (showRefresh) setRefreshing(true);
       else setLoading(true);
-      const [compRes, analyticsRes] = await Promise.all([
+      const [compRes, analyticsRes, overviewRes] = await Promise.all([
         getPlatformCompaniesAction(),
         getPlatformAnalyticsAction(platformDays),
+        getPlatformOverviewAction(platformDays),
       ]);
       setData(compRes);
       setPlatformAnalytics(analyticsRes);
+      setPlatformOverview(overviewRes);
       // Requirement 7: Automatically default to Table view if more than 20 companies
       if (!hasUserSwitchedView && compRes.companies && compRes.companies.length > 20) {
         setViewMode('table');
@@ -283,15 +296,17 @@ export function CompaniesAdminDashboard({
 
   // Management Action Handlers
   const handleSuspendConfirm = async (company: CompanyMetricItem, reason: string) => {
-    await suspendCompanyAction(company.id, reason);
-    showToast(`Workspace "${company.name}" suspended. Widget disabled and logins paused.`);
+    await suspendWorkspaceAction(company.id, reason);
+    showToast(`Workspace "${company.name}" suspended. Widget disabled, logins paused, and audit log recorded.`);
+    setSuspendModalCompany(null);
     loadData(true);
   };
 
-  const handleReactivate = async (company: CompanyMetricItem) => {
+  const handleReactivateConfirm = async (company: CompanyMetricItem) => {
     try {
-      await reactivateCompanyAction(company.id);
-      showToast(`Workspace "${company.name}" reactivated successfully!`);
+      await reactivateWorkspaceAction(company.id);
+      showToast(`Workspace "${company.name}" reactivated successfully! Audit log recorded.`);
+      setReactivateModalCompany(null);
       loadData(true);
     } catch (err: any) {
       showToast(err.message || 'Failed to reactivate company');
@@ -399,7 +414,8 @@ export function CompaniesAdminDashboard({
           const matchesUrl = comp.website_url?.toLowerCase().includes(q);
           const matchesId = comp.id?.toLowerCase().includes(q);
           const matchesOwner = comp.owner_email?.toLowerCase().includes(q);
-          if (!matchesName && !matchesUrl && !matchesId && !matchesOwner) return false;
+          const matchesChannel = (comp.connected_channels || []).some((ch) => ch.toLowerCase().includes(q));
+          if (!matchesName && !matchesUrl && !matchesId && !matchesOwner && !matchesChannel) return false;
         }
 
         // Filter
@@ -440,6 +456,15 @@ export function CompaniesAdminDashboard({
         } else if (tableSortColumn === 'created_at') {
           valA = new Date(a.created_at || 0).getTime();
           valB = new Date(b.created_at || 0).getTime();
+        } else if (tableSortColumn === 'tickets_30d_count') {
+          valA = Number(a.tickets_30d_count ?? 0);
+          valB = Number(b.tickets_30d_count ?? 0);
+        } else if (tableSortColumn === 'agents_count') {
+          valA = Number(a.agents_count ?? 0);
+          valB = Number(b.agents_count ?? 0);
+        } else if (tableSortColumn === 'website_url') {
+          valA = a.website_url || '';
+          valB = b.website_url || '';
         }
 
         if (typeof valA === 'string') {
@@ -458,6 +483,12 @@ export function CompaniesAdminDashboard({
     }
 
     return [...filteredCompanies].sort((a, b) => {
+      if (sortBy === 'tickets_30d') return (b.tickets_30d_count ?? 0) - (a.tickets_30d_count ?? 0);
+      if (sortBy === 'last_activity') {
+        const timeA = new Date(a.last_activity_at || a.created_at || 0).getTime();
+        const timeB = new Date(b.last_activity_at || b.created_at || 0).getTime();
+        return timeB - timeA;
+      }
       if (sortBy === 'conversations') return b.conversations_count - a.conversations_count;
       if (sortBy === 'visitors') return b.visitors_count - a.visitors_count;
       if (sortBy === 'agents') return b.agents_count - a.agents_count;
@@ -654,6 +685,7 @@ export function CompaniesAdminDashboard({
         {dashboardTab === 'overview' ? (
           <PlatformAnalyticsView
             analytics={platformAnalytics}
+            overview={platformOverview}
             loading={analyticsLoading}
             rangeDays={platformDays}
             onRangeChange={handlePlatformRangeChange}
@@ -817,6 +849,8 @@ export function CompaniesAdminDashboard({
                 className="h-8.5 px-2.5 rounded-lg border border-line bg-surface text-xs text-ink focus:outline-none"
               >
                 <option value="newest">Sort: Newest</option>
+                <option value="tickets_30d">Sort: Tickets (30d)</option>
+                <option value="last_activity">Sort: Last Activity</option>
                 <option value="conversations">Sort: Most Chats</option>
                 <option value="visitors">Sort: Most Visitors</option>
                 <option value="agents">Sort: Most Agents</option>
@@ -859,7 +893,7 @@ export function CompaniesAdminDashboard({
               onOpenEdit={(c) => setEditCompanyModalCompany(c)}
               onOpenChangeOwner={(c) => setChangeOwnerModalCompany(c)}
               onOpenSuspend={(c) => setSuspendModalCompany(c)}
-              onReactivate={handleReactivate}
+              onOpenReactivate={(c) => setReactivateModalCompany(c)}
               onOpenMerge={(c) => setMergeModalCompany(c)}
               onOpenDelete={(c) => setDeleteModalCompany(c)}
               onRestore={handleRestore}
@@ -1016,8 +1050,17 @@ export function CompaniesAdminDashboard({
                         </div>
                       </div>
 
-                      {/* Main Action Buttons: Insights & Switch */}
+                      {/* Main Action Buttons: Details, Insights & Switch */}
                       <div className="flex items-center gap-2 shrink-0">
+                        <Link
+                          href={`/admin/workspaces/${comp.id}`}
+                          className="h-8.5 px-3 rounded-xl bg-accent text-accent-ink hover:opacity-90 text-xs font-semibold flex items-center gap-1.5 transition-all shadow-xs"
+                          title="View workspace detail page"
+                        >
+                          <span>Details</span>
+                          <ExternalLink className="w-3.5 h-3.5" />
+                        </Link>
+
                         <button
                           onClick={() => openDrilldown(comp.id)}
                           className="h-8.5 px-3 rounded-xl border border-line bg-surface hover:bg-surface-2 text-ink text-xs font-medium flex items-center gap-1.5 transition-colors shadow-2xs"
@@ -1159,22 +1202,30 @@ export function CompaniesAdminDashboard({
                     {/* Stats Summary & Management Action Buttons */}
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1 border-t border-line/40">
                       {/* Metric summary numbers */}
-                      <div className="flex items-center gap-4 text-xs text-ink-3 flex-wrap">
+                      <div className="flex items-center gap-3 text-xs text-ink-3 flex-wrap">
                         <span>
-                          <strong className="text-ink font-bold">{formatNumber(comp.conversations_count)}</strong> chats (
-                          {formatNumber(comp.open_conversations_count)} open)
+                          <strong className="text-ink font-bold">{formatNumber(comp.tickets_30d_count ?? 0)}</strong> tickets (30d)
                         </span>
                         <span>•</span>
                         <span>
-                          <strong className="text-ink font-bold">{formatNumber(comp.messages_count)}</strong> messages
+                          <strong className="text-ink font-bold">{formatSeats(comp.agents_count)}</strong>
+                        </span>
+                        <span>•</span>
+                        <span className="flex items-center gap-1">
+                          <span className="text-ink-3">Channels:</span>
+                          {(comp.connected_channels || []).length > 0 ? (
+                            (comp.connected_channels || []).map((ch) => (
+                              <span key={ch} className="px-1.5 py-0.2 rounded text-2xs font-semibold bg-accent/10 text-accent">
+                                {ch}
+                              </span>
+                            ))
+                          ) : (
+                            <span className="text-ink-3 italic">none</span>
+                          )}
                         </span>
                         <span>•</span>
                         <span>
-                          <strong className="text-ink font-bold">{formatNumber(comp.visitors_count)}</strong> visitors
-                        </span>
-                        <span>•</span>
-                        <span className={cn(hasNoOwner && 'text-danger font-bold')}>
-                          {formatSeats(comp.agents_count)}
+                          <strong className="text-ink font-bold">{formatNumber(comp.conversations_count)}</strong> chats
                         </span>
                       </div>
 
@@ -1203,7 +1254,7 @@ export function CompaniesAdminDashboard({
                         {/* 3. Suspend / Reactivate */}
                         {comp.is_suspended ? (
                           <button
-                            onClick={() => handleReactivate(comp)}
+                            onClick={() => setReactivateModalCompany(comp)}
                             className="h-7 px-2.5 rounded-lg border border-success/30 bg-success/10 hover:bg-success/20 text-success text-2xs font-medium flex items-center gap-1 transition-colors"
                             title="Reactivate company widget and agent logins"
                           >
@@ -1319,6 +1370,14 @@ export function CompaniesAdminDashboard({
           company={suspendModalCompany}
           onClose={() => setSuspendModalCompany(null)}
           onConfirm={handleSuspendConfirm}
+        />
+      )}
+
+      {reactivateModalCompany && (
+        <ReactivateCompanyModal
+          company={reactivateModalCompany}
+          onClose={() => setReactivateModalCompany(null)}
+          onConfirm={handleReactivateConfirm}
         />
       )}
 
@@ -1688,6 +1747,100 @@ function SuspendCompanyModal({ company, onClose, onConfirm }: SuspendCompanyModa
             >
               {loading ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <PauseCircle className="w-3.5 h-3.5" />}
               <span>{loading ? 'Suspending...' : 'Suspend Workspace'}</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================================
+// REACTIVATE COMPANY MODAL (Requirement 4)
+// Confirms restoring active status and writes an audit log entry.
+// ============================================================================
+interface ReactivateCompanyModalProps {
+  company: CompanyMetricItem;
+  onClose: () => void;
+  onConfirm: (company: CompanyMetricItem) => Promise<void>;
+}
+
+function ReactivateCompanyModal({ company, onClose, onConfirm }: ReactivateCompanyModalProps) {
+  const [loading, setLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setErrorMsg(null);
+    try {
+      await onConfirm(company);
+      onClose();
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Failed to reactivate company');
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-overlay animate-in fade-in">
+      <div className="popover border border-line rounded-2xl shadow-2xl max-w-md w-full overflow-hidden flex flex-col">
+        <div className="px-6 py-4 border-b border-line flex items-center justify-between bg-surface-2/60">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-success/10 text-success flex items-center justify-center font-bold">
+              <PlayCircle className="w-4.5 h-4.5" />
+            </div>
+            <div>
+              <h2 className="text-base font-bold text-ink">Reactivate Workspace</h2>
+              <p className="text-xs text-ink-3">{company.name}</p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="w-8 h-8 rounded-lg hover:bg-surface-3 flex items-center justify-center text-ink-3 hover:text-ink transition-colors"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          {errorMsg && (
+            <div className="p-3 rounded-lg bg-danger/10 border border-danger/20 text-danger text-xs">
+              {errorMsg}
+            </div>
+          )}
+
+          <div className="p-3.5 rounded-xl bg-success/10 border border-success/20 text-success text-xs space-y-1.5">
+            <div className="font-semibold flex items-center gap-1.5">
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              <span>Reactivation Confirmation</span>
+            </div>
+            <ul className="list-disc pl-4 space-y-1 text-xs text-ink-2">
+              <li>Re-enables the website chat widget for all visitors immediately</li>
+              <li>Restores workspace dashboard and login access for all agents</li>
+              <li>Records an immutable platform audit log entry with timestamp and admin credentials</li>
+            </ul>
+          </div>
+
+          <p className="text-xs text-ink-2">
+            Are you sure you want to restore active status for <strong>{company.name}</strong>?
+          </p>
+
+          <div className="pt-3 flex items-center justify-end gap-2.5 border-t border-line">
+            <button
+              type="button"
+              onClick={onClose}
+              className="h-9 px-4 rounded-xl border border-line bg-surface hover:bg-surface-2 text-ink text-xs font-medium"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={loading}
+              className="h-9 px-5 rounded-xl bg-success hover:bg-success text-white text-xs font-semibold disabled:opacity-50 flex items-center gap-1.5"
+            >
+              {loading ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <PlayCircle className="w-3.5 h-3.5" />}
+              <span>{loading ? 'Reactivating...' : 'Confirm Reactivation'}</span>
             </button>
           </div>
         </form>
@@ -2319,7 +2472,8 @@ interface CompaniesTableViewProps {
   onOpenEdit: (comp: CompanyMetricItem) => void;
   onOpenChangeOwner: (comp: CompanyMetricItem) => void;
   onOpenSuspend: (comp: CompanyMetricItem) => void;
-  onReactivate: (comp: CompanyMetricItem) => void;
+  onOpenReactivate?: (comp: CompanyMetricItem) => void;
+  onReactivate?: (comp: CompanyMetricItem) => void;
   onOpenMerge: (comp: CompanyMetricItem) => void;
   onOpenDelete: (comp: CompanyMetricItem) => void;
   onRestore: (comp: CompanyMetricItem) => void;
@@ -2337,6 +2491,7 @@ function CompaniesTableView({
   onOpenEdit,
   onOpenChangeOwner,
   onOpenSuspend,
+  onOpenReactivate,
   onReactivate,
   onOpenMerge,
   onOpenDelete,
@@ -2360,13 +2515,25 @@ function CompaniesTableView({
           <thead>
             <tr className="border-b border-line bg-surface-2/60 text-ink-3 font-semibold uppercase text-2xs tracking-wider select-none">
               <th className="py-3 px-4 cursor-pointer hover:text-ink" onClick={() => onSort('name')}>
-                Company {renderSortIndicator('name')}
+                Workspace {renderSortIndicator('name')}
               </th>
-              <th className="py-3 px-3 cursor-pointer hover:text-ink" onClick={() => onSort('owner')}>
-                Owner {renderSortIndicator('owner')}
+              <th className="py-3 px-3 cursor-pointer hover:text-ink" onClick={() => onSort('website_url')}>
+                Site {renderSortIndicator('website_url')}
               </th>
               <th className="py-3 px-3 cursor-pointer hover:text-ink" onClick={() => onSort('status')}>
                 Status {renderSortIndicator('status')}
+              </th>
+              <th className="py-3 px-3 cursor-pointer hover:text-ink" onClick={() => onSort('agents_count')}>
+                Agents {renderSortIndicator('agents_count')}
+              </th>
+              <th className="py-3 px-3 cursor-pointer hover:text-ink" onClick={() => onSort('tickets_30d_count')}>
+                Tickets (30d) {renderSortIndicator('tickets_30d_count')}
+              </th>
+              <th className="py-3 px-3">
+                Channels
+              </th>
+              <th className="py-3 px-3 cursor-pointer hover:text-ink" onClick={() => onSort('last_activity_at')}>
+                Last Activity {renderSortIndicator('last_activity_at')}
               </th>
               <th className="py-3 px-3 cursor-pointer hover:text-ink" onClick={() => onSort('plan')}>
                 Plan {renderSortIndicator('plan')}
@@ -2374,32 +2541,8 @@ function CompaniesTableView({
               <th className="py-3 px-3 cursor-pointer hover:text-ink" onClick={() => onSort('conversations_count')}>
                 Chats {renderSortIndicator('conversations_count')}
               </th>
-              <th className="py-3 px-3 cursor-pointer hover:text-ink" onClick={() => onSort('messages_count')}>
-                Messages {renderSortIndicator('messages_count')}
-              </th>
-              <th className="py-3 px-3 cursor-pointer hover:text-ink" onClick={() => onSort('visitors_count')}>
-                Visitors {renderSortIndicator('visitors_count')}
-              </th>
-              <th className="py-3 px-3 cursor-pointer hover:text-ink" onClick={() => onSort('agents_count')}>
-                Seats {renderSortIndicator('agents_count')}
-              </th>
-              <th className="py-3 px-3 cursor-pointer hover:text-ink" onClick={() => onSort('widget_installed')}>
-                Widget {renderSortIndicator('widget_installed')}
-              </th>
-              <th className="py-3 px-3 cursor-pointer hover:text-ink" onClick={() => onSort('ai_enabled')}>
-                AI {renderSortIndicator('ai_enabled')}
-              </th>
-              <th className="py-3 px-3 cursor-pointer hover:text-ink" onClick={() => onSort('published_articles_count')}>
-                Articles {renderSortIndicator('published_articles_count')}
-              </th>
               <th className="py-3 px-3">
                 Health Flags
-              </th>
-              <th className="py-3 px-3 cursor-pointer hover:text-ink" onClick={() => onSort('last_activity_at')}>
-                Last Activity {renderSortIndicator('last_activity_at')}
-              </th>
-              <th className="py-3 px-3 cursor-pointer hover:text-ink" onClick={() => onSort('created_at')}>
-                Created {renderSortIndicator('created_at')}
               </th>
               <th className="py-3 px-4 text-right">Actions</th>
             </tr>
@@ -2421,51 +2564,49 @@ function CompaniesTableView({
                     isSuspended && 'bg-warn/5'
                   )}
                 >
-                  {/* 1. Company */}
+                  {/* 1. Workspace */}
                   <td className="py-3 px-4">
-                    <div className="flex items-center gap-2.5 min-w-[160px]">
+                    <div className="flex items-center gap-2.5 min-w-[170px]">
                       <div
-                        className="w-7 h-7 rounded-lg shrink-0 flex items-center justify-center font-bold text-white text-xs"
+                        className="w-7 h-7 rounded-lg shrink-0 flex items-center justify-center font-bold text-white text-xs shadow-2xs"
                         style={{ backgroundColor: comp.brand_color || '#2563eb' }}
                       >
                         {comp.name.charAt(0).toUpperCase()}
                       </div>
                       <div className="min-w-0">
                         <div className="font-semibold text-ink truncate flex items-center gap-1.5">
-                          <span>{comp.name}</span>
+                          <Link href={`/admin/workspaces/${comp.id}`} className="hover:text-accent hover:underline">
+                            {comp.name}
+                          </Link>
                           {isCurrent && (
                             <span className="px-1.5 py-0.2 rounded text-2xs font-bold bg-accent text-accent-ink">
                               Active
                             </span>
                           )}
                         </div>
-                        <div className="text-2xs text-ink-3 truncate max-w-[150px]">
-                          {comp.website_url ? (
-                            <a
-                              href={comp.website_url.startsWith('http') ? comp.website_url : `https://${comp.website_url}`}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="text-accent hover:underline"
-                            >
-                              {comp.website_url.replace(/^https?:\/\//, '')}
-                            </a>
-                          ) : (
-                            <span className="italic">No domain</span>
-                          )}
+                        <div className="text-2xs text-ink-3 truncate">
+                          {comp.owner_email || 'No owner'}
                         </div>
                       </div>
                     </div>
                   </td>
 
-                  {/* 2. Owner */}
+                  {/* 2. Site */}
                   <td className="py-3 px-3">
-                    <div className="min-w-[130px]">
-                      {comp.owner_email ? (
-                        <span className="text-accent truncate block" title={comp.owner_email}>
-                          {comp.owner_email}
-                        </span>
+                    <div className="min-w-[130px] max-w-[180px]">
+                      {comp.website_url ? (
+                        <a
+                          href={comp.website_url.startsWith('http') ? comp.website_url : `https://${comp.website_url}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-accent hover:underline flex items-center gap-1 truncate text-xs"
+                        >
+                          <Globe className="w-3 h-3 shrink-0" />
+                          <span className="truncate">{comp.website_url.replace(/^https?:\/\//, '')}</span>
+                          <ExternalLink className="w-2.5 h-2.5 shrink-0 opacity-70" />
+                        </a>
                       ) : (
-                        <span className="text-danger italic">No owner</span>
+                        <span className="text-ink-3 italic text-2xs">No site URL</span>
                       )}
                     </div>
                   </td>
@@ -2487,69 +2628,58 @@ function CompaniesTableView({
                     )}
                   </td>
 
-                  {/* 4. Plan */}
-                  <td className="py-3 px-3 whitespace-nowrap">
-                    <span className="px-2 py-0.5 rounded text-2xs font-bold bg-accent/10 text-accent uppercase tracking-wider">
-                      {comp.plan || 'Free'}
-                    </span>
-                  </td>
-
-                  {/* 5. Chats */}
-                  <td className="py-3 px-3 whitespace-nowrap font-medium text-ink">
-                    {formatNumber(comp.conversations_count)}{' '}
-                    <span className="text-2xs text-ink-3">({formatNumber(comp.open_conversations_count)})</span>
-                  </td>
-
-                  {/* 6. Messages */}
-                  <td className="py-3 px-3 whitespace-nowrap font-medium text-ink">
-                    {formatNumber(comp.messages_count)}
-                  </td>
-
-                  {/* 7. Visitors */}
-                  <td className="py-3 px-3 whitespace-nowrap font-medium text-ink">
-                    {formatNumber(comp.visitors_count)}
-                    {comp.active_visitors_count > 0 && !isSuspended && !isDeleted && (
-                      <span className="ml-1 inline-flex items-center px-1.5 py-0.2 rounded text-2xs font-bold bg-success/15 text-success">
-                        🟢 {comp.active_visitors_count}
-                      </span>
-                    )}
-                  </td>
-
-                  {/* 8. Seats */}
+                  {/* 4. Agents */}
                   <td className="py-3 px-3 whitespace-nowrap">
                     <span className={cn(comp.agents_count === 0 ? 'text-danger font-bold' : 'text-ink font-medium')}>
                       {formatSeats(comp.agents_count)}
                     </span>
                   </td>
 
-                  {/* 9. Widget */}
+                  {/* 5. Tickets (30d) */}
+                  <td className="py-3 px-3 whitespace-nowrap font-bold text-ink">
+                    {formatNumber(comp.tickets_30d_count ?? 0)}
+                  </td>
+
+                  {/* 6. Channels */}
+                  <td className="py-3 px-3">
+                    <div className="flex flex-wrap gap-1 max-w-[150px]">
+                      {(comp.connected_channels || []).length > 0 ? (
+                        (comp.connected_channels || []).map((ch) => (
+                          <span
+                            key={ch}
+                            className="px-1.5 py-0.2 rounded text-2xs font-semibold bg-accent/10 text-accent"
+                          >
+                            {ch}
+                          </span>
+                        ))
+                      ) : (
+                        <span className="text-ink-3 text-2xs italic">None</span>
+                      )}
+                    </div>
+                  </td>
+
+                  {/* 7. Last Activity */}
+                  <td className="py-3 px-3 whitespace-nowrap text-ink-3" title={comp.last_activity_at || ''}>
+                    {formatRelativeTime(comp.last_activity_at)}
+                  </td>
+
+                  {/* 8. Plan */}
                   <td className="py-3 px-3 whitespace-nowrap">
-                    {comp.widget_installed ? (
-                      <span className="text-success font-semibold">Yes 🟢</span>
-                    ) : (
-                      <span className="text-ink-3">No ⚪</span>
-                    )}
+                    <span className="px-2 py-0.5 rounded text-2xs font-bold bg-accent/10 text-accent uppercase tracking-wider">
+                      {comp.plan || 'Free'}
+                    </span>
                   </td>
 
-                  {/* 10. AI */}
-                  <td className="py-3 px-3 whitespace-nowrap">
-                    {comp.ai_enabled ? (
-                      <span className="text-accent font-bold">ON ⚡</span>
-                    ) : (
-                      <span className="text-ink-3">OFF</span>
-                    )}
+                  {/* 9. Chats */}
+                  <td className="py-3 px-3 whitespace-nowrap font-medium text-ink">
+                    {formatNumber(comp.conversations_count)}
                   </td>
 
-                  {/* 11. Articles */}
-                  <td className="py-3 px-3 whitespace-nowrap text-ink font-medium">
-                    {formatNumber(comp.published_articles_count ?? 0)}
-                  </td>
-
-                  {/* 12. Health Flags (Requirement 3) */}
+                  {/* 10. Health Flags */}
                   <td className="py-3 px-3">
                     {comp.health_flags && comp.health_flags.length > 0 ? (
-                      <div className="flex flex-wrap gap-1 max-w-[190px]">
-                        {comp.health_flags.map((flag, idx) => (
+                      <div className="flex flex-wrap gap-1 max-w-[160px]">
+                        {comp.health_flags.slice(0, 2).map((flag, idx) => (
                           <span
                             key={idx}
                             className={cn(
@@ -2576,19 +2706,18 @@ function CompaniesTableView({
                     )}
                   </td>
 
-                  {/* 13. Last Activity */}
-                  <td className="py-3 px-3 whitespace-nowrap text-ink-3" title={comp.last_activity_at || ''}>
-                    {formatRelativeTime(comp.last_activity_at)}
-                  </td>
-
-                  {/* 13. Created Date */}
-                  <td className="py-3 px-3 whitespace-nowrap text-ink-3">
-                    {new Date(comp.created_at).toLocaleDateString()}
-                  </td>
-
-                  {/* 14. Actions */}
+                  {/* 11. Actions */}
                   <td className="py-3 px-4 text-right whitespace-nowrap">
                     <div className="flex items-center justify-end gap-1.5">
+                      <Link
+                        href={`/admin/workspaces/${comp.id}`}
+                        className="h-7 px-2.5 rounded-lg bg-accent text-accent-ink hover:opacity-90 text-2xs font-semibold flex items-center gap-1 shadow-2xs"
+                        title="View Workspace Detail Page"
+                      >
+                        <span>Details</span>
+                        <ExternalLink className="w-2.5 h-2.5" />
+                      </Link>
+
                       <button
                         onClick={() => onOpenDrilldown(comp.id)}
                         className="h-7 px-2 rounded-lg border border-line bg-surface hover:bg-surface-2 text-ink text-2xs font-medium"
@@ -2601,10 +2730,28 @@ function CompaniesTableView({
                         <button
                           onClick={() => onSwitchWorkspace(comp)}
                           disabled={switchingId === comp.id || isSuspended || isDeleted}
-                          className="h-7 px-2 rounded-lg bg-accent text-accent-ink hover:opacity-90 text-2xs font-semibold disabled:opacity-40"
+                          className="h-7 px-2 rounded-lg border border-line bg-surface hover:bg-surface-2 text-ink text-2xs font-medium disabled:opacity-40"
                           title="Switch into workspace"
                         >
                           Switch
+                        </button>
+                      )}
+
+                      {isSuspended ? (
+                        <button
+                          onClick={() => (onOpenReactivate ? onOpenReactivate(comp) : onReactivate?.(comp))}
+                          className="h-7 px-2 rounded-lg border border-success/30 bg-success/10 text-success text-2xs font-medium hover:bg-success/20"
+                          title="Reactivate Workspace (Confirmation Step)"
+                        >
+                          Reactivate
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => onOpenSuspend(comp)}
+                          className="h-7 px-2 rounded-lg border border-warn/30 bg-warn/10 text-warn text-2xs font-medium hover:bg-warn/20"
+                          title="Suspend Workspace (Confirmation Step)"
+                        >
+                          Suspend
                         </button>
                       )}
 
@@ -2623,24 +2770,6 @@ function CompaniesTableView({
                       >
                         Owner
                       </button>
-
-                      {isSuspended ? (
-                        <button
-                          onClick={() => onReactivate(comp)}
-                          className="h-7 px-2 rounded-lg border border-success/30 bg-success/10 text-success text-2xs"
-                          title="Reactivate Workspace"
-                        >
-                          Reactivate
-                        </button>
-                      ) : (
-                        <button
-                          onClick={() => onOpenSuspend(comp)}
-                          className="h-7 px-2 rounded-lg border border-warn/30 bg-warn/10 text-warn text-2xs"
-                          title="Suspend Workspace"
-                        >
-                          Suspend
-                        </button>
-                      )}
 
                       <button
                         onClick={() => onOpenMerge(comp)}

@@ -57,6 +57,108 @@ export interface CompanyMetricItem {
   csat_count?: number;
   unanswered_older_24h_count?: number;
   knowledge_gaps_count?: number;
+  tickets_30d_count?: number;
+  connected_channels?: string[];
+  status?: 'active' | 'suspended';
+}
+
+export interface PlatformWorkspaceItem {
+  id: string;
+  name: string;
+  website_url: string | null;
+  status: 'active' | 'suspended';
+  is_suspended: boolean;
+  suspended_at: string | null;
+  suspension_reason: string | null;
+  deleted_at: string | null;
+  plan: string;
+  brand_color: string;
+  logo_url: string | null;
+  agents_count: number;
+  tickets_30d_count: number;
+  connected_channels: string[];
+  last_activity_at: string | null;
+  created_at: string;
+  owner_email: string | null;
+}
+
+export interface PlatformOverviewData {
+  range_days: number;
+  total_workspaces: number;
+  active_workspaces: number;
+  suspended_workspaces: number;
+  total_tickets: number;
+  tickets_30d: number;
+  total_members: number;
+  avg_first_reply_seconds: number | null;
+  resolution_rate_percent: number;
+  bot_resolved_count: number;
+  bot_handover_count: number;
+  tickets_per_day: Array<{
+    date: string;
+    formatted_date: string;
+    tickets: number;
+    solved: number;
+  }>;
+  top_articles: Array<{
+    id: string;
+    title: string;
+    slug: string;
+    workspace_id: string;
+    workspace_name: string;
+    views_count: number;
+    helpful_count: number;
+  }>;
+}
+
+export interface WorkspaceDetailData {
+  workspace: {
+    id: string;
+    name: string;
+    website_url: string | null;
+    brand_color: string;
+    status: 'active' | 'suspended';
+    is_suspended: boolean;
+    suspended_at: string | null;
+    suspension_reason: string | null;
+    plan: string;
+    owner_email: string | null;
+    created_at: string;
+    connected_channels: string[];
+    tickets_30d_count: number;
+    total_tickets: number;
+    agents_count: number;
+  };
+  tickets_per_day: Array<{
+    date: string;
+    formatted_date: string;
+    tickets: number;
+    solved: number;
+  }>;
+  avg_first_reply_seconds: number | null;
+  resolution_rate_percent: number;
+  bot_resolved_count: number;
+  bot_handover_count: number;
+  top_articles: Array<{
+    id: string;
+    title: string;
+    slug: string;
+    status: string;
+    views_count: number;
+    helpful_count: number;
+    created_at: string;
+  }>;
+  members: Array<{
+    id: string;
+    name: string;
+    email: string;
+    role: string;
+    status: string;
+    avatar_url: string | null;
+    created_at: string;
+    is_active: boolean;
+    max_open_tickets: number | null;
+  }>;
 }
 
 export interface PlatformAnalyticsTimeSeriesPoint {
@@ -222,7 +324,7 @@ export interface PlatformCompaniesData {
  * Server-side guard: Ensures caller is an authenticated platform super admin
  * Checks is_super_admin stored in the database.
  */
-async function assertSuperAdmin(): Promise<{ user: any; agent: Agent }> {
+export async function assertSuperAdmin(): Promise<{ user: any; agent: Agent }> {
   const supabase = await createClient();
   const {
     data: { user },
@@ -249,7 +351,7 @@ async function assertSuperAdmin(): Promise<{ user: any; agent: Agent }> {
 /**
  * Inserts an immutable audit log record for super admin actions
  */
-async function recordSuperAdminAudit(params: {
+export async function recordSuperAdminAudit(params: {
   admin: Agent;
   action: string;
   workspaceId?: string | null;
@@ -281,11 +383,48 @@ export async function getPlatformCompaniesAction(): Promise<PlatformCompaniesDat
 
   const { data, error } = await supabase.rpc('fn_get_platform_companies_summary');
 
-  if (error) {
-    throw new Error(`Failed to load platform companies: ${error.message}`);
+  if (error || !data) {
+    throw new Error(`Failed to load platform companies: ${error?.message || 'No data'}`);
   }
 
-  return data as PlatformCompaniesData;
+  const result = data as PlatformCompaniesData;
+  try {
+    const adminClient = serviceClient();
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+    const [
+      { data: tickets },
+      { data: channelConns },
+    ] = await Promise.all([
+      adminClient.from('tickets').select('id, workspace_id, created_at').gte('created_at', thirtyDaysAgo),
+      adminClient.from('channel_connections').select('workspace_id, channel, status').neq('status', 'disconnected'),
+    ]);
+
+    const ticketMap = new Map<string, number>();
+    for (const t of tickets || []) {
+      ticketMap.set(t.workspace_id, (ticketMap.get(t.workspace_id) || 0) + 1);
+    }
+
+    const channelMap = new Map<string, Set<string>>();
+    for (const c of channelConns || []) {
+      if (!channelMap.has(c.workspace_id)) channelMap.set(c.workspace_id, new Set());
+      channelMap.get(c.workspace_id)!.add(c.channel);
+    }
+
+    result.companies = (result.companies || []).map((c) => {
+      const channels = Array.from(channelMap.get(c.id) || []);
+      if (c.widget_installed && !channels.includes('chat')) channels.push('chat');
+      return {
+        ...c,
+        tickets_30d_count: c.tickets_30d_count ?? ticketMap.get(c.id) ?? 0,
+        connected_channels: c.connected_channels ?? channels,
+        status: c.is_suspended ? ('suspended' as const) : ('active' as const),
+      };
+    });
+  } catch {
+    // Return base result if auxiliary query fails
+  }
+
+  return result;
 }
 
 /**
@@ -326,6 +465,473 @@ export async function getCompanyAnalyticsAction(
   }
 
   return data as CompanyAnalyticsData;
+}
+
+/**
+ * Platform Owner Action: Retrieve workspaces list with name, site, status,
+ * agents count, tickets in the last 30 days, connected channels, and last activity.
+ */
+export async function getPlatformWorkspacesAction(): Promise<PlatformWorkspaceItem[]> {
+  const { agent } = await assertSuperAdmin();
+  const supabase = await createClient();
+
+  const { data, error } = await supabase.rpc('fn_get_platform_workspaces');
+  if (!error && Array.isArray(data)) {
+    return data as PlatformWorkspaceItem[];
+  }
+
+  // Fallback to direct relational queries using serviceClient
+  const adminClient = serviceClient();
+  const [
+    { data: workspaces },
+    { data: agents },
+    { data: tickets },
+    { data: channelConns },
+    { data: visitors },
+  ] = await Promise.all([
+    adminClient.from('workspaces').select('*').is('deleted_at', null).order('created_at', { ascending: false }),
+    adminClient.from('agents').select('id, workspace_id, role, email'),
+    adminClient.from('tickets').select('id, workspace_id, created_at, updated_at'),
+    adminClient.from('channel_connections').select('workspace_id, channel, status'),
+    adminClient.from('visitors').select('workspace_id, last_seen, last_seen_at'),
+  ]);
+
+  const now = Date.now();
+  const thirtyDaysAgo = now - 30 * 24 * 60 * 60 * 1000;
+
+  return (workspaces || []).map((ws: any) => {
+    const wsAgents = (agents || []).filter((a: any) => a.workspace_id === ws.id);
+    const wsTickets = (tickets || []).filter((t: any) => t.workspace_id === ws.id);
+    const tickets30d = wsTickets.filter((t: any) => new Date(t.created_at).getTime() >= thirtyDaysAgo);
+    const wsConns = (channelConns || []).filter((c: any) => c.workspace_id === ws.id && c.status !== 'disconnected');
+    const wsVisitors = (visitors || []).filter((v: any) => v.workspace_id === ws.id);
+
+    const channels = Array.from(new Set(wsConns.map((c: any) => c.channel as string)));
+    if (wsVisitors.length > 0 && !channels.includes('chat')) {
+      channels.push('chat');
+    }
+
+    const timestamps = [
+      new Date(ws.created_at).getTime(),
+      ...wsTickets.map((t: any) => new Date(t.updated_at || t.created_at).getTime()),
+      ...wsVisitors.map((v: any) => new Date(v.last_seen || v.last_seen_at || 0).getTime()),
+    ].filter((t) => !isNaN(t));
+
+    const maxTime = timestamps.length > 0 ? Math.max(...timestamps) : new Date(ws.created_at).getTime();
+    const owner = wsAgents.find((a: any) => a.role === 'owner');
+
+    return {
+      id: ws.id,
+      name: ws.name,
+      website_url: ws.website_url || ws.custom_domain || null,
+      status: ws.is_suspended ? ('suspended' as const) : ('active' as const),
+      is_suspended: Boolean(ws.is_suspended),
+      suspended_at: ws.suspended_at || null,
+      suspension_reason: ws.suspension_reason || null,
+      deleted_at: ws.deleted_at || null,
+      plan: ws.plan || 'free',
+      brand_color: ws.brand_color || '#2563eb',
+      logo_url: ws.logo_url || null,
+      agents_count: wsAgents.length,
+      tickets_30d_count: tickets30d.length,
+      connected_channels: channels,
+      last_activity_at: new Date(maxTime).toISOString(),
+      created_at: ws.created_at,
+      owner_email: owner?.email || null,
+    };
+  });
+}
+
+/**
+ * Platform Owner Action: Retrieve platform overview totals across all workspaces
+ * with the same metrics (tickets per day, FRT, resolution rate, bot vs human, top articles, members).
+ */
+export async function getPlatformOverviewAction(days: number = 30): Promise<PlatformOverviewData> {
+  const { agent } = await assertSuperAdmin();
+  const supabase = await createClient();
+
+  const { data, error } = await supabase.rpc('fn_get_platform_overview', { p_days: days });
+  if (!error && data) {
+    return data as PlatformOverviewData;
+  }
+
+  // Fallback calculation using serviceClient
+  const adminClient = serviceClient();
+  const rangeMs = days * 24 * 60 * 60 * 1000;
+  const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
+
+  const [
+    { data: workspaces },
+    { data: agents },
+    { data: tickets },
+    { data: articles },
+    { data: messages },
+  ] = await Promise.all([
+    adminClient.from('workspaces').select('id, name, is_suspended, deleted_at').is('deleted_at', null),
+    adminClient.from('agents').select('id, workspace_id').not('workspace_id', 'is', null),
+    adminClient.from('tickets').select('id, workspace_id, status, created_at, solved_at, closed_at, updated_at, conversation_id'),
+    adminClient.from('articles').select('id, title, slug, workspace_id, views_count, helpful_count, status').eq('status', 'published').order('views_count', { ascending: false }).limit(10),
+    adminClient.from('messages').select('id, conversation_id, sender_type, created_at'),
+  ]);
+
+  const activeWs = (workspaces || []).filter((w: any) => !w.is_suspended);
+  const suspendedWs = (workspaces || []).filter((w: any) => w.is_suspended);
+  const allTickets = tickets || [];
+  const tickets30d = allTickets.filter((t: any) => new Date(t.created_at).getTime() >= thirtyDaysAgo);
+  const solvedCount = allTickets.filter((t: any) => ['solved', 'closed'].includes(t.status)).length;
+  const resolutionRate = allTickets.length > 0 ? Number(((solvedCount / allTickets.length) * 100).toFixed(1)) : 0;
+
+  // Tickets per day chart
+  const dateMap = new Map<string, { tickets: number; solved: number }>();
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date(Date.now() - i * 24 * 60 * 60 * 1000);
+    const key = d.toISOString().slice(0, 10);
+    dateMap.set(key, { tickets: 0, solved: 0 });
+  }
+
+  for (const t of allTickets) {
+    const cKey = new Date(t.created_at).toISOString().slice(0, 10);
+    if (dateMap.has(cKey)) {
+      dateMap.get(cKey)!.tickets += 1;
+    }
+    if (['solved', 'closed'].includes(t.status)) {
+      const sDate = t.solved_at || t.closed_at || t.updated_at;
+      if (sDate) {
+        const sKey = new Date(sDate).toISOString().slice(0, 10);
+        if (dateMap.has(sKey)) {
+          dateMap.get(sKey)!.solved += 1;
+        }
+      }
+    }
+  }
+
+  const ticketsPerDay = Array.from(dateMap.entries()).map(([date, counts]) => {
+    const d = new Date(date);
+    const formatted_date = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    return {
+      date,
+      formatted_date,
+      tickets: counts.tickets,
+      solved: counts.solved,
+    };
+  });
+
+  // Calculate FRT
+  const msgByConv = new Map<string, any[]>();
+  for (const m of messages || []) {
+    if (!msgByConv.has(m.conversation_id)) msgByConv.set(m.conversation_id, []);
+    msgByConv.get(m.conversation_id)!.push(m);
+  }
+
+  const frtList: number[] = [];
+  for (const t of allTickets) {
+    if (t.conversation_id && msgByConv.has(t.conversation_id)) {
+      const convMsgs = msgByConv.get(t.conversation_id)!;
+      const replies = convMsgs.filter((m: any) => ['agent', 'ai'].includes(m.sender_type) && new Date(m.created_at) >= new Date(t.created_at));
+      if (replies.length > 0) {
+        const first = Math.min(...replies.map((m: any) => new Date(m.created_at).getTime()));
+        const diffSec = Math.round((first - new Date(t.created_at).getTime()) / 1000);
+        if (diffSec >= 0) frtList.push(diffSec);
+      }
+    }
+  }
+  const avgFrt = frtList.length > 0 ? Math.round(frtList.reduce((a, b) => a + b, 0) / frtList.length) : null;
+
+  // Bot resolved vs handover
+  let botResolved = 0;
+  let botHandover = 0;
+  for (const [convId, cMsgs] of msgByConv.entries()) {
+    const hasAi = cMsgs.some((m: any) => m.sender_type === 'ai');
+    const hasAgent = cMsgs.some((m: any) => m.sender_type === 'agent');
+    if (hasAi && !hasAgent) botResolved++;
+    if (hasAi && hasAgent) botHandover++;
+  }
+
+  // Top articles with workspace names
+  const wsMap = new Map((workspaces || []).map((w: any) => [w.id, w.name]));
+  const topArticles = (articles || []).map((a: any) => ({
+    id: a.id,
+    title: a.title,
+    slug: a.slug,
+    workspace_id: a.workspace_id,
+    workspace_name: wsMap.get(a.workspace_id) || 'Support',
+    views_count: a.views_count || 0,
+    helpful_count: a.helpful_count || 0,
+  }));
+
+  return {
+    range_days: days,
+    total_workspaces: (workspaces || []).length,
+    active_workspaces: activeWs.length,
+    suspended_workspaces: suspendedWs.length,
+    total_tickets: allTickets.length,
+    tickets_30d: tickets30d.length,
+    total_members: (agents || []).length,
+    avg_first_reply_seconds: avgFrt,
+    resolution_rate_percent: resolutionRate,
+    bot_resolved_count: botResolved,
+    bot_handover_count: botHandover,
+    tickets_per_day: ticketsPerDay,
+    top_articles: topArticles,
+  };
+}
+
+/**
+ * Platform Owner Action: Retrieve deep workspace detail page metrics
+ * (tickets per day, average FRT, resolution rate, bot vs human, top articles, members).
+ */
+export async function getWorkspaceDetailAction(
+  workspaceId: string,
+  days: number = 30
+): Promise<WorkspaceDetailData> {
+  const { agent } = await assertSuperAdmin();
+  const supabase = await createClient();
+
+  const { data, error } = await supabase.rpc('fn_get_workspace_owner_detail', {
+    p_workspace_id: workspaceId,
+    p_days: days,
+  });
+  if (!error && data) {
+    return data as WorkspaceDetailData;
+  }
+
+  // Fallback calculation using serviceClient
+  const adminClient = serviceClient();
+  const [
+    { data: ws, error: wsError },
+    { data: members },
+    { data: tickets },
+    { data: articles },
+    { data: channelConns },
+    { data: visitors },
+    { data: messages },
+  ] = await Promise.all([
+    adminClient.from('workspaces').select('*').eq('id', workspaceId).single(),
+    adminClient.from('agents').select('*').eq('workspace_id', workspaceId).order('created_at', { ascending: true }),
+    adminClient.from('tickets').select('*').eq('workspace_id', workspaceId),
+    adminClient.from('articles').select('*').eq('workspace_id', workspaceId).order('views_count', { ascending: false }).limit(10),
+    adminClient.from('channel_connections').select('channel, status').eq('workspace_id', workspaceId).neq('status', 'disconnected'),
+    adminClient.from('visitors').select('id').eq('workspace_id', workspaceId).limit(1),
+    adminClient.from('messages').select('id, conversation_id, sender_type, created_at'),
+  ]);
+
+  if (wsError || !ws) {
+    throw new Error('Workspace not found.');
+  }
+
+  const allTickets = tickets || [];
+  const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
+  const tickets30d = allTickets.filter((t: any) => new Date(t.created_at).getTime() >= thirtyDaysAgo);
+  const solvedCount = allTickets.filter((t: any) => ['solved', 'closed'].includes(t.status)).length;
+  const resolutionRate = allTickets.length > 0 ? Number(((solvedCount / allTickets.length) * 100).toFixed(1)) : 0;
+
+  // Tickets per day chart
+  const dateMap = new Map<string, { tickets: number; solved: number }>();
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date(Date.now() - i * 24 * 60 * 60 * 1000);
+    const key = d.toISOString().slice(0, 10);
+    dateMap.set(key, { tickets: 0, solved: 0 });
+  }
+
+  for (const t of allTickets) {
+    const cKey = new Date(t.created_at).toISOString().slice(0, 10);
+    if (dateMap.has(cKey)) {
+      dateMap.get(cKey)!.tickets += 1;
+    }
+    if (['solved', 'closed'].includes(t.status)) {
+      const sDate = t.solved_at || t.closed_at || t.updated_at;
+      if (sDate) {
+        const sKey = new Date(sDate).toISOString().slice(0, 10);
+        if (dateMap.has(sKey)) {
+          dateMap.get(sKey)!.solved += 1;
+        }
+      }
+    }
+  }
+
+  const ticketsPerDay = Array.from(dateMap.entries()).map(([date, counts]) => {
+    const d = new Date(date);
+    const formatted_date = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    return {
+      date,
+      formatted_date,
+      tickets: counts.tickets,
+      solved: counts.solved,
+    };
+  });
+
+  // Calculate FRT for this workspace
+  const msgByConv = new Map<string, any[]>();
+  for (const m of messages || []) {
+    if (!msgByConv.has(m.conversation_id)) msgByConv.set(m.conversation_id, []);
+    msgByConv.get(m.conversation_id)!.push(m);
+  }
+
+  const frtList: number[] = [];
+  for (const t of allTickets) {
+    if (t.conversation_id && msgByConv.has(t.conversation_id)) {
+      const convMsgs = msgByConv.get(t.conversation_id)!;
+      const replies = convMsgs.filter((m: any) => ['agent', 'ai'].includes(m.sender_type) && new Date(m.created_at) >= new Date(t.created_at));
+      if (replies.length > 0) {
+        const first = Math.min(...replies.map((m: any) => new Date(m.created_at).getTime()));
+        const diffSec = Math.round((first - new Date(t.created_at).getTime()) / 1000);
+        if (diffSec >= 0) frtList.push(diffSec);
+      }
+    }
+  }
+  const avgFrt = frtList.length > 0 ? Math.round(frtList.reduce((a, b) => a + b, 0) / frtList.length) : null;
+
+  // Bot resolved vs handover
+  let botResolved = 0;
+  let botHandover = 0;
+  for (const t of allTickets) {
+    if (t.conversation_id && msgByConv.has(t.conversation_id)) {
+      const convMsgs = msgByConv.get(t.conversation_id)!;
+      const hasAi = convMsgs.some((m: any) => m.sender_type === 'ai');
+      const hasAgent = convMsgs.some((m: any) => m.sender_type === 'agent');
+      if (hasAi && !hasAgent) botResolved++;
+      if (hasAi && hasAgent) botHandover++;
+    }
+  }
+
+  // Channels
+  const channels = Array.from(new Set((channelConns || []).map((c: any) => c.channel as string)));
+  if ((visitors || []).length > 0 && !channels.includes('chat')) {
+    channels.push('chat');
+  }
+
+  const owner = (members || []).find((m: any) => m.role === 'owner');
+
+  return {
+    workspace: {
+      id: ws.id,
+      name: ws.name,
+      website_url: ws.website_url || ws.custom_domain || null,
+      brand_color: ws.brand_color || '#2563eb',
+      status: ws.is_suspended ? ('suspended' as const) : ('active' as const),
+      is_suspended: Boolean(ws.is_suspended),
+      suspended_at: ws.suspended_at || null,
+      suspension_reason: ws.suspension_reason || null,
+      plan: ws.plan || 'free',
+      owner_email: owner?.email || null,
+      created_at: ws.created_at,
+      connected_channels: channels,
+      tickets_30d_count: tickets30d.length,
+      total_tickets: allTickets.length,
+      agents_count: (members || []).length,
+    },
+    tickets_per_day: ticketsPerDay,
+    avg_first_reply_seconds: avgFrt,
+    resolution_rate_percent: resolutionRate,
+    bot_resolved_count: botResolved,
+    bot_handover_count: botHandover,
+    top_articles: (articles || []).map((a: any) => ({
+      id: a.id,
+      title: a.title,
+      slug: a.slug,
+      status: a.status,
+      views_count: a.views_count || 0,
+      helpful_count: a.helpful_count || 0,
+      created_at: a.created_at,
+    })),
+    members: (members || []).map((m: any) => ({
+      id: m.id,
+      name: m.name,
+      email: m.email,
+      role: m.role,
+      status: m.status,
+      avatar_url: m.avatar_url || null,
+      created_at: m.created_at,
+      is_active: m.is_active !== false,
+      max_open_tickets: m.max_open_tickets || null,
+    })),
+  };
+}
+
+/**
+ * Super Admin Action: Suspend a workspace
+ * Blocks widget and agent logins while preserving data, with audit log.
+ */
+export async function suspendWorkspaceAction(workspaceId: string, reason?: string) {
+  const { agent } = await assertSuperAdmin();
+  const supabase = await createClient();
+
+  const { data: ws, error: fetchErr } = await supabase
+    .from('workspaces')
+    .select('id, name')
+    .eq('id', workspaceId)
+    .single();
+
+  if (fetchErr || !ws) {
+    throw new Error('Workspace not found.');
+  }
+
+  const suspensionReason = reason?.trim() || 'Suspended by Platform Super Admin';
+
+  const { error } = await supabase
+    .from('workspaces')
+    .update({
+      is_suspended: true,
+      suspended_at: new Date().toISOString(),
+      suspension_reason: suspensionReason,
+    })
+    .eq('id', workspaceId);
+
+  if (error) {
+    throw new Error(`Failed to suspend workspace: ${error.message}`);
+  }
+
+  await recordSuperAdminAudit({
+    admin: agent,
+    action: 'suspend_workspace',
+    workspaceId,
+    workspaceName: ws.name,
+    details: { reason: suspensionReason },
+  });
+
+  return { success: true };
+}
+
+/**
+ * Super Admin Action: Reactivate a suspended workspace
+ * Restores access, with audit log.
+ */
+export async function reactivateWorkspaceAction(workspaceId: string) {
+  const { agent } = await assertSuperAdmin();
+  const supabase = await createClient();
+
+  const { data: ws, error: fetchErr } = await supabase
+    .from('workspaces')
+    .select('id, name')
+    .eq('id', workspaceId)
+    .single();
+
+  if (fetchErr || !ws) {
+    throw new Error('Workspace not found.');
+  }
+
+  const { error } = await supabase
+    .from('workspaces')
+    .update({
+      is_suspended: false,
+      suspended_at: null,
+      suspension_reason: null,
+    })
+    .eq('id', workspaceId);
+
+  if (error) {
+    throw new Error(`Failed to reactivate workspace: ${error.message}`);
+  }
+
+  await recordSuperAdminAudit({
+    admin: agent,
+    action: 'reactivate_workspace',
+    workspaceId,
+    workspaceName: ws.name,
+    details: {},
+  });
+
+  return { success: true };
 }
 
 /**
