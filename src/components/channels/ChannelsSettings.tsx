@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useCallback, useEffect, useState } from 'react';
-import { AlertTriangle, Camera, CheckCircle2, Copy, Link2, Mail, MessageCircle, Phone, Send, Settings2, Unplug } from 'lucide-react';
+import { AlertTriangle, Camera, CheckCircle2, Link2, Mail, MessageCircle, Phone, Send, Settings2, Unplug } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Badge, type BadgeTone } from '@/components/ui/Badge';
 import { Field, Input, Select } from '@/components/ui/Input';
@@ -11,6 +11,8 @@ import { ErrorState, SkeletonBlock } from '@/components/ui/States';
 import { useToast } from '@/components/ui/Toast';
 import { timeAgo } from '@/components/tickets/TicketBits';
 import { EmailChannelPanel } from './EmailChannelPanel';
+import { CopyRow } from './CopyRow';
+import { SocialChannelCard } from './SocialChannelCard';
 import {
   completeWhatsAppSignupAction,
   connectInstagramManualAction,
@@ -46,6 +48,9 @@ const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   messenger: MessageCircle,
 };
 
+const CHANNEL_NAMES: Record<string, string> = { instagram: 'Instagram', x: 'X', threads: 'Threads', linkedin: 'LinkedIn', tiktok: 'TikTok' };
+const channelLabel = (id: string) => CHANNEL_NAMES[id] || 'The channel';
+
 type CardState = 'not_connected' | 'connected' | 'needs_attention';
 
 function stateOf(card: ChannelCard): CardState {
@@ -71,14 +76,16 @@ export function ChannelsSettings({ workspaceId }: { workspaceId: string }) {
 
   const [attempt, setAttempt] = useState(0);
   // Instagram sends the admin back to the dashboard with the outcome in the URL.
-  const [returned, setReturned] = useState<{ ok: boolean; message: string } | null>(() => {
+  const [returned, setReturned] = useState<{ ok: boolean; channel: string; message: string } | null>(() => {
     if (typeof window === 'undefined') return null;
     const params = new URLSearchParams(window.location.search);
     const result = params.get('channel_result');
     if (!result) return null;
+    const channel = params.get('channel') || 'instagram';
     return {
       ok: result === 'connected',
-      message: params.get('channel_message') || (result === 'connected' ? 'If you used manual setup, add the webhook details shown on the card in Meta.' : ''),
+      channel,
+      message: params.get('channel_message') || (result === 'connected' ? (channel === 'instagram' ? 'If you used manual setup, add the webhook details shown on the card in Meta.' : 'New items arrive as tickets.') : ''),
     };
   });
 
@@ -159,7 +166,7 @@ export function ChannelsSettings({ workspaceId }: { workspaceId: string }) {
         >
           <p>
             <span className={cn('font-semibold', returned.ok ? 'text-success' : 'text-danger')}>
-              {returned.ok ? 'Instagram connected.' : 'Instagram was not connected.'}
+              {returned.ok ? `${channelLabel(returned.channel)} connected.` : `${channelLabel(returned.channel)} was not connected.`}
             </span>{' '}
             {returned.message}
           </p>
@@ -183,15 +190,19 @@ export function ChannelsSettings({ workspaceId }: { workspaceId: string }) {
       )}
 
       <div className="grid gap-4 md:grid-cols-2">
-        {overview.cards.map((card) => (
-          <ChannelCardView
-            key={card.id}
-            card={card}
-            onConnect={() => setConnecting(card)}
-            onTest={() => setTesting(card)}
-            onDisconnect={() => setDisconnecting(card)}
-          />
-        ))}
+        {overview.cards.map((card) =>
+          card.social ? (
+            <SocialChannelCard key={card.id} workspaceId={workspaceId} card={card} onChanged={load} onDisconnect={() => setDisconnecting(card)} />
+          ) : (
+            <ChannelCardView
+              key={card.id}
+              card={card}
+              onConnect={() => setConnecting(card)}
+              onTest={() => setTesting(card)}
+              onDisconnect={() => setDisconnecting(card)}
+            />
+          )
+        )}
       </div>
 
       {connecting && connecting.id === 'email' && (
@@ -354,31 +365,6 @@ function ChannelCardView({
         </div>
       )}
     </article>
-  );
-}
-
-function CopyRow({ label, value }: { label: string; value: string }) {
-  const toast = useToast();
-  return (
-    <div className="min-w-0">
-      <p className="text-2xs font-medium text-ink-3">{label}</p>
-      <div className="mt-1 flex items-center gap-2 min-w-0">
-        <code className="flex-1 min-w-0 truncate rounded-sm bg-surface-2 border border-line px-2 py-1 font-mono text-xs text-ink">{value}</code>
-        <Button
-          size="xs"
-          iconOnly
-          aria-label={`Copy ${label.toLowerCase()}`}
-          onClick={() =>
-            navigator.clipboard
-              .writeText(value)
-              .then(() => toast.success(`${label} copied`))
-              .catch(() => toast.error('Could not copy; select the text instead.'))
-          }
-        >
-          <Copy className="w-3.5 h-3.5" aria-hidden="true" />
-        </Button>
-      </div>
-    </div>
   );
 }
 

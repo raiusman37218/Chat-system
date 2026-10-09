@@ -15,8 +15,8 @@ import { processAutomationOutbox } from '@/lib/automation/outbox';
 export async function verify(request: Request, channel: string, connectionId?: string) {
   // Providers ping an email webhook URL with GET when it is saved; there is no handshake.
   if (channel === 'email') return new NextResponse('OK', { status: 200, headers: { 'Content-Type': 'text/plain' } });
-  const { status, body } = await handleWebhookChallenge(channel, new URL(request.url).searchParams, connectionId);
-  return new NextResponse(body, { status, headers: { 'Content-Type': 'text/plain' } });
+  const { status, body, contentType } = await handleWebhookChallenge(channel, new URL(request.url).searchParams, connectionId);
+  return new NextResponse(body, { status, headers: { 'Content-Type': contentType || 'text/plain' } });
 }
 
 export async function receive(request: Request, channel: string, connectionId?: string) {

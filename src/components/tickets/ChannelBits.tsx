@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, Check, CheckCheck, Clock, FileText, Image as ImageIcon, RotateCcw, Send } from 'lucide-react';
+import { AlertTriangle, Check, CheckCheck, Clock, ExternalLink, FileText, Globe, Image as ImageIcon, Lock, RotateCcw, Send } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Field, Input, Select } from '@/components/ui/Input';
 import { SkeletonBlock } from '@/components/ui/States';
@@ -90,6 +90,87 @@ export function ChannelBanner({ state, window: win }: { state: TicketChannelStat
         </div>
       )}
     </>
+  );
+}
+
+const PUBLIC_KIND: Record<'mention' | 'reply' | 'comment', string> = { mention: 'mention', reply: 'reply', comment: 'comment' };
+
+/**
+ * Shown above the reply box on a ticket about a public post, reply or comment.
+ * It says, in words and with an icon (never colour alone), that what the agent
+ * types will be posted where everyone can read it, and under what.
+ * `length` counts toward the platform's limit.
+ */
+export function PublicReplyNotice({ state, length }: { state: TicketChannelState; length: number }) {
+  const target = state.publicTarget;
+  const over = state.maxReplyLength !== null && length > state.maxReplyLength;
+  return (
+    <div role="note" className="mb-2 rounded-md border border-warn-line bg-warn-soft px-3 py-2 text-xs text-ink">
+      <p className="font-semibold text-warn flex items-center gap-1.5">
+        <Globe className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+        Public reply on {state.label}: everyone can see it, not just {target?.handle || 'the customer'}
+      </p>
+      {target ? (
+        <p className="mt-1 text-ink-2">
+          It will be posted under their {PUBLIC_KIND[target.kind]}
+          {target.excerpt ? <>: “{target.excerpt}{target.excerpt.length >= 160 ? '…' : ''}”</> : '.'}{' '}
+          {target.permalink && (
+            <a href={target.permalink} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-accent underline underline-offset-2">
+              View on {state.label} <ExternalLink className="w-3 h-3" aria-hidden="true" />
+            </a>
+          )}
+        </p>
+      ) : (
+        <p className="mt-1 text-ink-2">There is no public post in this conversation to reply under, so a reply cannot be sent.</p>
+      )}
+      <p className="mt-1 text-ink-3">To discuss anything private, add an internal note or ask them to contact you another way. Replies are text only.</p>
+      {state.maxReplyLength !== null && (
+        <p className={over ? 'mt-1 font-semibold text-danger' : 'mt-1 tabular-nums text-ink-3'} aria-live="polite">
+          {length} / {state.maxReplyLength} characters{over ? ': too long to post' : ''}
+        </p>
+      )}
+    </div>
+  );
+}
+
+/** For channels that mix direct messages with public posts: this ticket is the private side. */
+export function PrivateReplyNotice({ state }: { state: TicketChannelState }) {
+  return (
+    <p className="mb-2 flex items-center gap-1.5 text-xs text-ink-2">
+      <Lock className="w-3.5 h-3.5 text-ink-3" aria-hidden="true" />
+      Private message on {state.label}: only the customer can see your reply.
+    </p>
+  );
+}
+
+interface PublicMeta {
+  kind?: 'mention' | 'reply' | 'comment';
+  handle?: string;
+  permalink?: string;
+}
+
+/** On a customer's message: it was said in public, with a link to see it in context. */
+export function PublicItemChip({ item, label }: { item: PublicMeta; label: string }) {
+  if (!item.kind) return null;
+  return (
+    <p className="mb-1 inline-flex items-center gap-1.5 rounded-md border border-line bg-surface-2 px-2 py-0.5 text-2xs text-ink-2">
+      <Globe className="w-3 h-3 text-ink-3" aria-hidden="true" />
+      Public {PUBLIC_KIND[item.kind]} on {label}
+      {item.permalink && (
+        <a href={item.permalink} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-0.5 text-accent underline underline-offset-2">
+          View <ExternalLink className="w-3 h-3" aria-hidden="true" />
+        </a>
+      )}
+    </p>
+  );
+}
+
+/** Under an agent's reply that went out in public. */
+export function PostedPublicly() {
+  return (
+    <p className="mt-0.5 inline-flex items-center gap-1 text-2xs text-ink-3">
+      <Globe className="w-3 h-3" aria-hidden="true" /> Posted publicly
+    </p>
   );
 }
 

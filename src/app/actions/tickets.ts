@@ -19,6 +19,7 @@ import { isValidEmail, sendSmtpEmail } from '@/lib/email/smtp';
 import { sanitizeTicketPatch, type TicketPatch } from '@/lib/tickets/patch';
 import { getAdapter } from '@/lib/channels/registry';
 import { processOutboundQueue } from '@/lib/channels/outbound';
+import { audienceOf } from '@/lib/channels/public';
 import { renderTemplate } from '@/lib/channels/templates';
 import {
   SETTABLE_STATUSES,
@@ -316,6 +317,18 @@ export interface TicketChannelState {
   templates: boolean;
   connectionStatus: 'connected' | 'needs_attention' | 'disconnected';
   connectionName: string | null;
+  /**
+   * Who can read a reply: 'public' when this ticket is about a public post,
+   * reply or comment (X, Threads, LinkedIn, TikTok), 'private' for a direct
+   * message or any other channel.
+   */
+  audience: 'public' | 'private';
+  /** The channel also has public replies (X), so a private reply deserves saying so. */
+  offersPublic: boolean;
+  /** The platform's reply length limit, for the counter; null when it has none we know of. */
+  maxReplyLength: number | null;
+  /** For a public ticket: the item a reply will be posted under. */
+  publicTarget: { kind: 'mention' | 'reply' | 'comment'; handle: string | null; permalink: string | null; excerpt: string } | null;
 }
 
 /**
@@ -336,10 +349,33 @@ async function channelStateFor(supabase: Supabase, workspaceId: string, ticket: 
   const adapter = await adapterFor(supabase, workspaceId, ticket);
   if (!adapter || !ticket.conversation_id) return null;
   const [{ data: conv }, { data: conn }] = await Promise.all([
-    supabase.from('conversations').select('channel_last_inbound_at').eq('id', ticket.conversation_id).eq('workspace_id', workspaceId).maybeSingle(),
+    supabase.from('conversations').select('channel_last_inbound_at, channel_user_id').eq('id', ticket.conversation_id).eq('workspace_id', workspaceId).maybeSingle(),
     supabase.from('channel_connections').select('status, display_name, settings').eq('workspace_id', workspaceId).eq('channel', adapter.id).maybeSingle(),
   ]);
+  const audience = audienceOf(conv?.channel_user_id);
+  let publicTarget: TicketChannelState['publicTarget'] = null;
+  if (audience === 'public') {
+    // The reply goes under the newest public item the customer posted.
+    const { data: recent } = await supabase
+      .from('messages')
+      .select('content, metadata')
+      .eq('conversation_id', ticket.conversation_id)
+      .eq('sender_type', 'visitor')
+      .order('created_at', { ascending: false })
+      .limit(10);
+    for (const m of (recent as { content: string | null; metadata: Record<string, unknown> | null }[] | null) || []) {
+      const item = m.metadata?.channel_public as { kind?: 'mention' | 'reply' | 'comment'; handle?: string; permalink?: string } | undefined;
+      if (item?.kind) {
+        publicTarget = { kind: item.kind, handle: item.handle ?? null, permalink: item.permalink ?? null, excerpt: (m.content || '').slice(0, 160) };
+        break;
+      }
+    }
+  }
   return {
+    audience,
+    offersPublic: adapter.capabilities.publicReplies === true,
+    maxReplyLength: adapter.capabilities.maxReplyLength ?? null,
+    publicTarget,
     channel: adapter.id,
     label: adapter.label,
     lastInboundAt: conv?.channel_last_inbound_at ?? null,

@@ -2,6 +2,10 @@ import type { ChannelAdapter, ChannelId } from './types';
 import { whatsappAdapter } from './whatsapp/adapter';
 import { instagramAdapter } from './instagram/adapter';
 import { emailAdapter } from './email/adapter';
+import { xAdapter } from './x/adapter';
+import { threadsAdapter } from './threads/adapter';
+import { linkedinAdapter } from './linkedin/adapter';
+import { tiktokAdapter } from './tiktok/adapter';
 
 /**
  * Every channel the app can talk to. The integrations page, the webhook
@@ -14,6 +18,10 @@ const ADAPTERS: Record<ChannelId, ChannelAdapter<any, any>> = {
   whatsapp: whatsappAdapter,
   instagram: instagramAdapter,
   email: emailAdapter,
+  x: xAdapter,
+  threads: threadsAdapter,
+  linkedin: linkedinAdapter,
+  tiktok: tiktokAdapter,
 };
 
 export function getAdapter(channel: string | null | undefined): ChannelAdapter<unknown, unknown> | null {
@@ -49,6 +57,30 @@ export const CHANNEL_CATALOG: ChannelCatalogEntry[] = [
     id: 'email',
     label: 'Email',
     description: 'Give your team a support address: emails become tickets, and replies go out as branded emails from your address.',
+    available: true,
+  },
+  {
+    id: 'x',
+    label: 'X',
+    description: 'Mentions, replies and direct messages on X become tickets. Replies to posts are public.',
+    available: true,
+  },
+  {
+    id: 'threads',
+    label: 'Threads',
+    description: 'Replies to your posts and mentions on Threads become tickets, answered publicly.',
+    available: true,
+  },
+  {
+    id: 'linkedin',
+    label: 'LinkedIn',
+    description: 'Comments on your Company Page’s posts become tickets, answered publicly as the Page.',
+    available: true,
+  },
+  {
+    id: 'tiktok',
+    label: 'TikTok',
+    description: 'Comments on your TikTok videos become tickets, answered publicly. Requires TikTok approval.',
     available: true,
   },
   {

@@ -32,6 +32,11 @@ export function platformWebhookSecrets(channel: string): { appSecret?: string; v
   if (channel === 'instagram') {
     return { appSecret: process.env.INSTAGRAM_APP_SECRET, verifyToken: process.env.INSTAGRAM_WEBHOOK_VERIFY_TOKEN };
   }
+  // X signs with the app's consumer (API) secret, TikTok and LinkedIn with the app's client secret.
+  if (channel === 'x') return { appSecret: process.env.X_API_SECRET };
+  if (channel === 'tiktok') return { appSecret: process.env.TIKTOK_CLIENT_SECRET };
+  if (channel === 'linkedin') return { appSecret: process.env.LINKEDIN_CLIENT_SECRET };
+  if (channel === 'threads') return { appSecret: process.env.THREADS_APP_SECRET, verifyToken: process.env.THREADS_WEBHOOK_VERIFY_TOKEN };
   return {};
 }
 
@@ -44,9 +49,16 @@ export async function handleWebhookChallenge(
   channel: string,
   query: URLSearchParams,
   connectionId?: string
-): Promise<{ status: number; body: string }> {
+): Promise<{ status: number; body: string; contentType?: string }> {
   const adapter = getAdapter(channel);
   if (!adapter) return { status: 404, body: 'Unknown channel' };
+  // X and TikTok prove ownership of the URL with a signed JSON answer, not an echoed token.
+  if (adapter.respondToChallenge) {
+    const secret = platformWebhookSecrets(channel).appSecret;
+    if (!secret) return { status: 403, body: 'Webhook verification is not configured' };
+    const answer = adapter.respondToChallenge(query, secret);
+    return answer ? { status: 200, body: answer.body, contentType: answer.contentType } : { status: 403, body: 'Verification failed' };
+  }
   let expected = platformWebhookSecrets(channel).verifyToken;
   let connection: LoadedConnection<Creds> | null = null;
   if (connectionId) {
@@ -70,6 +82,7 @@ function metadataFor(event: InboundMessageEvent): Record<string, unknown> {
     ...(event.media ? { channel_media: event.media } : {}),
     ...(event.replyToExternalId ? { channel_reply_to: event.replyToExternalId } : {}),
     ...(event.story ? { channel_story: event.story } : {}),
+    ...(event.public ? { channel_public: event.public } : {}),
   };
 }
 
@@ -138,7 +151,8 @@ export async function handleWebhookPost(params: {
   return { status: 200, body: 'EVENT_RECEIVED', followUps };
 }
 
-async function storeEvent(
+/** Stores one event from a webhook or a poll. Exported for the poller (./poll.ts). */
+export async function storeEvent(
   adapter: ChannelAdapter<unknown, unknown>,
   conn: LoadedConnection<Creds>,
   event: ChannelEvent,
