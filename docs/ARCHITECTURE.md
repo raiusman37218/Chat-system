@@ -315,8 +315,13 @@ The AI auto-reply system is initiated from **exactly one path**: the visitor cha
 5. **Context Assembly**:
    - Aggregates recent unanswered lines as the main question.
    - Extracts conversational turns (`history` and `turns`) to provide multi-turn context.
-6. **RAG & Decision Generation**:
-   - Invokes `generateHelpDeskResponseWithHandover()` in `src/lib/ai/anthropic.ts`.
+6. **Intent, then RAG & Decision Generation**:
+   - Invokes `generateHelpDeskResponseWithHandover()` in `src/lib/ai/anthropic.ts`, which first classifies the message (`classifyVisitorIntent` in `src/lib/ai/intent.ts`) and routes it:
+     - `small_talk`: short reply, no retrieval.
+     - `help_center_question`: retrieval over **published articles only** (no team notes). If retrieval confidence is low, or the model answers `[NOT_COVERED]` or names no source, the bot says it couldn't find the answer and offers a team member; nothing is guessed and the gap is logged. Otherwise the reply ends with a code-built `Source: [Article](url)` citation.
+     - `account_specific`, `out_of_scope`, `wants_human`: hand over to the inbox with a deterministic summary note (`buildHandoverSummary`). `out_of_scope` keeps the bot on; the other two turn it off for the conversation.
+   - A "yes" to the bot's offer of a team member is classified as `wants_human`.
+   - The bot message's `metadata` records `bot_intent`, `bot_intent_source`, `retrieval_confidence` and `cited_article_id`.
 7. **Atomic Race-Condition Check**:
    - Re-queries the `messages` table for any human agent message that arrived while the model was thinking. If a human agent responded in the interim, the AI drops its reply.
 8. **Outbound Dispatch & Storage**:

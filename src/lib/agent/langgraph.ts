@@ -269,6 +269,9 @@ export async function triggerLangGraphAgent(params: LangGraphTriggerParams) {
         visitorMessageId: latestVisitorMsg?.id,
         reason: result.handoverReason || 'Inquiry requires human specialist assistance.',
         channel: sender.channel,
+        internalNote: result.internalNote,
+        disableAi: Boolean(result.disableAi),
+        priority: result.priority || 'high',
       });
       return { success: true, action: 'escalate', reason: result.handoverReason };
     }
