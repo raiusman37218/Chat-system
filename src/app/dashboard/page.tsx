@@ -13,6 +13,7 @@ import { LiveVisitorsRadar } from '@/components/dashboard/LiveVisitorsRadar';
 import { SettingsHub } from '@/components/dashboard/SettingsHub';
 import { AnalyticsDashboard } from '@/components/admin/AnalyticsDashboard';
 import { HelpDeskDashboard } from '@/components/dashboard/HelpDeskDashboard';
+import { TicketsView } from '@/components/tickets/TicketsView';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { KeyboardShortcutsModal } from '@/components/ui/KeyboardShortcutsModal';
 import { MobileInstallModal } from '@/components/pwa/MobileInstallModal';
@@ -22,7 +23,7 @@ import { sendBrowserNotification, cn } from '@/lib/utils';
 import { updateFaviconBadge } from '@/lib/favicon';
 import { SetupChecklist } from '@/components/dashboard/SetupChecklist';
 import type { SectionId } from '@/components/dashboard/SettingsHub';
-import { BarChart2, BookOpen, Inbox, Radio, Settings, Smartphone, ShieldAlert, LogOut, Sparkles } from 'lucide-react';
+import { BarChart2, BookOpen, Inbox, Radio, Settings, Smartphone, ShieldAlert, LogOut, Sparkles, Ticket } from 'lucide-react';
 import { exitSuperAdminWorkspaceViewAction } from '@/app/actions/platform';
 
 /**
@@ -1776,6 +1777,12 @@ export default function DashboardPage() {
         </div>
       )}
 
+      {activeView === 'tickets' && currentWorkspace && (
+        <div className="flex-1 flex overflow-hidden w-full pb-14 md:pb-0">
+          <TicketsView workspaceId={currentWorkspace.id} />
+        </div>
+      )}
+
       {activeView === 'helpdesk' && (
         <div className="flex-1 flex overflow-hidden w-full pb-14 md:pb-0">
           <HelpDeskDashboard
@@ -1820,6 +1827,7 @@ export default function DashboardPage() {
           {(
             [
               ['inbox', 'Inbox', Inbox, true],
+              ['tickets', 'Tickets', Ticket, true],
               ['visitors', 'Visitors', Radio, true],
               ['reports', 'Reports', BarChart2, isAdmin],
               ['helpdesk', 'Help Desk', BookOpen, true],
