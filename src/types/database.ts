@@ -683,6 +683,13 @@ export interface Ticket {
   last_customer_reply_at: string | null;
   status_rank: number;
   priority_rank: number;
+  /** SLA cache, kept by the database (fn_sla_sync). */
+  sla_policy_id?: string | null;
+  sla_state?: 'running' | 'paused' | 'met' | null;
+  sla_next_due_at?: string | null;
+  sla_next_warn_at?: string | null;
+  sla_next_metric?: 'first_reply' | 'next_reply' | 'resolution' | null;
+  sla_breached_at?: string | null;
 }
 
 export interface TicketGroup {

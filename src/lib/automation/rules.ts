@@ -97,6 +97,8 @@ export const CHANGED_OPTIONS = [
   { value: 'tags', label: 'Tags change' },
   { value: 'subject', label: 'Subject changes' },
   { value: 'type', label: 'Type changes' },
+  { value: 'sla_warning', label: 'An SLA is about to be breached' },
+  { value: 'sla_breach', label: 'An SLA is breached' },
 ];
 
 export const STATUS_OPTIONS = [
@@ -119,6 +121,10 @@ export const TYPE_OPTIONS = [
   { value: 'problem', label: 'Problem' },
   { value: 'task', label: 'Task' },
 ];
+export const YES_NO_OPTIONS = [
+  { value: 'yes', label: 'Yes' },
+  { value: 'no', label: 'No' },
+];
 export const CHANNEL_OPTIONS = [
   { value: 'chat', label: 'Chat' },
   { value: 'email', label: 'Email' },
@@ -139,6 +145,10 @@ export const CONDITION_FIELDS: FieldDef[] = [
   { id: 'assignee_id', label: 'Assignee', kinds: ['trigger', 'automation'], ops: ENTITY_OPS, value: 'entity' },
   { id: 'requester_email', label: 'Requester email', kinds: ['trigger', 'automation'], ops: TEXT_OPS, value: 'text' },
   { id: 'requester_name', label: 'Requester name', kinds: ['trigger', 'automation'], ops: TEXT_OPS, value: 'text' },
+  // Both read the SLA timers live. Hours until breach goes negative once an
+  // SLA is breached, so "at most 2" also catches tickets that are already late.
+  { id: 'sla_breached', label: 'SLA breached', kinds: ['trigger', 'automation'], ops: [{ id: 'is', label: 'is' }], value: 'enum', options: YES_NO_OPTIONS },
+  { id: 'hours_until_breach', label: 'Hours until SLA breach', kinds: ['trigger', 'automation'], ops: HOUR_OPS, value: 'number' },
   { id: 'hours_since_created', label: 'Hours since created', kinds: ['automation'], ops: HOUR_OPS, value: 'number' },
   { id: 'hours_since_updated', label: 'Hours since last update', kinds: ['automation'], ops: HOUR_OPS, value: 'number' },
   { id: 'hours_since_status_change', label: 'Hours in current status', kinds: ['automation'], ops: HOUR_OPS, value: 'number' },
@@ -299,7 +309,8 @@ function conditionError(c: Condition, kind: RuleKind): string | null {
   if (!needsValue(c)) return null;
   if (def.value === 'number') {
     const n = Number(c.value);
-    return Number.isFinite(n) && n >= 0 && n <= 8760 ? null : 'Enter a number of hours from 0 to 8760.';
+    const min = c.field === 'hours_until_breach' ? -8760 : 0;
+    return Number.isFinite(n) && n >= min && n <= 8760 ? null : `Enter a number of hours from ${min} to 8760.`;
   }
   const empty = Array.isArray(c.value) ? c.value.length === 0 : String(c.value ?? '').trim() === '';
   if (empty) return def.value === 'enum' || def.value === 'entity' ? 'Choose a value.' : 'Enter at least one value.';

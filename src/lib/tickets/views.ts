@@ -47,13 +47,13 @@ export interface TicketFilters {
   solvedWithinDays?: number;
 }
 
-export type SortField = 'updated_at' | 'created_at' | 'number' | 'priority' | 'status' | 'solved_at';
+export type SortField = 'updated_at' | 'created_at' | 'number' | 'priority' | 'status' | 'solved_at' | 'sla_next_due_at';
 export interface TicketSort {
   field: SortField;
   direction: 'asc' | 'desc';
 }
 
-export const SORT_FIELDS: readonly SortField[] = ['updated_at', 'created_at', 'number', 'priority', 'status', 'solved_at'];
+export const SORT_FIELDS: readonly SortField[] = ['updated_at', 'created_at', 'number', 'priority', 'status', 'solved_at', 'sla_next_due_at'];
 export const SORT_LABEL: Record<SortField, string> = {
   updated_at: 'Last updated',
   created_at: 'Created',
@@ -61,6 +61,9 @@ export const SORT_LABEL: Record<SortField, string> = {
   priority: 'Priority',
   status: 'Status',
   solved_at: 'Solved',
+  // Ascending puts the ticket closest to (or furthest past) its SLA first;
+  // tickets with no running SLA clock always sort last.
+  sla_next_due_at: 'Next SLA breach',
 };
 export const DEFAULT_SORT: TicketSort = { field: 'updated_at', direction: 'desc' };
 

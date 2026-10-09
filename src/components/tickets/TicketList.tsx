@@ -17,6 +17,7 @@ import {
 import type { TicketListItem } from '@/app/actions/tickets';
 import type { TicketStatus } from '@/types/database';
 import { ChannelIcon, Modal, PriorityLabel, StatusBadge, inputClass, timeAgo } from './TicketBits';
+import { SlaBadge } from './SlaBadge';
 
 export const PAGE_SIZE = 50;
 
@@ -67,7 +68,7 @@ export function TicketList(props: Props) {
             <div className="flex items-center gap-1.5">
               <Menu<SortField>
                 value={props.sort.field}
-                onChange={(field) => props.onSort({ ...props.sort, field })}
+                onChange={(field) => props.onSort({ field, direction: field === 'sla_next_due_at' ? 'asc' : props.sort.direction })}
                 options={SORT_FIELDS.map((f) => ({ value: f, label: SORT_LABEL[f] }))}
                 trigger={() => (
                   <span className="btn btn-ghost btn-xs">
@@ -103,6 +104,7 @@ export function TicketList(props: Props) {
               <th className="px-2 py-2 border-b border-line text-left font-semibold">Ticket</th>
               <th className="px-2 py-2 border-b border-line text-left font-semibold hidden md:table-cell">Requester</th>
               <th className="px-2 py-2 border-b border-line text-left font-semibold">Status</th>
+              <th className="px-2 py-2 border-b border-line text-left font-semibold hidden sm:table-cell">SLA</th>
               <th className="px-2 py-2 border-b border-line text-left font-semibold hidden lg:table-cell">Priority</th>
               <th className="px-2 py-2 border-b border-line text-left font-semibold hidden lg:table-cell">Assignee</th>
               <th className="px-4 py-2 border-b border-line text-right font-semibold">Updated</th>
@@ -165,6 +167,10 @@ export function TicketList(props: Props) {
                   </td>
                   <td className="px-2 py-2.5 border-b border-line">
                     <StatusBadge status={t.status} />
+                    <SlaBadge ticket={t} className="mt-1 sm:hidden" />
+                  </td>
+                  <td className="px-2 py-2.5 border-b border-line hidden sm:table-cell">
+                    <SlaBadge ticket={t} />
                   </td>
                   <td className="px-2 py-2.5 border-b border-line hidden lg:table-cell">
                     <PriorityLabel priority={t.priority} />

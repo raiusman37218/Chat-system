@@ -113,7 +113,8 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
       { id: 'log', label: 'Rule log', description: 'Which triggers and automations fired on which ticket, and what they did.', capability: 'manage_settings', keywords: ['log', 'history', 'fired', 'rule', 'debug'] },
       { id: 'replies', label: 'Saved replies', description: 'Plain pre-written replies your team inserts with a shortcut.', capability: 'manage_settings', keywords: ['canned', 'saved replies', 'templates', 'shortcut', 'quick response'] },
       { id: 'assignment', label: 'Assignment & auto-close', description: 'Who new chats go to, and when quiet conversations are resolved.', capability: 'manage_settings', keywords: ['assignment', 'auto assign', 'round robin', 'auto close', 'inactive', 'resolve'] },
-      { id: 'sla', label: 'SLA policies', description: 'Set first-reply and resolution targets and get warned before they are missed.', capability: 'manage_settings', status: 'soon', keywords: ['sla', 'target', 'breach', 'response time'] },
+      { id: 'sla', label: 'SLA policies', description: 'Set first-reply, next-reply and resolution targets per priority, and get warned before they are missed.', capability: 'manage_settings', keywords: ['sla', 'target', 'breach', 'response time', 'first reply', 'resolution', 'policy', 'priority'] },
+      { id: 'sla-calendar', label: 'SLA calendar', description: 'The business hours and holidays that business-hour SLAs count against.', capability: 'manage_settings', keywords: ['sla', 'holiday', 'business hours', 'calendar', 'closed', 'timezone', 'day off'] },
     ],
   },
   {
