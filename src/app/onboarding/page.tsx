@@ -152,8 +152,9 @@ export default function OnboardingPage() {
           : null;
 
       if (customDomain) {
+        // public_workspaces: RLS hides other tenants' rows from `workspaces`.
         const { data: taken } = await supabase
-          .from('workspaces')
+          .from('public_workspaces')
           .select('id')
           .ilike('custom_domain', customDomain)
           .maybeSingle();

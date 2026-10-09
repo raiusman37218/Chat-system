@@ -13,6 +13,7 @@ import {
   Settings,
   Smartphone,
   Sparkles,
+  Ticket,
   Volume2,
   VolumeX,
 } from 'lucide-react';
@@ -23,7 +24,7 @@ import { Avatar } from '@/components/ui/Avatar';
 import { Menu } from '@/components/ui/Menu';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 
-export type View = 'inbox' | 'visitors' | 'reports' | 'helpdesk' | 'settings';
+export type View = 'inbox' | 'tickets' | 'visitors' | 'reports' | 'helpdesk' | 'settings';
 
 interface SidebarProps {
   currentAgent: Agent | null;
@@ -94,6 +95,7 @@ export function Sidebar({
         </span>
       ) : undefined,
     },
+    { view: 'tickets', label: 'Tickets', Icon: Ticket },
     {
       view: 'visitors',
       label: 'Live visitors',

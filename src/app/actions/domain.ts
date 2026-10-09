@@ -63,8 +63,9 @@ export async function connectCustomDomainAction(
     const domain = validation.domain;
 
     // 2. Cross-workspace collision check (not used by another workspace)
+    // public_workspaces: RLS hides other tenants' rows from `workspaces`.
     const { data: existing } = await supabase
-      .from('workspaces')
+      .from('public_workspaces')
       .select('id, name')
       .ilike('custom_domain', domain)
       .neq('id', workspaceId)
@@ -442,8 +443,9 @@ export async function checkWorkspaceSlugAvailabilityAction(
     }
 
     const supabase = await createClient();
+    // public_workspaces: RLS hides other tenants' rows from `workspaces`.
     const { data: existing } = await supabase
-      .from('workspaces')
+      .from('public_workspaces')
       .select('id, name')
       .ilike('slug', formattedSlug)
       .neq('id', workspaceId)
@@ -503,8 +505,9 @@ export async function updateWorkspaceSlugAction(
       return { success: true, data: { workspace: ws as Workspace, slug: formattedSlug } };
     }
 
+    // public_workspaces: RLS hides other tenants' rows from `workspaces`.
     const { data: conflict } = await supabase
-      .from('workspaces')
+      .from('public_workspaces')
       .select('id')
       .ilike('slug', formattedSlug)
       .neq('id', workspaceId)

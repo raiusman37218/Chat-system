@@ -107,6 +107,8 @@ export interface Conversation {
   merged_into?: string | null;
   summary?: string | null;
   sentiment?: 'positive' | 'neutral' | 'negative' | null;
+  /** Where the conversation's next message goes. */
+  current_ticket_id?: string | null;
 }
 
 export type ConversationInsert = Partial<Conversation>;
@@ -135,6 +137,8 @@ export interface Message {
   is_internal?: boolean;
   metadata?: Record<string, any> | null;
   email_notified_at?: string | null;
+  /** The ticket this message belongs to (see supabase/migrations/20261009110000_ticketing.sql). */
+  ticket_id?: string | null;
 }
 
 export type MessageInsert = Partial<Message>;
@@ -605,4 +609,74 @@ export interface Database {
       [key: string]: any;
     };
   };
+}
+
+/* ── Ticketing ────────────────────────────────────────────────────────── */
+
+export type TicketStatus = 'new' | 'open' | 'pending' | 'on_hold' | 'solved' | 'closed';
+export type TicketPriority = 'low' | 'normal' | 'high' | 'urgent';
+export type TicketType = 'question' | 'incident' | 'problem' | 'task';
+export type TicketChannel = 'chat' | 'email' | 'web_form';
+
+export interface Ticket {
+  id: string;
+  workspace_id: string;
+  number: number;
+  conversation_id: string | null;
+  subject: string;
+  status: TicketStatus;
+  priority: TicketPriority;
+  type: TicketType;
+  assignee_id: string | null;
+  group_id: string | null;
+  tags: string[];
+  requester_id: string | null;
+  channel: TicketChannel;
+  follow_up_of_id: string | null;
+  merged_into_id: string | null;
+  created_at: string;
+  updated_at: string;
+  status_changed_at: string;
+  solved_at: string | null;
+  closed_at: string | null;
+  first_agent_reply_at: string | null;
+  last_agent_reply_at: string | null;
+  last_customer_reply_at: string | null;
+  status_rank: number;
+  priority_rank: number;
+}
+
+export interface TicketGroup {
+  id: string;
+  workspace_id: string;
+  name: string;
+  description: string | null;
+  created_at: string;
+}
+
+export type TicketActorType = 'agent' | 'customer' | 'system' | 'bot';
+
+export interface TicketEvent {
+  id: number;
+  ticket_id: string;
+  workspace_id: string;
+  actor_type: TicketActorType;
+  actor_id: string | null;
+  action: 'created' | 'updated' | 'public_reply' | 'internal_note' | 'merged' | 'follow_up_created' | string;
+  field: string | null;
+  old_value: string | null;
+  new_value: string | null;
+  created_at: string;
+}
+
+export interface TicketViewRow {
+  id: string;
+  workspace_id: string;
+  owner_id: string | null;
+  name: string;
+  filters: Record<string, unknown>;
+  sort: Record<string, unknown>;
+  position: number;
+  created_at: string;
+  updated_at: string;
 }

@@ -28,6 +28,8 @@ The application-level guards (`assertAdminUser`, `assertAgent`, `assertSuperAdmi
 - **Fix:** rotate both keys now, delete the file, and purge it from git history (`git filter-repo`). Add `env.download` and `*.download` to `.gitignore`. Turn on secret scanning.
 
 ### H-2: `is_current_user_super_admin()` is true for every caller
+> **Fixed** by `supabase/migrations/20261009100000_tenant_isolation_fixes.sql`, covered by `ticket-isolation.db.test.ts`. The slug and custom-domain uniqueness checks that depended on the bug now read `public_workspaces`. Still open: the `current_user` checks inside `fn_get_platform_analytics` and the second `fn_get_platform_companies_summary`, and the unguarded `fn_get_company_analytics` (M-4).
+
 - **Where:** `supabase/migrations/20261004000000_super_admin_data_correctness_and_orphans.sql:5-21`.
 - **Problem:** the function is `SECURITY DEFINER` and returns true when `current_user IN ('postgres','supabase_admin','service_role')`. Inside a security-definer function, `current_user` is the function **owner** (`postgres`), so the check passes for `anon` and `authenticated` alike. The same mistake appears in `fn_get_platform_analytics` and the second `fn_get_platform_companies_summary` (`20261004020000_…:36-39, 522-526`: `IF current_user <> 'postgres' …`).
 - **Impact:**
@@ -47,6 +49,8 @@ The application-level guards (`assertAdminUser`, `assertAgent`, `assertSuperAdmi
 - **Fix:** give visitors a credential: either a signed visitor JWT minted by a route that knows the workspace, or a random per-conversation secret stored client-side. Then replace the anon table policies with `SECURITY DEFINER` RPCs that check that credential. Anon should have no direct `SELECT`/`UPDATE` on these tables.
 
 ### H-4: Any user can join any workspace as admin by editing their own `agents` row
+> **Fixed** by the same migration (trigger `trg_guard_agent_membership`), with tests in `ticket-isolation.db.test.ts`.
+
 - **Where:** RLS policy "Allow agents to update their own profile" / "…insert their own agent profile" (`20261002030000:383-404`: `USING/WITH CHECK (auth.uid() = id)` with no column restriction). The dashboard auto-creates new users with `role: 'owner'` from the browser (`src/app/dashboard/page.tsx:210-218`).
 - **Exploit:** sign up, then from the browser console run `supabase.from('agents').update({ workspace_id: '<victim id>', role: 'admin' }).eq('id', myId)`. Workspace IDs are public, because they appear in every embed snippet and widget request. After that, `current_user_workspace_ids()`, `fn_is_workspace_admin`, `assertAdminUser` and `assertAgent` all treat the attacker as an admin of the victim. Only `is_super_admin` is protected (by `fn_protect_agent_super_admin`).
 - **Fix:** add a `BEFORE UPDATE/INSERT` trigger that rejects changes to `workspace_id` and `role` unless the caller is service-role or an admin of the target workspace. Move team changes exclusively into server actions. Stop creating agents with `role: 'owner'` on the client.

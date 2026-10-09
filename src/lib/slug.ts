@@ -145,8 +145,10 @@ export async function generateUniqueWorkspaceSlug(
   }
 
   // Check if baseSlug exists
+  // public_workspaces, not workspaces: row level security hides other tenants'
+  // rows, and uniqueness has to be checked against all of them.
   let query = supabase
-    .from('workspaces')
+    .from('public_workspaces')
     .select('id, slug')
     .ilike('slug', `${baseSlug}%`);
 

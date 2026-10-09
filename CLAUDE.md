@@ -111,6 +111,7 @@ Database: there is no `supabase/config.toml`, and the migrations are **not** a c
 ## Testing and checks
 
 - `npm test` runs **Vitest** (`vitest.config.ts`, files matching `src/**/*.test.ts`). The current suites cover the AI bot: `src/lib/ai/intent.test.ts` (intent classification over a table of sample messages, including Roman Urdu and off-topic ones) and `src/lib/ai/bot-pipeline.test.ts` (the full answer pipeline against a fixture help center, with Supabase and the model mocked). Mock `@/lib/supabase/service` and `@/lib/ai/provider` in new tests; never call a real database or model from a test.
+- `npm run test:db` runs the **database tests** (`src/**/*.db.test.ts`) against a throwaway local Postgres. `scripts/test-db.sh` boots a temporary cluster (needs Postgres 15+ binaries; nothing touches Supabase), loads a stub of Supabase's roles and `auth.uid()` (`supabase/tests/`), applies the real migrations, and runs the tests. Each test runs in a rolled-back transaction and acts as `anon`, a given agent, or `service_role` through the helpers in `src/test/db.ts`. `npm test` skips these suites when `TEST_DATABASE_URL` is unset. Put rules that live in SQL (triggers, RLS) under test here. If a new migration depends on an older one the script doesn't load, add it to the list in the script.
 - `npx tsc --noEmit`: type-checks cleanly today; keep it that way.
 - `npm run lint` (ESLint 9 + `eslint-config-next`) currently fails with ~530 errors, mostly `no-explicit-any`, plus `react-hooks/*` and the generated `public/widget.js`. Don't add new errors in files you touch. For a scoped run: `npx eslint src/path/to/file.tsx`.
 - `npm run build`: the production build check.
@@ -134,6 +135,9 @@ All tenant data hangs off `workspaces.id`. Some child tables carry `workspace_id
 | `messages` | `conversation_id`, `sender_type` visitor/agent/ai/system, `sender_id`, `content`, `attachment_url`, `is_internal`, `metadata` (translations, AI idempotency keys), `reply_to_message_id`, `delivered_at`, `read_at`, `email_notified_at` | via conversation |
 | `internal_notes`, `conversation_tags` | Legacy per-conversation notes/tags (internal notes are now mostly `messages.is_internal`) | via conversation |
 | `canned_responses` | Saved replies (`shortcut`, `title`, `content`; `agent_id` null = team-wide) | `workspace_id` |
+| `tickets` | The unit of work: `number` (per workspace, from #1001), `subject`, `status` new/open/pending/on_hold/solved/closed, `priority`, `type` question/incident/problem/task, `assignee_id`, `group_id`, `tags[]`, `requester_id` (visitor), `channel` chat/email/web_form, `follow_up_of_id`, `merged_into_id`, solved/closed timestamps. `conversations.current_ticket_id` points at a conversation's current ticket; `messages.ticket_id` is the ticket thread | `workspace_id` |
+| `ticket_events` | Audit log: actor (agent/customer/system/bot), action, field, old → new. Written only by triggers | `workspace_id` |
+| `ticket_groups`, `ticket_views`, `ticket_counters` | Teams tickets route to; saved inbox views (filters + sort, personal or shared); the per-workspace number counter | `workspace_id` |
 | `help_sections`, `articles` | Help center collections and articles (`slug` unique per workspace, `status` published/draft, `order_index`, view/helpful counters) | `workspace_id` |
 | `article_feedback`, `article_slug_redirects`, `article_chunks` | Votes, old-slug redirects, pgvector(768) chunks + FTS for RAG | `workspace_id` |
 | `knowledge_notes` | Private team notes; `visibility` agent_only / assistant (assistant notes reach the bot via `fn_assistant_notes`) | `workspace_id` |
@@ -149,7 +153,17 @@ Main RPCs:
 
 Triggers: `fn_auto_assign_conversation_on_create` (least-loaded online agent), `handle_new_message` (bumps `updated_at`, reopens on a visitor message, assigns on the first agent reply), `fn_conversation_resolution_bookkeeping`, and `fn_protect_agent_super_admin`.
 
-**Isolation model:** RLS is meant to scope authenticated users to `current_user_workspace_ids()`. The widget runs as `anon`, and anon policies on `conversations`, `messages`, `visitors` and `agents` are currently wide open (see `docs/AUDIT.md`). Server code that uses `serviceClient()` bypasses RLS completely, so those call sites must check tenancy themselves.
+**Isolation model:** RLS scopes authenticated users to `current_user_workspace_ids()` (and, for ticket tables, `fn_ticket_member()`). The widget runs as `anon`, and anon policies on `conversations`, `messages`, `visitors` and `agents` are still wide open (`docs/AUDIT.md` H-3). Ticket tables have no anon policy at all. Server code that uses `serviceClient()` bypasses RLS completely, so those call sites must check tenancy themselves. Agents cannot change their own `workspace_id` or role (a trigger guards it), so membership comes only from owning a workspace or an admin's invite.
+
+**Ticketing rules live in the database** (`supabase/migrations/20261009110000_ticketing.sql`), so they hold for every writer: the widget, the bot, the old inbox and the ticket screens.
+- New conversations get a ticket, and the first customer line becomes its subject.
+- `new → open` when an agent replies publicly or the ticket is assigned.
+- A customer reply reopens a pending or solved ticket.
+- `fn_close_solved_tickets()` closes tickets that have been solved for 4 days. It is run daily by `/api/cron/close-solved-tickets`, which needs `CRON_SECRET`; the schedule is in `vercel.json`.
+- Closed tickets are read-only. A new message on that conversation opens a linked follow-up ticket instead.
+- Merging and search go through `fn_merge_tickets` and `fn_search_tickets`.
+- Ticket status, priority, assignee and tags are kept in sync with the conversation's `status`/`priority`/`assigned_agent_id`/`tags`, so older code that writes conversations keeps working.
+- Don't write ticket numbers, links or `ticket_events` from application code.
 
 ---
 
@@ -168,6 +182,7 @@ Follow the patterns already in the code:
 - **Comments**: explain *why*, often in multi-line prose blocks above a function or SQL statement (see `src/lib/supabase/service.ts` and the migrations). Keep that style; don't narrate *what* the code does.
 - **Migrations**: `supabase/migrations/YYYYMMDDHHMMSS_snake_description.sql`. Start with a comment block explaining the problem being fixed. Make every migration idempotent (`ADD COLUMN IF NOT EXISTS`, `CREATE OR REPLACE FUNCTION`, `DROP POLICY IF EXISTS` before `CREATE POLICY`). `SECURITY DEFINER` functions must `SET search_path = public` and must check `auth.uid()` membership themselves. Never decide privilege from `current_user` inside a definer function, because it is always the owner. Grant `EXECUTE` explicitly and revoke it from `PUBLIC`/`anon` for anything that isn't meant for the widget.
 - **AI code**: every model call goes through `chat()` in `src/lib/ai/provider.ts` with a `ProviderConfig` built by `providerConfigFrom(workspace.ai_settings)`, and each caller must have a deterministic fallback for when no provider is configured. Auto-replies must stay idempotent: `reply_to_message_id` plus the unique indexes on `messages`.
+- **Tickets**: the UI is `src/components/tickets/` (rendered as the dashboard's `tickets` view) and the server actions are `src/app/actions/tickets.ts`, which guard every call with `assertTicketAccess`. View filters and sorting live in `src/lib/tickets/views.ts`; both the list and the per-view counts use `applyTicketFilters`, so they can't disagree. Run anything a user saved through `normalizeFilters` first. Add a status rule as a trigger plus a case in `ticket-rules.db.test.ts`, not as app code.
 - **Bot pipeline** (`generateHelpDeskResponseWithHandover` in `src/lib/ai/anthropic.ts`): every visitor message is first classified by `classifyVisitorIntent` (`src/lib/ai/intent.ts`) into `help_center_question`, `account_specific`, `small_talk`, `out_of_scope` or `wants_human`. Help-center answers come only from published articles, are cited by code (never by the model), and are not attempted when retrieval confidence is low; the bot offers a person instead. If you change a handoff-offer template, keep `HANDOFF_OFFER` matching it (a test checks this), or a visitor's "yes" won't be understood. Add new sample messages to `intent.test.ts` when you change a rule.
 - **Errors**: log with a bracketed tag (`console.error('[Auto-Close Error]:', err)`). Don't swallow errors silently in new code. Check `{ error }` on every Supabase call that writes.
 - **Git**: commit messages in this repo are not descriptive. Write clear, imperative ones. Don't commit `env.download`, `tsconfig.tsbuildinfo` changes or scratch scripts with keys.
