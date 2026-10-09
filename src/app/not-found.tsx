@@ -13,7 +13,7 @@ export default function NotFound() {
   return (
     <div className="min-h-screen bg-canvas text-ink flex flex-col justify-between selection:bg-accent/20">
       {/* Header */}
-      <header className="border-b border-line bg-surface/80 backdrop-blur-md sticky top-0 z-40">
+      <header className="border-b border-line bg-surface sticky top-0 z-40">
         <div className="u-container h-16 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2">
             <Logo size={32} />
@@ -38,16 +38,16 @@ export default function NotFound() {
             <div className="w-20 h-20 rounded-3xl bg-accent/10 border border-accent/20 text-accent flex items-center justify-center shadow-xs">
               <Compass className="w-10 h-10 stroke-[1.75] animate-pulse" />
             </div>
-            <span className="absolute -bottom-2.5 px-3 py-0.5 rounded-full text-[11px] font-bold tracking-wider uppercase bg-surface border border-line shadow-xs text-accent">
+            <span className="absolute -bottom-2.5 px-3 py-0.5 rounded-full text-2xs font-bold tracking-wider uppercase bg-surface border border-line shadow-xs text-accent">
               Error 404
             </span>
           </div>
 
           <div className="space-y-3">
-            <h1 className="text-[2.25rem] sm:text-[3rem] font-bold tracking-tight text-ink">
+            <h1 className="text-4xl sm:text-5xl font-bold tracking-tight text-ink">
               Page not found
             </h1>
-            <p className="text-[15px] sm:text-[16px] text-ink-2 max-w-md mx-auto leading-relaxed">
+            <p className="text-md sm:text-base text-ink-2 max-w-md mx-auto leading-relaxed">
               The page you are looking for doesn&apos;t exist, has been moved, or is temporarily unavailable.
             </p>
           </div>
@@ -82,10 +82,10 @@ export default function NotFound() {
 
           {/* Helpful Navigation Card */}
           <div className="card p-5 text-left max-w-md mx-auto space-y-2.5">
-            <span className="text-[12px] font-semibold text-ink-3 uppercase tracking-wider block">
+            <span className="text-xs font-semibold text-ink-3 uppercase tracking-wider block">
               Quick links
             </span>
-            <div className="grid grid-cols-2 gap-2 text-[13.5px]">
+            <div className="grid grid-cols-2 gap-2 text-ui">
               <Link
                 href="/#product"
                 className="text-ink-2 hover:text-accent transition-colors flex items-center gap-1.5"
@@ -117,7 +117,7 @@ export default function NotFound() {
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-line py-6 text-center text-[12.5px] text-ink-3">
+      <footer className="border-t border-line py-6 text-center text-xs text-ink-3">
         <div className="u-container flex flex-col sm:flex-row items-center justify-between gap-3">
           <span>&copy; {new Date().getFullYear()} Zen-try Inc. All rights reserved.</span>
           <div className="flex items-center gap-4">

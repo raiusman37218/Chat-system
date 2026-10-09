@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useEffect } from 'react';
-import { Globe, Mail, MessageCircle, X } from 'lucide-react';
+import React from 'react';
+import { Globe, Mail, MessageCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { CHANNEL_LABEL, PRIORITY_LABEL, STATUS_LABEL } from '@/lib/tickets/views';
 import type { TicketChannel, TicketPriority, TicketStatus } from '@/types/database';
@@ -19,7 +19,7 @@ export function StatusBadge({ status, className }: { status: TicketStatus; class
   return (
     <span
       className={cn(
-        'inline-flex items-center px-2 h-5 rounded-md border text-[10.5px] font-bold uppercase tracking-wide whitespace-nowrap',
+        'inline-flex items-center px-2 h-5 rounded-md border text-2xs font-bold uppercase tracking-wide whitespace-nowrap',
         STATUS_STYLE[status],
         className
       )}
@@ -38,7 +38,7 @@ const PRIORITY_DOT: Record<TicketPriority, string> = {
 
 export function PriorityLabel({ priority, className }: { priority: TicketPriority; className?: string }) {
   return (
-    <span className={cn('inline-flex items-center gap-1.5 text-[12px] text-ink-2 whitespace-nowrap', className)}>
+    <span className={cn('inline-flex items-center gap-1.5 text-xs text-ink-2 whitespace-nowrap', className)}>
       <span className={cn('w-2 h-2 rounded-full', PRIORITY_DOT[priority])} aria-hidden />
       {PRIORITY_LABEL[priority]}
     </span>
@@ -87,7 +87,7 @@ export function ChipGroup<T extends string>({
 }) {
   return (
     <fieldset>
-      <legend className="text-[11.5px] font-semibold text-ink-2 mb-1.5">{label}</legend>
+      <legend className="text-xs font-semibold text-ink-2 mb-1.5">{label}</legend>
       <div className="flex flex-wrap gap-1.5">
         {options.map((o) => {
           const active = value.includes(o.value);
@@ -98,7 +98,7 @@ export function ChipGroup<T extends string>({
               aria-pressed={active}
               onClick={() => onChange(active ? value.filter((v) => v !== o.value) : [...value, o.value])}
               className={cn(
-                'px-2.5 h-7 rounded-lg border text-[12px] font-medium transition-colors',
+                'px-2.5 h-7 rounded-lg border text-xs font-medium transition-colors',
                 active ? 'bg-accent-soft border-accent-line text-accent' : 'bg-surface border-line text-ink-2 hover:bg-surface-2'
               )}
             >
@@ -111,61 +111,17 @@ export function ChipGroup<T extends string>({
   );
 }
 
-export function Modal({
-  title,
-  onClose,
-  children,
-  footer,
-  wide,
-}: {
-  title: string;
-  onClose: () => void;
-  children: React.ReactNode;
-  footer?: React.ReactNode;
-  wide?: boolean;
-}) {
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
+/** Ticket and team dialogs use the shared modal (focus trap, Esc, glass surface). */
+export { Modal } from '@/components/ui/Modal';
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-overlay animate-fade" onMouseDown={onClose}>
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label={title}
-        onMouseDown={(e) => e.stopPropagation()}
-        className={cn(
-          'w-full max-h-[90vh] flex flex-col rounded-2xl bg-surface border border-line shadow-xl animate-pop',
-          wide ? 'max-w-2xl' : 'max-w-md'
-        )}
-      >
-        <div className="flex items-center justify-between px-5 h-14 border-b border-line shrink-0">
-          <h2 className="text-[15px] font-bold text-ink">{title}</h2>
-          <button type="button" onClick={onClose} className="btn btn-ghost btn-icon" aria-label="Close">
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-        <div className="px-5 py-4 overflow-y-auto space-y-4">{children}</div>
-        {footer && <div className="px-5 py-3 border-t border-line flex justify-end gap-2 shrink-0">{footer}</div>}
-      </div>
-    </div>
-  );
-}
-
-export const inputClass =
-  'w-full h-9 px-3 rounded-lg border border-line-2 bg-surface text-[13px] text-ink placeholder:text-ink-3 focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent-soft';
-
-export const selectClass = cn(inputClass, 'pr-8');
+export { inputClass, selectClass } from '@/components/ui/Input';
 
 export function Field({ label, children, hint }: { label: string; children: React.ReactNode; hint?: string }) {
   return (
     <label className="block">
-      <span className="block text-[11.5px] font-semibold text-ink-2 mb-1">{label}</span>
+      <span className="field-label">{label}</span>
       {children}
-      {hint && <span className="block text-[11px] text-ink-3 mt-1">{hint}</span>}
+      {hint && <span className="block text-2xs text-ink-3 mt-1">{hint}</span>}
     </label>
   );
 }

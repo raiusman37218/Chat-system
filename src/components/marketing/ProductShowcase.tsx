@@ -81,15 +81,15 @@ function Bubble({
         <div
           className={
             out
-              ? 'rounded-2xl rounded-br-md bg-bubble-out text-bubble-out-ink px-3.5 py-2.5 text-[12.5px] leading-relaxed shadow-sm'
-              : 'rounded-2xl rounded-bl-md bg-surface-2 border border-line px-3.5 py-2.5 text-[12.5px] leading-relaxed text-ink'
+              ? 'rounded-2xl rounded-br-md bg-bubble-out text-bubble-out-ink px-3.5 py-2.5 text-xs leading-relaxed shadow-sm'
+              : 'rounded-2xl rounded-bl-md bg-surface-2 border border-line px-3.5 py-2.5 text-xs leading-relaxed text-ink'
           }
         >
           {children}
         </div>
         {meta ? (
           <div
-            className={`mt-1 flex items-center gap-1 text-[10px] text-ink-3 ${
+            className={`mt-1 flex items-center gap-1 text-2xs text-ink-3 ${
               out ? 'justify-end' : ''
             }`}
           >
@@ -113,7 +113,7 @@ export function ProductShowcase() {
             <span className="w-2.5 h-2.5 rounded-full bg-line-3" />
           </div>
           <div className="flex-1 flex justify-center">
-            <div className="px-3 py-1 rounded-md bg-surface border border-line text-[10.5px] text-ink-3 font-mono">
+            <div className="px-3 py-1 rounded-md bg-surface border border-line text-2xs text-ink-3 font-mono">
               zen-try.site/dashboard
             </div>
           </div>
@@ -124,14 +124,14 @@ export function ProductShowcase() {
           {/* Rail */}
           <div className="hidden sm:flex w-[172px] flex-col border-r border-line bg-surface-2 p-3 gap-4">
             <div className="flex items-center gap-2 px-1">
-              <div className="w-6 h-6 rounded-lg bg-ink text-ink-inv flex items-center justify-center text-[11px] font-bold">
+              <div className="w-6 h-6 rounded-lg bg-ink text-ink-inv flex items-center justify-center text-2xs font-bold">
                 L
               </div>
               <div className="min-w-0">
-                <div className="text-[11px] font-semibold text-ink truncate">
+                <div className="text-2xs font-semibold text-ink truncate">
                   Lumen Outdoor Co.
                 </div>
-                <div className="text-[9.5px] text-ink-3 truncate">
+                <div className="text-2xs text-ink-3 truncate">
                   lumenoutdoor.com
                 </div>
               </div>
@@ -141,7 +141,7 @@ export function ProductShowcase() {
               {NAV.map(({ Icon, label, count, active }) => (
                 <div
                   key={label}
-                  className={`flex items-center justify-between px-2 py-1.5 rounded-lg text-[11.5px] font-medium ${
+                  className={`flex items-center justify-between px-2 py-1.5 rounded-lg text-xs font-medium ${
                     active
                       ? 'bg-surface text-ink shadow-xs border border-line'
                       : 'text-ink-2'
@@ -152,14 +152,14 @@ export function ProductShowcase() {
                     {label}
                   </span>
                   {count ? (
-                    <span className="text-[10px] text-ink-3">{count}</span>
+                    <span className="text-2xs text-ink-3">{count}</span>
                   ) : null}
                 </div>
               ))}
             </div>
 
             <div className="mt-auto rounded-xl border border-line bg-surface p-2.5">
-              <div className="flex items-center gap-1.5 text-[10px] font-semibold text-success">
+              <div className="flex items-center gap-1.5 text-2xs font-semibold text-success">
                 <span className="live-dot" />
                 38 online now
               </div>
@@ -178,7 +178,7 @@ export function ProductShowcase() {
           {/* Thread list */}
           <div className="w-[196px] shrink-0 border-r border-line flex flex-col">
             <div className="p-2.5 border-b border-line">
-              <div className="flex items-center gap-1.5 h-7 px-2 rounded-lg bg-surface-2 border border-line text-[10.5px] text-ink-3">
+              <div className="flex items-center gap-1.5 h-7 px-2 rounded-lg bg-surface-2 border border-line text-2xs text-ink-3">
                 <Search className="w-3 h-3" />
                 Search conversations
               </div>
@@ -193,7 +193,7 @@ export function ProductShowcase() {
                 >
                   <div className="relative shrink-0">
                     <div
-                      className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-semibold text-white"
+                      className="w-7 h-7 rounded-full flex items-center justify-center text-2xs font-semibold text-white"
                       style={{ background: t.tint }}
                     >
                       {t.initial}
@@ -204,19 +204,19 @@ export function ProductShowcase() {
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-baseline justify-between gap-1">
-                      <span className="text-[11.5px] font-semibold text-ink truncate">
+                      <span className="text-xs font-semibold text-ink truncate">
                         {t.name}
                       </span>
-                      <span className="text-[9.5px] text-ink-3 shrink-0">
+                      <span className="text-2xs text-ink-3 shrink-0">
                         {t.time}
                       </span>
                     </div>
-                    <p className="text-[10.5px] text-ink-2 truncate mt-0.5">
+                    <p className="text-2xs text-ink-2 truncate mt-0.5">
                       {t.snippet}
                     </p>
                   </div>
                   {t.unread > 0 && (
-                    <span className="self-center shrink-0 min-w-[16px] h-4 px-1 rounded-full bg-accent text-white text-[9px] font-bold flex items-center justify-center">
+                    <span className="self-center shrink-0 min-w-[16px] h-4 px-1 rounded-full bg-accent text-white text-2xs font-bold flex items-center justify-center">
                       {t.unread}
                     </span>
                   )}
@@ -229,14 +229,14 @@ export function ProductShowcase() {
           <div className="flex-1 flex flex-col min-w-0">
             <div className="h-12 px-4 flex items-center justify-between border-b border-line">
               <div className="flex items-center gap-2.5 min-w-0">
-                <div className="w-7 h-7 rounded-full bg-accent text-white flex items-center justify-center text-[11px] font-semibold">
+                <div className="w-7 h-7 rounded-full bg-accent text-white flex items-center justify-center text-2xs font-semibold">
                   M
                 </div>
                 <div className="min-w-0">
-                  <div className="text-[12px] font-semibold text-ink leading-tight">
+                  <div className="text-xs font-semibold text-ink leading-tight">
                     Maya Chandra
                   </div>
-                  <div className="text-[10px] text-ink-3 flex items-center gap-1 truncate">
+                  <div className="text-2xs text-ink-3 flex items-center gap-1 truncate">
                     <span className="live-dot" />
                     Viewing /products/ridgeline-2p-tent
                   </div>
@@ -276,12 +276,12 @@ export function ProductShowcase() {
                   <span />
                   <span />
                 </span>
-                <span className="text-[10px]">Maya is typing…</span>
+                <span className="text-2xs">Maya is typing…</span>
               </div>
             </div>
 
             <div className="p-3 border-t border-line">
-              <div className="flex items-center gap-2 h-9 px-3 rounded-xl border border-line bg-surface-2 text-[11px] text-ink-3">
+              <div className="flex items-center gap-2 h-9 px-3 rounded-xl border border-line bg-surface-2 text-2xs text-ink-3">
                 <span className="flex-1">Reply to Maya…</span>
                 <span className="kbd">Enter</span>
               </div>
@@ -297,7 +297,7 @@ export function ProductShowcase() {
           <span className="text-2xl font-semibold tracking-tight text-ink">
             18s
           </span>
-          <span className="inline-flex items-center gap-0.5 text-[11px] font-semibold text-success">
+          <span className="inline-flex items-center gap-0.5 text-2xs font-semibold text-success">
             <ArrowUpRight className="w-3 h-3" />
             41%
           </span>

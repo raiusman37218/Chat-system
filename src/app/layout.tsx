@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { PwaRegistrar } from "@/components/pwa/PwaRegistrar";
+import { ToastProvider } from "@/components/ui/Toast";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -90,7 +91,7 @@ export default function RootLayout({
       </head>
       <body className="min-h-full bg-canvas text-ink">
         <PwaRegistrar />
-        {children}
+        <ToastProvider>{children}</ToastProvider>
       </body>
     </html>
   );

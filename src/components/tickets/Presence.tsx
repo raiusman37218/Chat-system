@@ -76,8 +76,8 @@ export function CollisionBanner({ others }: { others: TicketPresence[] }) {
       aria-live="polite"
       className={
         urgent
-          ? 'px-4 py-2 bg-warn-soft border-b border-warn-line text-[12.5px] text-ink flex items-center gap-2 shrink-0'
-          : 'px-4 py-2 bg-surface-2 border-b border-line text-[12.5px] text-ink-2 flex items-center gap-2 shrink-0'
+          ? 'px-4 py-2 bg-warn-soft border-b border-warn-line text-xs text-ink flex items-center gap-2 shrink-0'
+          : 'px-4 py-2 bg-surface-2 border-b border-line text-xs text-ink-2 flex items-center gap-2 shrink-0'
       }
     >
       {urgent ? <PenLine className="w-3.5 h-3.5 shrink-0 text-warn" /> : <Eye className="w-3.5 h-3.5 shrink-0" />}

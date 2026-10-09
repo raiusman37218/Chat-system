@@ -304,7 +304,7 @@ export function IntegrationsSettings({
     return (
       <div className="flex-1 h-screen flex flex-col items-center justify-center gap-3">
         <span className="w-6 h-6 rounded-full border-2 border-accent border-t-transparent animate-spin" />
-        <p className="text-[13px] text-ink-3 font-medium">Loading integrations…</p>
+        <p className="text-ui text-ink-3 font-medium">Loading integrations…</p>
       </div>
     );
   }
@@ -314,13 +314,13 @@ export function IntegrationsSettings({
       {!embedded && (
       <>
       {/* Header */}
-      <div className="sticky top-0 z-20 px-8 py-5 border-b border-line bg-surface/90 backdrop-blur-md flex items-center justify-between">
+      <div className="sticky top-0 z-20 px-8 py-5 border-b border-line bg-surface flex items-center justify-between">
         <div>
-          <h1 className="text-[1.35rem] font-semibold tracking-tight text-ink flex items-center gap-2.5">
+          <h1 className="text-2xl font-semibold tracking-tight text-ink flex items-center gap-2.5">
             <Share2 className="w-5 h-5 text-accent" />
             Integrations & Omnichannel Hub
           </h1>
-          <p className="mt-0.5 text-[13px] text-ink-3">
+          <p className="mt-0.5 text-ui text-ink-3">
             Connect your LangGraph AI agent and sync customer messages from WhatsApp, Facebook, Instagram and LinkedIn.
           </p>
         </div>
@@ -369,7 +369,7 @@ export function IntegrationsSettings({
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id as any)}
-                className={`flex items-center gap-2 px-4 py-3 text-[13px] font-medium border-b-2 transition-colors -mb-px ${
+                className={`flex items-center gap-2 px-4 py-3 text-ui font-medium border-b-2 transition-colors -mb-px ${
                   active
                     ? tab.activeClass
                     : 'border-transparent text-ink-3 hover:text-ink hover:border-line-2'
@@ -392,17 +392,17 @@ export function IntegrationsSettings({
             <div className="card p-6 space-y-5">
               <div className="flex items-start justify-between">
                 <div>
-                  <h3 className="text-[15px] font-semibold text-ink flex items-center gap-2">
+                  <h3 className="text-md font-semibold text-ink flex items-center gap-2">
                     <Phone className="w-4 h-4 text-[#25D366]" />
                     WhatsApp Business Cloud API
                   </h3>
-                  <p className="mt-1 text-[12.5px] text-ink-3 max-w-2xl">
+                  <p className="mt-1 text-xs text-ink-3 max-w-2xl">
                     Receive and reply to WhatsApp messages from your official business number inside Zen-try. Powered by Meta Cloud API.
                   </p>
                 </div>
 
                 <label className="flex items-center gap-2.5 cursor-pointer select-none">
-                  <span className="text-[12.5px] font-medium text-ink-2">Enable WhatsApp</span>
+                  <span className="text-xs font-medium text-ink-2">Enable WhatsApp</span>
                   <input
                     type="checkbox"
                     checked={formData.whatsapp_enabled}
@@ -422,7 +422,7 @@ export function IntegrationsSettings({
                     onChange={(e) => setFormData({ ...formData, whatsapp_phone_number_id: e.target.value })}
                     className="input"
                   />
-                  <p className="mt-1 text-[11.5px] text-ink-3">
+                  <p className="mt-1 text-xs text-ink-3">
                     Found in Meta for Developers &gt; WhatsApp &gt; API Setup &gt; Phone number ID.
                   </p>
                 </div>
@@ -436,7 +436,7 @@ export function IntegrationsSettings({
                     onChange={(e) => setFormData({ ...formData, whatsapp_access_token: e.target.value })}
                     className="input"
                   />
-                  <p className="mt-1 text-[11.5px] text-ink-3">
+                  <p className="mt-1 text-xs text-ink-3">
                     Generate a permanent token with <code>whatsapp_business_messaging</code> and <code>whatsapp_business_management</code> permissions.
                   </p>
                 </div>
@@ -456,15 +456,15 @@ export function IntegrationsSettings({
 
             {/* Meta Webhook Setup Instructions */}
             <div className="panel p-5 space-y-3">
-              <h4 className="text-[13.5px] font-semibold text-ink">Webhook Setup in Meta Developer Dashboard</h4>
-              <p className="text-[12px] text-ink-3 leading-relaxed">
+              <h4 className="text-ui font-semibold text-ink">Webhook Setup in Meta Developer Dashboard</h4>
+              <p className="text-xs text-ink-3 leading-relaxed">
                 Copy and paste these exact settings into Meta for Developers &gt; WhatsApp &gt; Configuration &gt; Callback URL:
               </p>
 
               <div className="space-y-2">
                 <div>
-                  <span className="text-[11px] font-semibold text-ink-3 uppercase">Callback URL</span>
-                  <div className="flex items-center justify-between p-2.5 rounded-xl bg-surface-2 border border-line font-mono text-[12px] mt-1">
+                  <span className="text-2xs font-semibold text-ink-3 uppercase">Callback URL</span>
+                  <div className="flex items-center justify-between p-2.5 rounded-xl bg-surface-2 border border-line font-mono text-xs mt-1">
                     <span className="text-ink truncate">{metaWebhookUrl}</span>
                     <button
                       type="button"
@@ -478,8 +478,8 @@ export function IntegrationsSettings({
                 </div>
 
                 <div>
-                  <span className="text-[11px] font-semibold text-ink-3 uppercase">Verify Token</span>
-                  <div className="flex items-center justify-between p-2.5 rounded-xl bg-surface-2 border border-line font-mono text-[12px] mt-1">
+                  <span className="text-2xs font-semibold text-ink-3 uppercase">Verify Token</span>
+                  <div className="flex items-center justify-between p-2.5 rounded-xl bg-surface-2 border border-line font-mono text-xs mt-1">
                     <span className="text-ink">{formData.meta_verify_token || 'zentry_meta_verify_secret'}</span>
                     <button
                       type="button"
@@ -493,7 +493,7 @@ export function IntegrationsSettings({
                 </div>
               </div>
 
-              <p className="text-[11.5px] text-ink-3 pt-1">
+              <p className="text-xs text-ink-3 pt-1">
                 Under Webhook fields, click <strong>Manage</strong> and subscribe to <code>messages</code>.
               </p>
             </div>
@@ -506,17 +506,17 @@ export function IntegrationsSettings({
             <div className="card p-6 space-y-5">
               <div className="flex items-start justify-between">
                 <div>
-                  <h3 className="text-[15px] font-semibold text-ink flex items-center gap-2">
+                  <h3 className="text-md font-semibold text-ink flex items-center gap-2">
                     <Globe className="w-4 h-4 text-[#0084FF]" />
                     Facebook Messenger & Instagram Direct
                   </h3>
-                  <p className="mt-1 text-[12.5px] text-ink-3 max-w-2xl">
+                  <p className="mt-1 text-xs text-ink-3 max-w-2xl">
                     Unified inbox for customer inquiries from your Facebook Business Page and Instagram professional profile.
                   </p>
                 </div>
 
                 <label className="flex items-center gap-2.5 cursor-pointer select-none">
-                  <span className="text-[12.5px] font-medium text-ink-2">Enable Meta Channels</span>
+                  <span className="text-xs font-medium text-ink-2">Enable Meta Channels</span>
                   <input
                     type="checkbox"
                     checked={formData.meta_enabled}
@@ -536,7 +536,7 @@ export function IntegrationsSettings({
                     onChange={(e) => setFormData({ ...formData, meta_page_access_token: e.target.value })}
                     className="input"
                   />
-                  <p className="mt-1 text-[11.5px] text-ink-3">
+                  <p className="mt-1 text-xs text-ink-3">
                     Page token with <code>pages_messaging</code> and <code>instagram_manage_messages</code> permissions.
                   </p>
                 </div>
@@ -555,11 +555,11 @@ export function IntegrationsSettings({
             </div>
 
             <div className="panel p-5 space-y-3">
-              <h4 className="text-[13.5px] font-semibold text-ink">Webhook Configuration</h4>
-              <p className="text-[12px] text-ink-3">
+              <h4 className="text-ui font-semibold text-ink">Webhook Configuration</h4>
+              <p className="text-xs text-ink-3">
                 In your Meta Developer App, configure the Messenger and Instagram webhooks using the same endpoint:
               </p>
-              <div className="flex items-center justify-between p-2.5 rounded-xl bg-surface-2 border border-line font-mono text-[12px]">
+              <div className="flex items-center justify-between p-2.5 rounded-xl bg-surface-2 border border-line font-mono text-xs">
                 <span className="text-ink truncate">{metaWebhookUrl}</span>
                 <button
                   type="button"
@@ -580,17 +580,17 @@ export function IntegrationsSettings({
             <div className="card p-6 space-y-5">
               <div className="flex items-start justify-between">
                 <div>
-                  <h3 className="text-[15px] font-semibold text-ink flex items-center gap-2">
+                  <h3 className="text-md font-semibold text-ink flex items-center gap-2">
                     <Link2 className="w-4 h-4 text-[#0A66C2]" />
                     LinkedIn Messaging API
                   </h3>
-                  <p className="mt-1 text-[12.5px] text-ink-3 max-w-2xl">
+                  <p className="mt-1 text-xs text-ink-3 max-w-2xl">
                     Manage LinkedIn page direct messages inside your Zen-try inbox.
                   </p>
                 </div>
 
                 <label className="flex items-center gap-2.5 cursor-pointer select-none">
-                  <span className="text-[12.5px] font-medium text-ink-2">Enable LinkedIn</span>
+                  <span className="text-xs font-medium text-ink-2">Enable LinkedIn</span>
                   <input
                     type="checkbox"
                     checked={formData.linkedin_enabled}
@@ -626,8 +626,8 @@ export function IntegrationsSettings({
             </div>
 
             <div className="panel p-5 space-y-3">
-              <h4 className="text-[13.5px] font-semibold text-ink">LinkedIn Webhook Endpoint</h4>
-              <div className="flex items-center justify-between p-2.5 rounded-xl bg-surface-2 border border-line font-mono text-[12px]">
+              <h4 className="text-ui font-semibold text-ink">LinkedIn Webhook Endpoint</h4>
+              <div className="flex items-center justify-between p-2.5 rounded-xl bg-surface-2 border border-line font-mono text-xs">
                 <span className="text-ink truncate">{linkedinWebhookUrl}</span>
                 <button
                   type="button"
@@ -653,17 +653,17 @@ export function IntegrationsSettings({
                     <div className="w-8 h-8 rounded-lg bg-[#E01E5A]/10 text-[#E01E5A] flex items-center justify-center font-bold text-sm">
                       #
                     </div>
-                    <h3 className="text-[16px] font-semibold text-ink">
+                    <h3 className="text-base font-semibold text-ink">
                       Slack Channel Notifications
                     </h3>
                   </div>
-                  <p className="mt-1 text-[12.5px] text-ink-3 max-w-2xl">
+                  <p className="mt-1 text-xs text-ink-3 max-w-2xl">
                     Automatically post an alert to your company Slack channel whenever a customer initiates a new conversation on your website, complete with a direct button to open the ticket in your dashboard.
                   </p>
                 </div>
 
                 <label className="flex items-center gap-2.5 cursor-pointer select-none">
-                  <span className="text-[12.5px] font-medium text-ink-2">
+                  <span className="text-xs font-medium text-ink-2">
                     Enable Slack Alerts
                   </span>
                   <input
@@ -691,7 +691,7 @@ export function IntegrationsSettings({
                           slack_webhook_url: e.target.value.trim(),
                         })
                       }
-                      className="input flex-1 font-mono text-[12px]"
+                      className="input flex-1 font-mono text-xs"
                     />
                     <button
                       type="button"
@@ -709,7 +709,7 @@ export function IntegrationsSettings({
                       )}
                     </button>
                   </div>
-                  <p className="mt-1.5 text-[11.5px] text-ink-3">
+                  <p className="mt-1.5 text-xs text-ink-3">
                     Create an Incoming Webhook in your Slack workspace under <strong>Apps &rarr; Incoming Webhooks</strong> and paste the URL here.
                   </p>
                 </div>
@@ -717,10 +717,10 @@ export function IntegrationsSettings({
                 {/* Test Result Message */}
                 {slackTestResult && (
                   <div
-                    className={`p-3 rounded-xl border text-[12.5px] flex items-center gap-2 ${
+                    className={`p-3 rounded-xl border text-xs flex items-center gap-2 ${
                       slackTestResult.success
-                        ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-700 dark:text-emerald-300'
-                        : 'bg-red-500/10 border-red-500/30 text-red-700 dark:text-red-300'
+                        ? 'bg-success/10 border-success/30 text-success'
+                        : 'bg-danger/10 border-danger/30 text-danger'
                     }`}
                   >
                     {slackTestResult.success ? (
@@ -739,20 +739,20 @@ export function IntegrationsSettings({
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-lg bg-blue-500/10 text-blue-500 flex items-center justify-center">
+                    <div className="w-8 h-8 rounded-lg bg-accent/10 text-accent flex items-center justify-center">
                       <Mail className="w-4 h-4" />
                     </div>
-                    <h3 className="text-[16px] font-semibold text-ink">
+                    <h3 className="text-base font-semibold text-ink">
                       Offline Agent Email Notifications
                     </h3>
                   </div>
-                  <p className="mt-1 text-[12.5px] text-ink-3 max-w-2xl">
+                  <p className="mt-1 text-xs text-ink-3 max-w-2xl">
                     When an agent is offline or away and an assigned customer sends a reply, send an email alert to the agent with the customer's message and a direct link to reply.
                   </p>
                 </div>
 
                 <label className="flex items-center gap-2.5 cursor-pointer select-none">
-                  <span className="text-[12.5px] font-medium text-ink-2">
+                  <span className="text-xs font-medium text-ink-2">
                     Enable Offline Emails
                   </span>
                   <input

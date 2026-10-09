@@ -157,10 +157,10 @@ function LoginForm() {
   return (
     <div>
       <div className="mb-7">
-        <h1 className="text-[1.75rem] leading-tight font-semibold">
+        <h1 className="text-3xl leading-tight font-semibold">
           Welcome back
         </h1>
-        <p className="mt-2 text-[14px] text-ink-2">
+        <p className="mt-2 text-sm text-ink-2">
           Sign in to your support inbox.
         </p>
       </div>
@@ -168,7 +168,7 @@ function LoginForm() {
       {errorMsg && (
         <div
           role="alert"
-          className="mb-5 flex items-start gap-2.5 rounded-xl border border-danger-line bg-danger-soft px-3.5 py-3 text-[12.5px] text-danger animate-pop"
+          className="mb-5 flex items-start gap-2.5 rounded-xl border border-danger-line bg-danger-soft px-3.5 py-3 text-xs text-danger animate-pop"
         >
           <AlertCircle className="w-4 h-4 shrink-0 mt-px" />
           <span>{errorMsg}</span>
@@ -184,7 +184,7 @@ function LoginForm() {
             text="Continue with Google"
           />
 
-          <div className="relative my-6 text-center text-[12px] text-ink-3">
+          <div className="relative my-6 text-center text-xs text-ink-3">
             <div className="absolute inset-0 flex items-center">
               <div className="w-full border-t border-line-2" />
             </div>
@@ -263,7 +263,7 @@ function LoginForm() {
 
       <div className="mt-6 hairline" />
 
-      <div className="mt-5 flex items-center justify-between text-[12.5px]">
+      <div className="mt-5 flex items-center justify-between text-xs">
         <button
           type="button"
           onClick={handleDemoFill}

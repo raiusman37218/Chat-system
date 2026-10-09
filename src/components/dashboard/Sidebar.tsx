@@ -13,11 +13,13 @@ import {
   Settings,
   Smartphone,
   Sparkles,
+  Search,
   Ticket,
   Volume2,
   VolumeX,
 } from 'lucide-react';
 import { Agent, AgentStatus, Workspace } from '@/types/database';
+import { openCommandPalette } from './DashboardCommandPalette';
 import { sound } from '@/lib/sound';
 import { requestNotificationPermission, cn } from '@/lib/utils';
 import { Avatar } from '@/components/ui/Avatar';
@@ -90,7 +92,7 @@ export function Sidebar({
       label: 'Inbox',
       Icon: Inbox,
       badge: counts.open > 0 ? (
-        <span className="px-1.5 py-0.5 text-[10.5px] font-bold rounded-full bg-accent text-accent-ink shadow-xs">
+        <span className="px-1.5 py-0.5 text-2xs font-bold rounded-full bg-accent text-accent-ink shadow-xs">
           {counts.open}
         </span>
       ) : undefined,
@@ -102,7 +104,7 @@ export function Sidebar({
       Icon: Radio,
       badge:
         counts.liveVisitors > 0 ? (
-          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold border border-emerald-500/20">
+          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-2xs bg-success/10 text-success font-bold border border-success/20">
             <span className="live-dot" />
             {counts.liveVisitors}
           </span>
@@ -117,7 +119,7 @@ export function Sidebar({
       Icon: BookOpen,
       badge:
         counts.articles !== undefined && counts.articles > 0 ? (
-          <span className="px-1.5 py-0.5 text-[10.5px] font-medium rounded-full bg-surface-3 text-ink-2">
+          <span className="px-1.5 py-0.5 text-2xs font-medium rounded-full bg-surface-3 text-ink-2">
             {counts.articles}
           </span>
         ) : undefined,
@@ -126,7 +128,7 @@ export function Sidebar({
   ];
 
   return (
-    <aside className="w-[220px] shrink-0 h-screen flex flex-col bg-surface border-r border-line select-none relative z-10 overflow-hidden">
+    <aside className="glass w-[220px] shrink-0 h-screen flex flex-col border-r select-none relative z-10 overflow-hidden">
       {/* Workspace Identity Card */}
       <div className="p-3 border-b border-line/80">
         <div className="flex items-center justify-between gap-2.5 p-2 rounded-xl bg-surface-2/80 hover:bg-surface-2 transition-all border border-line/60">
@@ -136,20 +138,20 @@ export function Sidebar({
               seed={workspace?.id || 'zen-try'}
               color={workspace?.brand_color || undefined}
               size="sm"
-              className="shadow-xs ring-1 ring-black/5 dark:ring-white/10"
+              className="shadow-xs ring-1 ring-black/5"
             />
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-1.5">
-                <span className="text-[13px] font-bold text-ink truncate leading-tight">
+                <span className="text-ui font-bold text-ink truncate leading-tight">
                   {workspace?.name || 'Zen-try'}
                 </span>
                 {hasVisitors && (
-                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 uppercase tracking-wider">
+                  <span className="text-2xs font-bold px-1.5 py-0.5 rounded bg-success/15 text-success border border-success/30 uppercase tracking-wider">
                     Live
                   </span>
                 )}
               </div>
-              <div className="text-[11px] text-ink-3 truncate flex items-center gap-1 mt-0.5">
+              <div className="text-2xs text-ink-3 truncate flex items-center gap-1 mt-0.5">
                 <span className="truncate">{workspace?.website_url ? workspace.website_url.replace(/^https?:\/\//, '').replace(/\/+$/, '') : 'Workspace Active'}</span>
               </div>
             </div>
@@ -158,8 +160,17 @@ export function Sidebar({
       </div>
 
       {/* Navigation List */}
-      <nav className="p-3 flex-1 overflow-y-auto space-y-1">
-        <div className="px-2 py-1 text-[10px] font-bold tracking-wider uppercase text-ink-3">
+      <nav className="p-3 flex-1 overflow-y-auto space-y-1" aria-label="Main">
+        <button
+          type="button"
+          onClick={openCommandPalette}
+          className="w-full h-9 mb-2 px-2.5 rounded-lg flex items-center gap-2.5 text-ui text-ink-3 bg-surface border border-line hover:border-line-3 hover:text-ink transition-colors"
+        >
+          <Search className="w-4 h-4 shrink-0" aria-hidden="true" />
+          <span className="flex-1 text-left">Search…</span>
+          <kbd className="kbd">Ctrl K</kbd>
+        </button>
+        <div className="px-2 py-1 text-2xs font-bold tracking-wider uppercase text-ink-3">
           Menu
         </div>
         {nav.map(({ view, label, Icon, badge }) => {
@@ -170,10 +181,10 @@ export function Sidebar({
               onClick={() => onSelectView(view)}
               aria-current={active ? 'page' : undefined}
               className={cn(
-                'w-full h-9 px-2.5 rounded-lg flex items-center justify-between gap-2 text-[13px] font-medium transition-all duration-150 relative group',
+                'w-full h-9 px-2.5 rounded-lg flex items-center justify-between gap-2 text-ui font-medium transition-all duration-150 relative group',
                 active
-                  ? 'bg-accent/10 text-accent font-semibold shadow-xs'
-                  : 'text-ink-2 hover:bg-surface-2 hover:text-ink'
+                  ? 'bg-accent-soft text-accent font-semibold'
+                  : 'text-ink-2 hover:bg-surface-3/70 hover:text-ink'
               )}
             >
               {active && (
@@ -182,7 +193,7 @@ export function Sidebar({
               <span className="flex items-center gap-2.5 truncate">
                 <Icon
                   className={cn(
-                    'w-4 h-4 shrink-0 transition-transform duration-150 group-hover:scale-105',
+                    'w-4 h-4 shrink-0',
                     active ? 'text-accent' : 'text-ink-3 group-hover:text-ink'
                   )}
                 />
@@ -197,7 +208,7 @@ export function Sidebar({
       </nav>
 
       {/* Footer: Quick controls + Agent Profile */}
-      <div className="p-3 border-t border-line/80 space-y-2.5 bg-surface-2/40">
+      <div className="p-3 border-t border-line/80 space-y-2.5">
         {/* 4 Bottom Icon Buttons with Clear Tooltips */}
         <div className="flex items-center justify-between px-1.5 py-0.5 rounded-lg bg-surface-2/60 border border-line/50">
           <button
@@ -230,7 +241,7 @@ export function Sidebar({
               onClick={onOpenShortcuts}
               title="Keyboard Shortcuts Cheat Sheet (Press ?)"
               aria-label="Keyboard Shortcuts"
-              className="w-7 h-7 rounded-md flex items-center justify-center text-ink-3 hover:text-accent hover:bg-accent/10 transition-colors text-[12px] font-mono font-bold cursor-pointer"
+              className="w-7 h-7 rounded-md flex items-center justify-center text-ink-3 hover:text-accent hover:bg-accent/10 transition-colors text-xs font-mono font-bold cursor-pointer"
             >
               ?
             </button>
@@ -281,7 +292,7 @@ export function Sidebar({
               ]}
               footer={
                 <div className="pt-2 mt-1.5 border-t border-line px-2 pb-1 flex items-center justify-between">
-                  <span className="text-[11.5px] font-medium text-ink-3">Appearance</span>
+                  <span className="text-xs font-medium text-ink-3">Appearance</span>
                   <ThemeToggle className="scale-90 origin-right" />
                 </div>
               }
@@ -307,10 +318,10 @@ export function Sidebar({
                     className="shrink-0"
                   />
                   <span className="min-w-0 flex-1 text-left">
-                    <span className="block text-[12.5px] font-bold text-ink truncate leading-tight">
+                    <span className="block text-xs font-bold text-ink truncate leading-tight">
                       {agentDisplayName}
                     </span>
-                    <span className="flex items-center gap-1.5 text-[10.5px] text-ink-3 mt-0.5">
+                    <span className="flex items-center gap-1.5 text-2xs text-ink-3 mt-0.5">
                       <span
                         className="w-1.5 h-1.5 rounded-full shrink-0"
                         style={{
@@ -319,7 +330,7 @@ export function Sidebar({
                       />
                       <span className="capitalize">{currentAgent?.status || 'online'}</span>
                       <span className="text-ink-3/40">·</span>
-                      <span className="text-[10px] font-semibold text-ink-2 bg-surface-3 px-1.5 py-0.2 rounded border border-line/60">
+                      <span className="text-2xs font-semibold text-ink-2 bg-surface-3 px-1.5 py-0.2 rounded border border-line/60">
                         {agentRoleLabel}
                       </span>
                     </span>

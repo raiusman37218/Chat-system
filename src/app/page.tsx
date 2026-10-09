@@ -40,7 +40,7 @@ const STEPS = [
     title: 'Create your workspace',
     body: 'Name your business, add your site, pick a brand colour. Your agent profile is provisioned automatically.',
     detail: (
-      <div className="space-y-1.5 font-mono text-[11px]">
+      <div className="space-y-1.5 font-mono text-2xs">
         <div className="flex justify-between">
           <span className="text-ink-3">workspace</span>
           <span className="text-ink">Lumen Outdoor Co.</span>
@@ -58,14 +58,14 @@ const STEPS = [
     body: 'Brand colour, greeting, reply-time promise and launcher position — all previewed live before you publish.',
     detail: (
       <div className="space-y-2">
-        <div className="flex items-center justify-between text-[11px]">
+        <div className="flex items-center justify-between text-2xs">
           <span className="text-ink-3">Brand</span>
           <span className="flex items-center gap-1.5 font-mono text-ink">
             <span className="w-2.5 h-2.5 rounded-full bg-accent" />
             #2E5BFF
           </span>
         </div>
-        <div className="flex items-center justify-between text-[11px]">
+        <div className="flex items-center justify-between text-2xs">
           <span className="text-ink-3">Greeting</span>
           <span className="text-ink">Hi there 👋</span>
         </div>
@@ -77,7 +77,7 @@ const STEPS = [
     title: 'Paste one line, go live',
     body: 'Drop the script tag anywhere in your site. The launcher appears for every visitor, instantly.',
     detail: (
-      <div className="font-mono text-[10.5px] text-ink-2 truncate">
+      <div className="font-mono text-2xs text-ink-2 truncate">
         &lt;script src=&quot;{PRODUCTION_APP_ORIGIN}/widget.js&quot; …&gt;
       </div>
     ),
@@ -107,9 +107,9 @@ export default function HomePage() {
             <div className="max-w-3xl mx-auto text-center sm:px-14 lg:px-0">
               <a
                 href="#product"
-                className="animate-rise relative before:absolute before:inset-x-0 before:-inset-y-2 before:content-[''] inline-flex items-center gap-2 h-7 pl-1.5 pr-3 rounded-full border border-line bg-surface hover:border-accent shadow-xs text-[12px] font-medium text-ink-2 transition-all hover:scale-102"
+                className="animate-rise relative before:absolute before:inset-x-0 before:-inset-y-2 before:content-[''] inline-flex items-center gap-2 h-7 pl-1.5 pr-3 rounded-full border border-line bg-surface hover:border-accent shadow-xs text-xs font-medium text-ink-2 transition-all hover:scale-102"
               >
-                <span className="inline-flex items-center h-5 px-2 rounded-full bg-accent text-white text-[10px] font-bold tracking-wide">
+                <span className="inline-flex items-center h-5 px-2 rounded-full bg-accent text-white text-2xs font-bold tracking-wide">
                   NEW
                 </span>
                 Live visitor radar & AI Autopilot are live →
@@ -121,7 +121,7 @@ export default function HomePage() {
                 <span className="text-gradient whitespace-nowrap">actually want to use.</span>
               </h1>
 
-              <p className="animate-rise delay-2 mt-6 mx-auto max-w-xl text-[16.5px] leading-relaxed text-ink-2">
+              <p className="animate-rise delay-2 mt-6 mx-auto max-w-xl text-base leading-relaxed text-ink-2">
                 See who&apos;s on your site right now, talk to them in one shared
                 inbox, and answer before they leave. Add it to any website with a
                 single line of code.
@@ -139,7 +139,7 @@ export default function HomePage() {
                     required
                     placeholder="you@company.com"
                     aria-label="Work email"
-                    className="flex-1 min-w-0 h-11 bg-transparent px-3 text-[16px] sm:text-[14px] text-ink placeholder:text-ink-3 focus:outline-none"
+                    className="flex-1 min-w-0 h-11 bg-transparent px-3 text-base sm:text-sm text-ink placeholder:text-ink-3 focus:outline-none"
                   />
                   <button type="submit" className="btn btn-primary shrink-0 max-sm:h-11">
                     Start free
@@ -147,7 +147,7 @@ export default function HomePage() {
                   </button>
                 </form>
 
-                <div className="mt-4 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-[12.5px] text-ink-3">
+                <div className="mt-4 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-xs text-ink-3">
                   {['No credit card', 'Free forever tier', 'Live in 2 minutes'].map(
                     (t) => (
                       <span key={t} className="inline-flex items-center gap-1.5">
@@ -185,7 +185,7 @@ export default function HomePage() {
               {[...PLATFORMS, ...PLATFORMS].map((p, i) => (
                 <span
                   key={`${p}-${i}`}
-                  className="text-[17px] font-semibold tracking-tight text-ink-3 whitespace-nowrap"
+                  className="text-lg font-semibold tracking-tight text-ink-3 whitespace-nowrap"
                 >
                   {p}
                 </span>
@@ -198,7 +198,7 @@ export default function HomePage() {
         <section id="product" className="u-container py-20 sm:py-28">
           <div className="max-w-2xl">
             <span className="eyebrow">The product</span>
-            <h2 className="mt-3 text-3xl sm:text-[2.6rem] leading-[1.1] font-semibold">
+            <h2 className="mt-3 text-3xl sm:text-5xl leading-[1.1] font-semibold">
               Everything a support team needs.
               <br />
               <span className="text-ink-3">Nothing it doesn&apos;t.</span>
@@ -216,7 +216,7 @@ export default function HomePage() {
                   <h3 className="text-lg font-semibold">
                     Watch your site breathe
                   </h3>
-                  <p className="mt-2 text-[13.5px] leading-relaxed text-ink-2">
+                  <p className="mt-2 text-ui leading-relaxed text-ink-2">
                     Every visitor, live: the exact page they&apos;re reading, how
                     long they&apos;ve been there, their device and location.
                     Start the conversation before they bounce.
@@ -247,21 +247,21 @@ export default function HomePage() {
                     key={v.url}
                     className="panel p-3 flex items-center gap-3"
                   >
-                    <div className="w-8 h-8 rounded-full bg-surface border border-line flex items-center justify-center text-[11px] font-semibold text-ink-2">
+                    <div className="w-8 h-8 rounded-full bg-surface border border-line flex items-center justify-center text-2xs font-semibold text-ink-2">
                       {v.n.charAt(0)}
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1.5">
-                        <span className="text-[12px] font-semibold truncate">
+                        <span className="text-xs font-semibold truncate">
                           {v.n}
                         </span>
                         {v.live && <span className="live-dot" />}
                       </div>
-                      <div className="text-[10.5px] text-ink-3 truncate font-mono">
+                      <div className="text-2xs text-ink-3 truncate font-mono">
                         {v.url}
                       </div>
                     </div>
-                    <span className="text-[10px] text-ink-3 shrink-0 hidden sm:block">
+                    <span className="text-2xs text-ink-3 shrink-0 hidden sm:block">
                       {v.meta.split(' · ')[2]}
                     </span>
                   </div>
@@ -275,31 +275,31 @@ export default function HomePage() {
                 <Palette className="w-4.5 h-4.5" />
               </div>
               <h3 className="text-lg font-semibold">Yours, not ours</h3>
-              <p className="mt-2 text-[13.5px] leading-relaxed text-ink-2">
+              <p className="mt-2 text-ui leading-relaxed text-ink-2">
                 Colour, copy, avatar and position — the messenger inherits your
                 brand, not a vendor&apos;s.
               </p>
 
               <div className="mt-6 -mb-14 mx-auto w-[236px] rounded-2xl border border-line bg-surface shadow-lg overflow-hidden">
                 <div className="px-4 pt-4 pb-5 bg-invert text-invert-ink">
-                  <div className="w-7 h-7 rounded-full bg-white/15 flex items-center justify-center text-[11px] font-bold mb-3">
+                  <div className="w-7 h-7 rounded-full bg-white/15 flex items-center justify-center text-2xs font-bold mb-3">
                     L
                   </div>
-                  <div className="text-[15px] font-semibold">Hi there 👋</div>
-                  <div className="text-[11px] opacity-70 mt-0.5">
+                  <div className="text-md font-semibold">Hi there 👋</div>
+                  <div className="text-2xs opacity-70 mt-0.5">
                     How can we help today?
                   </div>
                 </div>
                 <div className="p-3 space-y-2">
                   <div className="rounded-xl border border-line bg-surface-2 p-2.5">
-                    <div className="text-[11.5px] font-semibold">
+                    <div className="text-xs font-semibold">
                       Send us a message
                     </div>
-                    <div className="text-[10px] text-ink-3 mt-0.5">
+                    <div className="text-2xs text-ink-3 mt-0.5">
                       Typically replies in 5m
                     </div>
                   </div>
-                  <div className="h-8 rounded-xl border border-line bg-surface-2 flex items-center px-2.5 text-[10.5px] text-ink-3">
+                  <div className="h-8 rounded-xl border border-line bg-surface-2 flex items-center px-2.5 text-2xs text-ink-3">
                     Search for help…
                   </div>
                 </div>
@@ -309,15 +309,15 @@ export default function HomePage() {
             {/* Small cells */}
             <div className="card card-hover p-6 flex flex-col justify-between">
               <div>
-                <div className="w-9 h-9 rounded-xl bg-purple-500/10 border border-purple-500/20 text-purple-600 dark:text-purple-300 flex items-center justify-center mb-4">
+                <div className="w-9 h-9 rounded-xl bg-accent/10 border border-accent/20 text-accent flex items-center justify-center mb-4">
                   <Bot className="w-4.5 h-4.5" />
                 </div>
-                <h3 className="text-[15px] font-semibold text-ink">AI Autopilot & Copilot</h3>
-                <p className="mt-1.5 text-[13px] leading-relaxed text-ink-2">
+                <h3 className="text-md font-semibold text-ink">AI Autopilot & Copilot</h3>
+                <p className="mt-1.5 text-ui leading-relaxed text-ink-2">
                   Answer routine questions 24/7, draft contextual responses for agents, and summarize threads with one click.
                 </p>
               </div>
-              <div className="mt-4 pt-3 border-t border-line/60 flex items-center gap-1.5 text-[11px] font-semibold text-purple-600 dark:text-purple-300">
+              <div className="mt-4 pt-3 border-t border-line/60 flex items-center gap-1.5 text-2xs font-semibold text-accent">
                 <Sparkles className="w-3 h-3" />
                 <span>AI auto-reply & suggestions</span>
               </div>
@@ -339,8 +339,8 @@ export default function HomePage() {
                 <div className="w-9 h-9 rounded-xl bg-surface-2 border border-line text-ink-2 flex items-center justify-center mb-4">
                   <Icon className="w-4.5 h-4.5" />
                 </div>
-                <h3 className="text-[15px] font-semibold">{title}</h3>
-                <p className="mt-1.5 text-[13px] leading-relaxed text-ink-2">
+                <h3 className="text-md font-semibold">{title}</h3>
+                <p className="mt-1.5 text-ui leading-relaxed text-ink-2">
                   {body}
                 </p>
               </div>
@@ -356,7 +356,7 @@ export default function HomePage() {
                   <h3 className="text-lg font-semibold">
                     Built for the person doing the replying
                   </h3>
-                  <p className="mt-2 text-[13.5px] leading-relaxed text-ink-2">
+                  <p className="mt-2 text-ui leading-relaxed text-ink-2">
                     Saved replies behind a <span className="kbd">/</span>{' '}
                     shortcut, private team notes the customer never sees,
                     priority and tags, assignment, and a CSAT rating collected
@@ -373,7 +373,7 @@ export default function HomePage() {
                   ].map(({ l, I }) => (
                     <span
                       key={l}
-                      className="inline-flex items-center gap-2 h-9 px-3.5 rounded-xl border border-line bg-surface-2 text-[12.5px] font-medium text-ink-2"
+                      className="inline-flex items-center gap-2 h-9 px-3.5 rounded-xl border border-line bg-surface-2 text-xs font-medium text-ink-2"
                     >
                       <I className="w-3.5 h-3.5 text-accent" />
                       {l}
@@ -390,7 +390,7 @@ export default function HomePage() {
           <div className="u-container py-20 sm:py-28">
             <div className="max-w-2xl">
               <span className="eyebrow">Setup</span>
-              <h2 className="mt-3 text-3xl sm:text-[2.6rem] leading-[1.1] font-semibold">
+              <h2 className="mt-3 text-3xl sm:text-5xl leading-[1.1] font-semibold">
                 Three steps. About two minutes.
               </h2>
             </div>
@@ -399,13 +399,13 @@ export default function HomePage() {
               {STEPS.map((s) => (
                 <div key={s.n} className="card p-6 flex flex-col">
                   <div className="flex items-center gap-3">
-                    <span className="font-mono text-[11px] font-semibold text-accent">
+                    <span className="font-mono text-2xs font-semibold text-accent">
                       {s.n}
                     </span>
                     <span className="flex-1 hairline" />
                   </div>
-                  <h3 className="mt-4 text-[16px] font-semibold">{s.title}</h3>
-                  <p className="mt-2 text-[13px] leading-relaxed text-ink-2 flex-1">
+                  <h3 className="mt-4 text-base font-semibold">{s.title}</h3>
+                  <p className="mt-2 text-ui leading-relaxed text-ink-2 flex-1">
                     {s.body}
                   </p>
                   <div className="mt-5 panel p-3">{s.detail}</div>
@@ -427,12 +427,12 @@ export default function HomePage() {
           <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
             <div>
               <span className="eyebrow">Install</span>
-              <h2 className="mt-3 text-3xl sm:text-[2.6rem] leading-[1.1] font-semibold">
+              <h2 className="mt-3 text-3xl sm:text-5xl leading-[1.1] font-semibold">
                 One tag. Every page.
               </h2>
-              <p className="mt-5 text-[15px] leading-relaxed text-ink-2 max-w-md">
+              <p className="mt-5 text-md leading-relaxed text-ink-2 max-w-md">
                 No build step, no npm install, no framework lock-in. Paste it
-                once before <code className="font-mono text-[13px] text-ink">&lt;/body&gt;</code>{' '}
+                once before <code className="font-mono text-ui text-ink">&lt;/body&gt;</code>{' '}
                 and the launcher is live for every visitor on the site.
               </p>
 
@@ -442,7 +442,7 @@ export default function HomePage() {
                     <div className="text-2xl font-semibold tracking-tight text-ink">
                       {f.value}
                     </div>
-                    <div className="mt-0.5 text-[12.5px] text-ink-3 leading-snug">
+                    <div className="mt-0.5 text-xs text-ink-3 leading-snug">
                       {f.label}
                     </div>
                   </div>
@@ -453,7 +453,7 @@ export default function HomePage() {
             <div>
               <div className="card overflow-hidden shadow-lg">
                 <div className="h-11 px-4 flex items-center justify-between border-b border-line bg-surface-2">
-                  <span className="font-mono text-[11.5px] text-ink-3">
+                  <span className="font-mono text-xs text-ink-3">
                     index.html
                   </span>
                   <span className="pill pill-accent">
@@ -473,7 +473,7 @@ export default function HomePage() {
                 {['HTML', 'WordPress', 'Shopify', 'React'].map((p) => (
                   <div
                     key={p}
-                    className="h-10 rounded-xl border border-line bg-surface-2 flex items-center justify-center text-[12.5px] font-medium text-ink-2"
+                    className="h-10 rounded-xl border border-line bg-surface-2 flex items-center justify-center text-xs font-medium text-ink-2"
                   >
                     {p}
                   </div>
@@ -497,11 +497,11 @@ export default function HomePage() {
               }}
             />
             <div className="relative">
-              <h2 className="text-3xl sm:text-[2.75rem] leading-[1.08] font-semibold text-invert-ink">
+              <h2 className="text-3xl sm:text-5xl leading-[1.08] font-semibold text-invert-ink">
                 Your next customer is
                 <br className="hidden sm:block" /> on the site right now.
               </h2>
-              <p className="mt-5 mx-auto max-w-md text-[15px] leading-relaxed opacity-70">
+              <p className="mt-5 mx-auto max-w-md text-md leading-relaxed opacity-70">
                 Set up a workspace, paste one line, and start the conversation
                 before they close the tab.
               </p>
@@ -533,7 +533,7 @@ export default function HomePage() {
           <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-4">
             <div className="lg:col-span-2 max-w-xs">
               <Logo size={32} />
-              <p className="mt-4 text-[13px] leading-relaxed text-ink-2">
+              <p className="mt-4 text-ui leading-relaxed text-ink-2">
                 Real-time human support for any website.
               </p>
               <div className="mt-5">
@@ -568,7 +568,7 @@ export default function HomePage() {
                     <li key={href}>
                       <Link
                         href={href}
-                        className="text-[13px] text-ink-2 hover:text-ink transition-colors"
+                        className="text-ui text-ink-2 hover:text-ink transition-colors"
                       >
                         {label}
                       </Link>
@@ -579,7 +579,7 @@ export default function HomePage() {
             ))}
           </div>
 
-          <div className="mt-12 pt-6 border-t border-line flex flex-col sm:flex-row items-center justify-between gap-3 text-[12.5px] text-ink-3">
+          <div className="mt-12 pt-6 border-t border-line flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-ink-3">
             <span>© {new Date().getFullYear()} Zen-try. All rights reserved.</span>
             <span className="inline-flex items-center gap-1.5">
               <span className="live-dot" />

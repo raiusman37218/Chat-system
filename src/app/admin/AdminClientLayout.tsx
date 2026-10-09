@@ -40,26 +40,26 @@ export function AdminClientLayout({
     <div className="flex flex-col h-screen bg-canvas overflow-hidden">
       {/* Super Admin Switch Banner */}
       {isSwitched && (
-        <div className="bg-gradient-to-r from-purple-700 via-indigo-700 to-purple-800 text-white px-6 py-2.5 text-xs font-semibold flex items-center justify-between shadow-md z-30 shrink-0">
+        <div className="bg-accent text-white px-6 py-2.5 text-xs font-semibold flex items-center justify-between shadow-md z-30 shrink-0">
           <div className="flex items-center gap-2.5">
-            <span className="flex h-2 w-2 rounded-full bg-amber-400 animate-ping" />
-            <ShieldAlert className="w-4 h-4 text-amber-300" />
+            <span className="flex h-2 w-2 rounded-full bg-warn animate-ping" />
+            <ShieldAlert className="w-4 h-4 text-warn" />
             <span>
               Viewing as super admin: <strong className="underline underline-offset-2">{currentWorkspace.name}</strong>{' '}
-              <span className="opacity-80 font-mono text-[11px]">({currentWorkspace.id})</span>
+              <span className="opacity-80 font-mono text-2xs">({currentWorkspace.id})</span>
             </span>
           </div>
           <div className="flex items-center gap-3">
             <Link
               href="/dashboard"
-              className="px-3 py-1 rounded-lg bg-white/20 hover:bg-white/30 text-white text-[11.5px] font-bold flex items-center gap-1.5 transition-colors"
+              className="px-3 py-1 rounded-lg bg-white/20 hover:bg-white/30 text-white text-xs font-bold flex items-center gap-1.5 transition-colors"
             >
               <span>Open Workspace Inbox</span>
               <ExternalLink className="w-3 h-3" />
             </Link>
             <button
               onClick={handleExitSwitch}
-              className="px-3 py-1 rounded-lg bg-red-500/80 hover:bg-red-600 text-white text-[11.5px] font-bold flex items-center gap-1.5 transition-colors"
+              className="px-3 py-1 rounded-lg bg-danger/80 hover:bg-danger text-white text-xs font-bold flex items-center gap-1.5 transition-colors"
             >
               <LogOut className="w-3 h-3" />
               <span>Exit Super Admin View</span>

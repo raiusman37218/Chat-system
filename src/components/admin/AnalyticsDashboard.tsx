@@ -62,13 +62,13 @@ function KpiEmpty({
 }) {
   return (
     <div className="space-y-1.5">
-      <p className="text-[11.5px] text-ink-3 leading-snug">{meaning}</p>
-      <p className="text-[11.5px] text-ink-2 leading-snug">{action}</p>
+      <p className="text-xs text-ink-3 leading-snug">{meaning}</p>
+      <p className="text-xs text-ink-2 leading-snug">{action}</p>
       {cta && onClick && (
         <button
           type="button"
           onClick={onClick}
-          className="inline-flex items-center gap-1 text-[11.5px] font-semibold text-accent hover:underline"
+          className="inline-flex items-center gap-1 text-xs font-semibold text-accent hover:underline"
         >
           {cta}
           <ArrowRight className="w-3 h-3" />
@@ -92,9 +92,9 @@ function ChartEmpty({
 }) {
   return (
     <div className="absolute inset-0 flex items-center justify-center p-4">
-      <div className="max-w-xs text-center rounded-xl border border-line bg-surface/95 backdrop-blur-sm shadow-sm px-5 py-4">
-        <p className="text-[13px] font-semibold text-ink">{title}</p>
-        <p className="mt-1 text-[12px] text-ink-3 leading-snug">{body}</p>
+      <div className="max-w-xs text-center rounded-xl border border-line bg-surface shadow-sm px-5 py-4">
+        <p className="text-ui font-semibold text-ink">{title}</p>
+        <p className="mt-1 text-xs text-ink-3 leading-snug">{body}</p>
         {cta && onClick && (
           <button type="button" onClick={onClick} className="btn btn-sm btn-primary mt-3">
             {cta}
@@ -166,6 +166,7 @@ export function AnalyticsDashboard({
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [data, setData] = useState<AnalyticsData | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const fetchAnalytics = async () => {
     try {
@@ -176,9 +177,13 @@ export function AnalyticsDashboard({
       if (res.ok) {
         const json = await res.json();
         setData(json);
+        setLoadError(null);
+      } else {
+        setLoadError(`The analytics service answered ${res.status}.`);
       }
     } catch (err) {
       console.error('Failed to load analytics:', err);
+      setLoadError('Check your connection and try again.');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -210,27 +215,27 @@ export function AnalyticsDashboard({
   return (
     <div className="flex-1 flex flex-col h-full bg-surface-2 overflow-y-auto">
       {/* Header */}
-      <div className="h-16 px-8 border-b border-line flex items-center justify-between bg-surface sticky top-0 z-10 shrink-0">
+      <div className="min-h-16 px-4 md:px-8 py-3 border-b border-line flex flex-wrap items-center justify-between gap-3 bg-surface sticky top-0 z-10 shrink-0">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-xl bg-accent/10 text-accent flex items-center justify-center font-bold">
             <BarChart2 className="w-5 h-5" />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-[17px] font-bold text-ink tracking-tight">Support Analytics</h1>
-              <span className="flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 font-semibold">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              <h1 className="text-lg font-bold text-ink tracking-tight">Support Analytics</h1>
+              <span className="flex items-center gap-1 text-2xs px-2 py-0.5 rounded-full bg-success/10 text-success font-semibold">
+                <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
                 Live Aggregations
               </span>
             </div>
-            <p className="text-[12px] text-ink-3">
+            <p className="text-xs text-ink-3">
               Real-time insights across conversation volume, first-response times, resolution speed, and CSAT.
             </p>
           </div>
         </div>
 
         {/* Filters */}
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           {/* Time Range Selector */}
           <div className="flex items-center bg-surface-2 p-0.5 rounded-xl border border-line text-xs font-medium">
             {(
@@ -245,7 +250,7 @@ export function AnalyticsDashboard({
                 onClick={() => setRange(val)}
                 className={`px-3 py-1.5 rounded-lg transition-colors ${
                   range === val
-                    ? 'bg-white dark:bg-slate-800 text-ink shadow-xs font-semibold'
+                    ? 'bg-surface text-ink shadow-xs font-semibold'
                     : 'text-ink-3 hover:text-ink'
                 }`}
               >
@@ -268,7 +273,7 @@ export function AnalyticsDashboard({
                 onClick={() => setGranularity(val)}
                 className={`px-2.5 py-1.5 rounded-lg capitalize transition-colors ${
                   granularity === val
-                    ? 'bg-white dark:bg-slate-800 text-ink shadow-xs font-semibold'
+                    ? 'bg-surface text-ink shadow-xs font-semibold'
                     : 'text-ink-3 hover:text-ink'
                 }`}
               >
@@ -289,8 +294,17 @@ export function AnalyticsDashboard({
         </div>
       </div>
 
+      {loadError && (
+        <div role="alert" className="mx-4 md:mx-8 mt-4 flex items-center gap-3 px-4 py-3 rounded-xl border border-danger-line bg-danger-soft text-ui text-danger">
+          <span className="flex-1">Couldn&apos;t load analytics. {loadError}</span>
+          <button type="button" className="btn btn-sm btn-secondary" onClick={fetchAnalytics}>
+            Try again
+          </button>
+        </div>
+      )}
+
       {/* Main Body */}
-      <div className="p-8 max-w-7xl mx-auto w-full space-y-8 pb-20">
+      <div className="p-4 md:p-8 max-w-7xl mx-auto w-full space-y-8 pb-20">
         {/* 1. TOP 4 KPI CARDS */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
           {/* KPI 1: Total Conversations */}
@@ -307,7 +321,7 @@ export function AnalyticsDashboard({
                 summary.volumeChangePercent !== 0 && (
                 <span
                   className={`text-xs font-semibold flex items-center gap-0.5 ${
-                    summary.volumeChangePercent > 0 ? 'text-emerald-600' : 'text-amber-600'
+                    summary.volumeChangePercent > 0 ? 'text-success' : 'text-warn'
                   }`}
                 >
                   {summary.volumeChangePercent > 0 ? (
@@ -328,7 +342,7 @@ export function AnalyticsDashboard({
                 onClick={onOpenInstall}
               />
             ) : (
-              <p className="text-[11.5px] text-ink-3">Inbound visitor messages</p>
+              <p className="text-xs text-ink-3">Inbound visitor messages</p>
             )}
           </div>
 
@@ -336,7 +350,7 @@ export function AnalyticsDashboard({
           <div className="card p-5 space-y-2">
             <div className="flex items-center justify-between text-ink-3 text-xs font-medium">
               <span>Avg First Response (FRT)</span>
-              <Clock className="w-4 h-4 text-blue-500" />
+              <Clock className="w-4 h-4 text-accent" />
             </div>
             <div className="flex items-baseline gap-2">
               <span className="text-2xl font-bold text-ink tracking-tight">
@@ -346,7 +360,7 @@ export function AnalyticsDashboard({
                   average. It is a judgement, so it needs a real number first. */}
               {summary.avgFirstResponseSeconds !== null &&
                 summary.avgFirstResponseSeconds < 120 && (
-                  <span className="text-xs font-semibold text-emerald-600 flex items-center gap-0.5">
+                  <span className="text-xs font-semibold text-success flex items-center gap-0.5">
                     <CheckCircle2 className="w-3 h-3" /> Fast
                   </span>
                 )}
@@ -368,7 +382,7 @@ export function AnalyticsDashboard({
                 />
               )
             ) : (
-              <p className="text-[11.5px] text-ink-3">Time until first agent reply</p>
+              <p className="text-xs text-ink-3">Time until first agent reply</p>
             )}
           </div>
 
@@ -376,7 +390,7 @@ export function AnalyticsDashboard({
           <div className="card p-5 space-y-2">
             <div className="flex items-center justify-between text-ink-3 text-xs font-medium">
               <span>Avg Resolution Time</span>
-              <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+              <CheckCircle2 className="w-4 h-4 text-success" />
             </div>
             <div className="flex items-baseline gap-2">
               <span className="text-2xl font-bold text-ink tracking-tight">
@@ -395,7 +409,7 @@ export function AnalyticsDashboard({
                 onClick={onOpenInbox}
               />
             ) : (
-              <p className="text-[11.5px] text-ink-3">From start to closed ticket</p>
+              <p className="text-xs text-ink-3">From start to closed ticket</p>
             )}
           </div>
 
@@ -403,21 +417,21 @@ export function AnalyticsDashboard({
           <div className="card p-5 space-y-2">
             <div className="flex items-center justify-between text-ink-3 text-xs font-medium">
               <span>Customer Satisfaction (CSAT)</span>
-              <Star className="w-4 h-4 text-amber-500 fill-amber-500" />
+              <Star className="w-4 h-4 text-warn fill-warn" />
             </div>
             <div className="flex items-baseline gap-2">
               <span className="text-2xl font-bold text-ink tracking-tight flex items-center gap-1">
                 {summary.avgCsat ?? '—'}
                 {summary.avgCsat !== null && (
-                  <span className="text-amber-500 text-lg">★</span>
+                  <span className="text-warn text-lg">★</span>
                 )}
               </span>
               {summary.positiveCsatPercent !== null && (
                 <span
                   className={`text-xs font-semibold ${
                     summary.positiveCsatPercent >= 60
-                      ? 'text-emerald-600'
-                      : 'text-amber-600'
+                      ? 'text-success'
+                      : 'text-warn'
                   }`}
                 >
                   {summary.positiveCsatPercent}% positive
@@ -432,7 +446,7 @@ export function AnalyticsDashboard({
                 onClick={onOpenInbox}
               />
             ) : (
-              <p className="text-[11.5px] text-ink-3">
+              <p className="text-xs text-ink-3">
                 {summary.totalCsatRatings > 0
                   ? `Based on ${summary.totalCsatRatings} post-chat rating${
                       summary.totalCsatRatings === 1 ? '' : 's'
@@ -449,20 +463,20 @@ export function AnalyticsDashboard({
           <div className="lg:col-span-8 card p-6 space-y-4">
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="text-[15px] font-semibold text-ink">
+                <h3 className="text-md font-semibold text-ink">
                   Conversation Volume Over Time
                 </h3>
-                <p className="text-[12px] text-ink-3">
+                <p className="text-xs text-ink-3">
                   Total incoming conversations vs resolved tickets per {granularity}.
                 </p>
               </div>
               <div className="flex items-center gap-4 text-xs font-medium">
                 <span className="flex items-center gap-1.5">
-                  <span className="w-2.5 h-2.5 rounded-full bg-[#2563eb]" />
+                  <span className="w-2.5 h-2.5 rounded-full bg-accent" />
                   Total Conversations
                 </span>
                 <span className="flex items-center gap-1.5">
-                  <span className="w-2.5 h-2.5 rounded-full bg-[#10b981]" />
+                  <span className="w-2.5 h-2.5 rounded-full bg-success" />
                   Resolved
                 </span>
               </div>
@@ -477,12 +491,12 @@ export function AnalyticsDashboard({
                 >
                   <defs>
                     <linearGradient id="colorTotal" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#2563eb" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="#2563eb" stopOpacity={0.0} />
+                      <stop offset="5%" stopColor="var(--ds-accent)" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="var(--ds-accent)" stopOpacity={0.0} />
                     </linearGradient>
                     <linearGradient id="colorResolved" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="#10b981" stopOpacity={0.0} />
+                      <stop offset="5%" stopColor="var(--ds-success)" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="var(--ds-success)" stopOpacity={0.0} />
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--color-line, #e2e8f0)" opacity={0.6} />
@@ -500,7 +514,7 @@ export function AnalyticsDashboard({
                   />
                   <Tooltip
                     contentStyle={{
-                      backgroundColor: 'var(--color-surface-0, #ffffff)',
+                      backgroundColor: 'var(--ds-surface)',
                       borderColor: 'var(--color-line, #e2e8f0)',
                       borderRadius: '12px',
                       fontSize: '12px',
@@ -511,7 +525,7 @@ export function AnalyticsDashboard({
                     type="monotone"
                     dataKey="total"
                     name="Inbound Chats"
-                    stroke="#2563eb"
+                    stroke="var(--ds-accent)"
                     strokeWidth={2}
                     fillOpacity={1}
                     fill="url(#colorTotal)"
@@ -520,7 +534,7 @@ export function AnalyticsDashboard({
                     type="monotone"
                     dataKey="resolved"
                     name="Resolved"
-                    stroke="#10b981"
+                    stroke="var(--ds-success)"
                     strokeWidth={2}
                     fillOpacity={1}
                     fill="url(#colorResolved)"
@@ -546,8 +560,8 @@ export function AnalyticsDashboard({
           {/* Right Chart: Status Breakdown Donut */}
           <div className="lg:col-span-4 card p-6 space-y-4">
             <div>
-              <h3 className="text-[15px] font-semibold text-ink">Status Breakdown</h3>
-              <p className="text-[12px] text-ink-3">Current distribution of tickets.</p>
+              <h3 className="text-md font-semibold text-ink">Status Breakdown</h3>
+              <p className="text-xs text-ink-3">Current distribution of tickets.</p>
             </div>
 
             <div className="h-56 w-full relative flex items-center justify-center">
@@ -568,7 +582,7 @@ export function AnalyticsDashboard({
                   </Pie>
                   <Tooltip
                     contentStyle={{
-                      backgroundColor: 'var(--color-surface-0, #ffffff)',
+                      backgroundColor: 'var(--ds-surface)',
                       borderColor: 'var(--color-line, #e2e8f0)',
                       borderRadius: '10px',
                       fontSize: '12px',
@@ -579,7 +593,7 @@ export function AnalyticsDashboard({
               {/* Center Stat */}
               <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                 <span className="text-2xl font-bold text-ink">{summary.totalConversations}</span>
-                <span className="text-[10.5px] text-ink-3 uppercase tracking-wider font-semibold">
+                <span className="text-2xs text-ink-3 uppercase tracking-wider font-semibold">
                   Total
                 </span>
               </div>
@@ -612,12 +626,12 @@ export function AnalyticsDashboard({
         <div className="card p-6 space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-[15px] font-semibold text-ink">CSAT Satisfaction Trend</h3>
-              <p className="text-[12px] text-ink-3">
+              <h3 className="text-md font-semibold text-ink">CSAT Satisfaction Trend</h3>
+              <p className="text-xs text-ink-3">
                 Average visitor rating score (1.0 - 5.0) submitted via the post-chat widget survey.
               </p>
             </div>
-            <div className="flex items-center gap-2 bg-amber-500/10 text-amber-600 px-3 py-1 rounded-full text-xs font-bold">
+            <div className="flex items-center gap-2 bg-warn/10 text-warn px-3 py-1 rounded-full text-xs font-bold">
               <Star className="w-3.5 h-3.5 fill-current" />
               <span>Goal: &ge; 4.5 Stars</span>
             </div>
@@ -647,7 +661,7 @@ export function AnalyticsDashboard({
                 <Tooltip
                   formatter={(val: any) => [`${val} ★`, 'CSAT Score']}
                   contentStyle={{
-                    backgroundColor: 'var(--color-surface-0, #ffffff)',
+                    backgroundColor: 'var(--ds-surface)',
                     borderColor: 'var(--color-line, #e2e8f0)',
                     borderRadius: '12px',
                     fontSize: '12px',
@@ -657,9 +671,9 @@ export function AnalyticsDashboard({
                   type="monotone"
                   dataKey="csat"
                   name="CSAT Score"
-                  stroke="#f59e0b"
+                  stroke="var(--ds-warn)"
                   strokeWidth={2.5}
-                  dot={{ r: 3, fill: '#f59e0b' }}
+                  dot={{ r: 3, fill: 'var(--ds-warn)' }}
                   activeDot={{ r: 5 }}
                   // Days without ratings are gaps, not a continuation.
                   connectNulls={false}
@@ -680,8 +694,8 @@ export function AnalyticsDashboard({
         <div className="card p-6 space-y-4">
           <div className="flex items-center justify-between border-b border-line pb-4">
             <div>
-              <h3 className="text-[16px] font-semibold text-ink">Per-Agent Performance</h3>
-              <p className="text-[12.5px] text-ink-3 mt-0.5">
+              <h3 className="text-base font-semibold text-ink">Per-Agent Performance</h3>
+              <p className="text-xs text-ink-3 mt-0.5">
                 Workload distribution, response efficiency, and customer satisfaction by team member.
               </p>
             </div>
@@ -692,7 +706,7 @@ export function AnalyticsDashboard({
 
           <div className="border border-line rounded-xl overflow-hidden divide-y divide-line">
             {/* Table Header */}
-            <div className="p-3 px-5 bg-surface-2/60 text-[11.5px] font-semibold text-ink-3 uppercase tracking-wider grid grid-cols-12 gap-4 items-center">
+            <div className="p-3 px-5 bg-surface-2/60 text-xs font-semibold text-ink-3 uppercase tracking-wider grid grid-cols-12 gap-4 items-center">
               <div className="col-span-4">Agent Name</div>
               <div className="col-span-2 text-center">Handled</div>
               <div className="col-span-2 text-center">Avg Response (FRT)</div>
@@ -719,25 +733,25 @@ export function AnalyticsDashboard({
                         {agent.name.slice(0, 2).toUpperCase()}
                       </div>
                       <span
-                        className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2 border-white dark:border-slate-900 ${
+                        className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2 border-white ${
                           agent.status === 'online'
-                            ? 'bg-emerald-500'
+                            ? 'bg-success'
                             : agent.status === 'away'
-                            ? 'bg-amber-500'
-                            : 'bg-slate-400'
+                            ? 'bg-warn'
+                            : 'bg-ink-3'
                         }`}
                       />
                     </div>
                     <div>
-                      <div className="font-semibold text-[13px] text-ink">{agent.name}</div>
-                      <div className="text-[11px] text-ink-3">{agent.email}</div>
+                      <div className="font-semibold text-ui text-ink">{agent.name}</div>
+                      <div className="text-2xs text-ink-3">{agent.email}</div>
                     </div>
                   </div>
 
                   {/* Handled Conversations */}
                   <div className="col-span-2 text-center">
                     <span className="font-bold text-ink text-sm">{agent.handled}</span>
-                    <div className="text-[10.5px] text-ink-3">
+                    <div className="text-2xs text-ink-3">
                       {agent.resolutionRate === null
                         ? 'No conversations'
                         : `${agent.resolutionRate}% resolved`}
@@ -757,14 +771,14 @@ export function AnalyticsDashboard({
                   {/* CSAT Score */}
                   <div className="col-span-2 flex items-center justify-end gap-1.5">
                     {agent.csatScore === null ? (
-                      <span className="text-[12px] text-ink-3">—</span>
+                      <span className="text-xs text-ink-3">—</span>
                     ) : (
                       <>
-                        <span className="px-2.5 py-1 rounded-lg bg-amber-500/10 text-amber-700 dark:text-amber-400 font-bold text-xs flex items-center gap-1">
-                          <Star className="w-3 h-3 fill-current text-amber-500" />
+                        <span className="px-2.5 py-1 rounded-lg bg-warn/10 text-warn font-bold text-xs flex items-center gap-1">
+                          <Star className="w-3 h-3 fill-current text-warn" />
                           {agent.csatScore}
                         </span>
-                        <span className="text-[11px] text-ink-3 font-medium">
+                        <span className="text-2xs text-ink-3 font-medium">
                           ({agent.csatCount})
                         </span>
                       </>

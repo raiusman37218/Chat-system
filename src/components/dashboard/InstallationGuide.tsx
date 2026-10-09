@@ -65,10 +65,10 @@ export function InstallationGuide({
           'Save and deploy — the launcher appears for every visitor.',
         ].map((s, i) => (
           <li key={i} className="flex gap-3.5 items-center">
-            <span className="shrink-0 w-6 h-6 rounded-lg bg-accent text-white text-[12px] font-extrabold flex items-center justify-center shadow-xs">
+            <span className="shrink-0 w-6 h-6 rounded-lg bg-accent text-white text-xs font-extrabold flex items-center justify-center shadow-xs">
               {i + 1}
             </span>
-            <span className="text-[13.5px] leading-relaxed text-ink font-medium">{s}</span>
+            <span className="text-ui leading-relaxed text-ink font-medium">{s}</span>
           </li>
         ))}
       </ol>
@@ -82,10 +82,10 @@ export function InstallationGuide({
           'Paste the snippet into the Footer box and save.',
         ].map((s, i) => (
           <li key={i} className="flex gap-3.5 items-center">
-            <span className="shrink-0 w-6 h-6 rounded-lg bg-accent text-white text-[12px] font-extrabold flex items-center justify-center shadow-xs">
+            <span className="shrink-0 w-6 h-6 rounded-lg bg-accent text-white text-xs font-extrabold flex items-center justify-center shadow-xs">
               {i + 1}
             </span>
-            <span className="text-[13.5px] leading-relaxed text-ink font-medium">{s}</span>
+            <span className="text-ui leading-relaxed text-ink font-medium">{s}</span>
           </li>
         ))}
       </ol>
@@ -99,19 +99,19 @@ export function InstallationGuide({
           'Open theme.liquid, paste above </body>, then Save.',
         ].map((s, i) => (
           <li key={i} className="flex gap-3.5 items-center">
-            <span className="shrink-0 w-6 h-6 rounded-lg bg-accent text-white text-[12px] font-extrabold flex items-center justify-center shadow-xs">
+            <span className="shrink-0 w-6 h-6 rounded-lg bg-accent text-white text-xs font-extrabold flex items-center justify-center shadow-xs">
               {i + 1}
             </span>
-            <span className="text-[13.5px] leading-relaxed text-ink font-medium">{s}</span>
+            <span className="text-ui leading-relaxed text-ink font-medium">{s}</span>
           </li>
         ))}
       </ol>
     ),
     react: (
       <div className="space-y-3">
-        <p className="text-[13px] leading-relaxed text-ink-2">
+        <p className="text-ui leading-relaxed text-ink-2">
           Render the script from your root{' '}
-          <code className="font-mono text-[12px] text-ink">app/layout.tsx</code>{' '}
+          <code className="font-mono text-xs text-ink">app/layout.tsx</code>{' '}
           using the Next.js Script component:
         </p>
         <pre className="code-block">{`import Script from 'next/script';
@@ -144,10 +144,10 @@ export default function RootLayout({ children }) {
       {!embedded && (
         <header className="shrink-0 px-7 h-16 flex items-center justify-between gap-4 border-b border-line bg-surface">
           <div className="min-w-0">
-            <h1 className="text-[15px] font-semibold tracking-tight">
+            <h1 className="text-md font-semibold tracking-tight">
               Install the widget
             </h1>
-            <p className="text-[12px] text-ink-3 mt-0.5">
+            <p className="text-xs text-ink-3 mt-0.5">
               One script tag. Works on any site, no build step required.
             </p>
           </div>
@@ -182,10 +182,10 @@ export default function RootLayout({ children }) {
                 size="md"
               />
               <div className="min-w-0">
-                <h2 className="text-[14px] font-semibold truncate">
+                <h2 className="text-sm font-semibold truncate">
                   {workspace?.name || 'My workspace'}
                 </h2>
-                <div className="mt-1 flex items-center gap-3 flex-wrap text-[12px] text-ink-3">
+                <div className="mt-1 flex items-center gap-3 flex-wrap text-xs text-ink-3">
                   {workspace?.website_url && (
                     <span className="inline-flex items-center gap-1.5 truncate">
                       <Globe className="w-3.5 h-3.5" />
@@ -226,13 +226,13 @@ export default function RootLayout({ children }) {
           <div className="card p-6 border-2 border-line-2 shadow-xs space-y-3">
             <div className="flex items-center justify-between mb-1">
               <div>
-                <h2 className="text-[15px] font-bold text-ink">Your Embed Code</h2>
-                <p className="text-[12px] text-ink-2">Copy this snippet and paste it right before the closing &lt;/body&gt; tag on your website.</p>
+                <h2 className="text-md font-bold text-ink">Your Embed Code</h2>
+                <p className="text-xs text-ink-2">Copy this snippet and paste it right before the closing &lt;/body&gt; tag on your website.</p>
               </div>
               <button onClick={copyCode} className="btn btn-sm btn-primary font-bold shadow-xs px-4 py-2 shrink-0">
                 {copied ? (
                   <>
-                    <Check className="w-4 h-4 text-emerald-300" />
+                    <Check className="w-4 h-4 text-success" />
                     <span>Copied!</span>
                   </>
                 ) : (
@@ -244,13 +244,13 @@ export default function RootLayout({ children }) {
               </button>
             </div>
 
-            <pre className="p-4.5 rounded-xl bg-slate-950 text-emerald-400 font-mono text-[12.5px] border-2 border-slate-800 shadow-inner overflow-x-auto leading-relaxed">{embedScript}</pre>
+            <pre className="p-4.5 rounded-xl bg-invert text-success font-mono text-xs border-2 border-line-3 shadow-inner overflow-x-auto leading-relaxed">{embedScript}</pre>
           </div>
 
           {/* Platform guides */}
           <div className="card p-6 border-2 border-line-2 shadow-xs space-y-4">
             <div className="flex items-center justify-between gap-4 flex-wrap border-b border-line-2 pb-3.5">
-              <h2 className="text-[15px] font-bold text-ink">
+              <h2 className="text-md font-bold text-ink">
                 Platform-Specific Installation Steps
               </h2>
               <div className="inline-flex items-center gap-1 p-1 rounded-xl bg-surface-2 border-2 border-line-2">
@@ -259,7 +259,7 @@ export default function RootLayout({ children }) {
                     key={p}
                     onClick={() => setActivePlatform(p)}
                     className={cn(
-                      'h-7.5 px-3 rounded-lg text-[12px] font-bold transition-all',
+                      'h-7.5 px-3 rounded-lg text-xs font-bold transition-all',
                       activePlatform === p
                         ? 'bg-accent text-white shadow-xs'
                         : 'text-ink-2 hover:text-ink hover:bg-surface-3'
@@ -279,14 +279,14 @@ export default function RootLayout({ children }) {
             <div className="flex items-center gap-3 min-w-0">
               <div className={cn(
                 'w-8 h-8 rounded-lg flex items-center justify-center shrink-0 shadow-2xs',
-                hasVisitors ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30' : 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30'
+                hasVisitors ? 'bg-success/15 text-success border border-success/30' : 'bg-warn/15 text-warn border border-warn/30'
               )}>
                 <Check className="w-4 h-4" />
               </div>
-              <div className="text-[13px] leading-relaxed text-ink min-w-0 font-medium">
+              <div className="text-ui leading-relaxed text-ink min-w-0 font-medium">
                 {hasVisitors ? (
                   <>
-                    <span className="font-bold text-emerald-600 dark:text-emerald-400">Traffic detected</span> on{' '}
+                    <span className="font-bold text-success">Traffic detected</span> on{' '}
                     <span className="font-mono text-ink font-bold">
                       {latestVisitorUrl || 'your site'}
                     </span>

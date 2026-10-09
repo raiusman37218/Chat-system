@@ -101,7 +101,7 @@ export function EmojiPickerPopover({
       {/* Header with Search */}
       <div className="p-2.5 border-b border-line bg-surface-2/60 space-y-2">
         <div className="flex items-center justify-between">
-          <span className="text-[12px] font-bold text-ink flex items-center gap-1.5">
+          <span className="text-xs font-bold text-ink flex items-center gap-1.5">
             <span>Choose an Emoji</span>
           </span>
           <button
@@ -119,7 +119,7 @@ export function EmojiPickerPopover({
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search emoji or pick below..."
-            className="w-full h-7.5 pl-8 pr-2.5 rounded-lg border border-line bg-surface text-[12px] text-ink placeholder:text-ink-3 focus:outline-none focus:border-accent"
+            className="w-full h-7.5 pl-8 pr-2.5 rounded-lg border border-line bg-surface text-xs text-ink placeholder:text-ink-3 focus:outline-none focus:border-accent"
           />
         </div>
       </div>
@@ -131,7 +131,7 @@ export function EmojiPickerPopover({
             <button
               key={cat.id}
               onClick={() => setActiveTab(cat.id)}
-              className={`h-6.5 px-2 rounded-md text-[11px] font-semibold flex items-center gap-1 shrink-0 transition-colors ${
+              className={`h-6.5 px-2 rounded-md text-2xs font-semibold flex items-center gap-1 shrink-0 transition-colors ${
                 activeTab === cat.id
                   ? 'bg-accent text-accent-ink shadow-2xs'
                   : 'text-ink-3 hover:bg-surface-2 hover:text-ink'
@@ -139,7 +139,7 @@ export function EmojiPickerPopover({
               title={cat.name}
             >
               <span>{cat.icon}</span>
-              <span className="text-[10.5px] truncate max-w-[80px]">{cat.name.split(' ')[0]}</span>
+              <span className="text-2xs truncate max-w-[80px]">{cat.name.split(' ')[0]}</span>
             </button>
           ))}
         </div>
@@ -155,7 +155,7 @@ export function EmojiPickerPopover({
               onSelect(emoji);
               onClose();
             }}
-            className="w-8 h-8 rounded-lg hover:bg-surface-2 flex items-center justify-center text-[18px] hover:scale-125 transition-transform"
+            className="w-8 h-8 rounded-lg hover:bg-surface-2 flex items-center justify-center text-lg hover:scale-125 transition-transform"
           >
             {emoji}
           </button>

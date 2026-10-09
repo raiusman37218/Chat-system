@@ -97,7 +97,7 @@ export function formatInlineText(text: string): React.ReactNode[] {
       return (
         <mark
           key={index}
-          className="bg-amber-300/35 dark:bg-amber-400/25 text-amber-950 dark:text-amber-100 font-semibold px-1.5 py-0.5 rounded-md border-b-2 border-amber-400/70"
+          className="bg-warn/35 text-warn font-semibold px-1.5 py-0.5 rounded-md border-b-2 border-warn/70"
         >
           {inner}
         </mark>
@@ -110,7 +110,7 @@ export function formatInlineText(text: string): React.ReactNode[] {
       return (
         <mark
           key={index}
-          className="bg-amber-300/35 dark:bg-amber-400/25 text-amber-950 dark:text-amber-100 font-semibold px-1.5 py-0.5 rounded-md border-b-2 border-amber-400/70"
+          className="bg-warn/35 text-warn font-semibold px-1.5 py-0.5 rounded-md border-b-2 border-warn/70"
         >
           {inner}
         </mark>
@@ -123,17 +123,17 @@ export function formatInlineText(text: string): React.ReactNode[] {
       const [, color, inner] = hlMatch;
       const colorMap: Record<string, string> = {
         yellow:
-          'bg-amber-300/35 dark:bg-amber-400/25 text-amber-950 dark:text-amber-100 border-amber-400/70',
+          'bg-warn/35 text-warn border-warn/70',
         green:
-          'bg-emerald-300/35 dark:bg-emerald-400/25 text-emerald-950 dark:text-emerald-100 border-emerald-400/70',
+          'bg-success/35 text-success border-success/70',
         blue:
-          'bg-sky-300/35 dark:bg-sky-400/25 text-sky-950 dark:text-sky-100 border-sky-400/70',
+          'bg-accent/35 text-accent border-accent/70',
         purple:
-          'bg-purple-300/35 dark:bg-purple-400/25 text-purple-950 dark:text-purple-100 border-purple-400/70',
+          'bg-accent/35 text-accent border-accent/70',
         rose:
-          'bg-rose-300/35 dark:bg-rose-400/25 text-rose-950 dark:text-rose-100 border-rose-400/70',
+          'bg-danger/35 text-danger border-danger/70',
         red:
-          'bg-rose-300/35 dark:bg-rose-400/25 text-rose-950 dark:text-rose-100 border-rose-400/70',
+          'bg-danger/35 text-danger border-danger/70',
       };
       const style = colorMap[color.toLowerCase()] || colorMap.yellow;
       return (
@@ -151,21 +151,21 @@ export function formatInlineText(text: string): React.ReactNode[] {
     if (badgeMatch) {
       const [, color = 'blue', label] = badgeMatch;
       const badgeStyles: Record<string, string> = {
-        blue: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20',
-        green: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20',
-        emerald: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20',
-        amber: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20',
-        yellow: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20',
-        rose: 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20',
-        red: 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20',
-        purple: 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20',
-        gray: 'bg-slate-500/10 text-slate-600 dark:text-slate-400 border-slate-500/20',
+        blue: 'bg-accent/10 text-accent border-accent/20',
+        green: 'bg-success/10 text-success border-success/20',
+        emerald: 'bg-success/10 text-success border-success/20',
+        amber: 'bg-warn/10 text-warn border-warn/20',
+        yellow: 'bg-warn/10 text-warn border-warn/20',
+        rose: 'bg-danger/10 text-danger border-danger/20',
+        red: 'bg-danger/10 text-danger border-danger/20',
+        purple: 'bg-accent/10 text-accent border-accent/20',
+        gray: 'bg-ink-3/10 text-ink-2 border-line-3/20',
       };
       const badgeClass = badgeStyles[color.toLowerCase()] || badgeStyles.blue;
       return (
         <span
           key={index}
-          className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11.5px] font-semibold border mx-1 align-baseline select-none ${badgeClass}`}
+          className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold border mx-1 align-baseline select-none ${badgeClass}`}
         >
           {label.trim()}
         </span>
@@ -182,7 +182,7 @@ export function formatInlineText(text: string): React.ReactNode[] {
           href={url}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex items-center justify-center gap-1.5 px-4 py-2 my-1 rounded-xl text-white font-semibold text-[13px] shadow-sm transition-all hover:opacity-95 hover:shadow-md active:scale-[0.98] cursor-pointer no-underline"
+          className="inline-flex items-center justify-center gap-1.5 px-4 py-2 my-1 rounded-xl text-white font-semibold text-ui shadow-sm transition-all hover:opacity-95 hover:shadow-md active:scale-[0.98] cursor-pointer no-underline"
           style={{ backgroundColor: 'var(--brand, #007aff)' }}
         >
           <span>{label}</span>
@@ -214,7 +214,7 @@ export function formatInlineText(text: string): React.ReactNode[] {
       return (
         <code
           key={index}
-          className="px-1.5 py-0.5 rounded-md bg-surface-3 dark:bg-slate-800 text-accent font-mono text-[12px] font-semibold border border-line/60"
+          className="px-1.5 py-0.5 rounded-md bg-surface-3 text-accent font-mono text-xs font-semibold border border-line/60"
         >
           {part.slice(1, -1)}
         </code>
@@ -261,18 +261,18 @@ function CodeBlockWithCopy({ language, code }: { language: string; code: string 
   };
 
   return (
-    <div className="my-4 rounded-xl border border-slate-700/80 bg-slate-950 text-slate-100 overflow-hidden shadow-md">
-      <div className="px-4 py-2 bg-slate-900 border-b border-slate-800 flex items-center justify-between text-[11px] text-slate-400 font-mono">
+    <div className="my-4 rounded-xl border border-line-3/80 bg-invert text-slate-100 overflow-hidden shadow-md">
+      <div className="px-4 py-2 bg-invert border-b border-line-3 flex items-center justify-between text-2xs text-ink-3 font-mono">
         <span>{language || 'code'}</span>
         <button
           onClick={handleCopy}
           type="button"
-          className="hover:text-white flex items-center gap-1 transition-colors px-2 py-0.5 rounded bg-slate-800/80 hover:bg-slate-700"
+          className="hover:text-white flex items-center gap-1 transition-colors px-2 py-0.5 rounded bg-invert/80 hover:bg-ink-2"
         >
           {copied ? (
             <>
-              <Check className="w-3 h-3 text-emerald-400" />
-              <span className="text-emerald-400">Copied!</span>
+              <Check className="w-3 h-3 text-success" />
+              <span className="text-success">Copied!</span>
             </>
           ) : (
             <>
@@ -282,7 +282,7 @@ function CodeBlockWithCopy({ language, code }: { language: string; code: string 
           )}
         </button>
       </div>
-      <pre className="p-4 text-[12.5px] font-mono leading-relaxed overflow-x-auto selection:bg-blue-600 selection:text-white">
+      <pre className="p-4 text-xs font-mono leading-relaxed overflow-x-auto selection:bg-accent selection:text-white">
         <code>{code}</code>
       </pre>
     </div>
@@ -368,7 +368,7 @@ export function MarkdownArticleContent({
             key={`table-${index}`}
             className="overflow-x-auto my-4 rounded-xl border border-line shadow-xs bg-surface"
           >
-            <table className="w-full text-left text-[13px] divide-y divide-line">
+            <table className="w-full text-left text-ui divide-y divide-line">
               <thead className="bg-surface-2 text-ink font-semibold">
                 <tr>
                   {headerCells.map((header, hIdx) => (
@@ -437,37 +437,37 @@ export function MarkdownArticleContent({
 
       const styles = {
         note: {
-          bg: 'bg-blue-50/70 dark:bg-blue-950/25 border-blue-200/80 dark:border-blue-800/50 text-blue-950 dark:text-blue-100',
-          icon: <Lightbulb className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />,
+          bg: 'bg-accent-soft/70 border-accent-line/80 text-accent',
+          icon: <Lightbulb className="w-4 h-4 text-accent shrink-0 mt-0.5" />,
           title: 'Note',
           isCentered: false,
         },
         tip: {
-          bg: 'bg-[#d7efdc]/60 dark:bg-emerald-950/30 border-[#1bb157]/30 text-emerald-950 dark:text-emerald-100',
-          icon: <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />,
+          bg: 'bg-[#d7efdc]/60 border-[#1bb157]/30 text-success',
+          icon: <CheckCircle2 className="w-4 h-4 text-success shrink-0 mt-0.5" />,
           title: 'Pro Tip',
           isCentered: false,
         },
         success: {
-          bg: 'bg-[#d7efdc]/70 dark:bg-emerald-950/35 border-[#1bb157]/35 text-emerald-950 dark:text-emerald-100 shadow-2xs',
-          icon: <Sparkles className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />,
+          bg: 'bg-[#d7efdc]/70 border-[#1bb157]/35 text-success shadow-2xs',
+          icon: <Sparkles className="w-4 h-4 text-success shrink-0 mt-0.5" />,
           title: 'Bonus / Upgrade',
           isCentered: false,
         },
         warning: {
-          bg: 'bg-[#fff3cd]/70 dark:bg-amber-950/30 border-[#d97706]/30 text-amber-950 dark:text-amber-100',
-          icon: <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />,
+          bg: 'bg-[#fff3cd]/70 border-[#d97706]/30 text-warn',
+          icon: <AlertTriangle className="w-4 h-4 text-warn shrink-0 mt-0.5" />,
           title: 'Important Rule',
           isCentered: false,
         },
         caution: {
-          bg: 'bg-[#ffebe9]/80 dark:bg-rose-950/30 border-[#df2020]/30 text-rose-950 dark:text-rose-100',
-          icon: <XCircle className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0 mt-0.5" />,
+          bg: 'bg-[#ffebe9]/80 border-[#df2020]/30 text-danger',
+          icon: <XCircle className="w-4 h-4 text-danger shrink-0 mt-0.5" />,
           title: 'Violation / Caution',
           isCentered: false,
         },
         cta: {
-          bg: 'bg-[#e3e7fa]/80 dark:bg-blue-950/40 border-[#334bfa]/30 text-blue-950 dark:text-blue-100 text-center shadow-xs',
+          bg: 'bg-[#e3e7fa]/80 border-[#334bfa]/30 text-accent text-center shadow-xs',
           icon: null,
           title: '',
           isCentered: true,
@@ -481,12 +481,12 @@ export function MarkdownArticleContent({
           key={`callout-${index}`}
           className={`p-4 sm:p-5 my-4 rounded-2xl border transition-all ${styles.bg} ${
             isCentered ? 'flex flex-col items-center justify-center text-center gap-2.5' : 'flex items-start gap-3.5'
-          } text-[13.5px] leading-relaxed`}
+          } text-ui leading-relaxed`}
         >
           {!isCentered && styles.icon}
           <div className={`space-y-1.5 ${isCentered ? 'w-full max-w-lg mx-auto text-center' : 'flex-1'}`}>
             {styles.title && (
-              <span className="font-bold uppercase tracking-wider text-[11px] block opacity-85">
+              <span className="font-bold uppercase tracking-wider text-2xs block opacity-85">
                 {styles.title}
               </span>
             )}
@@ -518,7 +518,7 @@ export function MarkdownArticleContent({
       elements.push(
         <blockquote
           key={`quote-${index}`}
-          className="pl-4 py-1.5 border-l-3 border-accent text-ink-2 italic bg-surface-2/40 rounded-r-lg my-3 space-y-1 text-[13.5px]"
+          className="pl-4 py-1.5 border-l-3 border-accent text-ink-2 italic bg-surface-2/40 rounded-r-lg my-3 space-y-1 text-ui"
         >
           {quoteLines.map((qLine, qIdx) => (
             <p key={qIdx}>{formatInlineText(qLine)}</p>
@@ -544,7 +544,7 @@ export function MarkdownArticleContent({
         <h1
           key={`h1-${index}`}
           id={nextHeadingId(raw)}
-          className="scroll-mt-24 text-[24px] sm:text-[28px] font-extrabold text-ink mt-7 mb-3 tracking-tight pb-2 border-b border-line"
+          className="scroll-mt-24 text-2xl sm:text-3xl font-extrabold text-ink mt-7 mb-3 tracking-tight pb-2 border-b border-line"
         >
           {formatInlineText(trimmed.replace('# ', ''))}
         </h1>
@@ -559,7 +559,7 @@ export function MarkdownArticleContent({
         <h2
           key={`h2-${index}`}
           id={nextHeadingId(raw)}
-          className="scroll-mt-24 text-[19px] sm:text-[22px] font-bold text-ink mt-6 mb-2 tracking-tight pb-1.5 border-b border-line/60"
+          className="scroll-mt-24 text-xl sm:text-2xl font-bold text-ink mt-6 mb-2 tracking-tight pb-1.5 border-b border-line/60"
         >
           {formatInlineText(trimmed.replace('## ', ''))}
         </h2>
@@ -574,7 +574,7 @@ export function MarkdownArticleContent({
         <h3
           key={`h3-${index}`}
           id={nextHeadingId(raw)}
-          className="scroll-mt-24 text-[16px] sm:text-[17px] font-bold text-ink mt-5 mb-1 tracking-tight"
+          className="scroll-mt-24 text-base sm:text-lg font-bold text-ink mt-5 mb-1 tracking-tight"
         >
           {formatInlineText(trimmed.replace('### ', ''))}
         </h3>
@@ -594,7 +594,7 @@ export function MarkdownArticleContent({
         const isChecked = curTrim.startsWith('- [x] ');
         const label = curTrim.replace(/^- \[( |x)\]\s*/, '');
         taskItems.push(
-          <div key={`task-item-${index}`} className="flex items-center gap-2.5 py-1 text-[13.5px]">
+          <div key={`task-item-${index}`} className="flex items-center gap-2.5 py-1 text-ui">
             <input
               type="checkbox"
               readOnly
@@ -628,7 +628,7 @@ export function MarkdownArticleContent({
         const curTrim = lines[index].trim();
         const itemText = curTrim.substring(2).trim();
         listItems.push(
-          <li key={`bullet-item-${index}`} className="text-[14px] text-ink-2 leading-relaxed">
+          <li key={`bullet-item-${index}`} className="text-sm text-ink-2 leading-relaxed">
             {formatInlineText(itemText)}
           </li>
         );
@@ -649,7 +649,7 @@ export function MarkdownArticleContent({
         const curTrim = lines[index].trim();
         const itemText = curTrim.replace(/^\d+\.\s+/, '').trim();
         listItems.push(
-          <li key={`ordered-item-${index}`} className="text-[14px] text-ink-2 leading-relaxed">
+          <li key={`ordered-item-${index}`} className="text-sm text-ink-2 leading-relaxed">
             {formatInlineText(itemText)}
           </li>
         );
@@ -671,7 +671,7 @@ export function MarkdownArticleContent({
         <figure key={`img-${index}`} className="my-4 rounded-xl overflow-hidden border border-line bg-surface-2/40 shadow-xs">
           <img src={src} alt={alt} className="w-full h-auto object-contain max-h-[500px] mx-auto rounded-t-xl" loading="lazy" />
           {alt && (
-            <figcaption className="text-[12px] text-ink-3 text-center py-2 px-4 italic border-t border-line/50 bg-surface">
+            <figcaption className="text-xs text-ink-3 text-center py-2 px-4 italic border-t border-line/50 bg-surface">
               {alt}
             </figcaption>
           )}
@@ -691,7 +691,7 @@ export function MarkdownArticleContent({
             href={url}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl text-white font-semibold text-[14px] shadow-sm transition-all hover:opacity-95 hover:shadow-md active:scale-[0.98] cursor-pointer no-underline"
+            className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl text-white font-semibold text-sm shadow-sm transition-all hover:opacity-95 hover:shadow-md active:scale-[0.98] cursor-pointer no-underline"
             style={{ backgroundColor: 'var(--brand, #007aff)' }}
           >
             <span>{label}</span>
@@ -705,7 +705,7 @@ export function MarkdownArticleContent({
 
     // 13. Normal Paragraph
     elements.push(
-      <p key={`p-${index}`} className="text-[14px] text-ink leading-relaxed">
+      <p key={`p-${index}`} className="text-sm text-ink leading-relaxed">
         {formatInlineText(trimmed)}
       </p>
     );

@@ -229,7 +229,7 @@ export default function OnboardingPage() {
                 <React.Fragment key={label}>
                   <div className="flex items-center gap-2.5">
                     <span
-                      className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-semibold transition-colors ${
+                      className={`w-6 h-6 rounded-full flex items-center justify-center text-2xs font-semibold transition-colors ${
                         done
                           ? 'bg-success text-white'
                           : current
@@ -240,7 +240,7 @@ export default function OnboardingPage() {
                       {done ? <Check className="w-3.5 h-3.5" /> : n}
                     </span>
                     <span
-                      className={`text-[13px] font-medium ${
+                      className={`text-ui font-medium ${
                         current ? 'text-ink' : 'text-ink-3'
                       }`}
                     >
@@ -261,19 +261,19 @@ export default function OnboardingPage() {
 
           {/* Email verification requirement banner */}
           {emailUnconfirmed && (
-            <div className="mb-6 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 sm:p-5 text-ink animate-pop">
+            <div className="mb-6 rounded-2xl border border-warn/30 bg-warn/10 p-4 sm:p-5 text-ink animate-pop">
               <div className="flex items-start gap-3.5">
-                <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-500 flex items-center justify-center shrink-0 mt-0.5">
+                <div className="w-10 h-10 rounded-xl bg-warn/20 text-warn flex items-center justify-center shrink-0 mt-0.5">
                   <Mail className="w-5 h-5" />
                 </div>
                 <div className="space-y-1.5 flex-1 min-w-0">
-                  <h2 className="text-[15px] font-semibold text-ink flex items-center gap-2">
+                  <h2 className="text-md font-semibold text-ink flex items-center gap-2">
                     <span>Email verification required</span>
-                    <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-500/20 text-amber-600 dark:text-amber-400">
+                    <span className="px-2 py-0.5 rounded-full text-2xs font-bold bg-warn/20 text-warn">
                       Pending
                     </span>
                   </h2>
-                  <p className="text-[13px] text-ink-2 leading-relaxed">
+                  <p className="text-ui text-ink-2 leading-relaxed">
                     Please confirm your email address <span className="font-semibold text-ink">{userEmail || 'in your inbox'}</span> before your workspace can become active.
                   </p>
                   <div className="pt-2 flex flex-wrap items-center gap-2.5">
@@ -304,7 +304,7 @@ export default function OnboardingPage() {
                       Check status
                     </button>
                     {resendSuccess && (
-                      <span className="text-[12px] text-success font-medium animate-fade-in">
+                      <span className="text-xs text-success font-medium animate-fade-in">
                         Verification email sent!
                       </span>
                     )}
@@ -317,10 +317,10 @@ export default function OnboardingPage() {
           {/* STEP 1: Business Info */}
           {step === 1 && (
             <div className="animate-rise">
-              <h1 className="text-[1.9rem] leading-tight font-semibold">
+              <h1 className="text-3xl leading-tight font-semibold">
                 Tell us about your business
               </h1>
-              <p className="mt-2 text-[14.5px] text-ink-2">
+              <p className="mt-2 text-sm text-ink-2">
                 We&apos;ll provision a dedicated, isolated workspace for your
                 conversations.
               </p>
@@ -350,9 +350,9 @@ export default function OnboardingPage() {
                 <div>
                   <label className="field-label flex items-center justify-between">
                     <span>Industry &amp; Use Case</span>
-                    <span className="text-[11px] font-normal text-ink-3">Default: General</span>
+                    <span className="text-2xs font-normal text-ink-3">Default: General</span>
                   </label>
-                  <p className="text-[12.5px] text-ink-3 mb-3">
+                  <p className="text-xs text-ink-3 mb-3">
                     Tailors your help center blueprints, section icon presets, and conversation placeholders.
                   </p>
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
@@ -371,7 +371,7 @@ export default function OnboardingPage() {
                         >
                           <span className="text-xl shrink-0 leading-none">{p.icon}</span>
                           <div className="min-w-0 flex-1">
-                            <span className="text-[13px] block truncate">{p.label}</span>
+                            <span className="text-ui block truncate">{p.label}</span>
                           </div>
                           {isSelected && <Check className="w-3.5 h-3.5 text-accent shrink-0" />}
                         </button>
@@ -392,7 +392,7 @@ export default function OnboardingPage() {
                     onChange={(e) => setWebsiteUrl(e.target.value)}
                     className="input"
                   />
-                  <p className="mt-1.5 text-[12px] text-ink-3">
+                  <p className="mt-1.5 text-xs text-ink-3">
                     Where the chat widget will live. You can change this later.
                   </p>
 
@@ -401,15 +401,15 @@ export default function OnboardingPage() {
                       <div className="flex items-center gap-2.5">
                         <BookOpen className="w-4 h-4 text-accent shrink-0" />
                         <div>
-                          <span className="text-[10.5px] font-bold text-accent uppercase tracking-wider block">
+                          <span className="text-2xs font-bold text-accent uppercase tracking-wider block">
                             Public Help Center Domain
                           </span>
-                          <span className="font-mono text-[12.5px] text-ink font-semibold">
+                          <span className="font-mono text-xs text-ink font-semibold">
                             https://{getDefaultSubdomain(websiteUrl)}
                           </span>
                         </div>
                       </div>
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-accent/15 text-accent whitespace-nowrap">
+                      <span className="px-2 py-0.5 rounded-full text-2xs font-bold bg-accent/15 text-accent whitespace-nowrap">
                         Workspace Scoped
                       </span>
                     </div>
@@ -434,10 +434,10 @@ export default function OnboardingPage() {
           {/* STEP 2: Branding */}
           {step === 2 && (
             <div className="animate-rise">
-              <h1 className="text-[1.9rem] leading-tight font-semibold">
+              <h1 className="text-3xl leading-tight font-semibold">
                 Make it look like you
               </h1>
-              <p className="mt-2 text-[14.5px] text-ink-2">
+              <p className="mt-2 text-sm text-ink-2">
                 Everything below updates the preview in real time.
               </p>
 
@@ -475,7 +475,7 @@ export default function OnboardingPage() {
                           className="w-5 h-5 bg-transparent border-0 cursor-pointer rounded p-0"
                           aria-label="Custom brand colour"
                         />
-                        <span className="font-mono text-[12px] text-ink-2 uppercase">
+                        <span className="font-mono text-xs text-ink-2 uppercase">
                           {brandColor}
                         </span>
                       </label>
@@ -522,23 +522,23 @@ export default function OnboardingPage() {
                       className="px-4 pt-4 pb-5 text-white"
                       style={{ backgroundColor: brandColor }}
                     >
-                      <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-[12px] font-bold mb-2.5">
+                      <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-xs font-bold mb-2.5">
                         {greetingTitle.charAt(0) || 'S'}
                       </div>
-                      <div className="text-[14px] font-semibold leading-tight truncate">
+                      <div className="text-sm font-semibold leading-tight truncate">
                         {greetingTitle || 'Support Team'}
                       </div>
-                      <div className="text-[11px] opacity-80 mt-0.5 line-clamp-2">
+                      <div className="text-2xs opacity-80 mt-0.5 line-clamp-2">
                         {greetingMessage}
                       </div>
                     </div>
 
                     <div className="p-3 space-y-2 min-h-[128px] flex flex-col justify-end">
-                      <div className="self-start max-w-[85%] rounded-2xl rounded-bl-md bg-surface-2 border border-line px-3 py-2 text-[11.5px] leading-relaxed">
+                      <div className="self-start max-w-[85%] rounded-2xl rounded-bl-md bg-surface-2 border border-line px-3 py-2 text-xs leading-relaxed">
                         Hi! How can we help today?
                       </div>
                       <div
-                        className="self-end max-w-[85%] rounded-2xl rounded-br-md px-3 py-2 text-[11.5px] leading-relaxed text-white"
+                        className="self-end max-w-[85%] rounded-2xl rounded-br-md px-3 py-2 text-xs leading-relaxed text-white"
                         style={{ backgroundColor: brandColor }}
                       >
                         A question about your plans!
@@ -546,7 +546,7 @@ export default function OnboardingPage() {
                     </div>
 
                     <div className="p-2.5 border-t border-line flex items-center gap-2">
-                      <div className="flex-1 h-8 rounded-lg border border-line bg-surface-2 flex items-center px-2.5 text-[11px] text-ink-3">
+                      <div className="flex-1 h-8 rounded-lg border border-line bg-surface-2 flex items-center px-2.5 text-2xs text-ink-3">
                         Type a message…
                       </div>
                       <div
@@ -559,7 +559,7 @@ export default function OnboardingPage() {
                   </div>
 
                   <div className="mt-4 flex items-center justify-between">
-                    <span className="text-[11.5px] text-ink-3">Launcher</span>
+                    <span className="text-xs text-ink-3">Launcher</span>
                     <div
                       className="w-12 h-12 rounded-full flex items-center justify-center p-2.5 shadow-lg transition-transform hover:scale-105"
                       style={{ backgroundColor: brandColor }}
@@ -611,12 +611,12 @@ export default function OnboardingPage() {
               <div className="w-11 h-11 rounded-xl bg-success-soft border border-success-line text-success flex items-center justify-center">
                 <Check className="w-5 h-5" />
               </div>
-              <h1 className="mt-5 text-[1.9rem] leading-tight font-semibold">
+              <h1 className="mt-5 text-3xl leading-tight font-semibold">
                 {businessName} is ready
               </h1>
-              <p className="mt-2 text-[14.5px] text-ink-2 max-w-lg">
+              <p className="mt-2 text-sm text-ink-2 max-w-lg">
                 Paste this snippet on your site — anywhere before the closing{' '}
-                <code className="font-mono text-[13px] text-ink">
+                <code className="font-mono text-ui text-ink">
                   &lt;/body&gt;
                 </code>{' '}
                 tag — and live chat is on.
@@ -624,7 +624,7 @@ export default function OnboardingPage() {
 
               <div className="mt-8 card overflow-hidden">
                 <div className="h-11 px-4 flex items-center justify-between border-b border-line bg-surface-2">
-                  <span className="font-mono text-[11.5px] text-ink-3">
+                  <span className="font-mono text-xs text-ink-3">
                     Embed code
                   </span>
                   <button
@@ -665,8 +665,8 @@ export default function OnboardingPage() {
                   },
                 ].map((c) => (
                   <div key={c.h} className="panel p-4">
-                    <div className="text-[13px] font-semibold">{c.h}</div>
-                    <p className="mt-1.5 text-[12px] leading-relaxed text-ink-2">
+                    <div className="text-ui font-semibold">{c.h}</div>
+                    <p className="mt-1.5 text-xs leading-relaxed text-ink-2">
                       {c.b}
                     </p>
                   </div>

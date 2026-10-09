@@ -337,8 +337,8 @@ function SignupForm() {
         <div className="mx-auto w-14 h-14 rounded-2xl bg-success-soft border border-success-line text-success flex items-center justify-center">
           <CheckCircle2 className="w-7 h-7" />
         </div>
-        <h1 className="mt-6 text-[1.6rem] font-semibold">Email verified!</h1>
-        <p className="mt-2 text-[14px] text-ink-2">
+        <h1 className="mt-6 text-2xl font-semibold">Email verified!</h1>
+        <p className="mt-2 text-sm text-ink-2">
           Setting up your workspace…
         </p>
         <div className="mt-6 mx-auto w-32 h-1 rounded-full bg-surface-3 overflow-hidden">
@@ -357,7 +357,7 @@ function SignupForm() {
             setPhase('form');
             setErrorMsg(null);
           }}
-          className="inline-flex items-center gap-1.5 text-[12.5px] text-ink-3 hover:text-ink transition-colors mb-6 cursor-pointer"
+          className="inline-flex items-center gap-1.5 text-xs text-ink-3 hover:text-ink transition-colors mb-6 cursor-pointer"
         >
           <ArrowLeft className="w-3.5 h-3.5" />
           Edit email or details
@@ -367,10 +367,10 @@ function SignupForm() {
           <KeyRound className="w-6 h-6 stroke-[1.8]" />
         </div>
 
-        <h1 className="mt-5 text-[1.75rem] leading-tight font-semibold">
+        <h1 className="mt-5 text-3xl leading-tight font-semibold">
           Enter verification code
         </h1>
-        <p className="mt-2 text-[14px] text-ink-2 leading-relaxed">
+        <p className="mt-2 text-sm text-ink-2 leading-relaxed">
           We sent a 6-digit code from <strong className="text-ink">ZenTry</strong> to{' '}
           <span className="font-semibold text-ink">{email}</span>. Enter or paste the code below to verify your email.
         </p>
@@ -378,7 +378,7 @@ function SignupForm() {
         {errorMsg && (
           <div
             role="alert"
-            className="mt-5 flex items-start gap-2.5 rounded-xl border border-danger-line bg-danger-soft px-3.5 py-3 text-[12.5px] text-danger animate-pop"
+            className="mt-5 flex items-start gap-2.5 rounded-xl border border-danger-line bg-danger-soft px-3.5 py-3 text-xs text-danger animate-pop"
           >
             <AlertCircle className="w-4 h-4 shrink-0 mt-px" />
             <span>{errorMsg}</span>
@@ -388,7 +388,7 @@ function SignupForm() {
         {resendSuccess && (
           <div
             role="status"
-            className="mt-5 flex items-center gap-2 rounded-xl border border-success-line bg-success-soft px-3.5 py-3 text-[12.5px] text-success animate-pop"
+            className="mt-5 flex items-center gap-2 rounded-xl border border-success-line bg-success-soft px-3.5 py-3 text-xs text-success animate-pop"
           >
             <CheckCircle2 className="w-4 h-4 shrink-0" />
             <span>A fresh verification code has been dispatched to your email.</span>
@@ -398,15 +398,15 @@ function SignupForm() {
         {deliveryWarning && (
           <div
             role="alert"
-            className="mt-5 p-4 rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-900 dark:text-amber-200 text-xs space-y-2 animate-pop"
+            className="mt-5 p-4 rounded-xl border border-warn/30 bg-warn/10 text-warn text-xs space-y-2 animate-pop"
           >
-            <div className="font-bold flex items-center gap-1.5 text-amber-700 dark:text-amber-300">
+            <div className="font-bold flex items-center gap-1.5 text-warn">
               <AlertCircle className="w-4 h-4 shrink-0" />
               <span>Email Delivery Notice:</span>
             </div>
             <p className="leading-relaxed">{deliveryWarning}</p>
             {fallbackCode && (
-              <div className="pt-2 border-t border-amber-500/20 flex flex-wrap items-center justify-between gap-2">
+              <div className="pt-2 border-t border-warn/20 flex flex-wrap items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
                   <span className="text-ink-2 font-medium">Verification Code:</span>
                   <span className="font-mono font-bold text-sm bg-surface px-2.5 py-1 rounded-lg border border-line text-ink">
@@ -470,13 +470,13 @@ function SignupForm() {
               )}
             </button>
 
-            <div className="panel p-3 text-center text-[12px] text-ink-3">
+            <div className="panel p-3 text-center text-xs text-ink-3">
               💡 Tip: You can copy the 6 digits from your email and paste them directly into the first box.
             </div>
           </div>
         </div>
 
-        <div className="mt-6 text-center text-[12.5px] text-ink-3">
+        <div className="mt-6 text-center text-xs text-ink-3">
           Didn&apos;t receive the email?{' '}
           <button
             type="button"
@@ -495,10 +495,10 @@ function SignupForm() {
   return (
     <div>
       <div className="mb-7">
-        <h1 className="text-[1.75rem] leading-tight font-semibold">
+        <h1 className="text-3xl leading-tight font-semibold">
           Create your workspace
         </h1>
-        <p className="mt-2 text-[14px] text-ink-2">
+        <p className="mt-2 text-sm text-ink-2">
           Free forever tier. No credit card required.
         </p>
       </div>
@@ -506,7 +506,7 @@ function SignupForm() {
       {errorMsg && (
         <div
           role="alert"
-          className="mb-5 flex items-start gap-2.5 rounded-xl border border-danger-line bg-danger-soft px-3.5 py-3 text-[12.5px] text-danger animate-pop"
+          className="mb-5 flex items-start gap-2.5 rounded-xl border border-danger-line bg-danger-soft px-3.5 py-3 text-xs text-danger animate-pop"
         >
           <AlertCircle className="w-4 h-4 shrink-0 mt-px" />
           <span>{errorMsg}</span>
@@ -522,7 +522,7 @@ function SignupForm() {
             text="Sign up with Google"
           />
 
-          <div className="relative my-6 text-center text-[12px] text-ink-3">
+          <div className="relative my-6 text-center text-xs text-ink-3">
             <div className="absolute inset-0 flex items-center">
               <div className="w-full border-t border-line-2" />
             </div>
@@ -596,7 +596,7 @@ function SignupForm() {
           </div>
 
           {/* Password rules checklist under the field */}
-          <div className="mt-2.5 rounded-xl border border-line-2 bg-surface-2/60 p-3 space-y-1.5 text-[12px]">
+          <div className="mt-2.5 rounded-xl border border-line-2 bg-surface-2/60 p-3 space-y-1.5 text-xs">
             <span className="font-medium text-ink-2 block mb-1">
               Password requirements:
             </span>
@@ -672,7 +672,7 @@ function SignupForm() {
                 termsError ? 'border-danger ring-1 ring-danger' : 'border-line-2'
               } text-accent focus:ring-accent bg-surface transition-all cursor-pointer`}
             />
-            <span className="text-[12.5px] text-ink-2 leading-snug">
+            <span className="text-xs text-ink-2 leading-snug">
               I agree to the{' '}
               <Link
                 href="/terms"
@@ -712,7 +712,7 @@ function SignupForm() {
         </button>
       </form>
 
-      <p className="mt-5 text-center text-[12.5px] text-ink-3">
+      <p className="mt-5 text-center text-xs text-ink-3">
         Already have an account?{' '}
         <Link
           href="/login"

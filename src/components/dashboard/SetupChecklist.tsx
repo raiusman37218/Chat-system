@@ -154,12 +154,12 @@ export function SetupChecklist({
       description: 'Add the Zen-try script tag to your website before the closing </body> tag.',
       done: isWidgetDetected,
       statusBadge: isWidgetDetected ? (
-        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25">
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-2xs font-semibold bg-success/15 text-success border border-success/25">
+          <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
           Live on site
         </span>
       ) : (
-        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/25">
+        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-2xs font-semibold bg-warn/15 text-warn border border-warn/25">
           Awaiting detection
         </span>
       ),
@@ -173,7 +173,7 @@ export function SetupChecklist({
           >
             {copiedSnippet ? (
               <>
-                <Check className="w-3 h-3 text-emerald-500" />
+                <Check className="w-3 h-3 text-success" />
                 Copied Snippet!
               </>
             ) : (
@@ -198,7 +198,7 @@ export function SetupChecklist({
           <button
             type="button"
             onClick={() => setShowCodeSnippet((prev) => !prev)}
-            className="btn btn-xs btn-ghost gap-1 text-ink-3 hover:text-ink text-[11px]"
+            className="btn btn-xs btn-ghost gap-1 text-ink-3 hover:text-ink text-2xs"
           >
             <Eye className="w-3 h-3" />
             {showCodeSnippet ? 'Hide code' : 'View snippet'}
@@ -212,12 +212,12 @@ export function SetupChecklist({
       description: 'Tune your brand colors, messenger title, avatar logo, and launcher style.',
       done: isCustomised,
       statusBadge: isCustomised ? (
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25">
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-2xs font-semibold bg-success/15 text-success border border-success/25">
           <Check className="w-3 h-3" />
           Customised
         </span>
       ) : (
-        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-surface-2 text-ink-3 border border-line">
+        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-2xs font-semibold bg-surface-2 text-ink-3 border border-line">
           Default theme
         </span>
       ),
@@ -250,12 +250,12 @@ export function SetupChecklist({
       description: 'Provide instant answers so customers get help even when your team is offline.',
       done: isHelpCenterReady,
       statusBadge: isHelpCenterReady ? (
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25">
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-2xs font-semibold bg-success/15 text-success border border-success/25">
           <Check className="w-3 h-3" />
           {articlesCount} articles in {sectionsCount} section{sectionsCount !== 1 ? 's' : ''}
         </span>
       ) : (
-        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/25">
+        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-2xs font-semibold bg-warn/15 text-warn border border-warn/25">
           {articlesCount}/3 articles • {sectionsCount}/1 sections
         </span>
       ),
@@ -279,12 +279,12 @@ export function SetupChecklist({
       description: 'Add your co-workers to manage incoming chats and collaborate seamlessly.',
       done: isTeamInvited,
       statusBadge: isTeamInvited ? (
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25">
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-2xs font-semibold bg-success/15 text-success border border-success/25">
           <Check className="w-3 h-3" />
           {allAgents.length} team members
         </span>
       ) : (
-        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/25">
+        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-2xs font-semibold bg-warn/15 text-warn border border-warn/25">
           1 member (Solo)
         </span>
       ),
@@ -311,12 +311,12 @@ export function SetupChecklist({
       description: 'Experience your live chat widget as a customer and verify real-time messaging.',
       done: isTestMessageSent,
       statusBadge: isTestMessageSent ? (
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25">
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-2xs font-semibold bg-success/15 text-success border border-success/25">
           <Check className="w-3 h-3" />
           First conversation started
         </span>
       ) : (
-        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/25">
+        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-2xs font-semibold bg-warn/15 text-warn border border-warn/25">
           Awaiting test chat
         </span>
       ),
@@ -374,9 +374,9 @@ export function SetupChecklist({
               </span>
               <span
                 className={cn(
-                  'px-2 py-0.5 rounded-full text-[11px] font-bold',
+                  'px-2 py-0.5 rounded-full text-2xs font-bold',
                   isAllComplete
-                    ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400'
+                    ? 'bg-success/20 text-success'
                     : 'bg-accent/15 text-accent'
                 )}
               >
@@ -389,7 +389,7 @@ export function SetupChecklist({
                 ? '🎉 Workspace setup complete!'
                 : 'Get your workspace ready for visitors'}
             </h2>
-            <p className="text-[12.5px] text-ink-3 mt-0.5 leading-relaxed">
+            <p className="text-xs text-ink-3 mt-0.5 leading-relaxed">
               {isAllComplete
                 ? 'All foundational setup tasks are done. You can now launch and support visitors anytime.'
                 : 'Follow these quick steps to customize your widget, populate answers, and test real-time chat.'}
@@ -426,7 +426,7 @@ export function SetupChecklist({
             <div
               className={cn(
                 'h-full transition-all duration-500 ease-out rounded-full',
-                isAllComplete ? 'bg-emerald-500' : 'bg-accent'
+                isAllComplete ? 'bg-success' : 'bg-accent'
               )}
               style={{ width: `${progressPercent}%` }}
             />
@@ -451,7 +451,7 @@ export function SetupChecklist({
                   {/* Status Indicator */}
                   <div className="shrink-0 mt-0.5">
                     {item.done ? (
-                      <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0" />
+                      <CheckCircle2 className="w-5 h-5 text-success shrink-0" />
                     ) : (
                       <Circle className="w-5 h-5 text-ink-3 shrink-0 stroke-[1.75]" />
                     )}
@@ -461,12 +461,12 @@ export function SetupChecklist({
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-2 flex-wrap">
                       <div className="flex items-center gap-2">
-                        <span className="text-[11px] font-bold text-ink-3 uppercase tracking-wider">
+                        <span className="text-2xs font-bold text-ink-3 uppercase tracking-wider">
                           Step {index + 1}
                         </span>
                         <h3
                           className={cn(
-                            'text-[13.5px] font-semibold leading-snug',
+                            'text-ui font-semibold leading-snug',
                             item.done ? 'text-ink-2 line-through decoration-line-2' : 'text-ink'
                           )}
                         >
@@ -476,25 +476,25 @@ export function SetupChecklist({
                       {item.statusBadge}
                     </div>
 
-                    <p className="text-[12px] text-ink-3 mt-1 leading-relaxed">
+                    <p className="text-xs text-ink-3 mt-1 leading-relaxed">
                       {item.description}
                     </p>
 
                     {/* Expandable snippet for widget */}
                     {item.id === 'install' && showCodeSnippet && (
                       <div className="mt-3 card overflow-hidden border-line">
-                        <div className="h-8 px-3 flex items-center justify-between border-b border-line bg-surface-2 text-[11px]">
+                        <div className="h-8 px-3 flex items-center justify-between border-b border-line bg-surface-2 text-2xs">
                           <span className="font-mono text-ink-3">HTML Snippet</span>
                           <button
                             type="button"
                             onClick={copyEmbedSnippet}
                             className="font-medium text-accent hover:underline flex items-center gap-1"
                           >
-                            {copiedSnippet ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
+                            {copiedSnippet ? <Check className="w-3 h-3 text-success" /> : <Copy className="w-3 h-3" />}
                             {copiedSnippet ? 'Copied' : 'Copy'}
                           </button>
                         </div>
-                        <pre className="p-3 text-[11px] font-mono leading-relaxed bg-surface overflow-x-auto text-ink-2">
+                        <pre className="p-3 text-2xs font-mono leading-relaxed bg-surface overflow-x-auto text-ink-2">
                           {embedSnippet}
                         </pre>
                       </div>

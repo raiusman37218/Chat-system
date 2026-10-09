@@ -266,11 +266,11 @@ export function PlatformSMTPSettingsSection() {
                   <h1 className="text-xl font-bold text-ink">
                     ZenTry Master Platform Email
                   </h1>
-                  <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold tracking-wide uppercase bg-accent/10 text-accent border border-accent/20">
+                  <span className="px-2.5 py-0.5 rounded-full text-2xs font-bold tracking-wide uppercase bg-accent/10 text-accent border border-accent/20">
                     Super Admin Only
                   </span>
                 </div>
-                <p className="text-[13.5px] text-ink-2 mt-1 leading-relaxed">
+                <p className="text-ui text-ink-2 mt-1 leading-relaxed">
                   The primary system email for the <strong>ZenTry SaaS platform</strong> ({platformUrl}). This email is used to verify every new customer and business who signs up to create a workspace and install the chat widget on their website.
                 </p>
               </div>
@@ -279,12 +279,12 @@ export function PlatformSMTPSettingsSection() {
             {/* Quick Status Pill */}
             <div className="shrink-0 flex items-center gap-2">
               {isConfigured ? (
-                <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/25 text-emerald-600 text-xs font-bold">
+                <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-success/10 border border-success/25 text-success text-xs font-bold">
                   <CheckCircle2 className="w-4 h-4" />
                   <span>ZenTry Mail Active</span>
                 </div>
               ) : (
-                <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/25 text-amber-600 text-xs font-bold">
+                <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-warn/10 border border-warn/25 text-warn text-xs font-bold">
                   <AlertCircle className="w-4 h-4" />
                   <span>Setup Pending</span>
                 </div>
@@ -307,17 +307,17 @@ export function PlatformSMTPSettingsSection() {
             role="alert"
             className={cn(
               'p-4 rounded-xl border flex items-start gap-3 text-sm shadow-xs transition-all',
-              statusMessage.type === 'success' && 'bg-emerald-50 border-emerald-200 text-emerald-900 dark:bg-emerald-950/40 dark:border-emerald-800 dark:text-emerald-200',
-              statusMessage.type === 'error' && 'bg-rose-50 border-rose-200 text-rose-900 dark:bg-rose-950/40 dark:border-rose-800 dark:text-rose-200',
-              statusMessage.type === 'info' && 'bg-blue-50 border-blue-200 text-blue-900 dark:bg-blue-950/40 dark:border-blue-800 dark:text-blue-200'
+              statusMessage.type === 'success' && 'bg-success-soft border-success-line text-success',
+              statusMessage.type === 'error' && 'bg-danger-soft border-danger-line text-danger',
+              statusMessage.type === 'info' && 'bg-accent-soft border-accent-line text-accent'
             )}
           >
             {statusMessage.type === 'success' ? (
-              <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+              <CheckCircle2 className="w-5 h-5 text-success shrink-0 mt-0.5" />
             ) : statusMessage.type === 'error' ? (
-              <AlertCircle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+              <AlertCircle className="w-5 h-5 text-danger shrink-0 mt-0.5" />
             ) : (
-              <Sparkles className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
+              <Sparkles className="w-5 h-5 text-accent shrink-0 mt-0.5" />
             )}
             <div className="flex-1 font-medium">{statusMessage.text}</div>
           </div>
@@ -338,7 +338,7 @@ export function PlatformSMTPSettingsSection() {
 
             {/* Presets */}
             <div className="flex items-center gap-2">
-              <span className="text-[11px] font-bold text-ink-3 uppercase tracking-wider">
+              <span className="text-2xs font-bold text-ink-3 uppercase tracking-wider">
                 Preset:
               </span>
               <button
@@ -382,7 +382,7 @@ export function PlatformSMTPSettingsSection() {
                 required
                 className="input w-full text-sm"
               />
-              <span className="text-[11px] text-ink-3 mt-1 block">
+              <span className="text-2xs text-ink-3 mt-1 block">
                 The name displayed in the recipient&apos;s inbox (e.g. &quot;ZenTry&quot; or &quot;ZenTry Verification&quot;).
               </span>
             </div>
@@ -400,7 +400,7 @@ export function PlatformSMTPSettingsSection() {
                 required
                 className="input w-full text-sm font-mono"
               />
-              <span className="text-[11px] text-ink-3 mt-1 block">
+              <span className="text-2xs text-ink-3 mt-1 block">
                 Must match your authenticated ZenTry email (e.g. <span className="font-mono text-accent">noreply@zen-try.site</span>).
               </span>
             </div>
@@ -418,7 +418,7 @@ export function PlatformSMTPSettingsSection() {
                 required
                 className="input w-full text-sm font-mono"
               />
-              <span className="text-[11px] text-ink-3 mt-1 block">
+              <span className="text-2xs text-ink-3 mt-1 block">
                 Hostinger: <span className="font-mono">smtp.hostinger.com</span>
               </span>
             </div>
@@ -447,7 +447,7 @@ export function PlatformSMTPSettingsSection() {
                   <span>SSL Security (Recommended for Port 465)</span>
                 </label>
               </div>
-              <span className="text-[11px] text-ink-3 mt-1 block">
+              <span className="text-2xs text-ink-3 mt-1 block">
                 Use 465 with SSL enabled, or 587 for TLS.
               </span>
             </div>
@@ -465,7 +465,7 @@ export function PlatformSMTPSettingsSection() {
                 required
                 className="input w-full text-sm font-mono"
               />
-              <span className="text-[11px] text-ink-3 mt-1 block">
+              <span className="text-2xs text-ink-3 mt-1 block">
                 Your full ZenTry email login address created in Hostinger / Webmail.
               </span>
             </div>
@@ -492,7 +492,7 @@ export function PlatformSMTPSettingsSection() {
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
-              <span className="text-[11px] text-ink-3 mt-1 block">
+              <span className="text-2xs text-ink-3 mt-1 block">
                 {smtp.host.includes('gmail')
                   ? 'Gmail requires a 16-character App Password (e.g. abcd efgh ijkl mnop).'
                   : 'The password for this specific email address.'}
@@ -501,8 +501,8 @@ export function PlatformSMTPSettingsSection() {
 
             {/* Google App Password Guide Banner */}
             {smtp.host.includes('gmail') && (
-              <div className="md:col-span-2 rounded-xl bg-blue-500/10 border border-blue-500/25 p-4 text-xs space-y-2">
-                <div className="font-bold text-blue-700 dark:text-blue-300 flex items-center gap-1.5">
+              <div className="md:col-span-2 rounded-xl bg-accent/10 border border-accent/25 p-4 text-xs space-y-2">
+                <div className="font-bold text-accent flex items-center gap-1.5">
                   <Sparkles className="w-4 h-4" />
                   <span>Important for Google / Gmail:</span>
                 </div>
@@ -555,7 +555,7 @@ export function PlatformSMTPSettingsSection() {
         {/* Live Delivery Testing Panel */}
         <div className="card border-2 border-line bg-surface p-6 rounded-2xl shadow-sm space-y-4">
           <div className="flex items-start gap-3">
-            <div className="p-2.5 rounded-xl bg-blue-500/10 text-blue-600 shrink-0">
+            <div className="p-2.5 rounded-xl bg-accent/10 text-accent shrink-0">
               <Send className="w-5 h-5" />
             </div>
             <div>
@@ -619,7 +619,7 @@ export function PlatformSMTPSettingsSection() {
                 1
               </div>
               <h4 className="text-xs font-bold text-ink">New Business Signs Up</h4>
-              <p className="text-[12px] text-ink-3 leading-relaxed">
+              <p className="text-xs text-ink-3 leading-relaxed">
                 A business owner registers at <span className="font-mono text-accent">zen-try.site/signup</span> to create their company workspace and install chat on their website.
               </p>
             </div>
@@ -629,7 +629,7 @@ export function PlatformSMTPSettingsSection() {
                 2
               </div>
               <h4 className="text-xs font-bold text-ink">ZenTry Verification Sent</h4>
-              <p className="text-[12px] text-ink-3 leading-relaxed">
+              <p className="text-xs text-ink-3 leading-relaxed">
                 Supabase Auth sends the activation link to the business owner&apos;s email from your authenticated <span className="font-mono text-accent">{smtp.from_email || 'noreply@zen-try.site'}</span> address.
               </p>
             </div>
@@ -639,7 +639,7 @@ export function PlatformSMTPSettingsSection() {
                 3
               </div>
               <h4 className="text-xs font-bold text-ink">Workspace Activated</h4>
-              <p className="text-[12px] text-ink-3 leading-relaxed">
+              <p className="text-xs text-ink-3 leading-relaxed">
                 Once verified, the user is redirected to onboarding to set up their company, get their widget code, and configure their own workspace email.
               </p>
             </div>
@@ -652,7 +652,7 @@ export function PlatformSMTPSettingsSection() {
                 <h4 className="text-xs font-bold text-ink uppercase tracking-wider">
                   Sync with Supabase Auth (Custom SMTP)
                 </h4>
-                <p className="text-[12px] text-ink-3 mt-0.5">
+                <p className="text-xs text-ink-3 mt-0.5">
                   To ensure Supabase Auth sends new business verification emails via your ZenTry mailbox, copy these values into your Supabase Dashboard:
                 </p>
               </div>
@@ -669,7 +669,7 @@ export function PlatformSMTPSettingsSection() {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
               <div className="p-3 rounded-lg bg-surface border border-line space-y-1">
-                <span className="text-[10.5px] font-bold text-ink-3 uppercase">Sender Email</span>
+                <span className="text-2xs font-bold text-ink-3 uppercase">Sender Email</span>
                 <div className="font-mono text-ink font-semibold truncate flex items-center justify-between">
                   <span>{smtp.from_email || 'noreply@zen-try.site'}</span>
                   <button
@@ -677,13 +677,13 @@ export function PlatformSMTPSettingsSection() {
                     onClick={() => handleCopy(smtp.from_email || 'noreply@zen-try.site', 'from_email')}
                     className="text-ink-3 hover:text-accent ml-1"
                   >
-                    {copiedField === 'from_email' ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+                    {copiedField === 'from_email' ? <Check className="w-3.5 h-3.5 text-success" /> : <Copy className="w-3.5 h-3.5" />}
                   </button>
                 </div>
               </div>
 
               <div className="p-3 rounded-lg bg-surface border border-line space-y-1">
-                <span className="text-[10.5px] font-bold text-ink-3 uppercase">Host</span>
+                <span className="text-2xs font-bold text-ink-3 uppercase">Host</span>
                 <div className="font-mono text-ink font-semibold truncate flex items-center justify-between">
                   <span>{smtp.host || 'smtp.hostinger.com'}</span>
                   <button
@@ -691,13 +691,13 @@ export function PlatformSMTPSettingsSection() {
                     onClick={() => handleCopy(smtp.host || 'smtp.hostinger.com', 'host')}
                     className="text-ink-3 hover:text-accent ml-1"
                   >
-                    {copiedField === 'host' ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+                    {copiedField === 'host' ? <Check className="w-3.5 h-3.5 text-success" /> : <Copy className="w-3.5 h-3.5" />}
                   </button>
                 </div>
               </div>
 
               <div className="p-3 rounded-lg bg-surface border border-line space-y-1">
-                <span className="text-[10.5px] font-bold text-ink-3 uppercase">Port</span>
+                <span className="text-2xs font-bold text-ink-3 uppercase">Port</span>
                 <div className="font-mono text-ink font-semibold truncate flex items-center justify-between">
                   <span>{smtp.port || 465}</span>
                   <button
@@ -705,13 +705,13 @@ export function PlatformSMTPSettingsSection() {
                     onClick={() => handleCopy(String(smtp.port || 465), 'port')}
                     className="text-ink-3 hover:text-accent ml-1"
                   >
-                    {copiedField === 'port' ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+                    {copiedField === 'port' ? <Check className="w-3.5 h-3.5 text-success" /> : <Copy className="w-3.5 h-3.5" />}
                   </button>
                 </div>
               </div>
 
               <div className="p-3 rounded-lg bg-surface border border-line space-y-1">
-                <span className="text-[10.5px] font-bold text-ink-3 uppercase">Username</span>
+                <span className="text-2xs font-bold text-ink-3 uppercase">Username</span>
                 <div className="font-mono text-ink font-semibold truncate flex items-center justify-between">
                   <span>{smtp.user || 'your-email@zen-try.site'}</span>
                   <button
@@ -719,7 +719,7 @@ export function PlatformSMTPSettingsSection() {
                     onClick={() => handleCopy(smtp.user || '', 'user')}
                     className="text-ink-3 hover:text-accent ml-1"
                   >
-                    {copiedField === 'user' ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+                    {copiedField === 'user' ? <Check className="w-3.5 h-3.5 text-success" /> : <Copy className="w-3.5 h-3.5" />}
                   </button>
                 </div>
               </div>

@@ -1,5 +1,16 @@
 import { clsx, type ClassValue } from 'clsx';
-import { twMerge } from 'tailwind-merge';
+import { extendTailwindMerge } from 'tailwind-merge';
+
+// The design system adds font sizes (text-2xs / text-ui / text-md) that
+// tailwind-merge can't know about. Without this it reads `text-ui` as a text
+// colour and drops it whenever the same class list also sets `text-ink`.
+const twMerge = extendTailwindMerge({
+  extend: {
+    classGroups: {
+      'font-size': [{ text: ['2xs', 'ui', 'md'] }],
+    },
+  },
+});
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));

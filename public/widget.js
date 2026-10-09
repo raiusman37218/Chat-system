@@ -436,13 +436,20 @@ ${_}`}var R=class extends Error{constructor({message:e,code:t,cause:i,name:s}){v
         --w-canvas: #fbfbf9;
 
         --w-ink: #0b0b0f;
-        --w-ink-2: #56575e;
-        --w-ink-3: #8b8c93;
+        --w-ink-2: #4f5057;
+        --w-ink-3: #64656c;
 
         --w-line: #e7e7e3;
         --w-line-2: #d6d6d1;
 
-        --w-success: #0f9d76;
+        --w-success: #0b7a5c;
+
+        /* Glass window (Zentry design system: the widget is one of the three
+           places glass is allowed). Kept mostly opaque so text contrast holds
+           over any host page. */
+        --w-glass: rgba(255, 255, 255, 0.86);
+        --w-glass-line: rgba(11, 11, 15, 0.08);
+        --w-focus: #2850e8;
 
         --w-r-sm: 10px;
         --w-r-md: 14px;
@@ -470,13 +477,17 @@ ${_}`}var R=class extends Error{constructor({message:e,code:t,cause:i,name:s}){v
           --w-canvas: #0b0b0e;
 
           --w-ink: #f5f5f3;
-          --w-ink-2: #a2a2aa;
-          --w-ink-3: #6e6e78;
+          --w-ink-2: #b4b4bc;
+          --w-ink-3: #8b8b95;
 
           --w-line: #232329;
           --w-line-2: #2f2f37;
 
           --w-success: #34d9a7;
+
+          --w-glass: rgba(16, 16, 19, 0.84);
+          --w-glass-line: rgba(255, 255, 255, 0.08);
+          --w-focus: #7a99ff;
 
           --w-shadow-sm: 0 1px 3px rgba(0,0,0,.5);
           --w-shadow-md: 0 6px 18px rgba(0,0,0,.55);
@@ -484,6 +495,12 @@ ${_}`}var R=class extends Error{constructor({message:e,code:t,cause:i,name:s}){v
 
           color-scheme: dark;
         }
+      }
+
+      /* Visible keyboard focus everywhere inside the widget. */
+      :focus-visible {
+        outline: 2px solid var(--w-focus);
+        outline-offset: 2px;
       }
 
       * {
@@ -848,8 +865,10 @@ ${_}`}var R=class extends Error{constructor({message:e,code:t,cause:i,name:s}){v
         max-width: calc(100vw - 40px);
         height: 640px;
         max-height: calc(100vh - 120px);
-        background: var(--w-surface);
-        border: 1px solid var(--w-line);
+        background: var(--w-glass);
+        backdrop-filter: saturate(160%) blur(18px);
+        -webkit-backdrop-filter: saturate(160%) blur(18px);
+        border: 1px solid var(--w-glass-line);
         border-radius: var(--w-r-xl);
         box-shadow: var(--w-shadow-xl);
         display: none;

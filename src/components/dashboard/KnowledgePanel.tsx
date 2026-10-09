@@ -343,7 +343,7 @@ export function KnowledgePanel({
               type="button"
               onClick={() => setTab(id)}
               className={cn(
-                'h-7 px-3 rounded-md text-[12.5px] font-medium transition-all inline-flex items-center gap-1.5',
+                'h-7 px-3 rounded-md text-xs font-medium transition-all inline-flex items-center gap-1.5',
                 tab === id
                   ? 'bg-surface text-ink font-semibold shadow-xs'
                   : 'text-ink-3 hover:text-ink'
@@ -355,7 +355,7 @@ export function KnowledgePanel({
                 <MessageSquareWarning className="w-3.5 h-3.5" />
               )}
               {label}
-              {count > 0 && <span className="text-[11px] opacity-70">({count})</span>}
+              {count > 0 && <span className="text-2xs opacity-70">({count})</span>}
             </button>
           ))}
         </div>
@@ -368,7 +368,7 @@ export function KnowledgePanel({
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search notes..."
-                className="w-full h-8 pl-8 pr-2.5 rounded-lg border border-line bg-surface-2/70 text-[12.5px] text-ink placeholder:text-ink-3 focus:outline-none focus:border-accent"
+                className="w-full h-8 pl-8 pr-2.5 rounded-lg border border-line bg-surface-2/70 text-xs text-ink placeholder:text-ink-3 focus:outline-none focus:border-accent"
               />
             </div>
           )}
@@ -376,7 +376,7 @@ export function KnowledgePanel({
       </div>
 
       {error && (
-        <div role="alert" className="rounded-xl border border-danger-line bg-danger-soft px-4 py-2.5 text-[12.5px] text-danger flex items-center justify-between gap-3">
+        <div role="alert" className="rounded-xl border border-danger-line bg-danger-soft px-4 py-2.5 text-xs text-danger flex items-center justify-between gap-3">
           <span>{error}</span>
           <button type="button" onClick={() => setError(null)} className="shrink-0">
             <X className="w-3.5 h-3.5" />
@@ -385,7 +385,7 @@ export function KnowledgePanel({
       )}
 
       {loading ? (
-        <div className="p-12 text-center text-ink-3 text-[13px] flex items-center justify-center gap-2">
+        <div className="p-12 text-center text-ink-3 text-ui flex items-center justify-center gap-2">
           <Loader2 className="w-4 h-4 animate-spin" />
           Loading…
         </div>
@@ -449,10 +449,10 @@ function NotesList({
     return (
       <div className="p-12 rounded-2xl border border-dashed border-line text-center space-y-3 bg-surface-2/40">
         <Lock className="w-9 h-9 text-ink-3 mx-auto stroke-[1.5]" />
-        <div className="text-[15px] font-semibold text-ink">
+        <div className="text-md font-semibold text-ink">
           {searching ? 'No notes match that' : 'Nothing here yet'}
         </div>
-        <p className="text-[12.5px] text-ink-3 max-w-md mx-auto">
+        <p className="text-xs text-ink-3 max-w-md mx-auto">
           {searching
             ? 'Try a different word.'
             : 'Keep the things your team needs but customers should not read — internal policies, escalation paths, known issues and their workarounds.'}
@@ -461,7 +461,7 @@ function NotesList({
           <button
             type="button"
             onClick={onNew}
-            className="h-8 px-3.5 rounded-lg bg-accent text-accent-ink text-[12.5px] font-semibold inline-flex items-center gap-1.5"
+            className="h-8 px-3.5 rounded-lg bg-accent text-accent-ink text-xs font-semibold inline-flex items-center gap-1.5"
           >
             <Plus className="w-3.5 h-3.5" />
             Write the first note
@@ -484,7 +484,7 @@ function NotesList({
               {note.tags.map((t) => (
                 <span
                   key={t}
-                  className="px-2 py-0.5 rounded-md text-[11px] font-medium bg-surface-2 text-ink-3 border border-line/60"
+                  className="px-2 py-0.5 rounded-md text-2xs font-medium bg-surface-2 text-ink-3 border border-line/60"
                 >
                   {t}
                 </span>
@@ -493,12 +493,12 @@ function NotesList({
             <button
               type="button"
               onClick={() => onEdit(note)}
-              className="block text-left text-[14.5px] font-semibold text-ink hover:text-accent transition-colors"
+              className="block text-left text-sm font-semibold text-ink hover:text-accent transition-colors"
             >
               {note.title}
             </button>
             {note.content && (
-              <p className="text-[12.5px] text-ink-2 line-clamp-2 max-w-3xl">
+              <p className="text-xs text-ink-2 line-clamp-2 max-w-3xl">
                 {note.content}
               </p>
             )}
@@ -518,7 +518,7 @@ function NotesList({
               onClick={() => onDelete(note)}
               disabled={busyId === note.id}
               title="Delete note"
-              className="h-8 w-8 rounded-md hover:bg-rose-500/10 grid place-items-center text-ink-3 hover:text-rose-500 transition-colors disabled:opacity-50"
+              className="h-8 w-8 rounded-md hover:bg-danger/10 grid place-items-center text-ink-3 hover:text-danger transition-colors disabled:opacity-50"
             >
               <Trash2 className="w-3.5 h-3.5" />
             </button>
@@ -539,7 +539,7 @@ function VisibilityBadge({ visibility }: { visibility: KnowledgeNote['visibility
           : 'Only your team can see this. The assistant will never quote it.'
       }
       className={cn(
-        'inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold border',
+        'inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-2xs font-semibold border',
         isAssistant
           ? 'bg-accent-soft text-accent border-accent-line'
           : 'bg-surface-2 text-ink-3 border-line/60'
@@ -581,10 +581,10 @@ function NoteEditor({
   };
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4">
-      <div className="w-full max-w-2xl rounded-2xl border border-line bg-surface shadow-2xl overflow-hidden">
+    <div className="fixed inset-0 z-50 grid place-items-center bg-overlay p-4">
+      <div className="w-full max-w-2xl rounded-2xl border border-line popover shadow-2xl overflow-hidden">
         <div className="px-5 py-3.5 border-b border-line flex items-center justify-between">
-          <h3 className="text-[15px] font-semibold text-ink">
+          <h3 className="text-md font-semibold text-ink">
             {note.id ? 'Edit note' : 'New team note'}
           </h3>
           <button
@@ -598,41 +598,41 @@ function NoteEditor({
 
         <div className="p-5 space-y-4 max-h-[70vh] overflow-y-auto">
           <div className="space-y-1.5">
-            <label className="text-[12px] font-medium text-ink-2">Title</label>
+            <label className="text-xs font-medium text-ink-2">Title</label>
             <input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               autoFocus
               placeholder="Refund policy for annual plans"
-              className="w-full h-9 px-3 rounded-lg border border-line bg-surface-2/60 text-[13.5px] text-ink focus:outline-none focus:border-accent"
+              className="w-full h-9 px-3 rounded-lg border border-line bg-surface-2/60 text-ui text-ink focus:outline-none focus:border-accent"
             />
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-[12px] font-medium text-ink-2">Details</label>
+            <label className="text-xs font-medium text-ink-2">Details</label>
             <textarea
               value={content}
               onChange={(e) => setContent(e.target.value)}
               rows={9}
               placeholder="Anything the team needs on hand. Plain text or markdown."
-              className="w-full px-3 py-2.5 rounded-lg border border-line bg-surface-2/60 text-[13.5px] leading-relaxed text-ink focus:outline-none focus:border-accent resize-y"
+              className="w-full px-3 py-2.5 rounded-lg border border-line bg-surface-2/60 text-ui leading-relaxed text-ink focus:outline-none focus:border-accent resize-y"
             />
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-[12px] font-medium text-ink-2">
+            <label className="text-xs font-medium text-ink-2">
               Tags <span className="text-ink-3 font-normal">(comma separated)</span>
             </label>
             <input
               value={tags}
               onChange={(e) => setTags(e.target.value)}
               placeholder="billing, escalation"
-              className="w-full h-9 px-3 rounded-lg border border-line bg-surface-2/60 text-[13px] text-ink focus:outline-none focus:border-accent"
+              className="w-full h-9 px-3 rounded-lg border border-line bg-surface-2/60 text-ui text-ink focus:outline-none focus:border-accent"
             />
           </div>
 
           <fieldset className="space-y-2">
-            <legend className="text-[12px] font-medium text-ink-2 mb-1.5">
+            <legend className="text-xs font-medium text-ink-2 mb-1.5">
               Who can use this
             </legend>
             {(
@@ -666,8 +666,8 @@ function NoteEditor({
                   className="mt-0.5"
                 />
                 <span className="min-w-0">
-                  <span className="block text-[13px] font-medium text-ink">{label}</span>
-                  <span className="block text-[12px] text-ink-3 mt-0.5">{hint}</span>
+                  <span className="block text-ui font-medium text-ink">{label}</span>
+                  <span className="block text-xs text-ink-3 mt-0.5">{hint}</span>
                 </span>
               </label>
             ))}
@@ -678,7 +678,7 @@ function NoteEditor({
           <button
             type="button"
             onClick={onCancel}
-            className="h-9 px-3.5 rounded-lg border border-line text-[13px] font-medium text-ink hover:bg-surface-2"
+            className="h-9 px-3.5 rounded-lg border border-line text-ui font-medium text-ink hover:bg-surface-2"
           >
             Cancel
           </button>
@@ -686,7 +686,7 @@ function NoteEditor({
             type="button"
             onClick={submit}
             disabled={saving || !title.trim()}
-            className="h-9 px-4 rounded-lg bg-accent text-accent-ink text-[13px] font-semibold disabled:opacity-50"
+            className="h-9 px-4 rounded-lg bg-accent text-accent-ink text-ui font-semibold disabled:opacity-50"
           >
             {saving ? 'Saving…' : 'Save note'}
           </button>
@@ -724,9 +724,9 @@ function GapsList({
   if (gaps.length === 0) {
     return (
       <div className="p-12 rounded-2xl border border-dashed border-line text-center space-y-2 bg-surface-2/40">
-        <Check className="w-9 h-9 text-emerald-500 mx-auto stroke-[1.5]" />
-        <div className="text-[15px] font-semibold text-ink">No open gaps</div>
-        <p className="text-[12.5px] text-ink-3 max-w-md mx-auto">
+        <Check className="w-9 h-9 text-success mx-auto stroke-[1.5]" />
+        <div className="text-md font-semibold text-ink">No open gaps</div>
+        <p className="text-xs text-ink-3 max-w-md mx-auto">
           Every question customers have asked was covered by an article or a note.
           Anything the assistant cannot answer will show up here.
         </p>
@@ -744,26 +744,26 @@ function GapsList({
             <div className="min-w-0 flex-1 space-y-1.5">
               <div className="flex items-center gap-2 flex-wrap">
                 {gap.timesAsked > 1 && (
-                  <span className="px-2 py-0.5 rounded-md text-[11px] font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+                  <span className="px-2 py-0.5 rounded-md text-2xs font-bold bg-warn/10 text-warn border border-warn/20">
                     asked {gap.timesAsked}×
                   </span>
                 )}
                 {gap.questionCount > 1 && (
                   <span
-                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium bg-surface-2 text-ink-2 border border-line/60"
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-2xs font-medium bg-surface-2 text-ink-2 border border-line/60"
                     title={`Grouped similar questions:\n${gap.allQuestions.map((q) => `• ${q}`).join('\n')}`}
                   >
                     <Layers className="w-3 h-3 text-ink-3" />
                     <span>{gap.questionCount} similar questions</span>
                   </span>
                 )}
-                <span className="text-[11px] text-ink-3">
+                <span className="text-2xs text-ink-3">
                   last {new Date(gap.lastAskedAt).toLocaleDateString()}
                 </span>
               </div>
-              <p className="text-[14px] font-medium text-ink">“{gap.primaryQuestion}”</p>
+              <p className="text-sm font-medium text-ink">“{gap.primaryQuestion}”</p>
               {gap.reason && (
-                <p className="text-[11.5px] text-ink-3">Why it went unanswered: {gap.reason}</p>
+                <p className="text-xs text-ink-3">Why it went unanswered: {gap.reason}</p>
               )}
             </div>
 
@@ -773,7 +773,7 @@ function GapsList({
                   type="button"
                   onClick={() => onCreateArticle(gap.primaryQuestion)}
                   title="Write a public article answering this"
-                  className="h-8 px-2.5 rounded-lg border border-line text-[12px] font-medium text-ink hover:bg-surface-2 inline-flex items-center gap-1.5"
+                  className="h-8 px-2.5 rounded-lg border border-line text-xs font-medium text-ink hover:bg-surface-2 inline-flex items-center gap-1.5"
                 >
                   <FileText className="w-3.5 h-3.5" />
                   Write article
@@ -783,7 +783,7 @@ function GapsList({
                 type="button"
                 onClick={() => onCreateNote(gap)}
                 title="Answer it in a team note instead"
-                className="h-8 px-2.5 rounded-lg border border-line text-[12px] font-medium text-ink hover:bg-surface-2 inline-flex items-center gap-1.5"
+                className="h-8 px-2.5 rounded-lg border border-line text-xs font-medium text-ink hover:bg-surface-2 inline-flex items-center gap-1.5"
               >
                 <Lock className="w-3.5 h-3.5" />
                 Note
@@ -793,7 +793,7 @@ function GapsList({
                 onClick={() => onResolve(gap, 'answered')}
                 disabled={busyId === gap.id}
                 title="Mark as covered"
-                className="h-8 w-8 rounded-md hover:bg-emerald-500/10 grid place-items-center text-ink-3 hover:text-emerald-500 disabled:opacity-50"
+                className="h-8 w-8 rounded-md hover:bg-success/10 grid place-items-center text-ink-3 hover:text-success disabled:opacity-50"
               >
                 <Check className="w-4 h-4" />
               </button>
@@ -812,7 +812,7 @@ function GapsList({
       </div>
 
       {totalPages > 1 && (
-        <div className="flex items-center justify-between px-2 py-1 text-[12.5px] text-ink-3">
+        <div className="flex items-center justify-between px-2 py-1 text-xs text-ink-3">
           <span>
             Showing {(page - 1) * PAGE_SIZE + 1} to{' '}
             {Math.min(page * PAGE_SIZE, gaps.length)} of {gaps.length} gaps
@@ -822,19 +822,19 @@ function GapsList({
               type="button"
               disabled={page <= 1}
               onClick={() => setPage((p) => Math.max(1, p - 1))}
-              className="h-7 px-2.5 rounded-md border border-line bg-surface text-ink hover:bg-surface-2 disabled:opacity-30 disabled:pointer-events-none inline-flex items-center gap-1 text-[12px]"
+              className="h-7 px-2.5 rounded-md border border-line bg-surface text-ink hover:bg-surface-2 disabled:opacity-30 disabled:pointer-events-none inline-flex items-center gap-1 text-xs"
             >
               <ChevronLeft className="w-3.5 h-3.5" />
               Previous
             </button>
-            <span className="px-2 text-[12px] font-medium text-ink">
+            <span className="px-2 text-xs font-medium text-ink">
               Page {page} of {totalPages}
             </span>
             <button
               type="button"
               disabled={page >= totalPages}
               onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-              className="h-7 px-2.5 rounded-md border border-line bg-surface text-ink hover:bg-surface-2 disabled:opacity-30 disabled:pointer-events-none inline-flex items-center gap-1 text-[12px]"
+              className="h-7 px-2.5 rounded-md border border-line bg-surface text-ink hover:bg-surface-2 disabled:opacity-30 disabled:pointer-events-none inline-flex items-center gap-1 text-xs"
             >
               Next
               <ChevronRight className="w-3.5 h-3.5" />

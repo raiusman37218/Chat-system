@@ -187,13 +187,13 @@ export function HelpHeader({
             />
           ) : (
             <span
-              className="w-8 h-8 rounded-lg grid place-items-center text-white text-[13px] font-bold shrink-0"
+              className="w-8 h-8 rounded-lg grid place-items-center text-white text-ui font-bold shrink-0"
               style={{ backgroundColor: brand }}
             >
               {(title?.trim()?.[0] || 'W').toUpperCase()}
             </span>
           )}
-          <span className="text-[15.5px] font-semibold text-white truncate group-hover:text-white/80 transition-colors">
+          <span className="text-md font-semibold text-white truncate group-hover:text-white/80 transition-colors">
             {title}
           </span>
         </button>
@@ -209,7 +209,7 @@ export function HelpHeader({
               href={link.url}
               target={link.target || '_blank'}
               rel={link.target === '_self' ? undefined : 'noreferrer'}
-              className="hidden sm:inline-flex items-center gap-1 px-2.5 h-8 rounded-lg text-[13px] font-medium text-white/70 hover:text-white hover:bg-white/5 transition-colors"
+              className="hidden sm:inline-flex items-center gap-1 px-2.5 h-8 rounded-lg text-ui font-medium text-white/70 hover:text-white hover:bg-white/5 transition-colors"
             >
               {link.label}
             </a>
@@ -220,7 +220,7 @@ export function HelpHeader({
               href={website}
               target="_blank"
               rel="noreferrer"
-              className="hidden sm:inline-flex items-center gap-1.5 px-2.5 h-8 rounded-lg text-[13px] font-medium text-white/70 hover:text-white hover:bg-white/5 transition-colors"
+              className="hidden sm:inline-flex items-center gap-1.5 px-2.5 h-8 rounded-lg text-ui font-medium text-white/70 hover:text-white hover:bg-white/5 transition-colors"
             >
               <span>Website</span>
               <ExternalLink className="w-3.5 h-3.5 opacity-60" />
@@ -237,7 +237,7 @@ export function HelpFooter({ workspace }: { workspace: Workspace }) {
 
   return (
     <footer className="mt-auto border-t border-line bg-surface pt-6 pb-28 sm:pb-24">
-      <div className="mx-auto max-w-5xl px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-2 text-[12px] text-ink-3">
+      <div className="mx-auto max-w-5xl px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-ink-3">
         <span>
           {workspace.help_center_footer_text ||
             `© ${new Date().getFullYear()} ${title}. All rights reserved.`}

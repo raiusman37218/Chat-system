@@ -130,7 +130,7 @@ export function SectionIconPreview({
           className={`object-contain ${imgClassName}`}
         />
       ) : (
-        <span className="text-[18px] leading-none">{icon?.trim() || '📚'}</span>
+        <span className="text-lg leading-none">{icon?.trim() || '📚'}</span>
       )}
     </span>
   );
@@ -767,10 +767,10 @@ export function HelpDeskDashboard({
       {toastMessage && (
         <div
           className={cn(
-            'fixed top-5 right-5 z-50 px-4 py-2.5 rounded-xl shadow-lg border text-[13px] font-medium flex items-center gap-2 animate-in fade-in slide-in-from-top-2',
+            'fixed top-5 right-5 z-50 px-4 py-2.5 rounded-xl shadow-lg border text-ui font-medium flex items-center gap-2 animate-in fade-in slide-in-from-top-2',
             toastMessage.type === 'success'
-              ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30'
-              : 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/30'
+              ? 'bg-success/10 text-success border-success/30'
+              : 'bg-danger/10 text-danger border-danger/30'
           )}
         >
           <span>{toastMessage.text}</span>
@@ -780,10 +780,10 @@ export function HelpDeskDashboard({
       {/* Top Navigation Bar */}
       <header className="px-8 py-5 border-b border-line/80 flex items-center justify-between gap-4 bg-surface sticky top-0 z-20">
         <div>
-          <h1 className="text-[19px] font-semibold text-ink tracking-tight">
+          <h1 className="text-xl font-semibold text-ink tracking-tight">
             Help Center
           </h1>
-          <p className="text-[12.5px] text-ink-3 mt-0.5">
+          <p className="text-xs text-ink-3 mt-0.5">
             {view === 'articles'
               ? 'Write once, and let customers answer their own questions.'
               : 'What your team knows but customers should not read — and what nobody has written yet.'}
@@ -833,7 +833,7 @@ export function HelpDeskDashboard({
                 setIsArticleModalOpen(true);
               }
             }}
-            className="h-9 px-4 rounded-lg bg-accent text-accent-ink hover:opacity-90 text-[13px] font-semibold flex items-center gap-1.5 transition-all shadow-sm whitespace-nowrap"
+            className="h-9 px-4 rounded-lg bg-accent text-accent-ink hover:opacity-90 text-ui font-semibold flex items-center gap-1.5 transition-all shadow-sm whitespace-nowrap"
           >
             <Plus className="w-4 h-4" />
             <span>{view === 'internal' ? 'New note' : 'New article'}</span>
@@ -855,19 +855,19 @@ export function HelpDeskDashboard({
             >
               {getWorkspaceHelpCenterUrl(workspace)}
             </a>
-            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider shrink-0 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+            <span className="px-2 py-0.5 rounded-full text-2xs font-bold uppercase tracking-wider shrink-0 bg-success/10 text-success border border-success/20 flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
               Live
             </span>
             {Boolean(workspace.custom_domain?.trim()) && (
               <span
                 className={cn(
-                  'px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider shrink-0',
+                  'px-2 py-0.5 rounded-full text-2xs font-bold uppercase tracking-wider shrink-0',
                   workspace.custom_domain_status === 'verified'
-                    ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
+                    ? 'bg-success/10 text-success border border-success/20'
                     : workspace.custom_domain_status === 'failed'
-                    ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20'
-                    : 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20'
+                    ? 'bg-danger/10 text-danger border border-danger/20'
+                    : 'bg-warn/10 text-warn border border-warn/20'
                 )}
               >
                 {workspace.custom_domain_status === 'verified'
@@ -881,7 +881,7 @@ export function HelpDeskDashboard({
           <div className="flex items-center gap-2 shrink-0 ml-4">
             <button
               onClick={handleCopyPublicHelpCenterLink}
-              className="text-ink-3 hover:text-ink font-medium text-[11.5px] flex items-center gap-1 transition-colors px-2 py-1 rounded-md hover:bg-surface-3"
+              className="text-ink-3 hover:text-ink font-medium text-xs flex items-center gap-1 transition-colors px-2 py-1 rounded-md hover:bg-surface-3"
               title="Copy public URL"
             >
               <Copy className="w-3 h-3" />
@@ -891,7 +891,7 @@ export function HelpDeskDashboard({
               href={getWorkspaceHelpCenterUrl(workspace)}
               target="_blank"
               rel="noreferrer"
-              className="text-accent hover:text-accent/80 font-medium text-[11.5px] flex items-center gap-1 transition-colors px-2 py-1 rounded-md hover:bg-accent-soft"
+              className="text-accent hover:text-accent/80 font-medium text-xs flex items-center gap-1 transition-colors px-2 py-1 rounded-md hover:bg-accent-soft"
               title="Open public Help Center in new tab"
             >
               <ExternalLink className="w-3 h-3" />
@@ -914,7 +914,7 @@ export function HelpDeskDashboard({
               type="button"
               onClick={() => setView(id)}
               className={cn(
-                'h-7 px-3 rounded-md text-[12.5px] font-medium transition-all',
+                'h-7 px-3 rounded-md text-xs font-medium transition-all',
                 view === id
                   ? 'bg-surface text-ink font-semibold shadow-xs'
                   : 'text-ink-3 hover:text-ink'
@@ -945,19 +945,19 @@ export function HelpDeskDashboard({
           workspaceState?.navbar_trigger_config?.enabled !== true &&
           !workspaceState?.navbar_trigger_config?.dismissed_prompt &&
           !navbarPromptDismissed && (
-            <div className="p-4 sm:p-5 rounded-2xl border border-accent/40 bg-gradient-to-r from-accent/10 via-surface to-accent/5 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4 animate-in fade-in">
+            <div className="p-4 sm:p-5 rounded-2xl border border-accent/40 bg-accent-soft shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4 animate-in fade-in">
               <div className="flex items-start sm:items-center gap-3.5">
                 <div className="w-10 h-10 rounded-xl bg-accent text-accent-ink flex items-center justify-center shrink-0 shadow-sm">
                   <Sparkles className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-[15px] font-bold text-ink flex items-center gap-2">
+                  <h3 className="text-md font-bold text-ink flex items-center gap-2">
                     <span>Your Help Center is live. Add it to your website menu?</span>
-                    <span className="px-2 py-0.5 rounded text-[10.5px] font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                    <span className="px-2 py-0.5 rounded text-2xs font-bold uppercase tracking-wider bg-success/10 text-success border border-success/20">
                       Zero-Code
                     </span>
                   </h3>
-                  <p className="text-[12.5px] text-ink-3 mt-0.5 max-w-xl">
+                  <p className="text-xs text-ink-3 mt-0.5 max-w-xl">
                     Direct your website visitors to your documentation seamlessly without touching any code. Preview where the button appears and customize its style.
                   </p>
                 </div>
@@ -967,14 +967,14 @@ export function HelpDeskDashboard({
                 <button
                   type="button"
                   onClick={handleDismissNavbarPrompt}
-                  className="btn btn-sm btn-ghost text-ink-3 hover:text-ink text-[12.5px]"
+                  className="btn btn-sm btn-ghost text-ink-3 hover:text-ink text-xs"
                 >
                   Not now
                 </button>
                 <button
                   type="button"
                   onClick={() => setIsNavbarModalOpen(true)}
-                  className="btn btn-sm btn-primary gap-1.5 shadow-sm text-[12.5px] font-semibold"
+                  className="btn btn-sm btn-primary gap-1.5 shadow-sm text-xs font-semibold"
                 >
                   <Sparkles className="w-3.5 h-3.5" />
                   <span>Preview and add</span>
@@ -987,7 +987,7 @@ export function HelpDeskDashboard({
         <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="p-4 rounded-xl border border-line bg-surface-2/60">
             <div className="flex items-center justify-between">
-              <span className="text-[12px] font-medium text-ink-3 uppercase tracking-wider">Total Articles</span>
+              <span className="text-xs font-medium text-ink-3 uppercase tracking-wider">Total Articles</span>
               <BookOpen className="w-4 h-4 text-accent" />
             </div>
             {loading && articles.length === 0 ? (
@@ -997,11 +997,11 @@ export function HelpDeskDashboard({
               </>
             ) : (
               <>
-                <div className="text-[26px] font-bold text-ink mt-2">{metrics.totalArticles}</div>
-                <div className="text-[11.5px] text-ink-3 mt-1 flex items-center gap-2">
-                  <span className="text-emerald-500 font-medium">{metrics.publishedCount} published</span>
+                <div className="text-2xl font-bold text-ink mt-2">{metrics.totalArticles}</div>
+                <div className="text-xs text-ink-3 mt-1 flex items-center gap-2">
+                  <span className="text-success font-medium">{metrics.publishedCount} published</span>
                   <span>•</span>
-                  <span className="text-amber-500 font-medium">
+                  <span className="text-warn font-medium">
                     {metrics.draftCount} {metrics.draftCount === 1 ? 'draft' : 'drafts'}
                   </span>
                 </div>
@@ -1011,22 +1011,22 @@ export function HelpDeskDashboard({
 
           <div className="p-4 rounded-xl border border-line bg-surface-2/60">
             <div className="flex items-center justify-between">
-              <span className="text-[12px] font-medium text-ink-3 uppercase tracking-wider">Total Views</span>
-              <Eye className="w-4 h-4 text-blue-500" />
+              <span className="text-xs font-medium text-ink-3 uppercase tracking-wider">Total Views</span>
+              <Eye className="w-4 h-4 text-accent" />
             </div>
-            <div className="text-[26px] font-bold text-ink mt-2">{metrics.totalViews.toLocaleString()}</div>
-            <div className="text-[11.5px] text-ink-3 mt-1">Across all published help guides</div>
+            <div className="text-2xl font-bold text-ink mt-2">{metrics.totalViews.toLocaleString()}</div>
+            <div className="text-xs text-ink-3 mt-1">Across all published help guides</div>
           </div>
 
           <div className="p-4 rounded-xl border border-line bg-surface-2/60">
             <div className="flex items-center justify-between">
-              <span className="text-[12px] font-medium text-ink-3 uppercase tracking-wider">Helpfulness Rate</span>
-              <ThumbsUp className="w-4 h-4 text-emerald-500" />
+              <span className="text-xs font-medium text-ink-3 uppercase tracking-wider">Helpfulness Rate</span>
+              <ThumbsUp className="w-4 h-4 text-success" />
             </div>
-            <div className="text-[26px] font-bold text-ink mt-2">
+            <div className="text-2xl font-bold text-ink mt-2">
               {metrics.helpfulRate === null ? '—' : `${metrics.helpfulRate}%`}
             </div>
-            <div className="text-[11.5px] text-ink-3 mt-1 flex items-center gap-2">
+            <div className="text-xs text-ink-3 mt-1 flex items-center gap-2">
               {metrics.helpfulRate === null ? (
                 <span>No reader votes yet</span>
               ) : (
@@ -1041,11 +1041,11 @@ export function HelpDeskDashboard({
 
           <div className="p-4 rounded-xl border border-line bg-surface-2/60">
             <div className="flex items-center justify-between">
-              <span className="text-[12px] font-medium text-ink-3 uppercase tracking-wider">Help Sections</span>
-              <Layers className="w-4 h-4 text-purple-500" />
+              <span className="text-xs font-medium text-ink-3 uppercase tracking-wider">Help Sections</span>
+              <Layers className="w-4 h-4 text-accent" />
             </div>
-            <div className="text-[26px] font-bold text-ink mt-2">{sections.length}</div>
-            <div className="text-[11.5px] text-ink-3 mt-1">Organized categories &amp; topics</div>
+            <div className="text-2xl font-bold text-ink mt-2">{sections.length}</div>
+            <div className="text-xs text-ink-3 mt-1">Organized categories &amp; topics</div>
           </div>
         </section>
 
@@ -1056,14 +1056,14 @@ export function HelpDeskDashboard({
               <button
                 onClick={() => setSelectedSectionId('all')}
                 className={cn(
-                  'h-8 px-3 rounded-lg text-[12.5px] font-medium transition-all whitespace-nowrap flex items-center gap-1.5',
+                  'h-8 px-3 rounded-lg text-xs font-medium transition-all whitespace-nowrap flex items-center gap-1.5',
                   selectedSectionId === 'all'
                     ? 'bg-accent text-accent-ink shadow-xs'
                     : 'bg-surface-2 text-ink-2 hover:bg-surface-3 hover:text-ink'
                 )}
               >
                 <span>All Sections</span>
-                <span className="text-[11px] opacity-80">({articles.length})</span>
+                <span className="text-2xs opacity-80">({articles.length})</span>
               </button>
 
               {/* Uncategorised (N) Chip */}
@@ -1072,16 +1072,16 @@ export function HelpDeskDashboard({
                   type="button"
                   onClick={() => setSelectedSectionId('uncategorised')}
                   className={cn(
-                    'h-8 px-3 rounded-lg text-[12.5px] font-medium transition-all whitespace-nowrap flex items-center gap-1.5 border',
+                    'h-8 px-3 rounded-lg text-xs font-medium transition-all whitespace-nowrap flex items-center gap-1.5 border',
                     selectedSectionId === 'uncategorised'
-                      ? 'bg-amber-500 text-white border-transparent shadow-xs font-semibold'
-                      : 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30 hover:bg-amber-500/20'
+                      ? 'bg-warn text-white border-transparent shadow-xs font-semibold'
+                      : 'bg-warn/10 text-warn border-warn/30 hover:bg-warn/20'
                   )}
                   title="Articles without a section or with legacy category"
                 >
                   <AlertCircle className="w-3.5 h-3.5" />
                   <span>Uncategorised</span>
-                  <span className="text-[11px] font-bold px-1.5 py-0.2 rounded-full bg-amber-500/20 text-inherit">
+                  <span className="text-2xs font-bold px-1.5 py-0.2 rounded-full bg-warn/20 text-inherit">
                     {uncategorisedCount}
                   </span>
                 </button>
@@ -1093,7 +1093,7 @@ export function HelpDeskDashboard({
                   <div
                     key={sec.id}
                     className={cn(
-                      'group relative inline-flex items-center h-8 rounded-lg text-[12.5px] font-medium transition-all whitespace-nowrap border',
+                      'group relative inline-flex items-center h-8 rounded-lg text-xs font-medium transition-all whitespace-nowrap border',
                       isSelected
                         ? 'bg-accent text-accent-ink border-transparent shadow-xs'
                         : 'bg-surface-2 text-ink-2 hover:bg-surface-3 hover:text-ink border-transparent'
@@ -1104,12 +1104,12 @@ export function HelpDeskDashboard({
                       onClick={() => setSelectedSectionId(sec.id)}
                       className="h-full pl-3 pr-2 flex items-center gap-1.5 cursor-pointer"
                     >
-                      <span className="font-mono text-[10px] font-bold opacity-75">
+                      <span className="font-mono text-2xs font-bold opacity-75">
                         #{String(idx + 1).padStart(2, '0')}
                       </span>
                       <span>{sec.icon || '📚'}</span>
                       <span className="max-w-[130px] truncate">{sec.name}</span>
-                      <span className="text-[11px] opacity-75">({sectionCounts[sec.id] || 0})</span>
+                      <span className="text-2xs opacity-75">({sectionCounts[sec.id] || 0})</span>
                     </button>
 
                     {/* Quick rename & delete actions on pill hover */}
@@ -1139,8 +1139,8 @@ export function HelpDeskDashboard({
                         className={cn(
                           'w-5 h-5 rounded flex items-center justify-center transition-colors cursor-pointer',
                           isSelected
-                            ? 'hover:bg-rose-500 text-accent-ink hover:text-white'
-                            : 'hover:bg-rose-500/20 text-ink-3 hover:text-rose-500'
+                            ? 'hover:bg-danger text-accent-ink hover:text-white'
+                            : 'hover:bg-danger/20 text-ink-3 hover:text-danger'
                         )}
                         title={`Delete section "${sec.name}"`}
                       >
@@ -1160,7 +1160,7 @@ export function HelpDeskDashboard({
                   setEditingSection(null);
                   setIsSectionModalOpen(true);
                 }}
-                className="h-8 px-2.5 rounded-lg border border-dashed border-line text-[12px] text-ink-3 hover:text-accent hover:border-accent flex items-center gap-1 transition-all whitespace-nowrap cursor-pointer"
+                className="h-8 px-2.5 rounded-lg border border-dashed border-line text-xs text-ink-3 hover:text-accent hover:border-accent flex items-center gap-1 transition-all whitespace-nowrap cursor-pointer"
               >
                 <Plus className="w-3 h-3" />
                 <span>Add Section</span>
@@ -1171,7 +1171,7 @@ export function HelpDeskDashboard({
                   setEditingSection(null);
                   setIsSectionModalOpen(true);
                 }}
-                className="h-8 px-2.5 rounded-lg bg-surface-2 hover:bg-surface-3 text-[12px] text-ink-2 hover:text-ink flex items-center gap-1.5 transition-all whitespace-nowrap cursor-pointer border border-line/60"
+                className="h-8 px-2.5 rounded-lg bg-surface-2 hover:bg-surface-3 text-xs text-ink-2 hover:text-ink flex items-center gap-1.5 transition-all whitespace-nowrap cursor-pointer border border-line/60"
                 title="Manage all sections (reorder, rename, delete, custom icons)"
               >
                 <Settings className="w-3 h-3 text-ink-3" />
@@ -1182,27 +1182,27 @@ export function HelpDeskDashboard({
 
           {/* Active Section Banner with direct Rename and Delete controls */}
           {activeSection && (
-            <div className="p-3.5 sm:p-4 rounded-xl border border-accent/30 bg-accent/5 backdrop-blur-xs flex flex-col md:flex-row md:items-center justify-between gap-3.5 animate-in fade-in">
+            <div className="p-3.5 sm:p-4 rounded-xl border border-accent/30 bg-accent/5 flex flex-col md:flex-row md:items-center justify-between gap-3.5 animate-in fade-in">
               <div className="flex items-center gap-3 min-w-0">
                 <SectionIconPreview
                   icon={activeSection.icon}
-                  className="w-10 h-10 rounded-xl bg-surface border border-line shadow-xs text-[20px] shrink-0"
+                  className="w-10 h-10 rounded-xl bg-surface border border-line shadow-xs text-xl shrink-0"
                   imgClassName="w-6 h-6 object-contain"
                 />
                 <div className="min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-mono text-[10.5px] font-bold px-1.5 py-0.5 rounded-md bg-surface border border-line text-ink-3">
+                    <span className="font-mono text-2xs font-bold px-1.5 py-0.5 rounded-md bg-surface border border-line text-ink-3">
                       Section #{String(sections.findIndex((s) => s.id === activeSection.id) + 1).padStart(2, '0')}
                     </span>
-                    <h2 className="text-[15px] font-bold text-ink truncate">{activeSection.name}</h2>
-                    <span className="text-[11.5px] font-medium px-2 py-0.5 rounded-full bg-accent/10 text-accent border border-accent/20">
+                    <h2 className="text-md font-bold text-ink truncate">{activeSection.name}</h2>
+                    <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-accent/10 text-accent border border-accent/20">
                       {sectionCounts[activeSection.id] || 0} articles
                     </span>
                   </div>
                   {activeSection.description ? (
-                    <p className="text-[12px] text-ink-3 mt-0.5 line-clamp-1">{activeSection.description}</p>
+                    <p className="text-xs text-ink-3 mt-0.5 line-clamp-1">{activeSection.description}</p>
                   ) : (
-                    <p className="text-[11.5px] text-ink-3 italic mt-0.5">No description set for this section.</p>
+                    <p className="text-xs text-ink-3 italic mt-0.5">No description set for this section.</p>
                   )}
                 </div>
               </div>
@@ -1211,7 +1211,7 @@ export function HelpDeskDashboard({
                 <button
                   type="button"
                   onClick={() => handleStartRenameSection(activeSection)}
-                  className="h-8 px-3 rounded-lg border border-line bg-surface hover:bg-surface-2 text-ink text-[12px] font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+                  className="h-8 px-3 rounded-lg border border-line bg-surface hover:bg-surface-2 text-ink text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
                   title="Rename or update this section"
                 >
                   <Edit2 className="w-3.5 h-3.5 text-accent" />
@@ -1221,7 +1221,7 @@ export function HelpDeskDashboard({
                 <button
                   type="button"
                   onClick={() => handleStartDeleteSection(activeSection)}
-                  className="h-8 px-3 rounded-lg border border-rose-500/20 bg-rose-500/5 hover:bg-rose-500/15 text-rose-600 dark:text-rose-400 text-[12px] font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+                  className="h-8 px-3 rounded-lg border border-danger/20 bg-danger/5 hover:bg-danger/15 text-danger text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
                   title="Delete this section"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
@@ -1231,7 +1231,7 @@ export function HelpDeskDashboard({
                 <button
                   type="button"
                   onClick={() => setIsReorderModalOpen(true)}
-                  className="h-8 px-3 rounded-lg border border-line bg-surface hover:bg-surface-2 text-ink text-[12px] font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+                  className="h-8 px-3 rounded-lg border border-line bg-surface hover:bg-surface-2 text-ink text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
                   title="Change the display order of articles in this section"
                 >
                   <ArrowUpDown className="w-3.5 h-3.5 text-accent" />
@@ -1244,7 +1244,7 @@ export function HelpDeskDashboard({
                     setEditingArticle({ section_id: activeSection.id } as Article);
                     setIsArticleModalOpen(true);
                   }}
-                  className="h-8 px-3 rounded-lg bg-accent text-accent-ink hover:opacity-95 text-[12px] font-semibold flex items-center gap-1.5 transition-all shadow-xs cursor-pointer"
+                  className="h-8 px-3 rounded-lg bg-accent text-accent-ink hover:opacity-95 text-xs font-semibold flex items-center gap-1.5 transition-all shadow-xs cursor-pointer"
                   title="Create a new article directly in this section"
                 >
                   <Plus className="w-3.5 h-3.5" />
@@ -1265,19 +1265,19 @@ export function HelpDeskDashboard({
 
           {/* Uncategorised Articles Banner */}
           {selectedSectionId === 'uncategorised' && (
-            <div className="p-3.5 sm:p-4 rounded-xl border border-amber-500/30 bg-amber-500/5 backdrop-blur-xs flex flex-col md:flex-row md:items-center justify-between gap-3.5 animate-in fade-in">
+            <div className="p-3.5 sm:p-4 rounded-xl border border-warn/30 bg-warn/5 flex flex-col md:flex-row md:items-center justify-between gap-3.5 animate-in fade-in">
               <div className="flex items-center gap-3 min-w-0">
-                <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 flex items-center justify-center text-[18px] shrink-0">
+                <div className="w-10 h-10 rounded-xl bg-warn/10 border border-warn/20 text-warn flex items-center justify-center text-lg shrink-0">
                   <AlertCircle className="w-5 h-5" />
                 </div>
                 <div className="min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <h2 className="text-[15px] font-bold text-ink">Uncategorised Articles</h2>
-                    <span className="text-[11.5px] font-medium px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30">
+                    <h2 className="text-md font-bold text-ink">Uncategorised Articles</h2>
+                    <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-warn/15 text-warn border border-warn/30">
                       {uncategorisedCount} {uncategorisedCount === 1 ? 'article' : 'articles'}
                     </span>
                   </div>
-                  <p className="text-[12px] text-ink-3 mt-0.5">
+                  <p className="text-xs text-ink-3 mt-0.5">
                     These articles have no section or point to a legacy category. Run the automatic migration to create or match sections from their categories.
                   </p>
                 </div>
@@ -1288,7 +1288,7 @@ export function HelpDeskDashboard({
                   type="button"
                   disabled={isMigrating}
                   onClick={handleRunMigration}
-                  className="h-8 px-3.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-[12px] font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs disabled:opacity-50"
+                  className="h-8 px-3.5 rounded-lg bg-warn hover:bg-warn text-white text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs disabled:opacity-50"
                   title="Automatically match or create sections from legacy categories"
                 >
                   <Sparkles className={cn('w-3.5 h-3.5', isMigrating && 'animate-spin')} />
@@ -1307,7 +1307,7 @@ export function HelpDeskDashboard({
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search articles by title, content..."
-                className="w-full h-9 pl-9 pr-3 rounded-lg border border-line bg-surface-2/70 text-[13px] text-ink placeholder:text-ink-3 focus:outline-none focus:border-accent focus:bg-surface transition-all"
+                className="w-full h-9 pl-9 pr-3 rounded-lg border border-line bg-surface-2/70 text-ui text-ink placeholder:text-ink-3 focus:outline-none focus:border-accent focus:bg-surface transition-all"
               />
               {searchQuery && (
                 <button
@@ -1326,7 +1326,7 @@ export function HelpDeskDashboard({
                     key={status}
                     onClick={() => setSelectedStatus(status)}
                     className={cn(
-                      'px-2.5 py-1 rounded-md text-[12px] font-medium transition-all capitalize',
+                      'px-2.5 py-1 rounded-md text-xs font-medium transition-all capitalize',
                       selectedStatus === status
                         ? 'bg-surface text-ink shadow-xs font-semibold'
                         : 'text-ink-3 hover:text-ink'
@@ -1343,12 +1343,12 @@ export function HelpDeskDashboard({
         {/* Articles List / Grid */}
         <section className="space-y-3">
           {loading ? (
-            <div className="p-12 text-center text-ink-3 text-[13px]">Loading help articles...</div>
+            <div className="p-12 text-center text-ink-3 text-ui">Loading help articles...</div>
           ) : filteredArticles.length === 0 ? (
             <div className="p-12 rounded-2xl border border-dashed border-line text-center space-y-3 bg-surface-2/40">
               <BookOpen className="w-10 h-10 text-ink-3 mx-auto stroke-1" />
-              <div className="text-[15px] font-semibold text-ink">No articles found</div>
-              <p className="text-[12.5px] text-ink-3 max-w-sm mx-auto">
+              <div className="text-md font-semibold text-ink">No articles found</div>
+              <p className="text-xs text-ink-3 max-w-sm mx-auto">
                 {searchQuery
                   ? 'No articles match your search filter. Try clearing the search query.'
                   : 'Start building your Knowledge Base so customers can resolve questions on their own.'}
@@ -1358,7 +1358,7 @@ export function HelpDeskDashboard({
                   setEditingArticle(null);
                   setIsArticleModalOpen(true);
                 }}
-                className="h-8 px-3.5 rounded-lg bg-accent text-accent-ink text-[12.5px] font-semibold inline-flex items-center gap-1.5 transition-all shadow-xs"
+                className="h-8 px-3.5 rounded-lg bg-accent text-accent-ink text-xs font-semibold inline-flex items-center gap-1.5 transition-all shadow-xs"
               >
                 <Plus className="w-3.5 h-3.5" />
                 <span>Create Your First Article</span>
@@ -1382,21 +1382,21 @@ export function HelpDeskDashboard({
                       className={cn(
                         'px-4 py-2.5 flex items-center justify-between gap-3 border-b',
                         group.isUncategorised
-                          ? 'bg-amber-500/10 border-amber-500/20 text-amber-800 dark:text-amber-300'
+                          ? 'bg-warn/10 border-warn/20 text-warn'
                           : 'bg-surface-2/80 border-line text-ink'
                       )}
                     >
                       <div className="flex items-center gap-2.5 min-w-0">
                         {group.isUncategorised ? (
-                          <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                          <AlertCircle className="w-4 h-4 text-warn shrink-0" />
                         ) : (
-                          <span className="text-[15px] shrink-0">{groupIcon}</span>
+                          <span className="text-md shrink-0">{groupIcon}</span>
                         )}
-                        <span className="text-[13.5px] font-semibold truncate">
+                        <span className="text-ui font-semibold truncate">
                           {groupTitle}
                         </span>
                         {groupDesc && (
-                          <span className="text-[12px] text-ink-3 hidden sm:inline truncate max-w-md">
+                          <span className="text-xs text-ink-3 hidden sm:inline truncate max-w-md">
                             — {groupDesc}
                           </span>
                         )}
@@ -1404,9 +1404,9 @@ export function HelpDeskDashboard({
 
                       <span
                         className={cn(
-                          'text-[11.5px] font-medium px-2 py-0.5 rounded-full shrink-0',
+                          'text-xs font-medium px-2 py-0.5 rounded-full shrink-0',
                           group.isUncategorised
-                            ? 'bg-amber-500/20 text-amber-800 dark:text-amber-300'
+                            ? 'bg-warn/20 text-warn'
                             : 'bg-surface border border-line text-ink-3'
                         )}
                       >
@@ -1452,16 +1452,16 @@ export function HelpDeskDashboard({
 
                                 <span
                                   className={cn(
-                                    'inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold',
+                                    'inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-2xs font-semibold',
                                     isPublished
-                                      ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
-                                      : 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20'
+                                      ? 'bg-success/10 text-success border border-success/20'
+                                      : 'bg-warn/10 text-warn border border-warn/20'
                                   )}
                                 >
                                   <span
                                     className={cn(
                                       'w-1.5 h-1.5 rounded-full',
-                                      isPublished ? 'bg-emerald-500' : 'bg-amber-500'
+                                      isPublished ? 'bg-success' : 'bg-warn'
                                     )}
                                   />
                                   {isPublished ? 'Published' : 'Draft'}
@@ -1470,14 +1470,14 @@ export function HelpDeskDashboard({
                                 {/* Order Index Badge */}
                                 {article.order_index && article.order_index > 0 ? (
                                   <span
-                                    className="font-mono text-[10.5px] font-bold px-1.5 py-0.5 rounded bg-surface-2 border border-line text-ink-3"
+                                    className="font-mono text-2xs font-bold px-1.5 py-0.5 rounded bg-surface-2 border border-line text-ink-3"
                                     title="Display order within section"
                                   >
                                     #{String(article.order_index).padStart(2, '0')}
                                   </span>
                                 ) : null}
 
-                                <span className="text-[11px] text-ink-3">
+                                <span className="text-2xs text-ink-3">
                                   Updated {new Date(article.updated_at || article.created_at).toLocaleDateString()}
                                 </span>
                               </div>
@@ -1487,20 +1487,20 @@ export function HelpDeskDashboard({
                                   setEditingArticle(article);
                                   setIsArticleModalOpen(true);
                                 }}
-                                className="text-[14.5px] font-semibold text-ink hover:text-accent cursor-pointer transition-colors"
+                                className="text-sm font-semibold text-ink hover:text-accent cursor-pointer transition-colors"
                               >
                                 {article.title}
                               </h3>
 
                               {article.summary && (
-                                <p className="text-[12.5px] text-ink-2 line-clamp-1 max-w-2xl">
+                                <p className="text-xs text-ink-2 line-clamp-1 max-w-2xl">
                                   {article.summary}
                                 </p>
                               )}
                             </div>
 
                             {/* Stats & Actions */}
-                            <div className="flex items-center gap-5 shrink-0 text-[12px] text-ink-3">
+                            <div className="flex items-center gap-5 shrink-0 text-xs text-ink-3">
                               <div className="flex items-center gap-3">
                                 <span className="flex items-center gap-1" title="Total Views">
                                   <Eye className="w-3.5 h-3.5 text-ink-3" />
@@ -1508,13 +1508,13 @@ export function HelpDeskDashboard({
                                 </span>
 
                                 <span className="flex items-center gap-1" title="Helpful votes">
-                                  <ThumbsUp className="w-3.5 h-3.5 text-emerald-500/80" />
+                                  <ThumbsUp className="w-3.5 h-3.5 text-success/80" />
                                   <span>{article.helpful_count || 0}</span>
                                 </span>
 
                                 {Boolean(article.not_helpful_count) && (
                                   <span className="flex items-center gap-1" title="Unhelpful votes">
-                                    <ThumbsDown className="w-3.5 h-3.5 text-rose-500/80" />
+                                    <ThumbsDown className="w-3.5 h-3.5 text-danger/80" />
                                     <span>{article.not_helpful_count}</span>
                                   </span>
                                 )}
@@ -1542,7 +1542,7 @@ export function HelpDeskDashboard({
                                 <button
                                   type="button"
                                   onClick={() => handleToggleStatus(article)}
-                                  className="h-8 px-2.5 rounded-md text-[11.5px] font-medium border border-line hover:bg-surface-2 text-ink transition-colors"
+                                  className="h-8 px-2.5 rounded-md text-xs font-medium border border-line hover:bg-surface-2 text-ink transition-colors"
                                   title={isPublished ? 'Unpublish to draft' : 'Publish live'}
                                 >
                                   {isPublished ? 'Unpublish' : 'Publish'}
@@ -1607,7 +1607,7 @@ export function HelpDeskDashboard({
 
               {/* Pagination footer (25 per page) */}
               {totalArticlePages > 1 && (
-                <div className="flex items-center justify-between px-3 py-2.5 rounded-xl border border-line bg-surface text-[12.5px] text-ink-3 shadow-xs">
+                <div className="flex items-center justify-between px-3 py-2.5 rounded-xl border border-line bg-surface text-xs text-ink-3 shadow-xs">
                   <span>
                     Showing {(articlePage - 1) * ARTICLES_PER_PAGE + 1} to{' '}
                     {Math.min(articlePage * ARTICLES_PER_PAGE, filteredArticles.length)} of {filteredArticles.length} articles
@@ -1617,7 +1617,7 @@ export function HelpDeskDashboard({
                       type="button"
                       disabled={articlePage <= 1}
                       onClick={() => setArticlePage((p) => Math.max(1, p - 1))}
-                      className="h-7 px-2.5 rounded-md border border-line bg-surface text-ink hover:bg-surface-2 disabled:opacity-30 disabled:pointer-events-none inline-flex items-center gap-1 text-[12px] font-medium"
+                      className="h-7 px-2.5 rounded-md border border-line bg-surface text-ink hover:bg-surface-2 disabled:opacity-30 disabled:pointer-events-none inline-flex items-center gap-1 text-xs font-medium"
                     >
                       <ChevronLeft className="w-3.5 h-3.5" />
                       Previous
@@ -1629,7 +1629,7 @@ export function HelpDeskDashboard({
                           type="button"
                           onClick={() => setArticlePage(pg)}
                           className={cn(
-                            'w-7 h-7 rounded-md text-[12px] font-semibold transition-all',
+                            'w-7 h-7 rounded-md text-xs font-semibold transition-all',
                             articlePage === pg
                               ? 'bg-accent text-accent-ink shadow-xs'
                               : 'text-ink-2 hover:bg-surface-2 hover:text-ink'
@@ -1643,7 +1643,7 @@ export function HelpDeskDashboard({
                       type="button"
                       disabled={articlePage >= totalArticlePages}
                       onClick={() => setArticlePage((p) => Math.min(totalArticlePages, p + 1))}
-                      className="h-7 px-2.5 rounded-md border border-line bg-surface text-ink hover:bg-surface-2 disabled:opacity-30 disabled:pointer-events-none inline-flex items-center gap-1 text-[12px] font-medium"
+                      className="h-7 px-2.5 rounded-md border border-line bg-surface text-ink hover:bg-surface-2 disabled:opacity-30 disabled:pointer-events-none inline-flex items-center gap-1 text-xs font-medium"
                     >
                       Next
                       <ChevronRight className="w-3.5 h-3.5" />
@@ -2845,7 +2845,7 @@ function ArticleEditorModal({
   return (
     <div
       className={cn(
-        'fixed z-50 flex items-center justify-center p-2 sm:p-4 bg-black/70 backdrop-blur-xs animate-in fade-in',
+        'fixed z-50 flex items-center justify-center p-2 sm:p-4 bg-black animate-in fade-in',
         isFullscreen ? 'inset-0 p-0' : 'inset-0'
       )}
     >
@@ -2867,14 +2867,14 @@ function ArticleEditorModal({
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-[15px] font-bold text-ink">
+                <h2 className="text-md font-bold text-ink">
                   {article ? 'Edit Knowledge Base Article' : 'Author Knowledge Base Article'}
                 </h2>
-                <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-accent-soft text-accent">
+                <span className="px-1.5 py-0.5 rounded text-2xs font-semibold bg-accent-soft text-accent">
                   Pro Studio
                 </span>
               </div>
-              <p className="text-[11.5px] text-ink-3">
+              <p className="text-xs text-ink-3">
                 Smart formatting, automated list continuation, blueprints &amp; live preview.
               </p>
             </div>
@@ -2887,7 +2887,7 @@ function ArticleEditorModal({
                 type="button"
                 onClick={() => setViewMode('write')}
                 className={cn(
-                  'px-2.5 py-1 rounded text-[11px] font-semibold transition-all',
+                  'px-2.5 py-1 rounded text-2xs font-semibold transition-all',
                   viewMode === 'write'
                     ? 'bg-surface-3 text-ink shadow-xs'
                     : 'text-ink-3 hover:text-ink'
@@ -2900,7 +2900,7 @@ function ArticleEditorModal({
                 type="button"
                 onClick={() => setViewMode('split')}
                 className={cn(
-                  'px-2.5 py-1 rounded text-[11px] font-semibold transition-all flex items-center gap-1',
+                  'px-2.5 py-1 rounded text-2xs font-semibold transition-all flex items-center gap-1',
                   viewMode === 'split'
                     ? 'bg-accent text-accent-ink shadow-xs'
                     : 'text-ink-3 hover:text-ink'
@@ -2914,7 +2914,7 @@ function ArticleEditorModal({
                 type="button"
                 onClick={() => setViewMode('preview')}
                 className={cn(
-                  'px-2.5 py-1 rounded text-[11px] font-semibold transition-all',
+                  'px-2.5 py-1 rounded text-2xs font-semibold transition-all',
                   viewMode === 'preview'
                     ? 'bg-surface-3 text-ink shadow-xs'
                     : 'text-ink-3 hover:text-ink'
@@ -2929,7 +2929,7 @@ function ArticleEditorModal({
             <button
               type="button"
               onClick={() => setShowShortcutsModal((prev) => !prev)}
-              className="h-8 px-2 rounded-lg border border-line hover:bg-surface-3 flex items-center gap-1 text-[11px] font-medium text-ink-3 hover:text-ink transition-colors"
+              className="h-8 px-2 rounded-lg border border-line hover:bg-surface-3 flex items-center gap-1 text-2xs font-medium text-ink-3 hover:text-ink transition-colors"
               title="Keyboard Shortcuts & Tips"
             >
               <Keyboard className="w-3.5 h-3.5 text-accent" />
@@ -2962,7 +2962,7 @@ function ArticleEditorModal({
             ───────────────────────────────────────────────────────────── */}
         <div className="p-5 overflow-y-auto flex-1 space-y-4">
           {errorMsg && (
-            <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400 text-[12.5px] flex items-center gap-2">
+            <div className="p-3 rounded-xl bg-danger/10 border border-danger/20 text-danger text-xs flex items-center gap-2">
               <AlertCircle className="w-4 h-4 shrink-0" />
               <span>{errorMsg}</span>
             </div>
@@ -2971,14 +2971,14 @@ function ArticleEditorModal({
           {/* Row 1: Article Title on its own row */}
           <div className="space-y-1">
             <div className="flex items-center justify-between">
-              <label className="text-[12px] font-semibold text-ink">
-                Article Title <span className="text-rose-500">*</span>
+              <label className="text-xs font-semibold text-ink">
+                Article Title <span className="text-danger">*</span>
               </label>
               <div className="relative">
                 <button
                   type="button"
                   onClick={() => setShowTitleEmojiPicker((prev) => !prev)}
-                  className="text-[11px] text-accent hover:underline flex items-center gap-1 font-medium cursor-pointer"
+                  className="text-2xs text-accent hover:underline flex items-center gap-1 font-medium cursor-pointer"
                 >
                   <Smile className="w-3.5 h-3.5" />
                   <span>Insert Emoji</span>
@@ -3009,14 +3009,14 @@ function ArticleEditorModal({
                   : 'e.g. 🚀 How to get started with your account'
               }
               className={cn(
-                'w-full h-9.5 px-3.5 rounded-xl border bg-surface text-[14px] text-ink focus:outline-none font-medium shadow-2xs transition-colors',
+                'w-full h-9.5 px-3.5 rounded-xl border bg-surface text-sm text-ink focus:outline-none font-medium shadow-2xs transition-colors',
                 titleError
-                  ? 'border-rose-500 focus:border-rose-500 bg-rose-500/5'
+                  ? 'border-danger focus:border-danger bg-danger/5'
                   : 'border-line focus:border-accent'
               )}
             />
             {titleError && (
-              <p className="text-[12px] font-medium text-rose-500 flex items-center gap-1 mt-1">
+              <p className="text-xs font-medium text-danger flex items-center gap-1 mt-1">
                 <AlertCircle className="w-3.5 h-3.5 shrink-0" />
                 <span>{titleError}</span>
               </p>
@@ -3026,11 +3026,11 @@ function ArticleEditorModal({
           {/* Row 2: Section and Order side by side below Title */}
           <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
             <div className="sm:col-span-3 space-y-1">
-              <label className="text-[12px] font-semibold text-ink">Section / Collection</label>
+              <label className="text-xs font-semibold text-ink">Section / Collection</label>
               <select
                 value={sectionId}
                 onChange={(e) => setSectionId(e.target.value)}
-                className="w-full h-9 px-3 rounded-xl border border-line bg-surface text-[13px] text-ink focus:outline-none focus:border-accent font-medium shadow-2xs"
+                className="w-full h-9 px-3 rounded-xl border border-line bg-surface text-ui text-ink focus:outline-none focus:border-accent font-medium shadow-2xs"
               >
                 <option value="">(No Section - General)</option>
                 {sections.map((sec, idx) => (
@@ -3043,7 +3043,7 @@ function ArticleEditorModal({
 
             <div className="sm:col-span-1 space-y-1">
               <label
-                className="text-[12px] font-semibold text-ink"
+                className="text-xs font-semibold text-ink"
                 title="Order position on help center (Auto puts the article last in section)"
               >
                 Order # in Section
@@ -3054,7 +3054,7 @@ function ArticleEditorModal({
                 value={orderIndex > 0 ? orderIndex : ''}
                 onChange={(e) => setOrderIndex(Math.max(0, parseInt(e.target.value, 10) || 0))}
                 placeholder="Auto"
-                className="w-full h-9 px-3 rounded-xl border border-line bg-surface text-[13px] font-mono text-ink focus:outline-none focus:border-accent font-medium shadow-2xs"
+                className="w-full h-9 px-3 rounded-xl border border-line bg-surface text-ui font-mono text-ink focus:outline-none focus:border-accent font-medium shadow-2xs"
               />
             </div>
           </div>
@@ -3062,10 +3062,10 @@ function ArticleEditorModal({
           {/* Excerpt / Summary */}
           <div className="space-y-1">
             <div className="flex items-center justify-between">
-              <label className="text-[12px] font-semibold text-ink">
+              <label className="text-xs font-semibold text-ink">
                 Short Summary <span className="font-normal text-ink-3">(Displayed on cards, preview &amp; search)</span>
               </label>
-              <span className="text-[11px] text-ink-3 font-mono">{summary.length}/200</span>
+              <span className="text-2xs text-ink-3 font-mono">{summary.length}/200</span>
             </div>
             <input
               type="text"
@@ -3073,7 +3073,7 @@ function ArticleEditorModal({
               maxLength={220}
               onChange={(e) => setSummary(e.target.value)}
               placeholder="Brief summary explaining what customer learns from this guide..."
-              className="w-full h-8.5 px-3 rounded-xl border border-line bg-surface text-[12.5px] text-ink focus:outline-none focus:border-accent shadow-2xs"
+              className="w-full h-8.5 px-3 rounded-xl border border-line bg-surface text-xs text-ink focus:outline-none focus:border-accent shadow-2xs"
             />
           </div>
 
@@ -3082,8 +3082,8 @@ function ArticleEditorModal({
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
               {/* Publishing Status Radio */}
               <div className="flex items-center gap-4">
-                <span className="text-[12px] font-semibold text-ink">Status:</span>
-                <label className="flex items-center gap-1.5 cursor-pointer text-[12.5px]">
+                <span className="text-xs font-semibold text-ink">Status:</span>
+                <label className="flex items-center gap-1.5 cursor-pointer text-xs">
                   <input
                     type="radio"
                     name="status"
@@ -3092,11 +3092,11 @@ function ArticleEditorModal({
                     onChange={() => setStatus('published')}
                     className="text-accent cursor-pointer"
                   />
-                  <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+                  <span className="font-semibold text-success">
                     Published (Live)
                   </span>
                 </label>
-                <label className="flex items-center gap-1.5 cursor-pointer text-[12.5px]">
+                <label className="flex items-center gap-1.5 cursor-pointer text-xs">
                   <input
                     type="radio"
                     name="status"
@@ -3105,7 +3105,7 @@ function ArticleEditorModal({
                     onChange={() => setStatus('draft')}
                     className="text-accent cursor-pointer"
                   />
-                  <span className="font-medium text-amber-600 dark:text-amber-400">
+                  <span className="font-medium text-warn">
                     Draft (Private)
                   </span>
                 </label>
@@ -3113,7 +3113,7 @@ function ArticleEditorModal({
 
               {/* URL Customizer & Copy */}
               <div className="flex items-center gap-2 text-xs">
-                <div className="flex items-center gap-1.5 bg-surface px-2.5 py-1 rounded-lg border border-line font-mono text-[11px] text-ink-2">
+                <div className="flex items-center gap-1.5 bg-surface px-2.5 py-1 rounded-lg border border-line font-mono text-2xs text-ink-2">
                   <Globe className="w-3.5 h-3.5 text-accent shrink-0" />
                   <span className="text-ink-3 hidden md:inline">URL:</span>
                   <span className="text-ink font-semibold truncate max-w-[200px] sm:max-w-xs">
@@ -3132,13 +3132,13 @@ function ArticleEditorModal({
                 <button
                   type="button"
                   onClick={handleCopyPublicUrl}
-                  className="h-7 px-2.5 rounded-lg border border-line bg-surface hover:bg-surface-3 text-[11px] font-medium text-ink flex items-center gap-1 transition-colors cursor-pointer"
+                  className="h-7 px-2.5 rounded-lg border border-line bg-surface hover:bg-surface-3 text-2xs font-medium text-ink flex items-center gap-1 transition-colors cursor-pointer"
                   title="Copy full article link"
                 >
                   {copiedLink ? (
                     <>
-                      <Check className="w-3 h-3 text-emerald-500" />
-                      <span className="text-emerald-500">Copied!</span>
+                      <Check className="w-3 h-3 text-success" />
+                      <span className="text-success">Copied!</span>
                     </>
                   ) : (
                     <>
@@ -3153,7 +3153,7 @@ function ArticleEditorModal({
                     href={resolvedPublicUrl}
                     target="_blank"
                     rel="noreferrer"
-                    className="h-7 px-2.5 rounded-lg border border-line bg-surface hover:bg-surface-3 text-[11px] font-medium text-ink flex items-center gap-1 transition-colors"
+                    className="h-7 px-2.5 rounded-lg border border-line bg-surface hover:bg-surface-3 text-2xs font-medium text-ink flex items-center gap-1 transition-colors"
                     title="Open live article page"
                   >
                     <ExternalLink className="w-3 h-3 text-ink-3" />
@@ -3167,28 +3167,28 @@ function ArticleEditorModal({
             {isSlugCustom && (
               <div className="flex flex-col gap-1 pt-1.5 border-t border-line/40">
                 <div className="flex items-center gap-2">
-                  <span className="text-[11.5px] text-ink-3 font-medium">Custom URL Slug:</span>
+                  <span className="text-xs text-ink-3 font-medium">Custom URL Slug:</span>
                   <input
                     type="text"
                     value={slug}
                     onChange={(e) => setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
                     onBlur={(e) => setSlug(generateSlug(e.target.value))}
                     placeholder="custom-article-slug"
-                    className="h-7 px-2 rounded-md border border-line bg-surface text-[12px] font-mono text-ink flex-1 max-w-sm focus:outline-none focus:border-accent"
+                    className="h-7 px-2 rounded-md border border-line bg-surface text-xs font-mono text-ink flex-1 max-w-sm focus:outline-none focus:border-accent"
                   />
                   <button
                     type="button"
                     onClick={() => {
                       setSlug(generateSlug(title));
                     }}
-                    className="text-[11px] text-accent hover:underline flex items-center gap-1 cursor-pointer"
+                    className="text-2xs text-accent hover:underline flex items-center gap-1 cursor-pointer"
                     title="Generate slug from current title"
                   >
                     <RotateCcw className="w-3 h-3" />
                     <span>Reset to Title</span>
                   </button>
                 </div>
-                <span className="text-[10.5px] text-ink-3">
+                <span className="text-2xs text-ink-3">
                   Changing the slug preserves the old URL and automatically redirects visitors to the new one.
                 </span>
               </div>
@@ -3214,7 +3214,7 @@ function ArticleEditorModal({
               className="flex items-center gap-2 overflow-x-auto py-0.5 flex-1 scroll-smooth scrollbar-none"
               style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
             >
-              <span className="text-[11px] font-bold uppercase tracking-wider text-ink-3 flex items-center gap-1 shrink-0">
+              <span className="text-2xs font-bold uppercase tracking-wider text-ink-3 flex items-center gap-1 shrink-0">
                 <Sparkles className="w-3 h-3 text-accent" />
                 <span>Blueprints:</span>
               </span>
@@ -3223,7 +3223,7 @@ function ArticleEditorModal({
                   key={bp.id}
                   type="button"
                   onClick={() => handleApplyBlueprint(bp.content)}
-                  className="h-7 px-2.5 rounded-lg border border-line/80 bg-surface hover:border-accent hover:bg-accent-soft/40 text-[11.5px] font-medium text-ink hover:text-accent transition-all whitespace-nowrap shadow-2xs flex items-center gap-1 shrink-0 cursor-pointer"
+                  className="h-7 px-2.5 rounded-lg border border-line/80 bg-surface hover:border-accent hover:bg-accent-soft/40 text-xs font-medium text-ink hover:text-accent transition-all whitespace-nowrap shadow-2xs flex items-center gap-1 shrink-0 cursor-pointer"
                   title={bp.desc}
                 >
                   <span>{bp.label}</span>
@@ -3248,7 +3248,7 @@ function ArticleEditorModal({
           <div
             className={cn(
               'border rounded-xl overflow-hidden shadow-xs transition-colors',
-              contentError ? 'border-rose-500 focus-within:border-rose-500' : 'border-line focus-within:border-accent'
+              contentError ? 'border-danger focus-within:border-danger' : 'border-line focus-within:border-accent'
             )}
           >
             {/* Rich Formatting Toolbar */}
@@ -3258,7 +3258,7 @@ function ArticleEditorModal({
                 <button
                   type="button"
                   onClick={() => insertMarkdown('\n# ', '\n')}
-                  className="h-7 px-2 rounded hover:bg-surface-2 text-[11px] font-bold text-ink hover:text-accent flex items-center gap-0.5"
+                  className="h-7 px-2 rounded hover:bg-surface-2 text-2xs font-bold text-ink hover:text-accent flex items-center gap-0.5"
                   title="Heading 1"
                 >
                   <Heading1 className="w-3.5 h-3.5" />
@@ -3267,7 +3267,7 @@ function ArticleEditorModal({
                 <button
                   type="button"
                   onClick={() => insertMarkdown('\n## ', '\n')}
-                  className="h-7 px-2 rounded hover:bg-surface-2 text-[11px] font-bold text-ink hover:text-accent flex items-center gap-0.5"
+                  className="h-7 px-2 rounded hover:bg-surface-2 text-2xs font-bold text-ink hover:text-accent flex items-center gap-0.5"
                   title="Heading 2"
                 >
                   <Heading2 className="w-3.5 h-3.5" />
@@ -3276,7 +3276,7 @@ function ArticleEditorModal({
                 <button
                   type="button"
                   onClick={() => insertMarkdown('\n### ', '\n')}
-                  className="h-7 px-2 rounded hover:bg-surface-2 text-[11px] font-bold text-ink hover:text-accent flex items-center gap-0.5"
+                  className="h-7 px-2 rounded hover:bg-surface-2 text-2xs font-bold text-ink hover:text-accent flex items-center gap-0.5"
                   title="Heading 3"
                 >
                   <Heading3 className="w-3.5 h-3.5" />
@@ -3305,7 +3305,7 @@ function ArticleEditorModal({
                 <button
                   type="button"
                   onClick={() => insertMarkdown('==', '==')}
-                  className="h-7 w-7 rounded hover:bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center font-bold transition-colors"
+                  className="h-7 w-7 rounded hover:bg-warn/10 text-warn flex items-center justify-center font-bold transition-colors"
                   title="Highlight Text (==text==) [Ctrl+H]"
                 >
                   <Highlighter className="w-3.5 h-3.5" />
@@ -3313,7 +3313,7 @@ function ArticleEditorModal({
                 <button
                   type="button"
                   onClick={() => insertMarkdown('[badge:green:', ']')}
-                  className="h-7 px-1.5 rounded hover:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center gap-1 text-[11px] font-semibold transition-colors"
+                  className="h-7 px-1.5 rounded hover:bg-success/10 text-success flex items-center gap-1 text-2xs font-semibold transition-colors"
                   title="Insert Status Badge"
                 >
                   <BadgeCheck className="w-3.5 h-3.5" />
@@ -3330,7 +3330,7 @@ function ArticleEditorModal({
                 <button
                   type="button"
                   onClick={() => insertMarkdown('`', '`')}
-                  className="h-7 w-7 rounded hover:bg-surface-2 flex items-center justify-center font-mono text-[11px] text-ink hover:text-accent"
+                  className="h-7 w-7 rounded hover:bg-surface-2 flex items-center justify-center font-mono text-2xs text-ink hover:text-accent"
                   title="Inline Code"
                 >
                   <Code className="w-3.5 h-3.5" />
@@ -3342,29 +3342,29 @@ function ArticleEditorModal({
                 <button
                   type="button"
                   onClick={toggleBulletList}
-                  className="h-7 px-2 rounded hover:bg-surface-2 flex items-center gap-1 text-[12px] font-semibold text-ink hover:text-accent"
+                  className="h-7 px-2 rounded hover:bg-surface-2 flex items-center gap-1 text-xs font-semibold text-ink hover:text-accent"
                   title="Smart Bullet List (- item)"
                 >
                   <List className="w-3.5 h-3.5" />
-                  <span className="text-[11px]">Bullet</span>
+                  <span className="text-2xs">Bullet</span>
                 </button>
                 <button
                   type="button"
                   onClick={toggleNumberedList}
-                  className="h-7 px-2 rounded hover:bg-surface-2 flex items-center gap-1 text-[12px] font-semibold text-ink hover:text-accent"
+                  className="h-7 px-2 rounded hover:bg-surface-2 flex items-center gap-1 text-xs font-semibold text-ink hover:text-accent"
                   title="Smart Numbered List (1. 2. 3.)"
                 >
                   <ListOrdered className="w-3.5 h-3.5" />
-                  <span className="text-[11px]">1. 2. 3.</span>
+                  <span className="text-2xs">1. 2. 3.</span>
                 </button>
                 <button
                   type="button"
                   onClick={toggleTaskList}
-                  className="h-7 px-2 rounded hover:bg-surface-2 flex items-center gap-1 text-[12px] font-semibold text-ink hover:text-accent"
+                  className="h-7 px-2 rounded hover:bg-surface-2 flex items-center gap-1 text-xs font-semibold text-ink hover:text-accent"
                   title="Task Checklist (- [ ] item)"
                 >
                   <CheckSquare className="w-3.5 h-3.5" />
-                  <span className="text-[11px]">Tasks</span>
+                  <span className="text-2xs">Tasks</span>
                 </button>
               </div>
 
@@ -3373,7 +3373,7 @@ function ArticleEditorModal({
                 <button
                   type="button"
                   onClick={() => insertText('\n> [!NOTE]\n> Important guidance or key fact...\n\n')}
-                  className="h-7 px-2 rounded hover:bg-blue-500/10 text-blue-600 dark:text-blue-400 text-[11px] font-semibold flex items-center gap-1"
+                  className="h-7 px-2 rounded hover:bg-accent/10 text-accent text-2xs font-semibold flex items-center gap-1"
                   title="Note Callout Box"
                 >
                   <Lightbulb className="w-3.5 h-3.5" />
@@ -3386,7 +3386,7 @@ function ArticleEditorModal({
                       '\n> [!SUCCESS]\n> **100% PROFIT SPLIT UPGRADE**\n> - Traders receive a **90% profit** split as standard.\n> - Upgrade add-on available at checkout for **100% PROFIT SPLIT**.\n\n'
                     )
                   }
-                  className="h-7 px-2 rounded hover:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[11px] font-semibold flex items-center gap-1"
+                  className="h-7 px-2 rounded hover:bg-success/10 text-success text-2xs font-semibold flex items-center gap-1"
                   title="Bonus / Upgrade Callout (Green)"
                 >
                   <Sparkles className="w-3.5 h-3.5" />
@@ -3399,7 +3399,7 @@ function ArticleEditorModal({
                       '\n> [!CTA]\n> **Trade with our capital and keep 100% of the profit**\n> *Take advantage of our limited time evaluation sale live now.*\n> [button:Get Funded](https://www.aquafunded.com/#Evaluations)\n\n'
                     )
                   }
-                  className="h-7 px-2 rounded hover:bg-blue-500/10 text-blue-600 dark:text-blue-400 text-[11px] font-semibold flex items-center gap-1"
+                  className="h-7 px-2 rounded hover:bg-accent/10 text-accent text-2xs font-semibold flex items-center gap-1"
                   title="Featured CTA Banner (Blue with Button)"
                 >
                   <ExternalLink className="w-3.5 h-3.5" />
@@ -3412,7 +3412,7 @@ function ArticleEditorModal({
                       '\n> [!WARNING]\n> **Important Risk Limit**\n> Floating loss exceeding -2% will result in automatic rule breach.\n\n'
                     )
                   }
-                  className="h-7 px-2 rounded hover:bg-amber-500/10 text-amber-600 dark:text-amber-400 text-[11px] font-semibold flex items-center gap-1"
+                  className="h-7 px-2 rounded hover:bg-warn/10 text-warn text-2xs font-semibold flex items-center gap-1"
                   title="Warning Box"
                 >
                   <AlertTriangle className="w-3.5 h-3.5" />
@@ -3425,7 +3425,7 @@ function ArticleEditorModal({
                       '\n> [!DANGER]\n> **Violation / Breach Notice**\n> Prohibited trading strategies will result in immediate account closure.\n\n'
                     )
                   }
-                  className="h-7 px-2 rounded hover:bg-rose-500/10 text-rose-600 dark:text-rose-400 text-[11px] font-semibold flex items-center gap-1"
+                  className="h-7 px-2 rounded hover:bg-danger/10 text-danger text-2xs font-semibold flex items-center gap-1"
                   title="Violation / Danger Box (Red)"
                 >
                   <ShieldAlert className="w-3.5 h-3.5" />
@@ -3446,7 +3446,7 @@ function ArticleEditorModal({
                 <button
                   type="button"
                   onClick={() => insertMarkdown('[button:Get Funded](', 'https://)')}
-                  className="h-7 px-2 rounded hover:bg-accent-soft text-accent text-[11px] font-semibold flex items-center gap-1"
+                  className="h-7 px-2 rounded hover:bg-accent-soft text-accent text-2xs font-semibold flex items-center gap-1"
                   title="Insert CTA Action Button"
                 >
                   <ArrowRight className="w-3.5 h-3.5" />
@@ -3475,7 +3475,7 @@ function ArticleEditorModal({
                 <button
                   type="button"
                   onClick={() => insertText('\n```javascript\n// Sample code snippet\nconst app = new Zentry();\n```\n\n')}
-                  className="h-7 px-1.5 rounded hover:bg-surface-2 text-[11px] font-mono text-ink hover:text-accent"
+                  className="h-7 px-1.5 rounded hover:bg-surface-2 text-2xs font-mono text-ink hover:text-accent"
                   title="Code Block"
                 >
                   {'```'}
@@ -3503,7 +3503,7 @@ function ArticleEditorModal({
                 <button
                   type="button"
                   onClick={() => setShowContentEmojiPicker((prev) => !prev)}
-                  className="h-7 px-2.5 rounded-lg bg-accent/10 border border-accent/20 hover:bg-accent/20 text-accent text-[11.5px] font-semibold flex items-center gap-1.5 transition-colors"
+                  className="h-7 px-2.5 rounded-lg bg-accent/10 border border-accent/20 hover:bg-accent/20 text-accent text-xs font-semibold flex items-center gap-1.5 transition-colors"
                 >
                   <Smile className="w-3.5 h-3.5" />
                   <span>Emojis</span>
@@ -3533,11 +3533,11 @@ function ArticleEditorModal({
                   {(bodyLoading || bodyError) && (
                     <div className="absolute inset-0 z-10 grid place-items-center bg-surface/85 backdrop-blur-[1px]">
                       {bodyError ? (
-                        <p className="text-[13px] text-rose-500 px-6 text-center">
+                        <p className="text-ui text-danger px-6 text-center">
                           {bodyError}
                         </p>
                       ) : (
-                        <p className="text-[13px] text-ink-3">Loading article…</p>
+                        <p className="text-ui text-ink-3">Loading article…</p>
                       )}
                     </div>
                   )}
@@ -3558,7 +3558,7 @@ Tip:
 - Press Backspace on an empty bullet to exit the list.
 - Use Tab to indent and Shift+Tab to outdent.
 - Press Ctrl+B for Bold, Ctrl+I for Italic, Ctrl+K for Links, Ctrl+Enter to Save."
-                    className="w-full h-full p-4.5 bg-transparent text-[14px] text-ink placeholder:text-ink-3 focus:outline-none resize-none font-mono leading-relaxed selection:bg-accent/20"
+                    className="w-full h-full p-4.5 bg-transparent text-sm text-ink placeholder:text-ink-3 focus:outline-none resize-none font-mono leading-relaxed selection:bg-accent/20"
                   />
                 </div>
               )}
@@ -3571,7 +3571,7 @@ Tip:
                     isFullscreen ? 'max-h-[calc(100vh-250px)]' : 'max-h-[500px] min-h-[320px]'
                   )}
                 >
-                  <div className="pb-2.5 mb-4 border-b border-line flex items-center justify-between text-[11.5px] text-ink-3">
+                  <div className="pb-2.5 mb-4 border-b border-line flex items-center justify-between text-xs text-ink-3">
                     <span className="font-semibold uppercase tracking-wider text-accent flex items-center gap-1.5">
                       <Sparkles className="w-3.5 h-3.5" />
                       <span>Live Customer Preview</span>
@@ -3581,10 +3581,10 @@ Tip:
                   {content.trim() ? (
                     <MarkdownArticleContent content={content} />
                   ) : (
-                    <div className="p-12 text-center text-ink-3 italic text-[13px] border border-dashed border-line rounded-xl space-y-2">
+                    <div className="p-12 text-center text-ink-3 italic text-ui border border-dashed border-line rounded-xl space-y-2">
                       <LayoutTemplate className="w-8 h-8 text-ink-3 mx-auto stroke-1" />
                       <p>Nothing to preview yet.</p>
-                      <p className="text-[12px] not-italic text-ink-3">
+                      <p className="text-xs not-italic text-ink-3">
                         Pick a blueprint from the top or start typing to see real-time formatting.
                       </p>
                     </div>
@@ -3595,7 +3595,7 @@ Tip:
           </div>
 
           {contentError && (
-            <p className="text-[12px] font-medium text-rose-500 flex items-center gap-1 mt-1">
+            <p className="text-xs font-medium text-danger flex items-center gap-1 mt-1">
               <AlertCircle className="w-3.5 h-3.5 shrink-0" />
               <span>{contentError}</span>
             </p>
@@ -3606,7 +3606,7 @@ Tip:
             5. MODAL FOOTER WITH LIVE METRICS & 1-CLICK SAVE
             ───────────────────────────────────────────────────────────── */}
         <div className="px-5 py-3 border-t border-line flex items-center justify-between bg-surface-2/50 shrink-0">
-          <div className="flex items-center gap-3 text-[12px] text-ink-3">
+          <div className="flex items-center gap-3 text-xs text-ink-3">
             <span className="font-medium">
               <strong className="text-ink font-semibold">{stats.words}</strong> words
             </span>
@@ -3618,19 +3618,19 @@ Tip:
             <span>~{stats.readMinutes} min read</span>
             <span className="hidden sm:inline">•</span>
             {autosaveStatus === 'saving' && (
-              <span className="flex items-center gap-1 text-[11.5px] text-accent font-medium">
+              <span className="flex items-center gap-1 text-xs text-accent font-medium">
                 <RefreshCw className="w-3 h-3 animate-spin" />
                 <span>Autosaving draft...</span>
               </span>
             )}
             {autosaveStatus === 'saved' && lastAutosavedAt && !hasUnsavedChanges && (
-              <span className="flex items-center gap-1 text-[11.5px] text-emerald-600 dark:text-emerald-400 font-medium">
+              <span className="flex items-center gap-1 text-xs text-success font-medium">
                 <Check className="w-3 h-3" />
                 <span>Draft autosaved at {lastAutosavedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
               </span>
             )}
             {hasUnsavedChanges && autosaveStatus !== 'saving' && (
-              <span className="text-[11.5px] text-amber-600 dark:text-amber-400 font-medium">
+              <span className="text-xs text-warn font-medium">
                 Unsaved changes
               </span>
             )}
@@ -3643,7 +3643,7 @@ Tip:
             <button
               type="button"
               onClick={handleSafeClose}
-              className="h-9 px-4 rounded-xl border border-line bg-surface hover:bg-surface-2 text-ink text-[12.5px] font-medium transition-colors cursor-pointer"
+              className="h-9 px-4 rounded-xl border border-line bg-surface hover:bg-surface-2 text-ink text-xs font-medium transition-colors cursor-pointer"
             >
               Cancel
             </button>
@@ -3651,7 +3651,7 @@ Tip:
               type="button"
               disabled={saving || bodyLoading}
               onClick={handleSave}
-              className="btn btn-primary h-9 px-5 text-[12.5px] font-semibold gap-1.5 shadow-sm cursor-pointer"
+              className="btn btn-primary h-9 px-5 text-xs font-semibold gap-1.5 shadow-sm cursor-pointer"
             >
               <Sparkles className="w-3.5 h-3.5" />
               <span>
@@ -3672,12 +3672,12 @@ Tip:
           IMAGE INSERTION MODAL
           ───────────────────────────────────────────────────────────── */}
       {showImageModal && (
-        <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
-          <div className="bg-surface border border-line rounded-2xl max-w-md w-full p-5 space-y-4 shadow-2xl animate-in zoom-in-95">
+        <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-overlay">
+          <div className="popover border border-line rounded-2xl max-w-md w-full p-5 space-y-4 shadow-2xl animate-in zoom-in-95">
             <div className="flex items-center justify-between border-b border-line pb-2.5">
               <div className="flex items-center gap-2">
                 <ImageIcon className="w-4 h-4 text-accent" />
-                <h3 className="text-[14px] font-bold text-ink">Insert Image</h3>
+                <h3 className="text-sm font-bold text-ink">Insert Image</h3>
               </div>
               <button
                 type="button"
@@ -3690,25 +3690,25 @@ Tip:
 
             <div className="space-y-3">
               <div className="space-y-1">
-                <label className="text-[12px] font-semibold text-ink">Image Web URL (HTTPS)</label>
+                <label className="text-xs font-semibold text-ink">Image Web URL (HTTPS)</label>
                 <input
                   type="url"
                   value={imageUrl}
                   onChange={(e) => setImageUrl(e.target.value)}
                   placeholder="https://example.com/images/guide-screenshot.png"
-                  className="w-full h-9 px-3 rounded-lg border border-line bg-surface text-[13px] text-ink focus:outline-none focus:border-accent font-mono"
+                  className="w-full h-9 px-3 rounded-lg border border-line bg-surface text-ui text-ink focus:outline-none focus:border-accent font-mono"
                   autoFocus
                 />
               </div>
 
               <div className="space-y-1">
-                <label className="text-[12px] font-semibold text-ink">Alt Text / Caption (Optional)</label>
+                <label className="text-xs font-semibold text-ink">Alt Text / Caption (Optional)</label>
                 <input
                   type="text"
                   value={imageAlt}
                   onChange={(e) => setImageAlt(e.target.value)}
                   placeholder="e.g. Dashboard Settings Panel"
-                  className="w-full h-9 px-3 rounded-lg border border-line bg-surface text-[13px] text-ink focus:outline-none focus:border-accent"
+                  className="w-full h-9 px-3 rounded-lg border border-line bg-surface text-ui text-ink focus:outline-none focus:border-accent"
                 />
               </div>
             </div>
@@ -3717,7 +3717,7 @@ Tip:
               <button
                 type="button"
                 onClick={() => setShowImageModal(false)}
-                className="h-8.5 px-3 rounded-lg border border-line hover:bg-surface-2 text-[12px] text-ink font-medium"
+                className="h-8.5 px-3 rounded-lg border border-line hover:bg-surface-2 text-xs text-ink font-medium"
               >
                 Cancel
               </button>
@@ -3725,7 +3725,7 @@ Tip:
                 type="button"
                 disabled={!imageUrl.trim()}
                 onClick={handleInsertImage}
-                className="btn btn-primary h-8.5 px-4 text-[12px] font-semibold"
+                className="btn btn-primary h-8.5 px-4 text-xs font-semibold"
               >
                 Insert into Article
               </button>
@@ -3738,12 +3738,12 @@ Tip:
           SHORTCUTS & TIPS POPUP
           ───────────────────────────────────────────────────────────── */}
       {showShortcutsModal && (
-        <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
-          <div className="bg-surface border border-line rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-2xl animate-in zoom-in-95">
+        <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-overlay">
+          <div className="popover border border-line rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-2xl animate-in zoom-in-95">
             <div className="flex items-center justify-between border-b border-line pb-3">
               <div className="flex items-center gap-2">
                 <Keyboard className="w-5 h-5 text-accent" />
-                <h3 className="text-[15px] font-bold text-ink">Keyboard Shortcuts &amp; Markdown Tricks</h3>
+                <h3 className="text-md font-bold text-ink">Keyboard Shortcuts &amp; Markdown Tricks</h3>
               </div>
               <button
                 type="button"
@@ -3754,41 +3754,41 @@ Tip:
               </button>
             </div>
 
-            <div className="space-y-3 text-[12.5px]">
+            <div className="space-y-3 text-xs">
               <div className="grid grid-cols-2 gap-2 text-ink">
                 <div className="p-2.5 rounded-lg bg-surface-2/60 border border-line/60 flex items-center justify-between">
                   <span>Bold text</span>
-                  <kbd className="px-1.5 py-0.5 rounded bg-surface border border-line text-[11px] font-mono text-ink-2">Ctrl+B</kbd>
+                  <kbd className="px-1.5 py-0.5 rounded bg-surface border border-line text-2xs font-mono text-ink-2">Ctrl+B</kbd>
                 </div>
                 <div className="p-2.5 rounded-lg bg-surface-2/60 border border-line/60 flex items-center justify-between">
                   <span>Italic text</span>
-                  <kbd className="px-1.5 py-0.5 rounded bg-surface border border-line text-[11px] font-mono text-ink-2">Ctrl+I</kbd>
+                  <kbd className="px-1.5 py-0.5 rounded bg-surface border border-line text-2xs font-mono text-ink-2">Ctrl+I</kbd>
                 </div>
                 <div className="p-2.5 rounded-lg bg-surface-2/60 border border-line/60 flex items-center justify-between">
                   <span>Highlight text</span>
-                  <kbd className="px-1.5 py-0.5 rounded bg-surface border border-line text-[11px] font-mono text-ink-2">Ctrl+H</kbd>
+                  <kbd className="px-1.5 py-0.5 rounded bg-surface border border-line text-2xs font-mono text-ink-2">Ctrl+H</kbd>
                 </div>
                 <div className="p-2.5 rounded-lg bg-surface-2/60 border border-line/60 flex items-center justify-between">
                   <span>Insert Link</span>
-                  <kbd className="px-1.5 py-0.5 rounded bg-surface border border-line text-[11px] font-mono text-ink-2">Ctrl+K</kbd>
+                  <kbd className="px-1.5 py-0.5 rounded bg-surface border border-line text-2xs font-mono text-ink-2">Ctrl+K</kbd>
                 </div>
                 <div className="p-2.5 rounded-lg bg-surface-2/60 border border-line/60 flex items-center justify-between">
                   <span>Save Article</span>
-                  <kbd className="px-1.5 py-0.5 rounded bg-surface border border-line text-[11px] font-mono text-ink-2">Ctrl+Enter</kbd>
+                  <kbd className="px-1.5 py-0.5 rounded bg-surface border border-line text-2xs font-mono text-ink-2">Ctrl+Enter</kbd>
                 </div>
                 <div className="p-2.5 rounded-lg bg-surface-2/60 border border-line/60 flex items-center justify-between">
                   <span>Indent List</span>
-                  <kbd className="px-1.5 py-0.5 rounded bg-surface border border-line text-[11px] font-mono text-ink-2">Tab</kbd>
+                  <kbd className="px-1.5 py-0.5 rounded bg-surface border border-line text-2xs font-mono text-ink-2">Tab</kbd>
                 </div>
               </div>
 
               <div className="space-y-1.5 pt-2 border-t border-line/60">
-                <h4 className="font-semibold text-ink text-[13px]">AquaFunded-Grade Article Features:</h4>
-                <ul className="list-disc pl-5 space-y-1 text-ink-2 text-[12px]">
-                  <li><strong className="text-ink">Highlighter:</strong> Wrap text with <code className="px-1 py-0.5 rounded bg-surface border border-line font-mono text-[11px]">==important figure==</code> or press <strong className="text-ink">Ctrl+H</strong>.</li>
-                  <li><strong className="text-ink">Status Badges:</strong> Use <code className="px-1 py-0.5 rounded bg-surface border border-line font-mono text-[11px]">[badge:green:Active]</code> or <code className="px-1 py-0.5 rounded bg-surface border border-line font-mono text-[11px]">[badge:blue:90% Split]</code>.</li>
-                  <li><strong className="text-ink">CTA Buttons:</strong> Use <code className="px-1 py-0.5 rounded bg-surface border border-line font-mono text-[11px]">[button:Get Funded](https://...)</code> to embed primary buttons.</li>
-                  <li><strong className="text-ink">Callout Cards:</strong> Use <code className="px-1 py-0.5 rounded bg-surface border border-line font-mono text-[11px]">&gt; [!SUCCESS]</code> (green), <code className="px-1 py-0.5 rounded bg-surface border border-line font-mono text-[11px]">&gt; [!CTA]</code> (blue banner), <code className="px-1 py-0.5 rounded bg-surface border border-line font-mono text-[11px]">&gt; [!WARNING]</code> (amber), or <code className="px-1 py-0.5 rounded bg-surface border border-line font-mono text-[11px]">&gt; [!DANGER]</code> (red).</li>
+                <h4 className="font-semibold text-ink text-ui">AquaFunded-Grade Article Features:</h4>
+                <ul className="list-disc pl-5 space-y-1 text-ink-2 text-xs">
+                  <li><strong className="text-ink">Highlighter:</strong> Wrap text with <code className="px-1 py-0.5 rounded bg-surface border border-line font-mono text-2xs">==important figure==</code> or press <strong className="text-ink">Ctrl+H</strong>.</li>
+                  <li><strong className="text-ink">Status Badges:</strong> Use <code className="px-1 py-0.5 rounded bg-surface border border-line font-mono text-2xs">[badge:green:Active]</code> or <code className="px-1 py-0.5 rounded bg-surface border border-line font-mono text-2xs">[badge:blue:90% Split]</code>.</li>
+                  <li><strong className="text-ink">CTA Buttons:</strong> Use <code className="px-1 py-0.5 rounded bg-surface border border-line font-mono text-2xs">[button:Get Funded](https://...)</code> to embed primary buttons.</li>
+                  <li><strong className="text-ink">Callout Cards:</strong> Use <code className="px-1 py-0.5 rounded bg-surface border border-line font-mono text-2xs">&gt; [!SUCCESS]</code> (green), <code className="px-1 py-0.5 rounded bg-surface border border-line font-mono text-2xs">&gt; [!CTA]</code> (blue banner), <code className="px-1 py-0.5 rounded bg-surface border border-line font-mono text-2xs">&gt; [!WARNING]</code> (amber), or <code className="px-1 py-0.5 rounded bg-surface border border-line font-mono text-2xs">&gt; [!DANGER]</code> (red).</li>
                 </ul>
               </div>
             </div>
@@ -3797,7 +3797,7 @@ Tip:
               <button
                 type="button"
                 onClick={() => setShowShortcutsModal(false)}
-                className="btn btn-primary h-8.5 px-4 text-[12px] font-semibold"
+                className="btn btn-primary h-8.5 px-4 text-xs font-semibold"
               >
                 Got it
               </button>
@@ -3913,24 +3913,24 @@ function ReorderArticlesModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-in fade-in">
-      <div className="bg-surface border border-line rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] flex flex-col overflow-hidden animate-in zoom-in-95">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-overlay animate-in fade-in">
+      <div className="popover border border-line rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] flex flex-col overflow-hidden animate-in zoom-in-95">
         {/* Header */}
         <div className="px-5 py-4 border-b border-line flex items-center justify-between bg-surface-2/60 shrink-0">
           <div className="flex items-center gap-3">
             <SectionIconPreview
               icon={section.icon}
-              className="w-10 h-10 rounded-xl bg-surface border border-line shadow-xs text-[20px]"
+              className="w-10 h-10 rounded-xl bg-surface border border-line shadow-xs text-xl"
               imgClassName="w-6 h-6 object-contain"
             />
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="text-[16px] font-bold text-ink">Reorder Articles</h3>
-                <span className="font-mono text-[11px] font-bold px-1.5 py-0.5 rounded-md bg-accent/10 text-accent border border-accent/20">
+                <h3 className="text-base font-bold text-ink">Reorder Articles</h3>
+                <span className="font-mono text-2xs font-bold px-1.5 py-0.5 rounded-md bg-accent/10 text-accent border border-accent/20">
                   {section.name}
                 </span>
               </div>
-              <p className="text-[12px] text-ink-3">
+              <p className="text-xs text-ink-3">
                 Change the sequence in which articles are displayed on help.business.com
               </p>
             </div>
@@ -3947,13 +3947,13 @@ function ReorderArticlesModal({
         {/* Content */}
         <div className="p-5 overflow-y-auto flex-1 space-y-4">
           {errorMsg && (
-            <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400 text-[12.5px] flex items-center gap-2">
+            <div className="p-3 rounded-xl bg-danger/10 border border-danger/20 text-danger text-xs flex items-center gap-2">
               <AlertCircle className="w-4 h-4 shrink-0" />
               <span>{errorMsg}</span>
             </div>
           )}
 
-          <div className="p-3.5 rounded-xl bg-accent-soft/30 border border-accent/20 flex items-start gap-2.5 text-[12.5px] text-ink-2">
+          <div className="p-3.5 rounded-xl bg-accent-soft/30 border border-accent/20 flex items-start gap-2.5 text-xs text-ink-2">
             <Info className="w-4 h-4 text-accent shrink-0 mt-0.5" />
             <span>
               Articles at the top appear first on your public Help Center and inside the widget. Use the <strong className="text-ink">Up</strong> and <strong className="text-ink">Down</strong> buttons to reorder.
@@ -3961,7 +3961,7 @@ function ReorderArticlesModal({
           </div>
 
           {list.length === 0 ? (
-            <div className="py-12 text-center text-ink-3 text-[13px]">
+            <div className="py-12 text-center text-ink-3 text-ui">
               No articles found in this section.
             </div>
           ) : (
@@ -3979,22 +3979,22 @@ function ReorderArticlesModal({
                     <div className="flex items-center gap-3 min-w-0 flex-1">
                       <div className="flex items-center gap-1.5 shrink-0">
                         <GripVertical className="w-4 h-4 text-ink-3/40 group-hover:text-ink-3 transition-colors" />
-                        <span className="font-mono text-[12px] font-bold px-2 py-0.5 rounded-md bg-surface-2 border border-line text-accent">
+                        <span className="font-mono text-xs font-bold px-2 py-0.5 rounded-md bg-surface-2 border border-line text-accent">
                           #{displayNum}
                         </span>
                       </div>
 
                       <div className="min-w-0 flex-1">
-                        <h4 className="text-[13.5px] font-semibold text-ink truncate">
+                        <h4 className="text-ui font-semibold text-ink truncate">
                           {item.title}
                         </h4>
-                        <div className="flex items-center gap-2 mt-0.5 text-[11px] text-ink-3">
+                        <div className="flex items-center gap-2 mt-0.5 text-2xs text-ink-3">
                           <span
                             className={cn(
                               'px-1.5 py-0.2 rounded font-medium',
                               item.status === 'published'
-                                ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
-                                : 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
+                                ? 'bg-success/10 text-success'
+                                : 'bg-warn/10 text-warn'
                             )}
                           >
                             {item.status === 'published' ? 'Published' : 'Draft'}
@@ -4014,7 +4014,7 @@ function ReorderArticlesModal({
                         type="button"
                         disabled={isFirst}
                         onClick={() => handleMove(index, 'up')}
-                        className="h-7.5 px-2 rounded-lg border border-line bg-surface hover:bg-surface-2 text-ink text-[12px] font-medium flex items-center gap-1 transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed shadow-2xs"
+                        className="h-7.5 px-2 rounded-lg border border-line bg-surface hover:bg-surface-2 text-ink text-xs font-medium flex items-center gap-1 transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed shadow-2xs"
                         title="Move Up"
                       >
                         <ArrowUp className="w-3.5 h-3.5 text-accent" />
@@ -4025,7 +4025,7 @@ function ReorderArticlesModal({
                         type="button"
                         disabled={isLast}
                         onClick={() => handleMove(index, 'down')}
-                        className="h-7.5 px-2 rounded-lg border border-line bg-surface hover:bg-surface-2 text-ink text-[12px] font-medium flex items-center gap-1 transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed shadow-2xs"
+                        className="h-7.5 px-2 rounded-lg border border-line bg-surface hover:bg-surface-2 text-ink text-xs font-medium flex items-center gap-1 transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed shadow-2xs"
                         title="Move Down"
                       >
                         <ArrowDown className="w-3.5 h-3.5 text-accent" />
@@ -4039,7 +4039,7 @@ function ReorderArticlesModal({
                         className="h-7.5 w-7.5 rounded-lg border border-line bg-surface hover:bg-surface-2 text-ink-3 hover:text-ink flex items-center justify-center transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
                         title="Move to Top"
                       >
-                        <span className="text-[11px] font-bold font-mono">⇈</span>
+                        <span className="text-2xs font-bold font-mono">⇈</span>
                       </button>
 
                       <button
@@ -4049,7 +4049,7 @@ function ReorderArticlesModal({
                         className="h-7.5 w-7.5 rounded-lg border border-line bg-surface hover:bg-surface-2 text-ink-3 hover:text-ink flex items-center justify-center transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
                         title="Move to Bottom"
                       >
-                        <span className="text-[11px] font-bold font-mono">⇊</span>
+                        <span className="text-2xs font-bold font-mono">⇊</span>
                       </button>
                     </div>
                   </div>
@@ -4065,7 +4065,7 @@ function ReorderArticlesModal({
             type="button"
             onClick={handleReset}
             disabled={saving || !hasChanges}
-            className="text-[12px] text-ink-3 hover:text-ink flex items-center gap-1 cursor-pointer font-medium disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            className="text-xs text-ink-3 hover:text-ink flex items-center gap-1 cursor-pointer font-medium disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           >
             <RotateCcw className="w-3.5 h-3.5" />
             <span>Reset Order</span>
@@ -4075,7 +4075,7 @@ function ReorderArticlesModal({
             <button
               type="button"
               onClick={onClose}
-              className="h-8.5 px-3.5 rounded-lg border border-line bg-surface text-ink text-[12.5px] font-medium hover:bg-surface-2 transition-colors cursor-pointer"
+              className="h-8.5 px-3.5 rounded-lg border border-line bg-surface text-ink text-xs font-medium hover:bg-surface-2 transition-colors cursor-pointer"
             >
               Cancel
             </button>
@@ -4083,7 +4083,7 @@ function ReorderArticlesModal({
               type="button"
               disabled={saving}
               onClick={handleSave}
-              className="h-8.5 px-4 rounded-lg bg-accent text-accent-ink text-[12.5px] font-semibold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+              className="h-8.5 px-4 rounded-lg bg-accent text-accent-ink text-xs font-semibold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
             >
               <Check className="w-4 h-4" />
               <span>{saving ? 'Saving...' : 'Save & Apply Order'}</span>
@@ -4175,13 +4175,13 @@ function QuickRenameSectionModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in">
-      <div className="bg-surface border border-line rounded-2xl shadow-2xl max-w-lg w-full flex flex-col overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-overlay animate-in fade-in">
+      <div className="popover border border-line rounded-2xl shadow-2xl max-w-lg w-full flex flex-col overflow-hidden">
         {/* Header */}
         <div className="px-6 py-4 border-b border-line flex items-center justify-between bg-surface-2/50">
           <div>
-            <h2 className="text-[16px] font-bold text-ink">Rename Section</h2>
-            <p className="text-[11.5px] text-ink-3">
+            <h2 className="text-base font-bold text-ink">Rename Section</h2>
+            <p className="text-xs text-ink-3">
               Change section name, description, or custom icon.
             </p>
           </div>
@@ -4197,7 +4197,7 @@ function QuickRenameSectionModal({
         {/* Form */}
         <form onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto max-h-[75vh]">
           {errorMsg && (
-            <div className="p-3 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-500 text-[12px] font-medium">
+            <div className="p-3 rounded-lg bg-danger/10 border border-danger/20 text-danger text-xs font-medium">
               {errorMsg}
             </div>
           )}
@@ -4206,28 +4206,28 @@ function QuickRenameSectionModal({
           <div className="p-3 rounded-xl border border-line bg-surface-2/60 flex items-center gap-3">
             <SectionIconPreview
               icon={icon}
-              className="w-11 h-11 rounded-xl text-[20px]"
+              className="w-11 h-11 rounded-xl text-xl"
               imgClassName="w-7 h-7"
             />
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
-                <span className="text-[14px] font-bold text-ink truncate">
+                <span className="text-sm font-bold text-ink truncate">
                   {name.trim() || 'Section Name'}
                 </span>
               </div>
-              <p className="text-[11.5px] text-ink-3 truncate mt-0.5">
+              <p className="text-xs text-ink-3 truncate mt-0.5">
                 {description.trim() || 'Section description will appear here'}
               </p>
             </div>
-            <span className="text-[10.5px] font-medium px-2 py-0.5 rounded bg-surface border border-line text-ink-3 shrink-0">
+            <span className="text-2xs font-medium px-2 py-0.5 rounded bg-surface border border-line text-ink-3 shrink-0">
               Live Preview
             </span>
           </div>
 
           {/* Name */}
           <div>
-            <label className="text-[11.5px] font-semibold text-ink-2 block mb-1">
-              Section Name <span className="text-rose-500">*</span>
+            <label className="text-xs font-semibold text-ink-2 block mb-1">
+              Section Name <span className="text-danger">*</span>
             </label>
             <input
               type="text"
@@ -4238,15 +4238,15 @@ function QuickRenameSectionModal({
               }}
               placeholder="e.g. Account Management, Rules, Payouts"
               className={cn(
-                'w-full h-9 px-3 rounded-lg border bg-surface text-[13px] text-ink focus:outline-none transition-colors',
+                'w-full h-9 px-3 rounded-lg border bg-surface text-ui text-ink focus:outline-none transition-colors',
                 nameError
-                  ? 'border-rose-500 focus:border-rose-500 bg-rose-500/5'
+                  ? 'border-danger focus:border-danger bg-danger/5'
                   : 'border-line focus:border-accent'
               )}
               autoFocus
             />
             {nameError && (
-              <p className="text-[11.5px] text-rose-500 font-medium flex items-center gap-1 mt-1">
+              <p className="text-xs text-danger font-medium flex items-center gap-1 mt-1">
                 <AlertCircle className="w-3.5 h-3.5 shrink-0" />
                 <span>{nameError}</span>
               </p>
@@ -4255,7 +4255,7 @@ function QuickRenameSectionModal({
 
           {/* Description */}
           <div>
-            <label className="text-[11.5px] font-semibold text-ink-2 block mb-1">
+            <label className="text-xs font-semibold text-ink-2 block mb-1">
               Short Description (Optional)
             </label>
             <input
@@ -4263,15 +4263,15 @@ function QuickRenameSectionModal({
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="e.g. Understand guidelines, payout split, and account types"
-              className="w-full h-9 px-3 rounded-lg border border-line bg-surface text-[13px] text-ink focus:outline-none focus:border-accent"
+              className="w-full h-9 px-3 rounded-lg border border-line bg-surface text-ui text-ink focus:outline-none focus:border-accent"
             />
           </div>
 
           {/* Icon Tabs */}
           <div className="space-y-2 pt-1">
             <div className="flex items-center justify-between">
-              <label className="text-[11.5px] font-semibold text-ink-2">Section Icon / Logo</label>
-              <div className="flex items-center gap-1 p-0.5 rounded-lg bg-surface-2 border border-line text-[11px]">
+              <label className="text-xs font-semibold text-ink-2">Section Icon / Logo</label>
+              <div className="flex items-center gap-1 p-0.5 rounded-lg bg-surface-2 border border-line text-2xs">
                 <button
                   type="button"
                   onClick={() => setIconTab('presets')}
@@ -4304,12 +4304,12 @@ function QuickRenameSectionModal({
                     type="text"
                     value={icon}
                     onChange={(e) => setIcon(e.target.value)}
-                    className="w-14 h-8 px-2 text-center text-[18px] rounded-lg border border-line bg-surface focus:outline-none focus:border-accent"
+                    className="w-14 h-8 px-2 text-center text-lg rounded-lg border border-line bg-surface focus:outline-none focus:border-accent"
                   />
                   <button
                     type="button"
                     onClick={() => setShowEmojiPicker((prev) => !prev)}
-                    className="h-8 px-2.5 rounded-lg border border-line bg-surface hover:bg-surface-2 text-ink text-[11.5px] shrink-0 font-medium inline-flex items-center gap-1 cursor-pointer"
+                    className="h-8 px-2.5 rounded-lg border border-line bg-surface hover:bg-surface-2 text-ink text-xs shrink-0 font-medium inline-flex items-center gap-1 cursor-pointer"
                   >
                     <span>😊</span>
                     <span>More Emojis</span>
@@ -4330,7 +4330,7 @@ function QuickRenameSectionModal({
                 <div className="space-y-1.5 pt-1">
                   {iconGroups.map((grp) => (
                     <div key={grp.name} className="flex items-center gap-1.5 flex-wrap">
-                      <span className="text-[10px] text-ink-3 w-28 shrink-0 font-medium">
+                      <span className="text-2xs text-ink-3 w-28 shrink-0 font-medium">
                         {grp.name}:
                       </span>
                       {grp.icons.map((em) => (
@@ -4338,7 +4338,7 @@ function QuickRenameSectionModal({
                           key={em}
                           type="button"
                           onClick={() => setIcon(em)}
-                          className={`w-6 h-6 rounded flex items-center justify-center text-[13px] transition-all cursor-pointer ${
+                          className={`w-6 h-6 rounded flex items-center justify-center text-ui transition-all cursor-pointer ${
                             icon === em ? 'bg-accent text-white scale-110' : 'hover:bg-surface'
                           }`}
                         >
@@ -4352,7 +4352,7 @@ function QuickRenameSectionModal({
             ) : (
               <div className="p-3 rounded-xl border border-line bg-surface-2/40 space-y-2.5">
                 <div className="flex items-center gap-2">
-                  <label className="h-8 px-3 rounded-lg border border-line bg-surface hover:bg-surface-2 text-ink text-[11.5px] font-medium inline-flex items-center gap-1.5 cursor-pointer shrink-0">
+                  <label className="h-8 px-3 rounded-lg border border-line bg-surface hover:bg-surface-2 text-ink text-xs font-medium inline-flex items-center gap-1.5 cursor-pointer shrink-0">
                     <Upload className="w-3.5 h-3.5" />
                     <span>{uploadingIcon ? 'Uploading…' : 'Upload Logo'}</span>
                     <input
@@ -4363,7 +4363,7 @@ function QuickRenameSectionModal({
                       className="hidden"
                     />
                   </label>
-                  <span className="text-[11px] text-ink-3">or paste image link:</span>
+                  <span className="text-2xs text-ink-3">or paste image link:</span>
                 </div>
 
                 <input
@@ -4371,7 +4371,7 @@ function QuickRenameSectionModal({
                   value={icon.startsWith('http') || icon.startsWith('/') ? icon : ''}
                   onChange={(e) => setIcon(e.target.value)}
                   placeholder="https://example.com/icon.svg"
-                  className="w-full h-8 px-3 rounded-lg border border-line bg-surface text-[11.5px] text-ink focus:outline-none focus:border-accent"
+                  className="w-full h-8 px-3 rounded-lg border border-line bg-surface text-xs text-ink focus:outline-none focus:border-accent"
                 />
               </div>
             )}
@@ -4382,7 +4382,7 @@ function QuickRenameSectionModal({
             <button
               type="button"
               onClick={() => onDeleteRequest(section)}
-              className="text-[12px] text-rose-500 hover:text-rose-600 hover:underline flex items-center gap-1 cursor-pointer font-medium"
+              className="text-xs text-danger hover:text-danger hover:underline flex items-center gap-1 cursor-pointer font-medium"
             >
               <Trash2 className="w-3.5 h-3.5" />
               <span>Delete this section</span>
@@ -4392,14 +4392,14 @@ function QuickRenameSectionModal({
               <button
                 type="button"
                 onClick={onClose}
-                className="h-8 px-3 rounded-lg border border-line bg-surface text-ink text-[12px] font-medium hover:bg-surface-2 transition-colors cursor-pointer"
+                className="h-8 px-3 rounded-lg border border-line bg-surface text-ink text-xs font-medium hover:bg-surface-2 transition-colors cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={saving || uploadingIcon}
-                className="h-8 px-4 rounded-lg bg-accent text-accent-ink text-[12px] font-semibold transition-all shadow-xs disabled:opacity-50 cursor-pointer"
+                className="h-8 px-4 rounded-lg bg-accent text-accent-ink text-xs font-semibold transition-all shadow-xs disabled:opacity-50 cursor-pointer"
               >
                 {saving ? 'Saving...' : 'Save Changes'}
               </button>
@@ -4440,23 +4440,23 @@ function DeleteSectionConfirmModal({
   );
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in">
-      <div className="bg-surface border border-line rounded-2xl shadow-2xl max-w-md w-full overflow-hidden animate-in zoom-in-95">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-overlay animate-in fade-in">
+      <div className="popover border border-line rounded-2xl shadow-2xl max-w-md w-full overflow-hidden animate-in zoom-in-95">
         <div className="p-6 space-y-4">
           <div className="flex items-start gap-3.5">
-            <div className="w-10 h-10 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400 flex items-center justify-center shrink-0">
+            <div className="w-10 h-10 rounded-xl bg-danger/10 border border-danger/20 text-danger flex items-center justify-center shrink-0">
               <Trash2 className="w-5 h-5" />
             </div>
             <div className="min-w-0 flex-1">
-              <h3 className="text-[16px] font-bold text-ink">Delete Section?</h3>
-              <p className="text-[12.5px] text-ink-3 mt-1">
+              <h3 className="text-base font-bold text-ink">Delete Section?</h3>
+              <p className="text-xs text-ink-3 mt-1">
                 Are you sure you want to delete <strong className="text-ink">"{section.name}"</strong>?
               </p>
             </div>
           </div>
 
           <div className="p-3.5 rounded-xl border border-line bg-surface-2/60 space-y-3">
-            <div className="flex items-center justify-between text-[12px]">
+            <div className="flex items-center justify-between text-xs">
               <span className="text-ink-3">Articles in this section:</span>
               <span className="font-bold text-ink px-2 py-0.5 rounded bg-surface border border-line">
                 {articleCount} {articleCount === 1 ? 'article' : 'articles'}
@@ -4466,14 +4466,14 @@ function DeleteSectionConfirmModal({
             {articleCount > 0 ? (
               availableSections.length > 0 ? (
                 <div className="space-y-2 pt-2 border-t border-line/60">
-                  <label className="text-[12px] font-semibold text-ink flex items-center gap-1">
+                  <label className="text-xs font-semibold text-ink flex items-center gap-1">
                     <span>Move articles to:</span>
-                    <span className="text-rose-500">*</span>
+                    <span className="text-danger">*</span>
                   </label>
                   <select
                     value={destinationSectionId}
                     onChange={(e) => setDestinationSectionId(e.target.value)}
-                    className="w-full h-8.5 px-2.5 rounded-lg border border-line bg-surface text-[12.5px] text-ink focus:outline-none focus:border-accent cursor-pointer"
+                    className="w-full h-8.5 px-2.5 rounded-lg border border-line bg-surface text-xs text-ink focus:outline-none focus:border-accent cursor-pointer"
                   >
                     {availableSections.map((s) => (
                       <option key={s.id} value={s.id}>
@@ -4481,17 +4481,17 @@ function DeleteSectionConfirmModal({
                       </option>
                     ))}
                   </select>
-                  <p className="text-[11.5px] text-ink-3 leading-relaxed">
+                  <p className="text-xs text-ink-3 leading-relaxed">
                     All {articleCount} articles will be moved into this section before deletion. Articles will never be left pointing to a deleted section.
                   </p>
                 </div>
               ) : (
-                <p className="text-[11.5px] text-amber-600 dark:text-amber-400 leading-relaxed pt-1 border-t border-line/60">
+                <p className="text-xs text-warn leading-relaxed pt-1 border-t border-line/60">
                   This is the only section in your workspace. Deleting it will leave these {articleCount} articles in <strong>Uncategorised</strong>.
                 </p>
               )
             ) : (
-              <p className="text-[11.5px] text-ink-3 leading-relaxed">
+              <p className="text-xs text-ink-3 leading-relaxed">
                 This section has no articles and will be safely removed.
               </p>
             )}
@@ -4502,7 +4502,7 @@ function DeleteSectionConfirmModal({
               type="button"
               disabled={isDeleting}
               onClick={onClose}
-              className="h-8 px-3.5 rounded-lg border border-line bg-surface text-ink text-[12.5px] font-medium hover:bg-surface-2 transition-colors cursor-pointer disabled:opacity-50"
+              className="h-8 px-3.5 rounded-lg border border-line bg-surface text-ink text-xs font-medium hover:bg-surface-2 transition-colors cursor-pointer disabled:opacity-50"
             >
               Cancel
             </button>
@@ -4519,7 +4519,7 @@ function DeleteSectionConfirmModal({
                     : null
                 )
               }
-              className="h-8 px-4 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-[12.5px] font-semibold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+              className="h-8 px-4 rounded-lg bg-danger hover:bg-danger text-white text-xs font-semibold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
             >
               <Trash2 className="w-3.5 h-3.5" />
               <span>
@@ -4756,13 +4756,13 @@ function SectionsManagerModal({
     : sectionList.length + 1;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in">
-      <div className="bg-surface border border-line rounded-2xl shadow-2xl max-w-xl w-full max-h-[88vh] flex flex-col overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-overlay animate-in fade-in">
+      <div className="popover border border-line rounded-2xl shadow-2xl max-w-xl w-full max-h-[88vh] flex flex-col overflow-hidden">
         {/* Header */}
         <div className="px-6 py-4 border-b border-line flex items-center justify-between bg-surface-2/50">
           <div>
-            <h2 className="text-[16px] font-bold text-ink">Manage Help Sections</h2>
-            <p className="text-[11.5px] text-ink-3">
+            <h2 className="text-base font-bold text-ink">Manage Help Sections</h2>
+            <p className="text-xs text-ink-3">
               Drag to reorder, customize icons, edit descriptions, or organize articles.
             </p>
           </div>
@@ -4778,9 +4778,9 @@ function SectionsManagerModal({
         <div className="p-6 overflow-y-auto flex-1 space-y-6">
           {/* Uncategorised Notice Banner */}
           {uncategorisedCount > 0 && (
-            <div className="p-3.5 rounded-xl border border-amber-500/30 bg-amber-500/10 flex items-center justify-between gap-3 text-[12px]">
-              <div className="flex items-center gap-2.5 text-amber-800 dark:text-amber-300 min-w-0">
-                <AlertCircle className="w-4 h-4 shrink-0 text-amber-600 dark:text-amber-400" />
+            <div className="p-3.5 rounded-xl border border-warn/30 bg-warn/10 flex items-center justify-between gap-3 text-xs">
+              <div className="flex items-center gap-2.5 text-warn min-w-0">
+                <AlertCircle className="w-4 h-4 shrink-0 text-warn" />
                 <span className="truncate">
                   <strong>{uncategorisedCount} uncategorised {uncategorisedCount === 1 ? 'article' : 'articles'}</strong> need section assignment.
                 </span>
@@ -4792,7 +4792,7 @@ function SectionsManagerModal({
                     onRunMigration();
                     onClose();
                   }}
-                  className="px-2.5 py-1 rounded-md bg-amber-600 hover:bg-amber-700 text-white text-[11.5px] font-semibold shrink-0 cursor-pointer transition-colors shadow-2xs"
+                  className="px-2.5 py-1 rounded-md bg-warn hover:bg-warn text-white text-xs font-semibold shrink-0 cursor-pointer transition-colors shadow-2xs"
                 >
                   Migrate All
                 </button>
@@ -4803,14 +4803,14 @@ function SectionsManagerModal({
           {/* Create / Edit Form */}
           <form onSubmit={handleSaveSection} className="p-4 rounded-xl border border-line bg-surface-2/60 space-y-3.5">
             <div className="flex items-center justify-between">
-              <span className="text-[12.5px] font-bold text-ink">
+              <span className="text-xs font-bold text-ink">
                 {editingSec ? `Edit Section: ${editingSec.name}` : 'Add New Section'}
               </span>
               {editingSec && (
                 <button
                   type="button"
                   onClick={handleResetForm}
-                  className="text-[11px] text-accent hover:underline cursor-pointer"
+                  className="text-2xs text-accent hover:underline cursor-pointer"
                 >
                   Cancel Edit
                 </button>
@@ -4818,30 +4818,30 @@ function SectionsManagerModal({
             </div>
 
             {errorMsg && (
-              <p className="text-[11.5px] text-rose-500 font-medium">{errorMsg}</p>
+              <p className="text-xs text-danger font-medium">{errorMsg}</p>
             )}
 
             {/* Live Section Preview Card */}
             <div className="p-3 rounded-xl border border-line bg-surface flex items-center gap-3">
               <SectionIconPreview
                 icon={icon}
-                className="w-11 h-11 rounded-xl text-[20px]"
+                className="w-11 h-11 rounded-xl text-xl"
                 imgClassName="w-7 h-7"
               />
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
-                  <span className="font-mono text-[11px] font-bold px-1.5 py-0.5 rounded bg-surface-2 border border-line text-ink-3 shrink-0">
+                  <span className="font-mono text-2xs font-bold px-1.5 py-0.5 rounded bg-surface-2 border border-line text-ink-3 shrink-0">
                     #{String(activePositionNum).padStart(2, '0')}
                   </span>
-                  <div className="text-[14px] font-bold text-ink truncate">
+                  <div className="text-sm font-bold text-ink truncate">
                     {name.trim() || 'Section Title Preview'}
                   </div>
                 </div>
-                <div className="text-[11.5px] text-ink-3 truncate mt-0.5">
+                <div className="text-xs text-ink-3 truncate mt-0.5">
                   {description.trim() || 'Short description preview will appear here'}
                 </div>
               </div>
-              <span className="text-[10.5px] font-medium px-2 py-0.5 rounded bg-surface-2 border border-line text-ink-3 shrink-0">
+              <span className="text-2xs font-medium px-2 py-0.5 rounded bg-surface-2 border border-line text-ink-3 shrink-0">
                 Live Preview
               </span>
             </div>
@@ -4849,8 +4849,8 @@ function SectionsManagerModal({
             {/* Section Name & Description */}
             <div className="space-y-2.5">
               <div>
-                <label className="text-[11px] font-semibold text-ink-2 block mb-1">
-                  Section Name <span className="text-rose-500">*</span>
+                <label className="text-2xs font-semibold text-ink-2 block mb-1">
+                  Section Name <span className="text-danger">*</span>
                 </label>
                 <input
                   type="text"
@@ -4861,14 +4861,14 @@ function SectionsManagerModal({
                   }}
                   placeholder="e.g. Account Types, Withdrawals, Risk Limits"
                   className={cn(
-                    'w-full h-8 px-3 rounded-lg border bg-surface text-[12.5px] text-ink focus:outline-none transition-colors',
+                    'w-full h-8 px-3 rounded-lg border bg-surface text-xs text-ink focus:outline-none transition-colors',
                     nameError
-                      ? 'border-rose-500 focus:border-rose-500 bg-rose-500/5'
+                      ? 'border-danger focus:border-danger bg-danger/5'
                       : 'border-line focus:border-accent'
                   )}
                 />
                 {nameError && (
-                  <p className="text-[11.5px] text-rose-500 font-medium flex items-center gap-1 mt-1">
+                  <p className="text-xs text-danger font-medium flex items-center gap-1 mt-1">
                     <AlertCircle className="w-3.5 h-3.5 shrink-0" />
                     <span>{nameError}</span>
                   </p>
@@ -4876,7 +4876,7 @@ function SectionsManagerModal({
               </div>
 
               <div>
-                <label className="text-[11px] font-semibold text-ink-2 block mb-1">
+                <label className="text-2xs font-semibold text-ink-2 block mb-1">
                   Short Description (Optional)
                 </label>
                 <input
@@ -4884,7 +4884,7 @@ function SectionsManagerModal({
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   placeholder="e.g. Learn about live accounts, funded steps, and payout rules"
-                  className="w-full h-8 px-3 rounded-lg border border-line bg-surface text-[12.5px] text-ink focus:outline-none focus:border-accent"
+                  className="w-full h-8 px-3 rounded-lg border border-line bg-surface text-xs text-ink focus:outline-none focus:border-accent"
                 />
               </div>
             </div>
@@ -4892,8 +4892,8 @@ function SectionsManagerModal({
             {/* Section Icon / Logo Picker Tabs */}
             <div className="space-y-2 pt-1">
               <div className="flex items-center justify-between">
-                <label className="text-[11px] font-semibold text-ink-2">Section Icon / Logo</label>
-                <div className="flex items-center gap-1 p-0.5 rounded-lg bg-surface border border-line text-[11px]">
+                <label className="text-2xs font-semibold text-ink-2">Section Icon / Logo</label>
+                <div className="flex items-center gap-1 p-0.5 rounded-lg bg-surface border border-line text-2xs">
                   <button
                     type="button"
                     onClick={() => setIconTab('presets')}
@@ -4926,12 +4926,12 @@ function SectionsManagerModal({
                       type="text"
                       value={icon}
                       onChange={(e) => setIcon(e.target.value)}
-                      className="w-16 h-8 px-2 text-center text-[17px] rounded-lg border border-line bg-surface-2 focus:outline-none focus:border-accent"
+                      className="w-16 h-8 px-2 text-center text-lg rounded-lg border border-line bg-surface-2 focus:outline-none focus:border-accent"
                     />
                     <button
                       type="button"
                       onClick={() => setShowSectionEmojiPicker((prev) => !prev)}
-                      className="h-8 px-2.5 rounded-lg border border-line bg-surface hover:bg-surface-2 text-ink text-[11.5px] shrink-0 font-medium inline-flex items-center gap-1 cursor-pointer"
+                      className="h-8 px-2.5 rounded-lg border border-line bg-surface hover:bg-surface-2 text-ink text-xs shrink-0 font-medium inline-flex items-center gap-1 cursor-pointer"
                     >
                       <span>😊</span>
                       <span>More Emojis</span>
@@ -4953,7 +4953,7 @@ function SectionsManagerModal({
                   <div className="space-y-1.5 pt-1">
                     {iconGroups.map((grp) => (
                       <div key={grp.name} className="flex items-center gap-1.5 flex-wrap">
-                        <span className="text-[10px] text-ink-3 w-28 shrink-0 font-medium">
+                        <span className="text-2xs text-ink-3 w-28 shrink-0 font-medium">
                           {grp.name}:
                         </span>
                         {grp.icons.map((em) => (
@@ -4961,7 +4961,7 @@ function SectionsManagerModal({
                             key={em}
                             type="button"
                             onClick={() => setIcon(em)}
-                            className={`w-6 h-6 rounded flex items-center justify-center text-[13px] transition-all cursor-pointer ${
+                            className={`w-6 h-6 rounded flex items-center justify-center text-ui transition-all cursor-pointer ${
                               icon === em ? 'bg-accent text-white scale-110' : 'hover:bg-surface-2'
                             }`}
                           >
@@ -4976,7 +4976,7 @@ function SectionsManagerModal({
                 /* Custom Logo / Image URL or Upload */
                 <div className="p-3 rounded-xl border border-line bg-surface space-y-2.5">
                   <div className="flex items-center gap-2">
-                    <label className="h-8 px-3 rounded-lg border border-line bg-surface hover:bg-surface-2 text-ink text-[11.5px] font-medium inline-flex items-center gap-1.5 cursor-pointer shrink-0">
+                    <label className="h-8 px-3 rounded-lg border border-line bg-surface hover:bg-surface-2 text-ink text-xs font-medium inline-flex items-center gap-1.5 cursor-pointer shrink-0">
                       <Upload className="w-3.5 h-3.5" />
                       <span>{uploadingIcon ? 'Uploading…' : 'Upload Section Logo'}</span>
                       <input
@@ -4987,7 +4987,7 @@ function SectionsManagerModal({
                         className="hidden"
                       />
                     </label>
-                    <span className="text-[11px] text-ink-3">or paste image link:</span>
+                    <span className="text-2xs text-ink-3">or paste image link:</span>
                   </div>
 
                   <input
@@ -4995,9 +4995,9 @@ function SectionsManagerModal({
                     value={icon.startsWith('http') || icon.startsWith('/') ? icon : ''}
                     onChange={(e) => setIcon(e.target.value)}
                     placeholder="https://example.com/section-icon.png"
-                    className="w-full h-8 px-3 rounded-lg border border-line bg-surface text-[11.5px] text-ink focus:outline-none focus:border-accent"
+                    className="w-full h-8 px-3 rounded-lg border border-line bg-surface text-xs text-ink focus:outline-none focus:border-accent"
                   />
-                  <p className="text-[10.5px] text-ink-3">
+                  <p className="text-2xs text-ink-3">
                     Supports SVG, PNG, WebP, JPG. Displays directly on the section card in your Help Center.
                   </p>
                 </div>
@@ -5007,7 +5007,7 @@ function SectionsManagerModal({
             <button
               type="submit"
               disabled={submitting || uploadingIcon}
-              className="w-full h-8 px-4 rounded-lg bg-accent text-accent-ink text-[12px] font-semibold transition-all shadow-xs disabled:opacity-50 cursor-pointer"
+              className="w-full h-8 px-4 rounded-lg bg-accent text-accent-ink text-xs font-semibold transition-all shadow-xs disabled:opacity-50 cursor-pointer"
             >
               {submitting ? 'Saving...' : editingSec ? 'Update Section' : '+ Add Section'}
             </button>
@@ -5016,16 +5016,16 @@ function SectionsManagerModal({
           {/* Current Sections List with Drag-to-Reorder */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <span className="text-[12px] font-semibold text-ink uppercase tracking-wider">
+              <span className="text-xs font-semibold text-ink uppercase tracking-wider">
                 Existing Sections ({sectionList.length})
               </span>
-              <span className="text-[11px] text-ink-3">
+              <span className="text-2xs text-ink-3">
                 Drag handle or use arrows to reorder
               </span>
             </div>
 
             {sectionList.length === 0 ? (
-              <p className="text-[12px] text-ink-3 italic">No sections created yet.</p>
+              <p className="text-xs text-ink-3 italic">No sections created yet.</p>
             ) : (
               <div className="border border-line rounded-xl divide-y divide-line/80 overflow-hidden bg-surface">
                 {sectionList.map((sec, idx) => {
@@ -5081,23 +5081,23 @@ function SectionsManagerModal({
                           </div>
                         </div>
 
-                        <span className="font-mono text-[11px] font-bold px-1.5 py-0.5 rounded bg-surface-2 border border-line text-ink-3 shrink-0">
+                        <span className="font-mono text-2xs font-bold px-1.5 py-0.5 rounded bg-surface-2 border border-line text-ink-3 shrink-0">
                           #{displayNum}
                         </span>
                         <SectionIconPreview
                           icon={sec.icon}
-                          className="w-8 h-8 rounded-lg text-[16px]"
+                          className="w-8 h-8 rounded-lg text-base"
                           imgClassName="w-5 h-5"
                         />
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2">
-                            <span className="text-[13px] font-semibold text-ink truncate">{sec.name}</span>
-                            <span className="text-[10.5px] font-medium px-2 py-0.2 rounded-full bg-surface-2 border border-line text-ink-3 shrink-0">
+                            <span className="text-ui font-semibold text-ink truncate">{sec.name}</span>
+                            <span className="text-2xs font-medium px-2 py-0.2 rounded-full bg-surface-2 border border-line text-ink-3 shrink-0">
                               {articleCounts[sec.id] || 0} {articleCounts[sec.id] === 1 ? 'article' : 'articles'}
                             </span>
                           </div>
                           {sec.description && (
-                            <div className="text-[11.5px] text-ink-3 truncate mt-0.5">{sec.description}</div>
+                            <div className="text-xs text-ink-3 truncate mt-0.5">{sec.description}</div>
                           )}
                         </div>
                       </div>
@@ -5106,7 +5106,7 @@ function SectionsManagerModal({
                         <button
                           type="button"
                           onClick={() => handleStartEdit(sec)}
-                          className="h-7 px-2.5 rounded-lg border border-line bg-surface hover:bg-surface-2 text-ink text-[11.5px] font-medium flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+                          className="h-7 px-2.5 rounded-lg border border-line bg-surface hover:bg-surface-2 text-ink text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
                           title="Edit section name, description, and icon"
                         >
                           <Edit2 className="w-3 h-3 text-accent" />
@@ -5116,7 +5116,7 @@ function SectionsManagerModal({
                         <button
                           type="button"
                           onClick={() => onDeleteRequest(sec)}
-                          className="h-7 px-2.5 rounded-lg border border-rose-500/20 bg-rose-500/5 hover:bg-rose-500/15 text-rose-600 dark:text-rose-400 text-[11.5px] font-medium flex items-center gap-1.5 transition-colors cursor-pointer"
+                          className="h-7 px-2.5 rounded-lg border border-danger/20 bg-danger/5 hover:bg-danger/15 text-danger text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer"
                           title="Delete section"
                         >
                           <Trash2 className="w-3 h-3" />
@@ -5135,7 +5135,7 @@ function SectionsManagerModal({
         <div className="px-6 py-3.5 border-t border-line flex items-center justify-end bg-surface-2/40">
           <button
             onClick={onClose}
-            className="h-8 px-4 rounded-lg bg-surface border border-line text-ink text-[12px] font-medium hover:bg-surface-2 transition-colors cursor-pointer"
+            className="h-8 px-4 rounded-lg bg-surface border border-line text-ink text-xs font-medium hover:bg-surface-2 transition-colors cursor-pointer"
           >
             Done
           </button>
@@ -5209,13 +5209,13 @@ function WidgetTabSettingsModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in">
-      <div className="bg-surface border border-line rounded-2xl shadow-2xl max-w-md w-full overflow-hidden flex flex-col">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-overlay animate-in fade-in">
+      <div className="popover border border-line rounded-2xl shadow-2xl max-w-md w-full overflow-hidden flex flex-col">
         {/* Header */}
         <div className="px-6 py-4 border-b border-line flex items-center justify-between bg-surface-2/50">
           <div>
-            <h2 className="text-[16px] font-bold text-ink">Customize Website Widget Tab</h2>
-            <p className="text-[11.5px] text-ink-3">
+            <h2 className="text-base font-bold text-ink">Customize Website Widget Tab</h2>
+            <p className="text-xs text-ink-3">
               Rename the Help tab, select icon, and control visibility on your website.
             </p>
           </div>
@@ -5230,7 +5230,7 @@ function WidgetTabSettingsModal({
         {/* Content Form */}
         <form onSubmit={handleSave} className="p-6 space-y-4">
           {errorMsg && (
-            <div className="p-3 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400 text-[12px] flex items-center gap-2">
+            <div className="p-3 rounded-lg bg-danger/10 border border-danger/20 text-danger text-xs flex items-center gap-2">
               <AlertCircle className="w-4 h-4 shrink-0" />
               <span>{errorMsg}</span>
             </div>
@@ -5239,8 +5239,8 @@ function WidgetTabSettingsModal({
           {/* Visibility Switch */}
           <div className="flex items-center justify-between p-3.5 rounded-xl border border-line bg-surface-2/40">
             <div>
-              <div className="text-[13px] font-semibold text-ink">Show Tab on Website Widget</div>
-              <div className="text-[11.5px] text-ink-3">
+              <div className="text-ui font-semibold text-ink">Show Tab on Website Widget</div>
+              <div className="text-xs text-ink-3">
                 Toggle whether visitors can browse articles in the chat launcher.
               </div>
             </div>
@@ -5257,7 +5257,7 @@ function WidgetTabSettingsModal({
 
           {/* Tab Label Name Input */}
           <div className="space-y-2">
-            <label className="text-[12px] font-semibold text-ink-2">
+            <label className="text-xs font-semibold text-ink-2">
               Tab Label Name <span className="font-normal text-ink-3">(Displayed to visitors)</span>
             </label>
             <input
@@ -5265,18 +5265,18 @@ function WidgetTabSettingsModal({
               value={tabLabel}
               onChange={(e) => setTabLabel(e.target.value)}
               placeholder="e.g. Help Center, FAQs, Guides, Madad..."
-              className="w-full h-10 px-3 rounded-xl border border-line bg-surface text-[13.5px] text-ink focus:outline-none focus:border-accent"
+              className="w-full h-10 px-3 rounded-xl border border-line bg-surface text-ui text-ink focus:outline-none focus:border-accent"
             />
 
             {/* Quick Suggestions */}
             <div className="flex items-center gap-1.5 flex-wrap pt-1">
-              <span className="text-[10.5px] text-ink-3">Presets:</span>
+              <span className="text-2xs text-ink-3">Presets:</span>
               {SUGGESTED_NAMES.map((name) => (
                 <button
                   key={name}
                   type="button"
                   onClick={() => setTabLabel(name)}
-                  className={`px-2 py-0.5 rounded-md text-[11px] font-medium transition-colors border ${
+                  className={`px-2 py-0.5 rounded-md text-2xs font-medium transition-colors border ${
                     tabLabel === name
                       ? 'bg-accent text-accent-ink border-accent'
                       : 'bg-surface-2 border-line text-ink-2 hover:bg-surface-3 hover:text-ink'
@@ -5290,14 +5290,14 @@ function WidgetTabSettingsModal({
 
           {/* Tab Icon Selection */}
           <div className="space-y-1.5">
-            <label className="text-[12px] font-semibold text-ink-2">Tab Icon</label>
+            <label className="text-xs font-semibold text-ink-2">Tab Icon</label>
             <div className="flex items-center gap-1.5 flex-wrap">
               {TAB_ICONS.map((icon) => (
                 <button
                   key={icon}
                   type="button"
                   onClick={() => setTabIcon(icon)}
-                  className={`w-9 h-9 rounded-xl flex items-center justify-center text-[18px] transition-transform border ${
+                  className={`w-9 h-9 rounded-xl flex items-center justify-center text-lg transition-transform border ${
                     tabIcon === icon
                       ? 'border-accent bg-accent/10 scale-110 shadow-xs'
                       : 'border-line bg-surface hover:bg-surface-2'
@@ -5311,20 +5311,20 @@ function WidgetTabSettingsModal({
 
           {/* Live Visitor Preview */}
           <div className="p-3.5 rounded-xl border border-line bg-surface-2/60 space-y-2">
-            <span className="text-[11px] font-bold text-ink-3 uppercase tracking-wider block">
+            <span className="text-2xs font-bold text-ink-3 uppercase tracking-wider block">
               Live Visitor Preview (Widget Bottom Bar)
             </span>
             <div className="bg-surface rounded-xl border border-line p-2 flex items-center justify-around shadow-sm max-w-xs mx-auto">
-              <div className="flex flex-col items-center gap-0.5 text-slate-400 text-[10.5px]">
-                <span className="text-[14px]">🏠</span>
+              <div className="flex flex-col items-center gap-0.5 text-ink-3 text-2xs">
+                <span className="text-sm">🏠</span>
                 <span>Home</span>
               </div>
-              <div className="flex flex-col items-center gap-0.5 text-slate-400 text-[10.5px]">
-                <span className="text-[14px]">💬</span>
+              <div className="flex flex-col items-center gap-0.5 text-ink-3 text-2xs">
+                <span className="text-sm">💬</span>
                 <span>Messages</span>
               </div>
-              <div className={`flex flex-col items-center gap-0.5 font-bold text-[10.5px] ${showTab ? 'text-blue-600 dark:text-blue-400 scale-105' : 'opacity-30 line-through'}`}>
-                <span className="text-[14px]">{tabIcon}</span>
+              <div className={`flex flex-col items-center gap-0.5 font-bold text-2xs ${showTab ? 'text-accent scale-105' : 'opacity-30 line-through'}`}>
+                <span className="text-sm">{tabIcon}</span>
                 <span>{tabLabel || 'Help'}</span>
               </div>
             </div>
@@ -5335,14 +5335,14 @@ function WidgetTabSettingsModal({
             <button
               type="button"
               onClick={onClose}
-              className="h-9 px-4 rounded-xl border border-line bg-surface hover:bg-surface-2 text-ink text-[12.5px] font-medium"
+              className="h-9 px-4 rounded-xl border border-line bg-surface hover:bg-surface-2 text-ink text-xs font-medium"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={saving}
-              className="h-9 px-5 rounded-xl bg-accent text-accent-ink hover:opacity-90 text-[12.5px] font-semibold transition-all shadow-xs disabled:opacity-50"
+              className="h-9 px-5 rounded-xl bg-accent text-accent-ink hover:opacity-90 text-xs font-semibold transition-all shadow-xs disabled:opacity-50"
             >
               {saving ? 'Saving...' : 'Save & Update Widget'}
             </button>

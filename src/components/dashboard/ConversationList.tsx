@@ -297,7 +297,7 @@ const ConversationItem = memo(function ConversationItem({
 
   // Chips share one shape so the row reads as a set, not a pile of styles.
   const chip =
-    'inline-flex items-center gap-1 h-5 px-1.5 rounded-md text-[10.5px] leading-none font-semibold border shrink-0 whitespace-nowrap';
+    'inline-flex items-center gap-1 h-5 px-1.5 rounded-md text-2xs leading-none font-semibold border shrink-0 whitespace-nowrap';
 
   const activate = () => {
     if (isSelectionMode && onToggleCheck) {
@@ -385,7 +385,7 @@ const ConversationItem = memo(function ConversationItem({
             )}
             <span
               className={cn(
-                'text-[14px] truncate leading-5',
+                'text-sm truncate leading-5',
                 hasUnread
                   ? 'font-bold text-ink'
                   : isSelected
@@ -409,7 +409,7 @@ const ConversationItem = memo(function ConversationItem({
           </div>
           <span
             className={cn(
-              'text-[11.5px] shrink-0 tabular-nums',
+              'text-xs shrink-0 tabular-nums',
               hasUnread ? 'text-accent font-bold' : 'text-ink-3'
             )}
           >
@@ -421,24 +421,24 @@ const ConversationItem = memo(function ConversationItem({
         <div className="flex items-center gap-2 mt-1">
           <p
             className={cn(
-              'text-[13px] truncate leading-5 flex-1 min-w-0',
+              'text-ui truncate leading-5 flex-1 min-w-0',
               hasUnread ? 'font-medium text-ink' : 'text-ink-3 group-hover:text-ink-2'
             )}
           >
             {isBotGreeting ? (
-              <span className="text-purple-600 dark:text-purple-400 font-semibold inline-flex items-center gap-1 mr-1 align-[-2px]">
+              <span className="text-accent font-semibold inline-flex items-center gap-1 mr-1 align-[-2px]">
                 <Bot className="w-3.5 h-3.5" />
                 Bot:
               </span>
             ) : fromAi ? (
-              <span className="text-purple-600 dark:text-purple-400 font-semibold inline-flex items-center gap-1 mr-1 align-[-2px]">
+              <span className="text-accent font-semibold inline-flex items-center gap-1 mr-1 align-[-2px]">
                 <Sparkles className="w-3.5 h-3.5" />
                 AI:
               </span>
             ) : fromAgent ? (
               <span className="text-ink-2 font-medium inline-flex items-center gap-1 mr-1 align-[-2px]">
                 {conv.last_message?.read_at ? (
-                  <CheckCheck className="w-3.5 h-3.5 text-blue-500 stroke-[2.5]" />
+                  <CheckCheck className="w-3.5 h-3.5 text-accent stroke-[2.5]" />
                 ) : online ? (
                   <CheckCheck className="w-3.5 h-3.5 text-ink-3/70 stroke-[2]" />
                 ) : (
@@ -450,7 +450,7 @@ const ConversationItem = memo(function ConversationItem({
             {previewText}
           </p>
           {hasUnread && (
-            <span className="h-5 min-w-[20px] px-1.5 grid place-items-center text-[11px] font-bold rounded-full bg-accent text-accent-ink shrink-0">
+            <span className="h-5 min-w-[20px] px-1.5 grid place-items-center text-2xs font-bold rounded-full bg-accent text-accent-ink shrink-0">
               {conv.unread_count}
             </span>
           )}
@@ -463,7 +463,7 @@ const ConversationItem = memo(function ConversationItem({
             <div className="flex flex-wrap items-center gap-1.5 min-w-0 flex-1">
               {sla?.isBreached ? (
                 <span
-                  className={cn(chip, 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/30')}
+                  className={cn(chip, 'bg-danger/10 text-danger border-danger/30')}
                   title={`SLA breached: customer waiting ${sla.waitLabel} without an agent reply`}
                 >
                   <Clock className="w-3 h-3" />
@@ -471,7 +471,7 @@ const ConversationItem = memo(function ConversationItem({
                 </span>
               ) : sla?.isWarning ? (
                 <span
-                  className={cn(chip, 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30')}
+                  className={cn(chip, 'bg-warn/10 text-warn border-warn/30')}
                   title={`Approaching SLA limit: customer waiting ${sla.waitLabel}`}
                 >
                   <Clock className="w-3 h-3" />
@@ -480,27 +480,27 @@ const ConversationItem = memo(function ConversationItem({
               ) : null}
 
               {isUrgent ? (
-                <span className={cn(chip, 'bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/25')}>Urgent</span>
+                <span className={cn(chip, 'bg-danger/10 text-danger border-danger/25')}>Urgent</span>
               ) : isHigh ? (
-                <span className={cn(chip, 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/25')}>High</span>
+                <span className={cn(chip, 'bg-warn/10 text-warn border-warn/25')}>High</span>
               ) : null}
 
               {isWaiting && !isResolved && (
-                <span className={cn(chip, 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/25')}>
-                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                <span className={cn(chip, 'bg-warn/10 text-warn border-warn/25')}>
+                  <span className="w-1.5 h-1.5 rounded-full bg-warn animate-pulse" />
                   Waiting
                 </span>
               )}
 
               {isBotGreeting && !isResolved && !isWaiting && (
-                <span className={cn(chip, 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/25 font-medium')}>
+                <span className={cn(chip, 'bg-accent/10 text-accent border-accent/25 font-medium')}>
                   <Bot className="w-3 h-3" />
                   Bot greeting
                 </span>
               )}
 
               {isResolved && (
-                <span className={cn(chip, 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/25')}>
+                <span className={cn(chip, 'bg-success/10 text-success border-success/25')}>
                   <Check className="w-3 h-3 stroke-[2.5]" />
                   Resolved
                 </span>
@@ -509,7 +509,7 @@ const ConversationItem = memo(function ConversationItem({
               {showLang && (
                 <span
                   title={`Visitor language: ${langCode!.toUpperCase()}`}
-                  className={cn(chip, 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/25 uppercase')}
+                  className={cn(chip, 'bg-accent/10 text-accent border-accent/25 uppercase')}
                 >
                   <Globe className="w-3 h-3" />
                   {langCode}
@@ -527,7 +527,7 @@ const ConversationItem = memo(function ConversationItem({
               ))}
 
               {conv.csat_rating && (
-                <span className={cn(chip, 'bg-amber-500/10 text-amber-600 border-amber-500/25')}>
+                <span className={cn(chip, 'bg-warn/10 text-warn border-warn/25')}>
                   <Star className="w-3 h-3 fill-current" />
                   {conv.csat_rating}
                 </span>
@@ -536,7 +536,7 @@ const ConversationItem = memo(function ConversationItem({
 
             {conv.agent && (
               <span
-                className="text-[11px] text-ink-3 truncate max-w-[90px] shrink-0"
+                className="text-2xs text-ink-3 truncate max-w-[90px] shrink-0"
                 title={`Assigned: ${conv.agent.name}`}
               >
                 {conv.agent.name.split(' ')[0]}
@@ -589,10 +589,12 @@ export function ConversationList({
   const listContainerRef = useRef<HTMLDivElement>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
 
-  // Focus search bar on Ctrl+K or Cmd+K
+  // Focus search with "/" (Ctrl/Cmd+K belongs to the command palette).
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+      const el = document.activeElement as HTMLElement | null;
+      const typing = !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable);
+      if (e.key === '/' && !typing && !e.metaKey && !e.ctrlKey && !e.altKey) {
         e.preventDefault();
         searchInputRef.current?.focus();
         searchInputRef.current?.select();
@@ -856,7 +858,8 @@ export function ConversationList({
         activeTag === 'textarea' ||
         (document.activeElement as HTMLElement)?.isContentEditable;
 
-      if (isInputActive) return;
+      // Modifier combos belong to someone else (Ctrl/Cmd+K is the command palette).
+      if (isInputActive || e.metaKey || e.ctrlKey || e.altKey || e.defaultPrevented) return;
 
       if (e.key === 'ArrowDown' || e.key === 'j') {
         e.preventDefault();
@@ -906,7 +909,7 @@ export function ConversationList({
       <div className="p-3 border-b border-line/80 space-y-2 bg-surface relative z-30 min-w-0">
         <div className="flex items-center justify-between gap-1.5 px-0.5 min-w-0">
           <div className="flex items-center gap-2 shrink-0">
-            <h2 className="text-[17px] md:text-[14.5px] font-bold tracking-tight text-ink">
+            <h2 className="text-lg md:text-sm font-bold tracking-tight text-ink">
               Inbox
             </h2>
           </div>
@@ -977,7 +980,7 @@ export function ConversationList({
                 aria-label="Sort & Filters"
                 title={`${SORT_LABELS[sortBy].label} • Click to change sort & filters`}
                 className={cn(
-                  'h-9 md:h-7 px-2.5 md:px-2 rounded-lg text-[12px] md:text-[11px] font-semibold inline-flex items-center gap-1.5 transition-all border shadow-2xs whitespace-nowrap shrink-0 cursor-pointer',
+                  'h-9 md:h-7 px-2.5 md:px-2 rounded-lg text-xs md:text-2xs font-semibold inline-flex items-center gap-1.5 transition-all border shadow-2xs whitespace-nowrap shrink-0 cursor-pointer',
                   hasActiveFilters
                     ? 'border-accent/50 bg-accent/10 text-accent font-bold ring-1 ring-accent/20'
                     : 'border-line/70 bg-surface-2 text-ink-3 hover:text-ink hover:bg-surface-3'
@@ -996,7 +999,7 @@ export function ConversationList({
                 <div className="absolute right-0 top-[calc(100%+6px)] z-50 w-[min(18rem,calc(100vw-1.5rem))] p-3.5 rounded-2xl border border-line bg-surface shadow-2xl animate-pop text-left">
                   {/* Sort Order Selector */}
                   <div className="mb-3">
-                    <div className="flex items-center gap-1 text-[10px] font-bold text-ink-3 uppercase tracking-wider mb-1.5">
+                    <div className="flex items-center gap-1 text-2xs font-bold text-ink-3 uppercase tracking-wider mb-1.5">
                       <ArrowUpDown className="w-3 h-3 text-accent" />
                       Sort Order
                     </div>
@@ -1006,7 +1009,7 @@ export function ConversationList({
                           key={key}
                           onClick={() => setSortBy(key)}
                           className={cn(
-                            'px-2 py-1.5 rounded-lg text-[11px] font-medium transition-all text-left border',
+                            'px-2 py-1.5 rounded-lg text-2xs font-medium transition-all text-left border',
                             sortBy === key
                               ? 'bg-accent text-accent-ink border-accent font-bold shadow-xs'
                               : 'bg-surface-2 text-ink-2 hover:bg-surface-3 border-line/60'
@@ -1020,7 +1023,7 @@ export function ConversationList({
 
                   {/* Channel Selector */}
                   <div className="mb-3 pt-2.5 border-t border-line">
-                    <div className="text-[10px] font-bold text-ink-3 uppercase tracking-wider mb-1.5">
+                    <div className="text-2xs font-bold text-ink-3 uppercase tracking-wider mb-1.5">
                       Channel
                     </div>
                     <div className="flex flex-wrap gap-1.5">
@@ -1029,7 +1032,7 @@ export function ConversationList({
                           key={ch.value}
                           onClick={() => setChannelFilter(ch.value)}
                           className={cn(
-                            'px-2.5 h-6 rounded-lg text-[10.5px] font-semibold transition-all',
+                            'px-2.5 h-6 rounded-lg text-2xs font-semibold transition-all',
                             channelFilter === ch.value
                               ? 'bg-ink text-ink-inv shadow-xs'
                               : 'bg-surface-2 text-ink-2 hover:bg-surface-3 border border-line/60'
@@ -1044,14 +1047,14 @@ export function ConversationList({
                   {/* Tag Selector */}
                   {availableTags.length > 0 && (
                     <div className="mb-3 pt-2.5 border-t border-line">
-                      <div className="text-[10px] font-bold text-ink-3 uppercase tracking-wider mb-1.5">
+                      <div className="text-2xs font-bold text-ink-3 uppercase tracking-wider mb-1.5">
                         Tag
                       </div>
                       <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto">
                         <button
                           onClick={() => setSelectedTagFilter('all')}
                           className={cn(
-                            'px-2 h-5.5 rounded-lg text-[10px] font-semibold transition-all',
+                            'px-2 h-5.5 rounded-lg text-2xs font-semibold transition-all',
                             selectedTagFilter === 'all'
                               ? 'bg-ink text-ink-inv'
                               : 'bg-surface-2 text-ink-2 hover:bg-surface-3 border border-line/60'
@@ -1064,7 +1067,7 @@ export function ConversationList({
                             key={tag}
                             onClick={() => setSelectedTagFilter(tag)}
                             className={cn(
-                              'px-2 h-5.5 rounded-lg text-[10px] font-semibold transition-all flex items-center gap-1',
+                              'px-2 h-5.5 rounded-lg text-2xs font-semibold transition-all flex items-center gap-1',
                               selectedTagFilter === tag
                                 ? 'bg-accent text-accent-ink'
                                 : 'bg-surface-2 text-ink-2 hover:bg-surface-3 border border-line/60'
@@ -1085,7 +1088,7 @@ export function ConversationList({
                           setChannelFilter('all');
                           setSelectedTagFilter('all');
                         }}
-                        className="text-[11px] font-semibold text-accent hover:underline"
+                        className="text-2xs font-semibold text-accent hover:underline"
                       >
                         Reset filters
                       </button>
@@ -1106,7 +1109,7 @@ export function ConversationList({
             placeholder="Search conversations..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="input input-sm h-10 md:h-8 pl-8.5 pr-14 bg-surface-2 text-[16px] md:text-[12px] w-full border-line/70 focus:border-accent"
+            className="input input-sm h-10 md:h-8 pl-8.5 pr-14 bg-surface-2 text-base md:text-xs w-full border-line/70 focus:border-accent"
           />
           {searchQuery ? (
             <button
@@ -1117,8 +1120,8 @@ export function ConversationList({
               <X className="w-3.5 h-3.5" />
             </button>
           ) : (
-            <span className="kbd hidden md:inline-flex absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-[9.5px]">
-              Ctrl K
+            <span className="kbd hidden md:inline-flex absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-2xs">
+              /
             </span>
           )}
         </div>
@@ -1138,7 +1141,7 @@ export function ConversationList({
                 }}
                 title={`${tab.label} (${count})`}
                 className={cn(
-                  'h-8 md:h-6 px-2.5 md:px-2 rounded-lg text-[12.5px] md:text-[10.5px] font-medium transition-all flex items-center justify-center gap-1 shrink-0 cursor-pointer',
+                  'h-8 md:h-6 px-2.5 md:px-2 rounded-lg text-xs md:text-2xs font-medium transition-all flex items-center justify-center gap-1 shrink-0 cursor-pointer',
                   active
                     ? 'bg-surface text-ink shadow-xs border border-line/60 font-bold'
                     : 'text-ink-3 hover:text-ink hover:bg-surface-3/60'
@@ -1148,10 +1151,10 @@ export function ConversationList({
                 {count > 0 && (
                   <span
                     className={cn(
-                      'tabular-nums text-[9px] px-1 py-0.1 rounded-full font-bold',
+                      'tabular-nums text-2xs px-1 py-0.1 rounded-full font-bold',
                       active
                         ? tab.id === 'waiting'
-                          ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
+                          ? 'bg-warn/15 text-warn'
                           : 'bg-accent/10 text-accent'
                         : 'bg-surface-3 text-ink-3'
                     )}
@@ -1175,7 +1178,7 @@ export function ConversationList({
                   onClick={() => setShowMoreTabs((v) => !v)}
                   title={isMoreTabActive ? `${activeMoreTab?.label} (Click for more tabs)` : 'More status tabs'}
                   className={cn(
-                    'h-8 md:h-6 px-2.5 md:px-2 rounded-lg text-[12.5px] md:text-[10.5px] font-medium transition-all flex items-center justify-center gap-1 shrink-0 cursor-pointer',
+                    'h-8 md:h-6 px-2.5 md:px-2 rounded-lg text-xs md:text-2xs font-medium transition-all flex items-center justify-center gap-1 shrink-0 cursor-pointer',
                     isMoreTabActive
                       ? 'bg-surface text-ink shadow-xs border border-line/60 font-bold'
                       : 'text-ink-3 hover:text-ink hover:bg-surface-3/60'
@@ -1183,11 +1186,11 @@ export function ConversationList({
                 >
                   <span>{isMoreTabActive ? activeMoreTab?.label : 'More'}</span>
                   {isMoreTabActive && activeMoreTab && counts[activeMoreTab.id] > 0 ? (
-                    <span className="tabular-nums text-[9px] px-1 py-0.1 rounded-full font-bold bg-accent/10 text-accent">
+                    <span className="tabular-nums text-2xs px-1 py-0.1 rounded-full font-bold bg-accent/10 text-accent">
                       {counts[activeMoreTab.id]}
                     </span>
                   ) : !isMoreTabActive && moreTotalCount > 0 ? (
-                    <span className="tabular-nums text-[9px] px-1 py-0.1 rounded-full font-bold bg-surface-3 text-ink-3">
+                    <span className="tabular-nums text-2xs px-1 py-0.1 rounded-full font-bold bg-surface-3 text-ink-3">
                       {moreTotalCount}
                     </span>
                   ) : null}
@@ -1206,14 +1209,14 @@ export function ConversationList({
                           if (selectedIds.size > 0) setSelectedIds(new Set());
                         }}
                         className={cn(
-                          'w-full px-2.5 py-2.5 md:py-1.5 rounded-lg text-[13px] md:text-[11px] font-medium transition-all flex items-center justify-between cursor-pointer',
+                          'w-full px-2.5 py-2.5 md:py-1.5 rounded-lg text-ui md:text-2xs font-medium transition-all flex items-center justify-between cursor-pointer',
                           activeTab === tab.id
                             ? 'bg-accent/10 text-accent font-bold'
                             : 'text-ink-2 hover:bg-surface-2'
                         )}
                       >
                         <span>{tab.label}</span>
-                        <span className="tabular-nums text-[10px] px-1.5 py-0.2 rounded-full font-bold bg-surface-2 text-ink-3 border border-line/40">
+                        <span className="tabular-nums text-2xs px-1.5 py-0.2 rounded-full font-bold bg-surface-2 text-ink-3 border border-line/40">
                           {counts[tab.id]}
                         </span>
                       </button>
@@ -1241,7 +1244,7 @@ export function ConversationList({
                 <div className="w-2 h-2 bg-accent rounded-xs" />
               ) : null}
             </button>
-            <span className="text-[11.5px] font-bold text-ink truncate">
+            <span className="text-xs font-bold text-ink truncate">
               {selectedIds.size} selected
             </span>
           </div>
@@ -1275,12 +1278,12 @@ export function ConversationList({
 
                 {isAssignMenuOpen && (
                   <div className="absolute right-0 top-[calc(100%+4px)] z-50 w-48 p-1.5 rounded-xl border border-line bg-surface shadow-xl text-left animate-pop">
-                    <div className="px-2 py-1 text-[10px] font-bold text-ink-3 uppercase tracking-wider">
+                    <div className="px-2 py-1 text-2xs font-bold text-ink-3 uppercase tracking-wider">
                       Assign to teammate
                     </div>
                     <button
                       onClick={() => handleBulkAssignClick(null)}
-                      className="w-full text-left px-2 py-1.5 rounded-lg text-[11px] font-medium text-ink-2 hover:bg-surface-2 transition-colors flex items-center gap-2"
+                      className="w-full text-left px-2 py-1.5 rounded-lg text-2xs font-medium text-ink-2 hover:bg-surface-2 transition-colors flex items-center gap-2"
                     >
                       <Users className="w-3 h-3 text-ink-3" />
                       <span>Unassign</span>
@@ -1289,7 +1292,7 @@ export function ConversationList({
                       <button
                         key={ag.id}
                         onClick={() => handleBulkAssignClick(ag.id)}
-                        className="w-full text-left px-2 py-1.5 rounded-lg text-[11px] font-medium text-ink hover:bg-surface-2 transition-colors flex items-center gap-2"
+                        className="w-full text-left px-2 py-1.5 rounded-lg text-2xs font-medium text-ink hover:bg-surface-2 transition-colors flex items-center gap-2"
                       >
                         <Avatar name={ag.name} seed={ag.id} size="xs" />
                         <span className="truncate">{ag.name}</span>
@@ -1305,7 +1308,7 @@ export function ConversationList({
               <button
                 disabled={selectedIds.size === 0 || isBulkOperating}
                 onClick={handleBulkMarkSpamClick}
-                className="btn btn-xs btn-secondary text-red-600 dark:text-red-400 hover:bg-red-500/10 border-red-500/20 gap-1"
+                className="btn btn-xs btn-secondary text-danger hover:bg-danger/10 border-danger/20 gap-1"
                 title="Mark selected as spam and close"
               >
                 <ShieldAlert className="w-3 h-3" />
@@ -1404,7 +1407,7 @@ export function ConversationList({
 
             {/* Loading more indicator */}
             {loadingMore && (
-              <div className="py-2.5 flex items-center justify-center gap-2 text-ink-3 text-[11px] font-medium animate-pulse">
+              <div className="py-2.5 flex items-center justify-center gap-2 text-ink-3 text-2xs font-medium animate-pulse">
                 <Loader2 className="w-3.5 h-3.5 animate-spin text-accent" />
                 <span>Loading more conversations…</span>
               </div>

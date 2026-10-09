@@ -55,7 +55,7 @@ export function MobileInstallBanner({ onOpenModal, className }: MobileInstallBan
   return (
     <div
       className={cn(
-        'relative bg-gradient-to-r from-accent/15 via-accent/10 to-surface border border-accent/25 rounded-xl px-2.5 py-1.5 shadow-2xs flex items-center justify-between gap-2 text-ink select-none animate-fade-in',
+        'relative bg-accent-soft border border-accent/25 rounded-xl px-2.5 py-1.5 shadow-2xs flex items-center justify-between gap-2 text-ink select-none animate-fade-in',
         className
       )}
     >
@@ -63,7 +63,7 @@ export function MobileInstallBanner({ onOpenModal, className }: MobileInstallBan
         <div className="w-6 h-6 rounded-lg bg-accent text-accent-ink flex items-center justify-center shrink-0 shadow-2xs">
           <Smartphone className="w-3.5 h-3.5" />
         </div>
-        <span className="text-[12px] font-semibold text-ink truncate">
+        <span className="text-xs font-semibold text-ink truncate">
           Get Mobile App Shortcut
         </span>
       </div>
@@ -71,7 +71,7 @@ export function MobileInstallBanner({ onOpenModal, className }: MobileInstallBan
       <div className="flex items-center gap-1.5 shrink-0">
         <button
           onClick={handleAction}
-          className="btn btn-xs btn-primary text-[11px] font-semibold px-2 py-1 rounded-lg shadow-2xs flex items-center gap-1 shrink-0"
+          className="btn btn-xs btn-primary text-2xs font-semibold px-2 py-1 rounded-lg shadow-2xs flex items-center gap-1 shrink-0"
         >
           <Download className="w-3 h-3" />
           <span>Add</span>

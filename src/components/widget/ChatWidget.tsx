@@ -898,7 +898,7 @@ export default function ChatWidget({
 
   return (
     <div
-      className={`zentry-widget-container chatify-widget-container font-sans antialiased text-slate-800 dark:text-slate-100 ${
+      className={`zentry-widget-container chatify-widget-container font-sans antialiased text-ink ${
         mode === 'window-only' ? 'w-full h-full' : 'fixed z-[999999]'
       } ${
         mode !== 'window-only'
@@ -919,8 +919,8 @@ export default function ChatWidget({
         } ${
           mode === 'window-only'
             ? 'w-full h-full flex flex-col'
-            : 'w-full max-w-[100vw] sm:max-w-none sm:w-[410px] h-[100dvh] sm:h-[590px] fixed sm:relative inset-0 sm:inset-auto sm:max-h-[calc(100vh-100px)] rounded-none sm:rounded-2xl shadow-2xl flex flex-col sm:mb-4 border-0 sm:border border-slate-200/80 dark:border-slate-800 z-50 sm:z-auto'
-        } bg-white dark:bg-slate-900 overflow-hidden`}
+            : 'glass w-full max-w-[100vw] sm:max-w-none sm:w-[410px] h-[100dvh] sm:h-[590px] fixed sm:relative inset-0 sm:inset-auto sm:max-h-[calc(100vh-100px)] rounded-none sm:rounded-2xl shadow-2xl flex flex-col sm:mb-4 border-0 sm:border z-50 sm:z-auto'
+        } ${mode === 'window-only' ? 'bg-surface' : ''} overflow-hidden`}
         style={{
           boxShadow:
             '0 20px 40px -15px rgba(0, 0, 0, 0.2), 0 0 1px 1px rgba(0, 0, 0, 0.05)',
@@ -956,8 +956,8 @@ export default function ChatWidget({
               <span
                 className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white ${
                   isAgentOnline
-                    ? 'bg-emerald-400 animate-pulse'
-                    : 'bg-slate-400'
+                    ? 'bg-success animate-pulse'
+                    : 'bg-ink-3'
                 }`}
                 title={isAgentOnline ? 'Agent is online' : "We're away, leave a message and we'll reply by email"}
               />
@@ -970,7 +970,7 @@ export default function ChatWidget({
               <div className="flex items-center gap-1.5 mt-0.5 text-xs text-white/90">
                 <span
                   className={`w-1.5 h-1.5 rounded-full ${
-                    isAgentOnline ? 'bg-emerald-300' : 'bg-white/60'
+                    isAgentOnline ? 'bg-success' : 'bg-white/60'
                   }`}
                 />
                 <span>
@@ -1002,7 +1002,7 @@ export default function ChatWidget({
               >
                 <BookOpen className="w-4.5 h-4.5" />
                 {unreadCount > 0 && isHelpOpen && (
-                  <span className="absolute -top-1 -right-1 bg-red-500 text-white font-bold text-[10px] min-w-4 h-4 px-1 rounded-full flex items-center justify-center shadow">
+                  <span className="absolute -top-1 -right-1 bg-danger text-white font-bold text-2xs min-w-4 h-4 px-1 rounded-full flex items-center justify-center shadow">
                     {unreadCount > 9 ? '9+' : unreadCount}
                   </span>
                 )}
@@ -1024,33 +1024,33 @@ export default function ChatWidget({
         </div>
 
         {isHelpOpen ? (
-          <div className="flex-1 flex flex-col min-h-0 bg-slate-50/80 dark:bg-slate-950/80 overflow-hidden">
+          <div className="flex-1 flex flex-col min-h-0 bg-surface-2/80 overflow-hidden">
             {selectedArticle ? (
               <div className="flex-1 overflow-y-auto p-4 space-y-3.5">
                 <button
                   onClick={() => setSelectedArticle(null)}
-                  className="text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"
+                  className="text-xs font-semibold text-accent hover:underline flex items-center gap-1"
                 >
                   <ChevronLeft className="w-3.5 h-3.5" />
                   <span>Back to all guides</span>
                 </button>
 
                 <div>
-                  <span className="text-[11px] font-semibold text-blue-600 dark:text-blue-400 px-2 py-0.5 rounded bg-blue-50 dark:bg-blue-950/50 border border-blue-200/50">
+                  <span className="text-2xs font-semibold text-accent px-2 py-0.5 rounded bg-accent-soft border border-accent-line/50">
                     {selectedArticle.section?.icon || '📚'} {selectedArticle.section?.name || selectedArticle.category || 'General'}
                   </span>
-                  <h3 className="text-[16px] font-bold text-slate-900 dark:text-white mt-2">
+                  <h3 className="text-base font-bold text-ink mt-2">
                     {selectedArticle.title}
                   </h3>
                 </div>
 
                 {selectedArticle.summary && (
-                  <p className="text-xs font-medium text-slate-600 dark:text-slate-300 bg-slate-200/50 dark:bg-slate-800/50 p-2.5 rounded-lg leading-relaxed">
+                  <p className="text-xs font-medium text-ink-2 bg-surface-3/50 p-2.5 rounded-lg leading-relaxed">
                     {selectedArticle.summary}
                   </p>
                 )}
 
-                <div className="text-xs text-slate-700 dark:text-slate-200 whitespace-pre-wrap leading-relaxed">
+                <div className="text-xs text-ink-2 whitespace-pre-wrap leading-relaxed">
                   {selectedArticle.content}
                 </div>
 
@@ -1063,7 +1063,7 @@ export default function ChatWidget({
                     }
                     target="_blank"
                     rel="noreferrer"
-                    className="inline-flex items-center gap-1.5 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline"
+                    className="inline-flex items-center gap-1.5 text-xs font-semibold text-accent hover:underline"
                   >
                     <span>Read the full article</span>
                     <ExternalLink className="w-3.5 h-3.5" />
@@ -1071,10 +1071,10 @@ export default function ChatWidget({
                 </div>
 
                 {/* Helpful voting */}
-                <div className="pt-3 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between text-xs text-slate-500">
+                <div className="pt-3 border-t border-line flex items-center justify-between text-xs text-ink-3">
                   <span>Was this article helpful?</span>
                   {articleVoted[selectedArticle.id] ? (
-                    <span className="text-emerald-500 font-semibold text-[11px]">✓ Thank you!</span>
+                    <span className="text-success font-semibold text-2xs">✓ Thank you!</span>
                   ) : (
                     <div className="flex items-center gap-2">
                       <button
@@ -1093,7 +1093,7 @@ export default function ChatWidget({
                             }).catch(() => {});
                           }
                         }}
-                        className="px-2.5 py-1 rounded bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs hover:border-emerald-500 transition-colors"
+                        className="px-2.5 py-1 rounded bg-surface border border-line text-xs hover:border-success transition-colors"
                       >
                         👍 Yes
                       </button>
@@ -1113,7 +1113,7 @@ export default function ChatWidget({
                             }).catch(() => {});
                           }
                         }}
-                        className="px-2.5 py-1 rounded bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs hover:border-rose-500 transition-colors"
+                        className="px-2.5 py-1 rounded bg-surface border border-line text-xs hover:border-danger transition-colors"
                       >
                         👎 No
                       </button>
@@ -1133,23 +1133,23 @@ export default function ChatWidget({
               </div>
             ) : (
               <div className="flex-1 flex flex-col min-h-0">
-                <div className="p-3 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
+                <div className="p-3 border-b border-line bg-surface">
                   <div className="relative">
-                    <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <Search className="w-4 h-4 text-ink-3 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                     <input
                       type="text"
                       value={helpSearch}
                       onChange={(e) => setHelpSearch(e.target.value)}
                       placeholder={`Search ${helpTabLabel.toLowerCase()}...`}
-                      className="w-full h-8.5 pl-9 pr-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      className="w-full h-8.5 pl-9 pr-3 rounded-lg border border-line bg-surface-2 text-xs text-ink placeholder:text-ink-3 focus:outline-none focus:ring-1 focus:ring-accent"
                     />
                   </div>
                 </div>
 
                 <div className="flex-1 overflow-y-auto p-3 space-y-2">
                   {helpArticles.length === 0 && helpSections.length === 0 ? (
-                    <div className="p-8 text-center text-xs text-slate-400 space-y-2">
-                      <BookOpen className="w-8 h-8 text-slate-300 mx-auto" />
+                    <div className="p-8 text-center text-xs text-ink-3 space-y-2">
+                      <BookOpen className="w-8 h-8 text-ink-3 mx-auto" />
                       <p>No articles available yet.</p>
                     </div>
                   ) : helpSearch.trim() ? (
@@ -1167,8 +1167,8 @@ export default function ChatWidget({
 
                       if (filtered.length === 0) {
                         return (
-                          <div className="p-8 text-center text-xs text-slate-400 space-y-2">
-                            <BookOpen className="w-8 h-8 text-slate-300 mx-auto" />
+                          <div className="p-8 text-center text-xs text-ink-3 space-y-2">
+                            <BookOpen className="w-8 h-8 text-ink-3 mx-auto" />
                             <p>No articles match &ldquo;{helpSearch}&rdquo;</p>
                           </div>
                         );
@@ -1176,23 +1176,23 @@ export default function ChatWidget({
 
                       return (
                         <div className="space-y-2">
-                          <div className="text-[11px] font-semibold text-slate-400 dark:text-slate-500 px-1">
+                          <div className="text-2xs font-semibold text-ink-3 px-1">
                             {filtered.length} article{filtered.length === 1 ? '' : 's'} found
                           </div>
                           {filtered.map((art) => (
                             <div
                               key={art.id}
                               onClick={() => setSelectedArticle(art)}
-                              className="p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-slate-400 dark:hover:border-slate-600 transition-all cursor-pointer space-y-1 shadow-2xs"
+                              className="p-3 rounded-xl border border-line bg-surface hover:border-line-3 transition-all cursor-pointer space-y-1 shadow-2xs"
                             >
-                              <span className="text-[10.5px] font-semibold text-blue-600 dark:text-blue-400">
+                              <span className="text-2xs font-semibold text-accent">
                                 {art.section?.icon || '📚'} {art.section?.name || art.category || 'General'}
                               </span>
-                              <h4 className="text-xs font-bold text-slate-800 dark:text-slate-100 leading-snug">
+                              <h4 className="text-xs font-bold text-ink leading-snug">
                                 {art.title}
                               </h4>
                               {art.summary && (
-                                <p className="text-[11.5px] text-slate-500 dark:text-slate-400 line-clamp-1">
+                                <p className="text-xs text-ink-3 line-clamp-1">
                                   {art.summary}
                                 </p>
                               )}
@@ -1209,16 +1209,16 @@ export default function ChatWidget({
                         <div
                           key={art.id}
                           onClick={() => setSelectedArticle(art)}
-                          className="p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-slate-400 dark:hover:border-slate-600 transition-all cursor-pointer space-y-1 shadow-2xs"
+                          className="p-3 rounded-xl border border-line bg-surface hover:border-line-3 transition-all cursor-pointer space-y-1 shadow-2xs"
                         >
-                          <span className="text-[10.5px] font-semibold text-blue-600 dark:text-blue-400">
+                          <span className="text-2xs font-semibold text-accent">
                             {art.section?.icon || '📚'} {art.section?.name || art.category}
                           </span>
-                          <h4 className="text-xs font-bold text-slate-800 dark:text-slate-100 leading-snug">
+                          <h4 className="text-xs font-bold text-ink leading-snug">
                             {art.title}
                           </h4>
                           {art.summary && (
-                            <p className="text-[11.5px] text-slate-500 dark:text-slate-400 line-clamp-1">
+                            <p className="text-xs text-ink-3 line-clamp-1">
                               {art.summary}
                             </p>
                           )}
@@ -1274,20 +1274,20 @@ export default function ChatWidget({
                                 <div
                                   key={sec.id}
                                   onClick={() => setSelectedSectionId(sec.id)}
-                                  className="p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-slate-400 dark:hover:border-slate-600 transition-all cursor-pointer flex items-center gap-3 shadow-2xs group"
+                                  className="p-3 rounded-xl border border-line bg-surface hover:border-line-3 transition-all cursor-pointer flex items-center gap-3 shadow-2xs group"
                                 >
-                                  <div className="w-9 h-9 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-lg shrink-0">
+                                  <div className="w-9 h-9 rounded-lg bg-surface-2 flex items-center justify-center text-lg shrink-0">
                                     {sec.icon || '📚'}
                                   </div>
                                   <div className="flex-1 min-w-0">
-                                    <h4 className="text-xs font-bold text-slate-800 dark:text-slate-100 leading-snug group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                                    <h4 className="text-xs font-bold text-ink leading-snug group-hover:text-accent transition-colors">
                                       {sec.name}
                                     </h4>
-                                    <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate mt-0.5">
+                                    <p className="text-2xs text-ink-3 truncate mt-0.5">
                                       {sec.description || `${count} article${count === 1 ? '' : 's'}`}
                                     </p>
                                   </div>
-                                  <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors shrink-0" />
+                                  <ChevronRight className="w-4 h-4 text-ink-3 group-hover:text-accent transition-colors shrink-0" />
                                 </div>
                               );
                             })}
@@ -1312,26 +1312,26 @@ export default function ChatWidget({
                         <div className="space-y-2">
                           <button
                             onClick={() => setSelectedSectionId(null)}
-                            className="text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 mb-2"
+                            className="text-xs font-semibold text-accent hover:underline flex items-center gap-1 mb-2"
                           >
                             <ChevronLeft className="w-3.5 h-3.5" />
                             <span>All Collections</span>
                           </button>
 
-                          <div className="flex items-center gap-2.5 pb-2.5 mb-2 border-b border-slate-200 dark:border-slate-800">
+                          <div className="flex items-center gap-2.5 pb-2.5 mb-2 border-b border-line">
                             <span className="text-xl">{currentSec.icon || '📚'}</span>
                             <div className="flex-1 min-w-0">
-                              <h3 className="text-xs font-bold text-slate-900 dark:text-white leading-snug">
+                              <h3 className="text-xs font-bold text-ink leading-snug">
                                 {currentSec.name}
                               </h3>
-                              <p className="text-[10.5px] text-slate-500 dark:text-slate-400">
+                              <p className="text-2xs text-ink-3">
                                 {sectionArticles.length} article{sectionArticles.length === 1 ? '' : 's'}
                               </p>
                             </div>
                           </div>
 
                           {sectionArticles.length === 0 ? (
-                            <div className="p-6 text-center text-xs text-slate-400">
+                            <div className="p-6 text-center text-xs text-ink-3">
                               No articles in this section yet.
                             </div>
                           ) : (
@@ -1339,13 +1339,13 @@ export default function ChatWidget({
                               <div
                                 key={art.id}
                                 onClick={() => setSelectedArticle(art)}
-                                className="p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-slate-400 dark:hover:border-slate-600 transition-all cursor-pointer space-y-1 shadow-2xs"
+                                className="p-3 rounded-xl border border-line bg-surface hover:border-line-3 transition-all cursor-pointer space-y-1 shadow-2xs"
                               >
-                                <h4 className="text-xs font-bold text-slate-800 dark:text-slate-100 leading-snug">
+                                <h4 className="text-xs font-bold text-ink leading-snug">
                                   {art.title}
                                 </h4>
                                 {art.summary && (
-                                  <p className="text-[11.5px] text-slate-500 dark:text-slate-400 line-clamp-1">
+                                  <p className="text-xs text-ink-3 line-clamp-1">
                                     {art.summary}
                                   </p>
                                 )}
@@ -1359,12 +1359,12 @@ export default function ChatWidget({
                 </div>
 
                 {config.workspaceId && (
-                  <div className="p-2.5 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-center">
+                  <div className="p-2.5 border-t border-line bg-surface text-center">
                     <a
                       href={helpCenterPortalUrl}
                       target="_blank"
                       rel="noreferrer"
-                      className="text-[11.5px] font-semibold text-blue-600 dark:text-blue-400 hover:underline inline-flex items-center gap-1"
+                      className="text-xs font-semibold text-accent hover:underline inline-flex items-center gap-1"
                     >
                       <span>Open Full {helpTabLabel} Portal</span>
                       <ExternalLink className="w-3 h-3" />
@@ -1377,14 +1377,14 @@ export default function ChatWidget({
         ) : (
           <>
             {/* BODY AREA */}
-            <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-4 space-y-3.5 bg-slate-50/70 dark:bg-slate-950/60 relative">
+            <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-4 space-y-3.5 bg-surface-2/70 relative">
           {/* OFFLINE BANNER */}
           {isAgentOnline === false && (
-            <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-xs text-amber-800 dark:text-amber-300 flex items-start gap-2.5">
+            <div className="p-3 bg-warn/10 border border-warn/20 rounded-xl text-xs text-warn flex items-start gap-2.5">
               <Clock className="w-4 h-4 shrink-0 mt-0.5" />
               <div>
                 <p className="font-semibold">Support is currently offline</p>
-                <p className="text-amber-700/80 dark:text-amber-400/80 mt-0.5">
+                <p className="text-warn/80 mt-0.5">
                   We're away, leave a message and we'll reply by email
                 </p>
               </div>
@@ -1393,33 +1393,33 @@ export default function ChatWidget({
 
           {/* PRE-CHAT IDENTIFICATION FORM */}
           {!isIdentified ? (
-            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 shadow-sm space-y-4 my-auto">
+            <div className="bg-surface border border-line rounded-xl p-5 shadow-sm space-y-4 my-auto">
               <div className="text-center space-y-1">
-                <h4 className="font-semibold text-base text-slate-800 dark:text-slate-100">
+                <h4 className="font-semibold text-base text-ink">
                   Welcome to Live Support! 👋
                 </h4>
-                <p className="text-xs text-slate-500 dark:text-slate-400">
+                <p className="text-xs text-ink-3">
                   Please introduce yourself to start chatting with our team.
                 </p>
               </div>
 
               <form onSubmit={handlePreChatSubmit} noValidate className="space-y-3">
                 <div>
-                  <label className="block text-xs font-medium text-slate-600 dark:text-slate-300 mb-1">
-                    Your Name <span className="text-[11px] font-normal text-slate-400 dark:text-slate-500">(Optional)</span>
+                  <label className="block text-xs font-medium text-ink-2 mb-1">
+                    Your Name <span className="text-2xs font-normal text-ink-3">(Optional)</span>
                   </label>
                   <input
                     type="text"
                     placeholder="e.g. Sarah Connor"
                     value={visitorName}
                     onChange={(e) => setVisitorName(e.target.value)}
-                    className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 text-sm rounded-lg border border-line-2 bg-surface focus:outline-none focus:ring-2 focus:ring-accent"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-medium text-slate-600 dark:text-slate-300 mb-1">
-                    Email Address <span className="text-[11px] font-normal text-slate-400 dark:text-slate-500">(Optional)</span>
+                  <label className="block text-xs font-medium text-ink-2 mb-1">
+                    Email Address <span className="text-2xs font-normal text-ink-3">(Optional)</span>
                   </label>
                   <input
                     type="email"
@@ -1433,16 +1433,16 @@ export default function ChatWidget({
                       if (emailError) checkEmail(e.target.value);
                     }}
                     onBlur={(e) => checkEmail(e.target.value)}
-                    className={`w-full px-3 py-2 text-sm rounded-lg border bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 ${
+                    className={`w-full px-3 py-2 text-sm rounded-lg border bg-surface focus:outline-none focus:ring-2 ${
                       emailError
-                        ? 'border-red-500 focus:ring-red-500/40'
-                        : 'border-slate-300 dark:border-slate-700 focus:ring-blue-500'
+                        ? 'border-danger focus:ring-danger/40'
+                        : 'border-line-2 focus:ring-accent'
                     }`}
                   />
                   <p
                     id="prechat-email-error"
                     role="alert"
-                    className={`mt-1 text-xs font-medium text-red-600 dark:text-red-400 ${emailError ? '' : 'hidden'}`}
+                    className={`mt-1 text-xs font-medium text-danger ${emailError ? '' : 'hidden'}`}
                   >
                     {emailError}
                   </p>
@@ -1459,7 +1459,7 @@ export default function ChatWidget({
                 <button
                   type="button"
                   onClick={() => handlePreChatSubmit(undefined, true)}
-                  className="w-full py-2 px-4 text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 text-xs font-medium rounded-lg border border-slate-200 dark:border-slate-800 hover:border-blue-500/40 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                  className="w-full py-2 px-4 text-ink-2 hover:text-accent text-xs font-medium rounded-lg border border-line hover:border-accent/40 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
                 >
                   <span>Skip &amp; start as Guest</span>
                   <ChevronRight className="w-3.5 h-3.5" />
@@ -1487,7 +1487,7 @@ export default function ChatWidget({
                       className={`max-w-[82%] px-3.5 py-2.5 text-sm rounded-2xl break-words transition-all duration-150 ${
                         isVisitor
                           ? 'rounded-br-xs text-white shadow-sm'
-                          : 'rounded-bl-xs bg-slate-200/90 dark:bg-slate-800 text-slate-900 dark:text-slate-100'
+                          : 'rounded-bl-xs bg-surface-3/90 text-ink'
                       }`}
                       style={isVisitor ? { backgroundColor: brandColor } : {}}
                     >
@@ -1498,7 +1498,7 @@ export default function ChatWidget({
                             <img
                               src={msg.attachment_url}
                               alt="Attachment"
-                              className="rounded-xl max-h-56 w-auto max-w-full object-cover cursor-pointer hover:opacity-90 transition-opacity border border-black/10 dark:border-white/10 shadow-xs"
+                              className="rounded-xl max-h-56 w-auto max-w-full object-cover cursor-pointer hover:opacity-90 transition-opacity border border-black/10 shadow-xs"
                               onClick={() => setPreviewImageModalUrl(msg.attachment_url)}
                             />
                           ) : (
@@ -1533,8 +1533,8 @@ export default function ChatWidget({
                             <div className="space-y-1">
                               <ChatMarkdown content={displayContent} className="leading-relaxed" />
                               {originalEnglish && translatedText && (
-                                <div className="mt-1.5 pt-1.5 border-t border-slate-300/80 dark:border-slate-700 flex items-center justify-between text-[11px] font-medium text-slate-600 dark:text-slate-300 select-none">
-                                  <span className="inline-flex items-center gap-1 font-bold text-blue-600 dark:text-blue-400">
+                                <div className="mt-1.5 pt-1.5 border-t border-line-2/80 flex items-center justify-between text-2xs font-medium text-ink-2 select-none">
+                                  <span className="inline-flex items-center gap-1 font-bold text-accent">
                                     <Globe className="w-3 h-3 shrink-0" />
                                     {isShowingOriginal ? 'Original English' : 'Auto-translated'}
                                   </span>
@@ -1546,7 +1546,7 @@ export default function ChatWidget({
                                         [msg.id]: !prev[msg.id],
                                       }))
                                     }
-                                    className="px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-blue-600 dark:text-blue-400 hover:underline cursor-pointer font-bold text-[10.5px] ml-auto shadow-2xs"
+                                    className="px-2 py-0.5 rounded bg-surface-2 border border-line-2 text-accent hover:underline cursor-pointer font-bold text-2xs ml-auto shadow-2xs"
                                   >
                                     {isShowingOriginal ? 'Show translated' : 'Show English'}
                                   </button>
@@ -1560,22 +1560,22 @@ export default function ChatWidget({
 
                     {/* Timestamp & Delivery Info */}
                     <div
-                      className={`flex items-center gap-1 text-[10px] mt-1 text-slate-400 dark:text-slate-500 ${
+                      className={`flex items-center gap-1 text-2xs mt-1 text-ink-3 ${
                         isVisitor ? 'justify-end pr-1' : 'justify-start pl-1'
                       }`}
                     >
                       <span className="tabular-nums">{timeString}</span>
                       {msg.metadata?.is_edited && (
-                        <span className="italic text-[9.5px] opacity-75">(edited)</span>
+                        <span className="italic text-2xs opacity-75">(edited)</span>
                       )}
                       {isVisitor && (
                         <span title={msg.read_at ? 'Seen by support' : isAgentOnline ? 'Delivered' : 'Sent'} className="flex items-center">
                           {msg.read_at ? (
-                            <CheckCheck className="w-3.5 h-3.5 text-blue-500 stroke-[2.5]" />
+                            <CheckCheck className="w-3.5 h-3.5 text-accent stroke-[2.5]" />
                           ) : isAgentOnline ? (
-                            <CheckCheck className="w-3.5 h-3.5 text-slate-400 stroke-[2]" />
+                            <CheckCheck className="w-3.5 h-3.5 text-ink-3 stroke-[2]" />
                           ) : (
-                            <Check className="w-3.5 h-3.5 text-slate-400 stroke-[2]" />
+                            <Check className="w-3.5 h-3.5 text-ink-3 stroke-[2]" />
                           )}
                         </span>
                       )}
@@ -1586,20 +1586,20 @@ export default function ChatWidget({
 
               {/* TYPING INDICATOR (Supabase Realtime Presence) */}
               {isAgentTyping && (
-                <div className="flex items-center gap-1.5 p-3 rounded-2xl bg-slate-200/80 dark:bg-slate-800 w-fit rounded-bl-xs">
+                <div className="flex items-center gap-1.5 p-3 rounded-2xl bg-surface-3/80 w-fit rounded-bl-xs">
                   <span
-                    className="w-2 h-2 rounded-full bg-slate-500 animate-bounce"
+                    className="w-2 h-2 rounded-full bg-ink-3 animate-bounce"
                     style={{ animationDelay: '0ms' }}
                   />
                   <span
-                    className="w-2 h-2 rounded-full bg-slate-500 animate-bounce"
+                    className="w-2 h-2 rounded-full bg-ink-3 animate-bounce"
                     style={{ animationDelay: '150ms' }}
                   />
                   <span
-                    className="w-2 h-2 rounded-full bg-slate-500 animate-bounce"
+                    className="w-2 h-2 rounded-full bg-ink-3 animate-bounce"
                     style={{ animationDelay: '300ms' }}
                   />
-                  <span className="text-[11px] text-slate-500 ml-1.5 font-medium">
+                  <span className="text-2xs text-ink-3 ml-1.5 font-medium">
                     Agent is typing...
                   </span>
                 </div>
@@ -1612,17 +1612,17 @@ export default function ChatWidget({
 
         {/* EMOJI PICKER POPOVER (WhatsApp Style) */}
         {showEmojiPicker && (
-          <div className="p-2.5 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 flex flex-col gap-2 shadow-lg max-h-60">
+          <div className="p-2.5 bg-surface border-t border-line flex flex-col gap-2 shadow-lg max-h-60">
             {/* Search */}
             <input
               type="text"
               value={emojiSearchQuery}
               onChange={(e) => setEmojiSearchQuery(e.target.value)}
               placeholder="Search emojis..."
-              className="w-full px-2.5 py-1 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="w-full px-2.5 py-1 text-xs rounded-lg border border-line bg-surface-2 focus:outline-none focus:ring-1 focus:ring-accent"
             />
             {/* Category tabs */}
-            <div className="flex items-center gap-1 overflow-x-auto pb-1 border-b border-slate-200 dark:border-slate-800">
+            <div className="flex items-center gap-1 overflow-x-auto pb-1 border-b border-line">
               {EMOJI_CATEGORIES.map((cat) => (
                 <button
                   key={cat.id}
@@ -1634,8 +1634,8 @@ export default function ChatWidget({
                   title={cat.name}
                   className={`p-1 text-sm rounded-md transition-colors ${
                     activeEmojiCategory === cat.id && !emojiSearchQuery
-                      ? 'bg-slate-200 dark:bg-slate-700'
-                      : 'hover:bg-slate-100 dark:hover:bg-slate-800'
+                      ? 'bg-surface-3'
+                      : 'hover:bg-surface-2'
                   }`}
                 >
                   {cat.icon}
@@ -1655,7 +1655,7 @@ export default function ChatWidget({
                     setInputContent((prev) => prev + emoji);
                     setShowEmojiPicker(false);
                   }}
-                  className="text-lg hover:scale-125 transition-transform p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center justify-center leading-none"
+                  className="text-lg hover:scale-125 transition-transform p-1 rounded hover:bg-surface-2 flex items-center justify-center leading-none"
                 >
                   {emoji}
                 </button>
@@ -1666,32 +1666,32 @@ export default function ChatWidget({
 
         {/* COMPOSER / OFFLINE INPUT */}
         {isIdentified && (
-          <div className="p-3 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800">
+          <div className="p-3 bg-surface border-t border-line">
             {isAgentOnline === false && isOfflineSubmitted ? (
-              <div className="text-center py-3 text-xs text-emerald-600 dark:text-emerald-400 font-medium">
+              <div className="text-center py-3 text-xs text-success font-medium">
                 ✓ Message received! We'll reply to your email shortly.
               </div>
             ) : (
               <>
                 {/* Pending Attachment Preview Banner */}
                 {pendingAttachment && (
-                  <div className="mb-2 p-2 rounded-xl bg-slate-100 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700 flex items-center gap-2.5">
+                  <div className="mb-2 p-2 rounded-xl bg-surface-2 border border-line flex items-center gap-2.5">
                     {pendingAttachment.isImage && pendingAttachment.previewUrl ? (
                       <img
                         src={pendingAttachment.previewUrl}
                         alt="Preview"
-                        className="w-12 h-12 rounded-lg object-cover border border-slate-300 dark:border-slate-600 shrink-0"
+                        className="w-12 h-12 rounded-lg object-cover border border-line-2 shrink-0"
                       />
                     ) : (
-                      <div className="w-12 h-12 rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
+                      <div className="w-12 h-12 rounded-lg bg-accent/10 text-accent flex items-center justify-center shrink-0">
                         <FileText className="w-5 h-5" />
                       </div>
                     )}
                     <div className="min-w-0 flex-1">
-                      <p className="text-xs font-semibold text-slate-800 dark:text-slate-100 truncate">
+                      <p className="text-xs font-semibold text-ink truncate">
                         {pendingAttachment.file.name}
                       </p>
-                      <p className="text-[10px] text-slate-500">
+                      <p className="text-2xs text-ink-3">
                         {(pendingAttachment.file.size / 1024).toFixed(0)} KB · Ready to send
                       </p>
                     </div>
@@ -1703,7 +1703,7 @@ export default function ChatWidget({
                         if (fileInputRef.current) fileInputRef.current.value = '';
                         if (imageInputRef.current) imageInputRef.current.value = '';
                       }}
-                      className="p-1 rounded-md text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+                      className="p-1 rounded-md text-ink-3 hover:text-ink-2 hover:bg-surface-3 transition-colors"
                       title="Remove attachment"
                     >
                       <X className="w-4 h-4" />
@@ -1736,12 +1736,12 @@ export default function ChatWidget({
                     accept="image/*,.pdf,.txt"
                   />
 
-                  <div className="flex items-center gap-0.5 mb-1 text-slate-500">
+                  <div className="flex items-center gap-0.5 mb-1 text-ink-3">
                     <button
                       type="button"
                       onClick={() => imageInputRef.current?.click()}
                       disabled={isUploading}
-                      className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                      className="p-1.5 rounded-lg hover:bg-surface-2 hover:text-accent transition-colors"
                       title="Send photo or image"
                     >
                       <ImageIcon className="w-4 h-4" />
@@ -1751,7 +1751,7 @@ export default function ChatWidget({
                       type="button"
                       onClick={() => fileInputRef.current?.click()}
                       disabled={isUploading}
-                      className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-300 transition-colors"
+                      className="p-1.5 rounded-lg hover:bg-surface-2 hover:text-ink-2 transition-colors"
                       title="Attach document or file"
                     >
                       <Paperclip className={`w-4 h-4 ${isUploading ? 'animate-spin' : ''}`} />
@@ -1760,7 +1760,7 @@ export default function ChatWidget({
                     <button
                       type="button"
                       onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-                      className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-300 transition-colors"
+                      className="p-1.5 rounded-lg hover:bg-surface-2 hover:text-ink-2 transition-colors"
                       title="Insert emoji"
                     >
                       <Smile className="w-4 h-4" />
@@ -1783,7 +1783,7 @@ export default function ChatWidget({
                         ? 'Add a caption (optional)...'
                         : 'Write a message...'
                     }
-                    className="flex-1 max-h-24 px-3 py-2 text-sm rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                    className="flex-1 max-h-24 px-3 py-2 text-sm rounded-xl border border-line-2 bg-surface-2 focus:outline-none focus:ring-2 focus:ring-accent resize-none"
                   />
 
                   <button
@@ -1817,7 +1817,7 @@ export default function ChatWidget({
             onClick={() => toggleWidget()}
             style={{ backgroundColor: brandColor }}
             className={`relative w-14 h-14 rounded-full text-white shadow-xl hover:scale-105 active:scale-95 flex items-center justify-center transition-all duration-200 focus:outline-none ${
-              hasNewMessagePulse ? 'ring-4 ring-blue-400/50 animate-pulse' : ''
+              hasNewMessagePulse ? 'ring-4 ring-accent/50 animate-pulse' : ''
             }`}
             title="Open Live Chat"
           >
@@ -1846,7 +1846,7 @@ export default function ChatWidget({
 
             {/* Unread Counter Badge Pill */}
             {unreadCount > 0 && !isOpen && (
-              <span className="absolute -top-1 -right-1 bg-red-500 text-white font-bold text-xs px-2 py-0.5 rounded-full border-2 border-white shadow-md animate-bounce">
+              <span className="absolute -top-1 -right-1 bg-danger text-white font-bold text-xs px-2 py-0.5 rounded-full border-2 border-white shadow-md animate-bounce">
                 {unreadCount > 9 ? '9+' : unreadCount}
               </span>
             )}
@@ -1865,7 +1865,7 @@ export default function ChatWidget({
           <div className="relative max-w-3xl max-h-[90vh] flex flex-col items-center">
             <button
               onClick={() => setPreviewImageModalUrl(null)}
-              className="absolute -top-10 right-0 text-white hover:text-slate-300 p-1.5 rounded-full bg-white/10 hover:bg-white/20 transition-colors cursor-pointer"
+              className="absolute -top-10 right-0 text-white hover:text-ink-3 p-1.5 rounded-full bg-white/10 hover:bg-white/20 transition-colors cursor-pointer"
               title="Close image"
             >
               <X className="w-5 h-5" />
@@ -1882,7 +1882,7 @@ export default function ChatWidget({
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={(e) => e.stopPropagation()}
-                className="text-xs text-blue-300 hover:text-blue-200 hover:underline inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/10 transition-colors"
+                className="text-xs text-accent hover:text-blue-200 hover:underline inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/10 transition-colors"
               >
                 <span>Open high-res in new tab</span>
                 <ExternalLink className="w-3.5 h-3.5" />

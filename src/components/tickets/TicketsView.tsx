@@ -23,6 +23,7 @@ import { TicketDetail } from './TicketDetail';
 import { NewTicketDialog, ViewEditor } from './TicketDialogs';
 import { roleCan } from '@/lib/team/permissions';
 import { inputClass } from './TicketBits';
+import { ErrorState } from '@/components/ui/States';
 
 const DEFAULT_VIEW = 'system:all_open';
 
@@ -30,7 +31,14 @@ const DEFAULT_VIEW = 'system:all_open';
  * The ticketing inbox: views with live counts on the left, the selected
  * view's tickets (or search results) in the middle, a ticket when opened.
  */
-export function TicketsView({ workspaceId }: { workspaceId: string }) {
+export function TicketsView({
+  workspaceId,
+  request,
+}: {
+  workspaceId: string;
+  /** Set by the command palette: open a view or a ticket. `nonce` makes repeats count. */
+  request?: { viewId?: string; ticketId?: string; nonce: number } | null;
+}) {
   const [boot, setBoot] = useState<TicketsBootstrap | null>(null);
   // Light agents read tickets and add notes; creating and bulk changes are for the other roles.
   const canEdit = roleCan(boot?.me.role, 'edit_ticket');
@@ -136,6 +144,15 @@ export function TicketsView({ workspaceId }: { workspaceId: string }) {
     setOpenId(null);
   };
 
+  // A palette request is applied once, during render (React's "adjust state
+  // when a prop changes" pattern), so there is no flash of the old view.
+  const [handledNonce, setHandledNonce] = useState<number | null>(null);
+  if (request && request.nonce !== handledNonce) {
+    setHandledNonce(request.nonce);
+    if (request.viewId) selectView(request.viewId);
+    if (request.ticketId) setOpenId(request.ticketId);
+  }
+
   const afterChange = useCallback(() => setRefreshTick((t) => t + 1), []);
 
   const runBulk = async (change: Parameters<typeof bulkUpdateTicketsAction>[2]) => {
@@ -158,7 +175,18 @@ export function TicketsView({ workspaceId }: { workspaceId: string }) {
   const savedViews = useMemo(() => boot?.views.filter((v) => !v.system) ?? [], [boot]);
 
   if (!boot && error) {
-    return <div className="flex-1 flex items-center justify-center text-[13px] text-danger p-6">{error}</div>;
+    return (
+      <ErrorState
+        className="flex-1"
+        title="Couldn't load tickets"
+        message={error}
+        onRetry={() => {
+          setError(null);
+          setBootTick((t) => t + 1);
+          setRefreshTick((t) => t + 1);
+        }}
+      />
+    );
   }
 
   const viewButton = (v: ViewDefinition) => (
@@ -168,12 +196,12 @@ export function TicketsView({ workspaceId }: { workspaceId: string }) {
         onClick={() => selectView(v.id)}
         aria-current={viewId === v.id && !activeSearch ? 'page' : undefined}
         className={cn(
-          'flex-1 min-w-0 flex items-center justify-between gap-2 px-2.5 h-8 rounded-lg text-[13px] text-left',
+          'flex-1 min-w-0 flex items-center justify-between gap-2 px-2.5 h-8 rounded-lg text-ui text-left',
           viewId === v.id && !activeSearch ? 'bg-accent-soft text-accent font-semibold' : 'text-ink-2 hover:bg-surface-2'
         )}
       >
         <span className="truncate">{v.name}</span>
-        <span className="tabular-nums text-[12px] text-ink-3">{boot?.counts[v.id] ?? '–'}</span>
+        <span className="tabular-nums text-xs text-ink-3">{boot?.counts[v.id] ?? '–'}</span>
       </button>
       {!v.system && (v.ownerId === boot?.me.id || boot?.me.isAdmin) && (
         <button
@@ -192,7 +220,7 @@ export function TicketsView({ workspaceId }: { workspaceId: string }) {
     <div className="flex-1 flex min-h-0 min-w-0 bg-surface">
       <nav className="w-[230px] shrink-0 border-r border-line flex-col hidden md:flex" aria-label="Ticket views">
         <div className="h-14 px-4 flex items-center justify-between border-b border-line">
-          <h1 className="text-[15px] font-bold text-ink">Tickets</h1>
+          <h1 className="text-md font-bold text-ink">Tickets</h1>
           {canEdit && (
             <button type="button" className="btn btn-accent btn-xs" onClick={() => setCreating(true)}>
               <Plus className="w-3.5 h-3.5" /> New
@@ -200,15 +228,23 @@ export function TicketsView({ workspaceId }: { workspaceId: string }) {
           )}
         </div>
         <div className="flex-1 overflow-y-auto p-2">
-          <ul className="space-y-0.5">{systemViews.map(viewButton)}</ul>
+          {!boot ? (
+            <div className="space-y-1.5 px-1" aria-hidden="true">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <div key={i} className="skeleton h-7" />
+              ))}
+            </div>
+          ) : (
+            <ul className="space-y-0.5">{systemViews.map(viewButton)}</ul>
+          )}
           <div className="flex items-center justify-between mt-4 mb-1 px-2.5">
-            <h2 className="text-[11px] font-bold uppercase tracking-wide text-ink-3">Saved views</h2>
+            <h2 className="text-2xs font-bold uppercase tracking-wide text-ink-3">Saved views</h2>
             <button type="button" className="btn btn-ghost btn-xs" onClick={() => setEditing('new')} aria-label="New view">
               <Plus className="w-3.5 h-3.5" />
             </button>
           </div>
           {savedViews.length === 0 ? (
-            <p className="px-2.5 text-[12px] text-ink-3">Save filters you use often as a view.</p>
+            <p className="px-2.5 text-xs text-ink-3">Save filters you use often as a view.</p>
           ) : (
             <ul className="space-y-0.5">{savedViews.map(viewButton)}</ul>
           )}
@@ -231,7 +267,7 @@ export function TicketsView({ workspaceId }: { workspaceId: string }) {
         <section className="flex-1 flex flex-col min-w-0">
           <header className="h-14 px-4 flex items-center gap-3 border-b border-line shrink-0">
             <div className="min-w-0 flex-1">
-              <h2 className="text-[15px] font-bold text-ink truncate">
+              <h2 className="text-md font-bold text-ink truncate">
                 {activeSearch ? `Search: “${activeSearch}”` : view?.name ?? 'Tickets'}
               </h2>
             </div>
@@ -289,7 +325,7 @@ export function TicketsView({ workspaceId }: { workspaceId: string }) {
             <div
               role="status"
               className={cn(
-                'px-4 py-2 text-[12.5px] border-b flex items-center gap-2',
+                'px-4 py-2 text-xs border-b flex items-center gap-2',
                 error ? 'bg-danger-soft border-danger-line text-danger' : 'bg-success-soft border-success-line text-ink'
               )}
             >

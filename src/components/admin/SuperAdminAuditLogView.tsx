@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { ErrorState, LoadingState } from '@/components/ui/States';
 import {
   ShieldAlert,
   Search,
@@ -29,6 +30,7 @@ export function SuperAdminAuditLogView() {
   const [actionFilter, setActionFilter] = useState('all');
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [totalCount, setTotalCount] = useState(0);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const fetchLogs = async (showSpin = false) => {
     try {
@@ -40,8 +42,10 @@ export function SuperAdminAuditLogView() {
       });
       setLogs(res.logs);
       setTotalCount(res.totalCount);
+      setLoadError(null);
     } catch (err) {
       console.error('Failed to load audit logs:', err);
+      setLoadError((err as Error).message || 'Audit records could not be loaded.');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -68,35 +72,35 @@ export function SuperAdminAuditLogView() {
     switch (action) {
       case 'switch_workspace':
         return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-2xs font-bold bg-warn/10 text-warn border border-warn/20">
             <ArrowRightLeft className="w-3 h-3" />
             Switch Workspace
           </span>
         );
       case 'create_company':
         return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-2xs font-bold bg-success/10 text-success border border-success/20">
             <PlusCircle className="w-3 h-3" />
             Create Company
           </span>
         );
       case 'view_company_drilldown':
         return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-2xs font-bold bg-accent/10 text-accent border border-accent/20">
             <Eye className="w-3 h-3" />
             View Drilldown
           </span>
         );
       case 'exit_switched_workspace':
         return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-slate-500/10 text-slate-600 dark:text-slate-400 border border-slate-500/20">
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-2xs font-bold bg-ink-3/10 text-ink-2 border border-line-3/20">
             <LogOut className="w-3 h-3" />
             Exit Switch
           </span>
         );
       default:
         return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20">
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-2xs font-bold bg-accent/10 text-accent border border-accent/20">
             <ShieldAlert className="w-3 h-3" />
             {action}
           </span>
@@ -111,17 +115,17 @@ export function SuperAdminAuditLogView() {
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-xl bg-purple-600/10 text-purple-600 dark:text-purple-400 flex items-center justify-center font-bold">
+              <div className="w-8 h-8 rounded-xl bg-accent/10 text-accent flex items-center justify-center font-bold">
                 <ShieldAlert className="w-4.5 h-4.5" />
               </div>
-              <h1 className="text-[20px] font-bold text-ink tracking-tight">
+              <h1 className="text-xl font-bold text-ink tracking-tight">
                 Super Admin Audit Logs
               </h1>
-              <span className="px-2.5 py-0.5 rounded-full text-[10.5px] font-bold bg-purple-500/10 text-purple-600 dark:text-purple-400 uppercase tracking-wider">
+              <span className="px-2.5 py-0.5 rounded-full text-2xs font-bold bg-accent/10 text-accent uppercase tracking-wider">
                 {totalCount} Actions Recorded
               </span>
             </div>
-            <p className="text-[12.5px] text-ink-3 mt-1">
+            <p className="text-xs text-ink-3 mt-1">
               Immutable audit trail recording all platform super admin operations, workspace switches, and tenant management.
             </p>
           </div>
@@ -130,7 +134,7 @@ export function SuperAdminAuditLogView() {
             <button
               onClick={() => fetchLogs(true)}
               disabled={refreshing}
-              className="h-9 px-3.5 rounded-xl border border-line bg-surface-2 hover:bg-surface text-ink text-[12.5px] font-medium flex items-center gap-2 transition-all disabled:opacity-50"
+              className="h-9 px-3.5 rounded-xl border border-line bg-surface-2 hover:bg-surface text-ink text-xs font-medium flex items-center gap-2 transition-all disabled:opacity-50"
             >
               <RefreshCw className={cn('w-3.5 h-3.5 text-ink-3', refreshing && 'animate-spin')} />
               <span>Refresh Log</span>
@@ -154,7 +158,7 @@ export function SuperAdminAuditLogView() {
                 key={val}
                 onClick={() => setActionFilter(val)}
                 className={cn(
-                  'h-8 px-3 rounded-lg text-[12px] font-medium transition-all whitespace-nowrap',
+                  'h-8 px-3 rounded-lg text-xs font-medium transition-all whitespace-nowrap',
                   actionFilter === val
                     ? 'bg-accent text-accent-ink shadow-xs'
                     : 'bg-surface-2 text-ink-2 hover:bg-surface-3 hover:text-ink'
@@ -172,7 +176,7 @@ export function SuperAdminAuditLogView() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search admin, company, or action..."
-              className="w-full h-8.5 pl-8.5 pr-3 rounded-lg border border-line bg-surface text-[12.5px] text-ink placeholder:text-ink-3 focus:outline-none focus:border-accent"
+              className="w-full h-8.5 pl-8.5 pr-3 rounded-lg border border-line bg-surface text-xs text-ink placeholder:text-ink-3 focus:outline-none focus:border-accent"
             />
           </div>
         </section>
@@ -180,22 +184,21 @@ export function SuperAdminAuditLogView() {
         {/* Audit Log Table */}
         <section className="border border-line rounded-2xl bg-surface overflow-hidden shadow-2xs">
           {loading ? (
-            <div className="p-16 text-center text-ink-3 space-y-3">
-              <RefreshCw className="w-7 h-7 animate-spin mx-auto text-accent" />
-              <p className="text-[13px]">Loading audit records...</p>
-            </div>
+            <LoadingState label="Loading audit records…" className="p-16" />
+          ) : loadError ? (
+            <ErrorState title="Couldn't load the audit log" message={loadError} onRetry={() => fetchLogs()} className="p-16" />
           ) : filteredLogs.length === 0 ? (
             <div className="p-16 text-center text-ink-3 space-y-3">
               <ShieldAlert className="w-10 h-10 mx-auto text-ink-3/50" />
-              <p className="text-[14px] font-bold text-ink">No audit entries found</p>
-              <p className="text-[12px] max-w-sm mx-auto">
+              <p className="text-sm font-bold text-ink">No audit entries found</p>
+              <p className="text-xs max-w-sm mx-auto">
                 No super admin actions match your selected filter. All super admin activities like switching workspaces are automatically recorded here.
               </p>
             </div>
           ) : (
             <div className="divide-y divide-line">
               {/* Header row */}
-              <div className="grid grid-cols-12 px-6 py-3 bg-surface-2/60 text-[11px] font-bold uppercase tracking-wider text-ink-3">
+              <div className="grid grid-cols-12 px-6 py-3 bg-surface-2/60 text-2xs font-bold uppercase tracking-wider text-ink-3">
                 <div className="col-span-3">Timestamp</div>
                 <div className="col-span-3">Super Admin</div>
                 <div className="col-span-2">Action</div>
@@ -212,7 +215,7 @@ export function SuperAdminAuditLogView() {
                   <div key={log.id} className="transition-colors hover:bg-surface-2/30">
                     <div
                       onClick={() => setExpandedId(isExpanded ? null : log.id)}
-                      className="grid grid-cols-12 px-6 py-4 items-center cursor-pointer text-[12.5px]"
+                      className="grid grid-cols-12 px-6 py-4 items-center cursor-pointer text-xs"
                     >
                       {/* Timestamp */}
                       <div className="col-span-3 flex items-center gap-2">
@@ -221,7 +224,7 @@ export function SuperAdminAuditLogView() {
                           <div className="font-semibold text-ink">
                             {date.toLocaleDateString()} {date.toLocaleTimeString()}
                           </div>
-                          <div className="text-[11px] text-ink-3">
+                          <div className="text-2xs text-ink-3">
                             {formatRelativeTime(date)}
                           </div>
                         </div>
@@ -229,14 +232,14 @@ export function SuperAdminAuditLogView() {
 
                       {/* Super Admin */}
                       <div className="col-span-3 flex items-center gap-2.5 min-w-0 pr-2">
-                        <div className="w-7 h-7 rounded-full bg-purple-500/10 text-purple-600 dark:text-purple-400 font-bold text-[11px] flex items-center justify-center shrink-0 border border-purple-500/20">
+                        <div className="w-7 h-7 rounded-full bg-accent/10 text-accent font-bold text-2xs flex items-center justify-center shrink-0 border border-accent/20">
                           {(log.admin_name || log.admin_email).slice(0, 2).toUpperCase()}
                         </div>
                         <div className="min-w-0">
                           <div className="font-semibold text-ink truncate">
                             {log.admin_name || log.admin_email.split('@')[0]}
                           </div>
-                          <div className="text-[11px] text-ink-3 truncate">
+                          <div className="text-2xs text-ink-3 truncate">
                             {log.admin_email}
                           </div>
                         </div>
@@ -257,11 +260,11 @@ export function SuperAdminAuditLogView() {
                             </span>
                           </div>
                         ) : log.workspace_id ? (
-                          <span className="font-mono text-[11px] text-ink-3 truncate">
+                          <span className="font-mono text-2xs text-ink-3 truncate">
                             {log.workspace_id}
                           </span>
                         ) : (
-                          <span className="text-ink-3 italic text-[11.5px]">Global / None</span>
+                          <span className="text-ink-3 italic text-xs">Global / None</span>
                         )}
                       </div>
 
@@ -283,9 +286,9 @@ export function SuperAdminAuditLogView() {
                     {/* Expanded Details Accordion */}
                     {isExpanded && (
                       <div className="px-6 py-4 bg-surface-2/40 border-t border-line/60 space-y-3">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-[12px]">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
                           <div className="space-y-1">
-                            <span className="font-semibold text-ink-3 uppercase text-[10.5px]">
+                            <span className="font-semibold text-ink-3 uppercase text-2xs">
                               Admin ID:
                             </span>
                             <div className="font-mono text-ink bg-surface px-2.5 py-1.5 rounded-lg border border-line">
@@ -294,7 +297,7 @@ export function SuperAdminAuditLogView() {
                           </div>
                           {log.workspace_id && (
                             <div className="space-y-1">
-                              <span className="font-semibold text-ink-3 uppercase text-[10.5px]">
+                              <span className="font-semibold text-ink-3 uppercase text-2xs">
                                 Target Workspace ID:
                               </span>
                               <div className="font-mono text-ink bg-surface px-2.5 py-1.5 rounded-lg border border-line">
@@ -306,10 +309,10 @@ export function SuperAdminAuditLogView() {
 
                         {log.details && Object.keys(log.details).length > 0 && (
                           <div className="space-y-1">
-                            <span className="font-semibold text-ink-3 uppercase text-[10.5px]">
+                            <span className="font-semibold text-ink-3 uppercase text-2xs">
                               Metadata &amp; Context:
                             </span>
-                            <pre className="font-mono text-[11px] bg-surface p-3 rounded-xl border border-line overflow-x-auto text-ink">
+                            <pre className="font-mono text-2xs bg-surface p-3 rounded-xl border border-line overflow-x-auto text-ink">
                               {JSON.stringify(log.details, null, 2)}
                             </pre>
                           </div>
