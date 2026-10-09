@@ -121,6 +121,15 @@ export async function recordConnectionError(id: string, message: string, needsAt
   });
 }
 
+/** Replaces a connection's credentials (a refreshed token, say). */
+export async function updateSecrets(connectionId: string, workspaceId: string, credentials: unknown): Promise<void> {
+  const { error } = await serviceClient().from('channel_secrets').upsert(
+    { connection_id: connectionId, workspace_id: workspaceId, ciphertext: encryptSecret(credentials), updated_at: new Date().toISOString() },
+    { onConflict: 'connection_id' }
+  );
+  if (error) throw new Error(`Could not store the credentials: ${error.message}`);
+}
+
 export async function deleteSecrets(connectionId: string): Promise<void> {
   const { error } = await serviceClient().from('channel_secrets').delete().eq('connection_id', connectionId);
   if (error) throw new Error(`Could not remove the credentials: ${error.message}`);

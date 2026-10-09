@@ -12,6 +12,10 @@ import { useToast } from '@/components/ui/Toast';
 import { timeAgo } from '@/components/tickets/TicketBits';
 import {
   completeWhatsAppSignupAction,
+  connectInstagramManualAction,
+  listTestRecipientsAction,
+  startInstagramConnectAction,
+  type TestRecipient,
   connectWhatsAppManualAction,
   disconnectChannelAction,
   getChannelsOverviewAction,
@@ -22,6 +26,9 @@ import {
 } from '@/app/actions/channels';
 import type { MessageTemplate } from '@/lib/channels/types';
 import { cn } from '@/lib/utils';
+
+// Instagram's own words for these screens, kept in one place.
+const IG_PROFESSIONAL_HELP = 'Instagram only allows messaging for professional accounts (Business or Creator).';
 
 /**
  * Settings → Channels. One card per channel: whether it is connected, the
@@ -61,6 +68,26 @@ export function ChannelsSettings({ workspaceId }: { workspaceId: string }) {
   const [disconnecting, setDisconnecting] = useState<ChannelCard | null>(null);
 
   const [attempt, setAttempt] = useState(0);
+  // Instagram sends the admin back to the dashboard with the outcome in the URL.
+  const [returned, setReturned] = useState<{ ok: boolean; message: string } | null>(() => {
+    if (typeof window === 'undefined') return null;
+    const params = new URLSearchParams(window.location.search);
+    const result = params.get('channel_result');
+    if (!result) return null;
+    return {
+      ok: result === 'connected',
+      message: params.get('channel_message') || (result === 'connected' ? 'If you used manual setup, add the webhook details shown on the card in Meta.' : ''),
+    };
+  });
+
+  // The outcome is shown once; take it out of the address bar.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (!params.has('channel_result')) return;
+    for (const k of ['settings', 'channel', 'channel_result', 'channel_message']) params.delete(k);
+    const qs = params.toString();
+    window.history.replaceState(window.history.state, '', `${window.location.pathname}${qs ? `?${qs}` : ''}`);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -120,6 +147,26 @@ export function ChannelsSettings({ workspaceId }: { workspaceId: string }) {
         </p>
       </div>
 
+      {returned && (
+        <div
+          role={returned.ok ? 'status' : 'alert'}
+          className={cn(
+            'rounded-lg border p-4 text-ui text-ink flex items-start justify-between gap-3',
+            returned.ok ? 'border-success-line bg-success-soft' : 'border-danger-line bg-danger-soft'
+          )}
+        >
+          <p>
+            <span className={cn('font-semibold', returned.ok ? 'text-success' : 'text-danger')}>
+              {returned.ok ? 'Instagram connected.' : 'Instagram was not connected.'}
+            </span>{' '}
+            {returned.message}
+          </p>
+          <Button size="xs" variant="ghost" onClick={() => setReturned(null)}>
+            Dismiss
+          </Button>
+        </div>
+      )}
+
       {overview.setupProblems.length > 0 && (
         <div role="alert" className="rounded-lg border border-warn-line bg-warn-soft p-4 text-ui text-ink">
           <p className="font-semibold flex items-center gap-2 text-warn">
@@ -145,7 +192,19 @@ export function ChannelsSettings({ workspaceId }: { workspaceId: string }) {
         ))}
       </div>
 
-      {connecting && (
+      {connecting && connecting.id === 'instagram' && (
+        <ConnectInstagramModal
+          workspaceId={workspaceId}
+          overview={overview}
+          card={connecting}
+          onClose={() => setConnecting(null)}
+          onConnected={() => {
+            setConnecting(null);
+            load();
+          }}
+        />
+      )}
+      {connecting && connecting.id === 'whatsapp' && (
         <ConnectWhatsAppModal
           workspaceId={workspaceId}
           overview={overview}
@@ -157,7 +216,11 @@ export function ChannelsSettings({ workspaceId }: { workspaceId: string }) {
           }}
         />
       )}
-      {testing && <TestMessageModal workspaceId={workspaceId} card={testing} onClose={() => setTesting(null)} onDone={load} />}
+      {testing && testing.id === 'instagram' ? (
+        <InstagramTestModal workspaceId={workspaceId} card={testing} onClose={() => setTesting(null)} onDone={load} />
+      ) : (
+        testing && <TestMessageModal workspaceId={workspaceId} card={testing} onClose={() => setTesting(null)} onDone={load} />
+      )}
       {disconnecting && (
         <DisconnectModal
           workspaceId={workspaceId}
@@ -217,12 +280,24 @@ function ChannelCardView({
           </div>
           <div className="min-w-0">
             <dt className="text-ink-3">Setup</dt>
-            <dd className="text-ink truncate">{c.setup_method === 'embedded_signup' ? 'Signed up with Meta' : 'Manual (your Meta app)'}</dd>
+            <dd className="text-ink truncate">
+              {c.setup_method === 'embedded_signup' ? (card.id === 'instagram' ? 'Signed in with Instagram' : 'Signed up with Meta') : 'Manual (your Meta app)'}
+            </dd>
           </div>
-          <div className="min-w-0">
-            <dt className="text-ink-3">Quality rating</dt>
-            <dd className="text-ink truncate">{String(c.settings?.quality_rating ?? 'Unknown').toLowerCase()}</dd>
-          </div>
+          {card.id === 'whatsapp' && (
+            <div className="min-w-0">
+              <dt className="text-ink-3">Quality rating</dt>
+              <dd className="text-ink truncate">{String(c.settings?.quality_rating ?? 'Unknown').toLowerCase()}</dd>
+            </div>
+          )}
+          {card.id === 'instagram' && (
+            <div className="min-w-0">
+              <dt className="text-ink-3">Token valid until</dt>
+              <dd className="text-ink truncate">
+                {c.settings?.token_expires_at ? new Date(String(c.settings.token_expires_at)).toLocaleDateString() : 'Unknown'}
+              </dd>
+            </div>
+          )}
         </dl>
       )}
 
@@ -493,6 +568,230 @@ function ConnectWhatsAppModal({
           </form>
         )}
       </div>
+    </Modal>
+  );
+}
+
+/* ── Instagram ────────────────────────────────────────────────────────── */
+
+function ConnectInstagramModal({
+  workspaceId,
+  overview,
+  card,
+  onClose,
+  onConnected,
+}: {
+  workspaceId: string;
+  overview: ChannelsOverview;
+  card: ChannelCard;
+  onClose: () => void;
+  onConnected: () => void;
+}) {
+  const toast = useToast();
+  const login = overview.instagramLogin;
+  const [mode, setMode] = useState<'login' | 'manual'>(login ? 'login' : 'manual');
+  const [form, setForm] = useState({ accessToken: '', appSecret: '' });
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) => setForm((f) => ({ ...f, [k]: e.target.value }));
+
+  async function startLogin() {
+    setBusy(true);
+    setError(null);
+    const res = await startInstagramConnectAction(workspaceId).catch((err: Error) => ({ success: false as const, error: err.message }));
+    if (!res.success) {
+      setBusy(false);
+      return setError(res.error);
+    }
+    // Instagram takes over; it sends the admin back to the dashboard when done.
+    window.location.assign(res.url);
+  }
+
+  async function submitManual(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setError(null);
+    const res = await connectInstagramManualAction(workspaceId, form).catch((err: Error) => ({ success: false as const, error: err.message }));
+    setBusy(false);
+    if (!res.success) return setError(res.error);
+    toast.success('Instagram connected. Add the webhook in Meta to start receiving messages.');
+    onConnected();
+  }
+
+  return (
+    <Modal title={`Connect ${card.label}`} description="Uses Meta’s official Instagram API with Instagram Login." onClose={onClose} size="lg">
+      <div className="space-y-5">
+        <div className="rounded-md border border-line bg-surface-2 px-3 py-2 text-xs text-ink-2">
+          <p className="font-semibold text-ink">Before you start</p>
+          <ul className="mt-1 list-disc pl-4 space-y-0.5">
+            <li>{IG_PROFESSIONAL_HELP} A personal account cannot be connected.</li>
+            <li>
+              In the Instagram app: Settings → Messages and story replies → Message controls → Connected tools → turn on “Allow access to messages”.
+              Without it no messages arrive and Instagram gives no error.
+            </li>
+            <li>You can reply for 24 hours after a customer’s last message.</li>
+          </ul>
+        </div>
+
+        {login && (
+          <Tabs
+            label="Setup method"
+            value={mode}
+            onChange={(m) => {
+              setMode(m);
+              setError(null);
+            }}
+            items={[
+              { id: 'login', label: 'Sign in with Instagram' },
+              { id: 'manual', label: 'Manual setup' },
+            ]}
+          />
+        )}
+
+        {error && (
+          <div role="alert" className="rounded-md border border-danger-line bg-danger-soft px-3 py-2 text-ui text-ink">
+            {error}
+          </div>
+        )}
+
+        {mode === 'login' && login ? (
+          <div className="space-y-4">
+            <ol className="list-decimal pl-5 space-y-1.5 text-ui text-ink-2">
+              <li>Sign in with the Instagram account that customers message.</li>
+              <li>Allow access to its profile and messages.</li>
+              <li>You come back here and the connection finishes on its own.</li>
+            </ol>
+            <p className="text-xs text-ink-3">
+              Webhooks arrive at <code className="font-mono">{login.webhookUrl}</code>, already set up on our Meta app.
+            </p>
+            <div className="flex justify-end gap-2">
+              <Button onClick={onClose}>Cancel</Button>
+              <Button variant="primary" loading={busy} onClick={startLogin}>
+                Continue with Instagram
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <form onSubmit={submitManual} className="space-y-4">
+            <ol className="list-decimal pl-5 space-y-1.5 text-ui text-ink-2">
+              <li>In Meta for Developers, create a Business app and add the “Instagram” product with Instagram login.</li>
+              <li>Under API setup with Instagram login, add your Instagram professional account and generate its access token.</li>
+              <li>Copy the Instagram app secret from the same page.</li>
+              <li>After connecting, paste the callback URL and verify token shown on the card into the webhook settings, and subscribe to “messages”.</li>
+            </ol>
+            <Field label="Instagram access token" hint="Stored encrypted; nobody can read it back, including you.">
+              <Input type="password" value={form.accessToken} onChange={set('accessToken')} autoComplete="off" required />
+            </Field>
+            <Field label="Instagram app secret" hint="Used only to check that webhooks really come from Meta.">
+              <Input type="password" value={form.appSecret} onChange={set('appSecret')} autoComplete="off" required />
+            </Field>
+            <div className="flex justify-end gap-2">
+              <Button onClick={onClose}>Cancel</Button>
+              <Button variant="primary" type="submit" loading={busy}>
+                Connect Instagram
+              </Button>
+            </div>
+          </form>
+        )}
+      </div>
+    </Modal>
+  );
+}
+
+/** Instagram only allows replying, so the test goes to someone who wrote in the last 24 hours. */
+function InstagramTestModal({ workspaceId, card, onClose, onDone }: { workspaceId: string; card: ChannelCard; onClose: () => void; onDone: () => void }) {
+  const toast = useToast();
+  const [people, setPeople] = useState<TestRecipient[] | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
+  const [to, setTo] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    listTestRecipientsAction(workspaceId, card.id)
+      .catch((e: Error) => ({ success: false as const, error: e.message }))
+      .then((res) => {
+        if (cancelled) return;
+        if (!res.success) return setLoadError(res.error);
+        setPeople(res.recipients);
+        setTo(res.recipients[0]?.id || '');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [workspaceId, card.id, attempt]);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setError(null);
+    const res = await sendChannelTestMessageAction(workspaceId, card.id, { to, templateName: '', language: '' }).catch((err: Error) => ({
+      success: false as const,
+      error: err.message,
+    }));
+    setBusy(false);
+    onDone();
+    if (!res.success) return setError(res.error);
+    toast.success('Test message sent.');
+    onClose();
+  }
+
+  return (
+    <Modal
+      title="Send a test message"
+      description="Instagram only lets a business reply to people who messaged it in the last 24 hours, so the test goes to one of them."
+      onClose={onClose}
+    >
+      <form onSubmit={submit} className="space-y-4">
+        {error && (
+          <div role="alert" className="rounded-md border border-danger-line bg-danger-soft px-3 py-2 text-ui text-ink">
+            {error}
+          </div>
+        )}
+        {loadError ? (
+          <div role="alert" className="text-ui text-ink-2 flex flex-wrap items-center gap-2">
+            <span>Recent conversations could not be loaded: {loadError}</span>
+            <Button
+              size="xs"
+              onClick={() => {
+                setLoadError(null);
+                setPeople(null);
+                setAttempt((n) => n + 1);
+              }}
+            >
+              Try again
+            </Button>
+          </div>
+        ) : people === null ? (
+          <SkeletonBlock className="h-9 w-full rounded-sm" />
+        ) : people.length === 0 ? (
+          <div className="rounded-md border border-line bg-surface-2 px-3 py-3 text-ui text-ink-2">
+            <p className="font-semibold text-ink">Nobody has messaged you in the last 24 hours</p>
+            <p className="mt-1">
+              From another Instagram account, send a message to {card.connection?.display_name || 'your account'}, then come back. It will appear here
+              within a few seconds.
+            </p>
+          </div>
+        ) : (
+          <Field label="Send to">
+            <Select value={to} onChange={(e) => setTo(e.target.value)}>
+              {people.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name} · wrote {timeAgo(p.lastInboundAt)}
+                </option>
+              ))}
+            </Select>
+          </Field>
+        )}
+        <div className="flex justify-end gap-2">
+          <Button onClick={onClose}>Cancel</Button>
+          <Button variant="primary" type="submit" loading={busy} disabled={!to}>
+            <Send className="w-3.5 h-3.5" aria-hidden="true" /> Send test
+          </Button>
+        </div>
+      </form>
     </Modal>
   );
 }

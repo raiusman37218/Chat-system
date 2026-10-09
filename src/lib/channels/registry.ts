@@ -1,5 +1,6 @@
 import type { ChannelAdapter, ChannelId } from './types';
 import { whatsappAdapter } from './whatsapp/adapter';
+import { instagramAdapter } from './instagram/adapter';
 
 /**
  * Every channel the app can talk to. The integrations page, the webhook
@@ -10,6 +11,7 @@ import { whatsappAdapter } from './whatsapp/adapter';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- each adapter has its own credential shape.
 const ADAPTERS: Record<ChannelId, ChannelAdapter<any, any>> = {
   whatsapp: whatsappAdapter,
+  instagram: instagramAdapter,
 };
 
 export function getAdapter(channel: string | null | undefined): ChannelAdapter<unknown, unknown> | null {
@@ -38,8 +40,8 @@ export const CHANNEL_CATALOG: ChannelCatalogEntry[] = [
   {
     id: 'instagram',
     label: 'Instagram',
-    description: 'Instagram direct messages. Not available yet.',
-    available: false,
+    description: 'Answer Instagram DMs, story replies and story mentions as tickets, for a professional (Business or Creator) account.',
+    available: true,
   },
   {
     id: 'messenger',

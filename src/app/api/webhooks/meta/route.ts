@@ -85,6 +85,10 @@ export async function POST(req: NextRequest) {
     if (body.object === 'whatsapp_business_account') {
       return NextResponse.json({ status: 'ignored_use_channels_webhook' }, { status: 200 });
     }
+    // Instagram moved too (/api/channels/instagram/webhook), for the same reasons.
+    if (body.object === 'instagram') {
+      return NextResponse.json({ status: 'ignored_use_channels_webhook' }, { status: 200 });
+    }
 
     // 2. Process Facebook Messenger, Instagram, or Threads
     if (body.object === 'page' || body.object === 'instagram') {

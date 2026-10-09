@@ -58,13 +58,18 @@ export function contentForMessage(
     const params = Array.isArray(template.body_params) ? template.body_params.map(String) : [];
     return { kind: 'content', content: { type: 'template', template: { name: template.name, language: template.language, bodyParams: params } } };
   }
+  // Set by the database when Instagram's Human Agent window applies.
+  const tag = msg.metadata?.channel_tag === 'HUMAN_AGENT' ? ('HUMAN_AGENT' as const) : undefined;
   if (msg.attachment_url) {
     const kind = mediaKindForUrl(msg.attachment_url);
     const caption = (msg.content || '').trim();
     const filename = decodeURIComponent(msg.attachment_url.split('?')[0].split('/').pop() || 'file');
-    return { kind: 'media', media: { kind, url: msg.attachment_url, caption: caption || undefined, filename } };
+    return { kind: 'media', media: { kind, url: msg.attachment_url, caption: caption || undefined, filename, ...(tag ? { tag } : {}) } };
   }
-  return { kind: 'content', content: { type: 'text', text: msg.content || '', replyToExternalId: replyToExternalId || undefined } };
+  return {
+    kind: 'content',
+    content: { type: 'text', text: msg.content || '', replyToExternalId: replyToExternalId || undefined, ...(tag ? { tag } : {}) },
+  };
 }
 
 type Attempt = SendResult & { connectionId?: string; connectionStatus?: string };

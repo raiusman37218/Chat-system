@@ -47,7 +47,7 @@ import type { TicketGroup, TicketPriority, TicketStatus, TicketType } from '@/ty
 import { ChannelIcon, StatusBadge, fullTime, inputClass, timeAgo } from './TicketBits';
 import { roleCan, type Role } from '@/lib/team/permissions';
 import { CollisionBanner, usePresence } from './Presence';
-import { ChannelBanner, DeliveryStatus, TemplateComposer, channelNotice, useServiceWindow } from './ChannelBits';
+import { ChannelBanner, DeliveryStatus, StoryContextCard, TemplateComposer, channelNotice, useServiceWindow } from './ChannelBits';
 
 interface Props {
   workspaceId: string;
@@ -403,6 +403,7 @@ function Thread({
               <div className="text-xs text-ink-3 mb-0.5">
                 <span className="font-semibold text-ink-2">{author}</span> · {time}
               </div>
+              {fromCustomer && m.metadata?.channel_story && <StoryContextCard story={m.metadata.channel_story} />}
               <div
                 className={cn(
                   'inline-block text-left rounded-2xl px-3.5 py-2 text-ui break-words',
@@ -465,6 +466,8 @@ function Composer({
   // Outside the window only templates may go out; notes are always fine.
   const templateOnly = Boolean(channelState && !internal && win && !win.open && channelState.templates);
   const channelDown = Boolean(channelState && !internal && channelState.connectionStatus === 'disconnected');
+  // Channels without templates (Instagram): past the window nothing may be sent.
+  const replyLocked = Boolean(channelState && !internal && win && !win.open && !channelState.templates);
 
   const send = async () => {
     if (!body.trim() || sending) return;
@@ -531,8 +534,15 @@ function Composer({
               if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) send();
             }}
             rows={3}
+            disabled={replyLocked}
             aria-label={internal ? 'Internal note' : 'Reply'}
-            placeholder={internal ? 'Only your team can see this note' : 'Write a reply to the customer'}
+            placeholder={
+              replyLocked
+                ? 'Replies are closed on this channel until the customer writes again'
+                : internal
+                  ? 'Only your team can see this note'
+                  : 'Write a reply to the customer'
+            }
             className={cn(inputClass, 'h-auto py-2 resize-y min-h-[76px]', internal && 'bg-surface border-warn-line')}
           />
           {error && <p className="text-xs text-danger mt-1.5">{error}</p>}
@@ -551,7 +561,7 @@ function Composer({
               type="button"
               className={cn('btn btn-sm', internal ? 'btn-secondary' : 'btn-accent')}
               onClick={send}
-              disabled={sending || !body.trim() || channelDown}
+              disabled={sending || !body.trim() || channelDown || replyLocked}
             >
               <Send className="w-3.5 h-3.5" /> {sending ? 'Sending…' : internal ? 'Add note' : 'Send'}
             </button>

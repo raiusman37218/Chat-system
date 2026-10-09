@@ -288,6 +288,8 @@ export interface TicketChannelState {
   lastInboundAt: string | null;
   /** Hours free-form replies are allowed after that; null when the channel has no window. */
   windowHours: number | null;
+  /** Hours a person may still reply when the connection has Meta's Human Agent feature (Instagram); null otherwise. */
+  humanAgentHours: number | null;
   templates: boolean;
   connectionStatus: 'connected' | 'needs_attention' | 'disconnected';
   connectionName: string | null;
@@ -298,13 +300,14 @@ async function channelStateFor(supabase: Supabase, workspaceId: string, ticket: 
   if (!adapter || !ticket.conversation_id) return null;
   const [{ data: conv }, { data: conn }] = await Promise.all([
     supabase.from('conversations').select('channel_last_inbound_at').eq('id', ticket.conversation_id).eq('workspace_id', workspaceId).maybeSingle(),
-    supabase.from('channel_connections').select('status, display_name').eq('workspace_id', workspaceId).eq('channel', adapter.id).maybeSingle(),
+    supabase.from('channel_connections').select('status, display_name, settings').eq('workspace_id', workspaceId).eq('channel', adapter.id).maybeSingle(),
   ]);
   return {
     channel: adapter.id,
     label: adapter.label,
     lastInboundAt: conv?.channel_last_inbound_at ?? null,
     windowHours: adapter.capabilities.serviceWindowHours,
+    humanAgentHours: conn?.settings?.human_agent === true ? adapter.capabilities.humanAgentWindowHours ?? null : null,
     templates: adapter.capabilities.templates,
     connectionStatus: conn?.status ?? 'disconnected',
     connectionName: conn?.display_name ?? null,

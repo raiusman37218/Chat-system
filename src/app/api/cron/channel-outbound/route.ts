@@ -1,13 +1,15 @@
 import { NextResponse } from 'next/server';
 import { hasServiceRole } from '@/lib/supabase/service';
 import { processOutboundQueue } from '@/lib/channels/outbound';
+import { refreshDueCredentials } from '@/lib/channels/refresh';
 
 export const dynamic = 'force-dynamic';
 
 /**
  * Sends what the channel outbound queue has due: retries after a provider
  * outage or rate limit, and anything a worker left half-sent. Replies are
- * normally sent the moment they are written; this is the safety net.
+ * normally sent the moment they are written; this is the safety net. It also
+ * renews channel tokens that are about to expire (Instagram's last 60 days).
  *
  * Needs `Authorization: Bearer $CRON_SECRET` (Vercel adds it to cron calls).
  * vercel.json runs it daily, the most often the Hobby plan allows; on Pro,
@@ -33,7 +35,8 @@ async function handle(request: Request) {
     totals.failed += batch.failed;
     if (batch.claimed < 50) break;
   }
-  return NextResponse.json(totals);
+  const tokens = await refreshDueCredentials();
+  return NextResponse.json({ ...totals, tokens });
 }
 
 export const GET = handle;

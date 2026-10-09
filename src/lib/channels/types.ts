@@ -11,7 +11,7 @@
 import type { ChannelConnection } from '@/types/database';
 
 /** Channels with an adapter. Add to this union when a new adapter lands. */
-export type ChannelId = 'whatsapp';
+export type ChannelId = 'whatsapp' | 'instagram';
 
 export type MediaKind = 'image' | 'video' | 'audio' | 'document' | 'sticker';
 
@@ -41,6 +41,15 @@ export interface InboundMessageEvent {
   type: string;
   /** The provider id of the message this one replies to, when the customer quoted one. */
   replyToExternalId?: string;
+  /** Instagram: the customer replied to, or mentioned the business in, a story. */
+  story?: StoryContext;
+}
+
+export interface StoryContext {
+  kind: 'reply' | 'mention';
+  /** The story's media URL; it expires with the story (about 24 hours). */
+  url?: string;
+  id?: string;
 }
 
 /** A message the business sent moved on: sent, delivered, read, or failed. */
@@ -64,7 +73,13 @@ export interface TemplateRef {
 }
 
 export type OutboundContent =
-  | { type: 'text'; text: string; replyToExternalId?: string }
+  | {
+      type: 'text';
+      text: string;
+      replyToExternalId?: string;
+      /** Instagram: a person replying after 24 hours (Meta's Human Agent feature). */
+      tag?: 'HUMAN_AGENT';
+    }
   | { type: 'template'; template: TemplateRef };
 
 export interface OutboundMedia {
@@ -73,6 +88,8 @@ export interface OutboundMedia {
   url: string;
   caption?: string;
   filename?: string;
+  /** Instagram: a person replying after 24 hours (Meta's Human Agent feature). */
+  tag?: 'HUMAN_AGENT';
 }
 
 export type SendResult =
@@ -124,6 +141,19 @@ export interface ChannelCapabilities {
   readReceipts: boolean;
   /** Hours after the customer's last message during which free-form replies are allowed; null when unlimited. */
   serviceWindowHours: number | null;
+  /** Hours a person (not the bot) may still reply when the connection has Meta's Human Agent feature. */
+  humanAgentWindowHours?: number | null;
+}
+
+export interface SenderProfile {
+  name?: string;
+  username?: string;
+}
+
+/** Fresh credentials and settings after a token refresh. */
+export interface RefreshedCredentials<Credentials> {
+  credentials: Credentials;
+  settings: Record<string, unknown>;
 }
 
 export interface ChannelAdapter<Credentials = unknown, ConnectInput = unknown> {
@@ -150,4 +180,9 @@ export interface ChannelAdapter<Credentials = unknown, ConnectInput = unknown> {
 
   /** Stops the provider sending webhooks for this account. Best effort; the connection is removed regardless. */
   disconnect(ctx: ChannelContext<Credentials>): Promise<void>;
+
+  /** Channels whose webhooks carry only an id for the sender: look up a display name. */
+  getSenderProfile?(ctx: ChannelContext<Credentials>, senderId: string): Promise<SenderProfile | null>;
+  /** Channels with expiring tokens: renew when due, or null when nothing needed doing. */
+  refreshCredentials?(ctx: ChannelContext<Credentials>): Promise<RefreshedCredentials<Credentials> | null>;
 }
