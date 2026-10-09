@@ -5,7 +5,8 @@ import {
   executeHandoverToHuman,
 } from '@/lib/ai/anthropic';
 import { dispatchOutboundMessage } from '@/lib/channels/dispatcher';
-import { providerConfigFrom, warmHelpIndex, wantsHuman } from '@/lib/ai/help-answer';
+import { providerConfigFrom, warmHelpIndex } from '@/lib/ai/help-answer';
+import { asksForHuman } from '@/lib/ai/intent';
 import {
   detectLanguage,
   getLanguageInfo,
@@ -283,7 +284,7 @@ export async function POST(req: NextRequest) {
     }
 
     // "wants_human: confirm the handover to the visitor and notify agents. This must work even after a previous handover."
-    const isAskingForHuman = wantsHuman(visitorMsg.content);
+    const isAskingForHuman = asksForHuman(visitorMsg.content);
 
     if ((humanActive || aiDisabled) && !isAskingForHuman) {
       return json({
@@ -446,6 +447,10 @@ export async function POST(req: NextRequest) {
           delivered_language: detected.code,
           delivered_language_name: detected.name,
           english_translation: aiEnglishTranslation,
+          bot_intent: result.intent ?? null,
+          bot_intent_source: result.intentSource ?? null,
+          retrieval_confidence: result.retrievalConfidence ?? null,
+          cited_article_id: result.citation?.id ?? null,
         },
       })
       .select()

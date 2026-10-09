@@ -31,6 +31,30 @@ import type { RetrievedChunk } from '@/types/database';
 /** Where a piece of knowledge came from. */
 export type KnowledgeSource = 'article' | 'note';
 
+/**
+ * How sure retrieval is that the help centre answers the question.
+ * 'low' means do not answer: there is nothing to quote that fits.
+ */
+export type RetrievalConfidence = 'high' | 'medium' | 'low';
+
+/** A published article an answer can point the visitor to. */
+export interface CitableArticle {
+  id: string;
+  title: string;
+  slug?: string | null;
+  /** Public URL, or null when the workspace has no help-centre address. */
+  url: string | null;
+}
+
+/** The public URL of an article, or null without a help-centre address. */
+export function articleUrl(
+  helpCenterUrl: string | null | undefined,
+  article: { id: string; slug?: string | null }
+): string | null {
+  if (!helpCenterUrl) return null;
+  return `${helpCenterUrl.replace(/\/$/, '')}/${article.slug || article.id}`;
+}
+
 export interface HelpAnswer {
   /** Whether the answer came from a published article or an internal note. */
   source?: KnowledgeSource;
@@ -38,7 +62,7 @@ export interface HelpAnswer {
   text: string | null;
   confidence: Confidence;
   /** The article the answer came from, for citation and analytics. */
-  article: { id: string; title: string; slug?: string | null } | null;
+  article: { id: string; title: string; slug?: string | null; url?: string | null } | null;
   /** Human-readable explanation of the decision, for logs and tests. */
   reason: string;
   /** Other articles worth offering when the answer is only partial. */
@@ -68,6 +92,26 @@ export function invalidateHelpIndex(workspaceId: string) {
 /** Starts loading the index early, so it is ready by the time it is needed. */
 export function warmHelpIndex(workspaceId: string): void {
   loadIndex(workspaceId).catch(() => {});
+}
+
+/**
+ * Section names and article titles, so the intent classifier can tell what
+ * this workspace's help centre is about. Empty when nothing is indexed.
+ */
+export async function helpCenterTopics(workspaceId: string, max = 40): Promise<string[]> {
+  try {
+    const index = await loadIndex(workspaceId);
+    const topics = new Set<string>();
+    for (const doc of index.docs) {
+      if (doc.article.id.startsWith('note:')) continue;
+      if (doc.article.sectionName) topics.add(doc.article.sectionName);
+      topics.add(doc.article.title);
+      if (topics.size >= max) break;
+    }
+    return Array.from(topics).slice(0, max);
+  } catch {
+    return [];
+  }
 }
 
 function loadIndex(workspaceId: string): Promise<HelpIndex> {
@@ -163,6 +207,12 @@ export interface AnswerRequest {
   queryEmbedding?: number[] | null;
   intent?: string;
   providerConfig?: ProviderConfig | null;
+  /**
+   * Answer from published articles only, never from team notes. A visitor
+   * asking a help-centre question gets an answer they can verify by following
+   * the citation; a team note has nothing to link to.
+   */
+  articlesOnly?: boolean;
 }
 
 /**
@@ -206,7 +256,7 @@ export async function recordUnanswered(
 
 const recordGap = (req: AnswerRequest, reason: string) => {
   // Handover Rule 4: Only log a knowledge gap for intent "question" with no answer.
-  if (req.intent && req.intent !== 'question') {
+  if (req.intent && req.intent !== 'question' && req.intent !== 'help_center_question') {
     return Promise.resolve();
   }
   return recordUnanswered(req.workspaceId, req.message, reason, req.conversationId, req.queryEmbedding);
@@ -250,20 +300,16 @@ export async function answerFromHelpCenter(
       const cleanContent = topChunk.content
         .replace(/^Article:\s*.*?\nSection:\s*.*?\n\n/i, '')
         .trim();
-      const link = req.helpCenterUrl
-        ? `${req.helpCenterUrl.replace(/\/$/, '')}/${topChunk.article_slug || topChunk.article_id}`
-        : null;
+      const link = articleUrl(req.helpCenterUrl, { id: topChunk.article_id, slug: topChunk.article_slug });
 
-      // Output plain text or simple markdown: bold title, no "###" headings
-      const heading = `**${topChunk.article_title}**\n\n`;
+      // The caller appends the citation, so every answer path cites the same way.
       const body = cleanContent.replace(/^\s*•\s+/gm, '- ').replace(/\n{3,}/g, '\n\n');
-      const citation = link ? `\n\n[Read more](${link})` : '';
 
       return {
-        text: `${heading}${body}${citation}`,
+        text: body,
         source: 'article',
         confidence: 'high',
-        article: { id: topChunk.article_id, title: topChunk.article_title, slug: topChunk.article_slug },
+        article: { id: topChunk.article_id, title: topChunk.article_title, slug: topChunk.article_slug, url: link },
         reason: `semantic hybrid high match (score: ${topChunk.combined_score.toFixed(2)}, similarity: ${topChunk.similarity.toFixed(2)})`,
         alternatives: [], // Single best article only
       };
@@ -281,7 +327,9 @@ export async function answerFromHelpCenter(
   }
 
   const index = await loadIndex(req.workspaceId);
-  const hits = search(index, req.message, { history: req.history, limit: 4 });
+  const hits = search(index, req.message, { history: req.history, limit: req.articlesOnly ? 8 : 4 })
+    .filter((h) => !req.articlesOnly || !h.article.id.startsWith('note:'))
+    .slice(0, 4);
   const verdict = assess(hits, req.message);
 
   // In no-API fallback, only show single best article when confidence is high
@@ -319,13 +367,8 @@ export async function answerFromHelpCenter(
   }
 
   const isNote = article.id.startsWith('note:');
-  const link =
-    !isNote && req.helpCenterUrl
-      ? `${req.helpCenterUrl.replace(/\/$/, '')}/${article.slug || article.id}`
-      : null;
+  const link = isNote ? null : articleUrl(req.helpCenterUrl, article);
 
-  // Simple markdown: bold title, no "###" headings
-  const heading = isNote ? '' : `**${article.title}**\n\n`;
   const body = passage
     .replace(/^\s*•\s+/gm, '- ')
     .replace(/^[ \t]*\|?[ \t]*:?-{2,}.*$/gm, '')
@@ -335,13 +378,11 @@ export async function answerFromHelpCenter(
     })
     .replace(/\n{3,}/g, '\n\n');
 
-  const citation = link ? `\n\n[Read more](${link})` : '';
-
   return {
-    text: `${heading}${body}${citation}`,
+    text: body,
     source: isNote ? 'note' : 'article',
     confidence: 'high',
-    article: { id: article.id, title: article.title, slug: article.slug },
+    article: { id: article.id, title: article.title, slug: article.slug, url: link },
     reason: verdict.reason,
     alternatives: [],
   };
@@ -360,6 +401,24 @@ export interface ModelContext {
   used: { id: string; title: string; source: KnowledgeSource }[];
 }
 
+export interface RetrievedContext extends ModelContext {
+  rewrittenQuery?: string;
+  queryEmbedding?: number[] | null;
+  chunks?: RetrievedChunk[];
+  belowThreshold?: boolean;
+  /** How well the best passage fits the question. */
+  confidence: RetrievalConfidence;
+  /**
+   * The article behind each numbered block in `text`: `sources[0]` is
+   * `[CHUNK 1]`. Team-note blocks have no entry and are numbered after these.
+   */
+  sources: CitableArticle[];
+}
+
+/** Semantic scores at which the top passage counts as a direct answer. */
+const HIGH_SIMILARITY = 0.65;
+const HIGH_COMBINED_SCORE = 0.55;
+
 /**
  * The passages a model should be given to answer this question.
  * Uses semantic retrieval (rewrites query, embeds, and executes pgvector hybrid search).
@@ -375,8 +434,10 @@ export async function buildModelContext(
     limit?: number;
     providerConfig?: ProviderConfig | null;
     helpCenterUrl?: string | null;
+    /** Published articles only; team notes are left out. */
+    articlesOnly?: boolean;
   } = {}
-): Promise<ModelContext & { rewrittenQuery?: string; queryEmbedding?: number[] | null; chunks?: RetrievedChunk[]; belowThreshold?: boolean }> {
+): Promise<RetrievedContext> {
   // The live keyword index reads the published articles and the team's
   // assistant notes straight from the database, so it always reflects the
   // help centre as it is now. It runs alongside semantic search: it is the
@@ -401,8 +462,20 @@ export async function buildModelContext(
     queryEmbedding = semantic.queryEmbedding;
 
     if (!semantic.belowThreshold && semantic.text) {
+      const top = semantic.chunks[0];
+      const confidence: RetrievalConfidence =
+        top && (top.similarity >= HIGH_SIMILARITY || top.combined_score >= HIGH_COMBINED_SCORE)
+          ? 'high'
+          : 'medium';
+      const sources = semantic.chunks.map((c) => ({
+        id: c.article_id,
+        title: c.article_title,
+        slug: c.article_slug ?? null,
+        url: articleUrl(options.helpCenterUrl, { id: c.article_id, slug: c.article_slug }),
+      }));
+
       // Add team notes that match, which semantic search cannot see.
-      const index = await indexPromise;
+      const index = options.articlesOnly ? null : await indexPromise;
       const noteHits = index
         ? search(index, `${rewrittenQuery || ''}\n${question}`, { history: options.history, limit: 4 })
             .filter((h) => h.article.id.startsWith('note:') && h.score >= 1)
@@ -421,39 +494,57 @@ export async function buildModelContext(
         queryEmbedding,
         chunks: semantic.chunks,
         belowThreshold: false,
+        confidence,
+        sources,
       };
     }
   } catch (err) {
     console.warn('[Semantic Retrieval] buildModelContext fallback to keyword index:', err);
   }
 
+  const nothing = (): RetrievedContext => ({
+    text: '',
+    used: [],
+    belowThreshold: true,
+    rewrittenQuery,
+    queryEmbedding,
+    confidence: 'low',
+    sources: [],
+  });
+
   // 2. Keyword index: semantic search found nothing usable.
   const index = await indexPromise;
-  if (!index) return { text: '', used: [], belowThreshold: true, rewrittenQuery, queryEmbedding };
+  if (!index) return nothing();
   // Search with the English rewrite as well as the visitor's own words, so a
   // question in Roman Urdu or Spanish still meets English articles.
   const searchText = rewrittenQuery && rewrittenQuery !== question ? `${rewrittenQuery}\n${question}` : question;
+  const limit = options.limit ?? 4;
   const hits = search(index, searchText, {
     history: options.history,
-    limit: options.limit ?? 4,
-  });
+    limit: options.articlesOnly ? limit * 2 : limit,
+  })
+    .filter((h) => !options.articlesOnly || !h.article.id.startsWith('note:'))
+    .slice(0, limit);
 
   // Only what plausibly relates
   const relevant = hits.filter((h) => h.score >= 1);
-  if (relevant.length === 0) return { text: '', used: [], belowThreshold: true, rewrittenQuery, queryEmbedding };
+  if (relevant.length === 0) return nothing();
+
+  const verdict = assess(hits, searchText);
+  const confidence: RetrievalConfidence =
+    verdict.confidence === 'high' ? 'high' : verdict.confidence === 'medium' ? 'medium' : 'low';
 
   const budgets = [MODEL_CONTEXT_TOP_CHARS, ...Array(relevant.length).fill(MODEL_CONTEXT_OTHER_CHARS)];
 
   const used: ModelContext['used'] = [];
+  const sources: CitableArticle[] = [];
   const blocks = relevant.map((h, i) => {
     const a = h.article;
     const isNote = a.id.startsWith('note:');
     used.push({ id: a.id, title: a.title, source: isNote ? 'note' : 'article' });
 
-    const articleUrl =
-      !isNote && options.helpCenterUrl
-        ? `${options.helpCenterUrl.replace(/\/$/, '')}/${a.slug || a.id}`
-        : null;
+    const url = isNote ? null : articleUrl(options.helpCenterUrl, a);
+    sources.push({ id: a.id, title: a.title, slug: a.slug ?? null, url });
 
     const body =
       a.content.length <= budgets[i]
@@ -468,14 +559,22 @@ export async function buildModelContext(
       `Article: ${a.title}`,
       `Section: ${a.sectionName || 'General'}`,
     ];
-    if (articleUrl) {
-      lines.push(`Article URL: ${articleUrl}`);
+    if (url) {
+      lines.push(`Article URL: ${url}`);
     }
     lines.push('', a.summary ? `${a.summary}\n\n${body}` : body);
     return lines.join('\n');
   });
 
-  return { text: blocks.join('\n\n---\n\n'), used, belowThreshold: false, rewrittenQuery, queryEmbedding };
+  return {
+    text: blocks.join('\n\n---\n\n'),
+    used,
+    belowThreshold: false,
+    rewrittenQuery,
+    queryEmbedding,
+    confidence,
+    sources,
+  };
 }
 
 

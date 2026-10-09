@@ -2,13 +2,29 @@ import { serviceClient } from '@/lib/supabase/service';
 import {
   answerFromHelpCenter,
   buildModelContext,
+  helpCenterTopics,
   recordUnanswered,
-  wantsHuman,
+  type CitableArticle,
+  type RetrievalConfidence,
 } from './help-answer';
 import { chat, isConfigured, ProviderError, type ProviderConfig } from './provider';
+import {
+  accountSpecificReply,
+  buildHandoverSummary,
+  classifyVisitorIntent,
+  cleanVisitorDisplayName,
+  complaintApology,
+  localized,
+  outOfScopeReply,
+  replyLanguageOf,
+  smallTalkReply,
+  wantsHumanReply,
+  type IntentClassificationResult,
+  type ReplyLanguage,
+  type VisitorIntent,
+} from './intent';
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://vfjsaynnubxywdbevxtx.supabase.co';
-const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZmanNheW5udWJ4eXdkYmV2eHR4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgyNTA5MDEsImV4cCI6MjEwMzgyNjkwMX0.YyBCXMqwrOk5BRhQafYLFw8tiM5PC8lc8Yocodw9wf0';
+export { cleanVisitorDisplayName };
 
 function getSupabase() {
   return serviceClient();
@@ -57,135 +73,240 @@ function parseJsonBlock<T>(text: string | null, opener: '[' | '{'): T | null {
   }
 }
 
-import { detectLanguage, translateToEnglish } from './translator';
-
-/**
- * The English wording of a question, for the search step only.
- * One short call with thinking switched off — well under a second.
- */
-async function translateForSearch(
-  providerConfig: ProviderConfig | null | undefined,
-  text: string
-): Promise<string> {
-  if (!isConfigured(providerConfig)) return text;
-  try {
-    const res = await chat(providerConfig!, {
-      system:
-        'Translate the customer message into plain English for knowledge base search. ' +
-        'Preserve key keywords, product names, numbers, and technical terms. ' +
-        'Output only the direct English translation without any extra notes.',
-      messages: [{ role: 'user', content: text }],
-      maxTokens: 120,
-      temperature: 0,
-      reasoning: 'fast',
-      timeoutMs: 4000,
-    });
-    const english = res.text?.trim();
-    return english ? `${english}\n${text}` : text;
-  } catch {
-    return text;
-  }
-}
-
-import {
-  classifyVisitorIntent,
-  generateIntentDirectResponse,
-  getExpectedReplyTimeNotice,
-  cleanVisitorDisplayName,
-  type VisitorIntent,
-} from './intent';
-
-export { cleanVisitorDisplayName };
-
 export interface HelpDeskResponseResult {
   replyText: string;
   shouldHandover: boolean;
   handoverReason?: string;
   canAnswerFromDocs: boolean;
   intent?: VisitorIntent;
+  /** Whether rules or the model chose the intent. */
+  intentSource?: IntentClassificationResult['source'];
+  /** Internal note for agents when handing over: the handover summary. */
   internalNote?: string | null;
   disableAi?: boolean;
   priority?: 'normal' | 'high' | 'urgent';
+  /** The article a help-centre answer is based on. */
+  citation?: CitableArticle | null;
+  /** Retrieval confidence, for help-centre questions only. */
+  retrievalConfidence?: RetrievalConfidence;
 }
 
+/* ── Help-centre answers ──────────────────────────────────────────────── */
 
 /**
- * Sanitizes and cleans the AI response according to display guidelines:
- * 1. Output plain text or simple markdown only (bold, lists, links). No "###" headings.
- * 2. Keep at most ONE "Read more" link to an article.
- * 3. Never repeat or leave raw [NOT_COVERED] / [HANDOVER] tags in visitor text.
+ * What the bot says when the help centre has nothing that fits. It does not
+ * guess and does not hand over on its own: it offers a person, and a "yes"
+ * comes back as `wants_human` (see HANDOFF_OFFER in intent.ts, which must keep
+ * matching every one of these).
  */
-export function sanitizeComposedAnswer(rawText: string): string {
-  let text = rawText.trim();
+export function lowConfidenceReply(lang: ReplyLanguage): string {
+  return localized(lang, {
+    en: "I couldn't find this in our help center, and I'd rather not guess. Would you like me to connect you with a team member?",
+    roman_ur: 'Mujhe yeh hamare help center mein nahi mila, aur main andaza nahi lagana chahta. Kya main aapko team member se connect kar doon?',
+    ur: 'مجھے یہ ہمارے ہیلپ سینٹر میں نہیں ملا، اور میں اندازہ نہیں لگانا چاہتا۔ کیا میں آپ کو ہماری سپورٹ ٹیم کے ممبر سے منسلک کر دوں؟',
+    hi: 'मुझे यह हमारे सहायता केंद्र में नहीं मिला, और मैं अनुमान नहीं लगाना चाहता। क्या मैं आपको हमारी सहायता टीम के किसी सदस्य से जोड़ दूँ?',
+    ar: 'لم أجد هذا في مركز المساعدة، ولا أريد التخمين. هل تريد أن أصلك بأحد أعضاء فريق الدعم؟',
+    es: 'No encontré esto en nuestro centro de ayuda y prefiero no adivinar. ¿Quieres que te comunique con un miembro de nuestro equipo?',
+    fr: "Je n'ai pas trouvé cela dans notre centre d'aide et je préfère ne pas deviner. Voulez-vous que je vous mette en contact avec un membre de notre équipe ?",
+  });
+}
 
-  // Strip prompt tags or markers
-  text = text
-    .replace(/\[(?:NOT_COVERED|HANDOVER):\s*[^\]]*\]/gi, '')
-    .replace(/\[NOT_COVERED\]/gi, '')
-    .replace(/\[HANDOVER\]/gi, '')
+/** "Source: [Title](url)" in the visitor's language; bold title without a URL. */
+export function formatCitation(source: { title: string; url: string | null }, lang: ReplyLanguage): string {
+  const label = localized(lang, { en: 'Source', ur: 'ماخذ', hi: 'स्रोत', ar: 'المصدر', es: 'Fuente' });
+  const title = source.title.replace(/[[\]]/g, '');
+  return source.url ? `${label}: [${title}](${source.url})` : `${label}: **${title}**`;
+}
+
+/**
+ * Tidies a model's answer for the chat bubble. Links are removed because the
+ * citation is added by code from the article that was actually retrieved; a
+ * URL the model wrote may be one it invented.
+ */
+export function cleanModelAnswer(rawText: string): string {
+  return rawText
+    .replace(/\[(?:SOURCE|NOT_COVERED|HANDOVER)[^\]]*\]/gi, '')
+    .replace(/^#{1,6}\s+(.+)$/gm, '**$1**')
+    .replace(/\[([^\]]+)\]\((?:https?:\/\/|mailto:)[^\s)]+\)/g, (_m, anchor: string) =>
+      /read\s+(?:more|full)|mazeed|مزید|اقرأ|leer|lire|source|article/i.test(anchor) ? '' : anchor
+    )
+    .replace(/(?:^|\s)https?:\/\/\S+/g, '')
+    .replace(/[ \t]+$/gm, '')
+    .replace(/\n{3,}/g, '\n\n')
     .trim();
+}
 
-  // Convert markdown headings (# Title, ## Title, ### Title) to **Title**
-  text = text.replace(/^#{1,6}\s+(.+)$/gm, '**$1**');
+const SOURCE_TAG = /\[SOURCE:\s*(\d+)\s*\]/i;
+const NOT_COVERED_TAG = /\[(?:NOT_COVERED|HANDOVER)\b/i;
 
-  // Ensure at most ONE "Read more" or article link in the entire reply
-  let linkCount = 0;
-  text = text.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, (fullMatch, anchorText) => {
-    linkCount++;
-    if (linkCount === 1) {
-      return fullMatch;
-    }
-    // For subsequent links, if it is a "read more" style link, strip it completely; otherwise keep anchor text
-    if (/read\s+more|read\s+full|mazeed|مزید|اقرأ|leer/i.test(anchorText)) {
-      return '';
-    }
-    return anchorText;
+function answeringInstructions(brand: string): string {
+  return [
+    `You answer customer questions for ${brand} using ONLY the numbered help-center articles below.`,
+    '',
+    'Rules:',
+    '1. Use only facts stated in the articles. Never add outside knowledge or assumptions.',
+    '2. If the articles do not answer the question, reply with exactly [NOT_COVERED] and nothing else.',
+    '3. Answer every part of the question the articles cover, in under 120 words.',
+    "4. Reply in the language and script of the customer's latest message. If it mixes English and Roman Urdu, reply in Roman Urdu.",
+    '5. Do not write links or URLs. The article link is added for you.',
+    '6. End your reply with [SOURCE: n], where n is the number of the article you relied on most.',
+    '7. Plain text or simple markdown only (bold, bullet lists). No headings.',
+  ].join('\n');
+}
+
+interface HelpCenterInput {
+  workspaceId: string;
+  conversationId: string;
+  incomingMessage: string;
+  intent: IntentClassificationResult;
+  lang: ReplyLanguage;
+  brand: string;
+  providerConfig?: ProviderConfig | null;
+  systemPrompt?: string | null;
+  history?: string[];
+  conversationMessages: { role: 'user' | 'assistant'; content: string }[];
+  helpCenterUrl?: string | null;
+}
+
+/**
+ * Answers a help-centre question from this workspace's published articles,
+ * with a citation, or says it cannot and offers a person. The decision to
+ * answer is made on retrieval confidence before any model is asked; a model
+ * that then finds the articles do not cover the question, or names no source,
+ * is treated the same as low confidence.
+ */
+async function answerHelpCenterQuestion(input: HelpCenterInput): Promise<HelpDeskResponseResult> {
+  const { workspaceId, conversationId, incomingMessage, intent, lang, brand, providerConfig } = input;
+  const apology = intent.isComplaint ? `${complaintApology(lang)} ` : '';
+
+  const context = await buildModelContext(workspaceId, incomingMessage, {
+    history: input.history,
+    turns: input.conversationMessages.slice(-6),
+    limit: 6,
+    providerConfig,
+    helpCenterUrl: input.helpCenterUrl,
+    articlesOnly: true,
   });
 
-  // Clean up excessive blank lines and trailing spaces
-  text = text.replace(/\n{3,}/g, '\n\n').trim();
+  const notAnswered = async (why: string, record = true): Promise<HelpDeskResponseResult> => {
+    if (record) {
+      await recordUnanswered(workspaceId, incomingMessage, why, conversationId, context.queryEmbedding);
+    }
+    return {
+      replyText: `${apology}${lowConfidenceReply(lang)}`,
+      shouldHandover: false,
+      canAnswerFromDocs: false,
+      intent: intent.intent,
+      intentSource: intent.source,
+      disableAi: false,
+      citation: null,
+      retrievalConfidence: 'low',
+    };
+  };
 
-  return text;
+  const answered = (text: string, citation: CitableArticle): HelpDeskResponseResult => ({
+    replyText: `${apology}${text}\n\n${formatCitation(citation, lang)}`,
+    shouldHandover: false,
+    canAnswerFromDocs: true,
+    intent: intent.intent,
+    intentSource: intent.source,
+    disableAi: false,
+    citation,
+    retrievalConfidence: context.confidence,
+  });
+
+  if (context.confidence === 'low' || context.sources.length === 0) {
+    return notAnswered('Help center has no article that fits (low retrieval confidence)');
+  }
+
+  if (isConfigured(providerConfig)) {
+    try {
+      const system = [
+        input.systemPrompt?.trim() || '',
+        answeringInstructions(brand),
+        '',
+        '# HELP-CENTER ARTICLES',
+        context.text,
+      ]
+        .filter((part, i) => i > 0 || part)
+        .join('\n');
+
+      const result = await chat(providerConfig!, {
+        system,
+        messages: input.conversationMessages,
+        maxTokens: 900,
+        temperature: 0.1,
+        reasoning: 'fast',
+      });
+      const raw = (result.text || '').trim();
+
+      if (raw) {
+        if (NOT_COVERED_TAG.test(raw)) {
+          return notAnswered('Articles retrieved, but they do not answer the question');
+        }
+        const n = Number(raw.match(SOURCE_TAG)?.[1]);
+        const cited =
+          Number.isInteger(n) && n >= 1 && n <= context.sources.length
+            ? context.sources[n - 1]
+            : context.confidence === 'high'
+            ? context.sources[0]
+            : null;
+        const text = cleanModelAnswer(raw);
+        if (!cited || !text) {
+          // An answer that cannot say where it came from is a guess.
+          return notAnswered('Model answer named no source');
+        }
+        return answered(text, cited);
+      }
+    } catch (err) {
+      const e = err as ProviderError;
+      console.warn(`[ai] ${e?.provider || 'provider'} call failed: ${e?.message}. Answering from the articles directly.`);
+    }
+  }
+
+  // No model, or it failed: quote the article itself, and only when sure.
+  const answer = await answerFromHelpCenter({
+    workspaceId,
+    conversationId,
+    message: context.rewrittenQuery || incomingMessage,
+    history: input.history,
+    helpCenterUrl: input.helpCenterUrl,
+    chunks: context.chunks,
+    belowThreshold: context.belowThreshold,
+    queryEmbedding: context.queryEmbedding,
+    intent: intent.intent,
+    providerConfig,
+    articlesOnly: true,
+  });
+
+  if (answer.text && answer.article && answer.source !== 'note') {
+    return answered(answer.text.trim(), {
+      id: answer.article.id,
+      title: answer.article.title,
+      slug: answer.article.slug ?? null,
+      url: answer.article.url ?? null,
+    });
+  }
+  // answerFromHelpCenter has already recorded the gap.
+  return notAnswered(answer.reason, false);
 }
 
-/**
- * Provides a warm, 1-sentence "not sure" response in the visitor's exact language and script,
- * asking a clarifying question or offering human assistance.
- */
-export function getFallbackNotSureReply(
-  langCode: string,
-  incomingMessage: string,
-  cleanName?: string | null
-): string {
-  const isRomanUrdu =
-    (langCode === 'ur' && !/[\u0600-\u06FF]/.test(incomingMessage)) ||
-    /\b(aap|kya|hai|hain|mein|kaise|shukriya|batao|karein|kar sakta|bataen|chahiye|kitna|hoga)\b/i.test(
-      incomingMessage
-    );
-
-  if (isRomanUrdu) {
-    return `Maazrat${cleanName ? ` ${cleanName}` : ''}, filhal mere paas is bare mein mukammal maloomat nahi hain. Kya main aapko support team ke member se connect kar doon?`;
-  }
-  if (langCode === 'hi') {
-    return `क्षमा करें${cleanName ? ` ${cleanName}` : ''}, इस समय हमारे सहायता केंद्र में इस बारे में पूरी जानकारी उपलब्ध नहीं है। क्या आप चाहते हैं कि मैं आपको हमारी सहायता टीम के किसी सदस्य से जोड़ दूँ?`;
-  }
-  if (langCode === 'ur') {
-    return `معذرت${cleanName ? ` ${cleanName}` : ''}، فی الحال میرے پاس اس بارے میں مکمل معلومات نہیں ہیں۔ کیا میں آپ کو ہماری سپورٹ ٹیم کے ممبر سے منسلک کر دوں؟`;
-  }
-  if (langCode === 'ar') {
-    return `عذراً${cleanName ? ` ${cleanName}` : ''}، لا تتوفر لديّ هذه المعلومة حالياً في مركز المساعدة. هل ترغب في أن أصلك بأحد أعضاء فريق الدعم للمتابعة؟`;
-  }
-  if (langCode === 'es') {
-    return `Disculpa${cleanName ? ` ${cleanName}` : ''}, no tengo esa información en nuestra guía de ayuda en este momento. ¿Te gustaría que te comunique con nuestro equipo de soporte?`;
-  }
-  if (langCode === 'fr') {
-    return `Désolé${cleanName ? ` ${cleanName}` : ''}, je n'ai pas cette information dans notre centre d'aide pour le moment. Souhaitez-vous que je vous mette en contact avec un conseiller ?`;
-  }
-  return `I don't have the exact details on that in our help guide right now. Would you like me to connect you with a team member who can help?`;
-}
+/* ── Pipeline ─────────────────────────────────────────────────────────── */
 
 /**
- * 1. AI Auto-First-Response with RAG over Help Desk sections & articles, with intelligent Human Handover
+ * The bot's reply to one visitor message:
+ *
+ *   1. classify intent (rules, then the workspace's model when rules are unsure)
+ *   2. route:
+ *      small_talk           short reply in the visitor's language
+ *      help_center_question cited answer from published articles, or an offer
+ *                           of a person when retrieval confidence is low
+ *      account_specific     hand over with a summary; ask for missing order /
+ *                           account number and email
+ *      out_of_scope         say what the bot covers; hand over with a summary
+ *      wants_human          hand over with a summary
+ *
+ * The caller (the auto-respond route) stores the reply and runs the handover.
  */
 export async function generateHelpDeskResponseWithHandover({
   workspaceId,
@@ -214,235 +335,77 @@ export async function generateHelpDeskResponseWithHandover({
   hasHumanReplied?: boolean;
 }): Promise<HelpDeskResponseResult> {
   const brand = workspaceName?.trim() || 'our team';
-  const detected = detectLanguage(incomingMessage);
-  const langCode = detected.code;
-  const cleanName = cleanVisitorDisplayName(visitorName);
-  const isRomanUrdu =
-    detected.name === 'Urdu (Roman)' ||
-    (langCode === 'ur' && !/[\u0600-\u06FF]/.test(incomingMessage)) ||
-    /\b(aap|kya|hai|hain|mein|kaise|shukriya|batao|karein|kar sakta|bataen|chahiye|kitna|hoga)\b/i.test(
-      incomingMessage
-    );
+  const lang = replyLanguageOf(incomingMessage);
+  const name = cleanVisitorDisplayName(visitorName);
 
-  // 1. Prepare conversation turns: Support up to 15 recent messages (including agent replies & internal notes)
   const priorTurns = (turns && turns.length
     ? turns
     : (history || []).slice(0, 14).reverse().map((h) => ({ role: 'user' as const, content: h }))
   ).slice(-14);
+  const conversationMessages = [...priorTurns, { role: 'user' as const, content: incomingMessage }].slice(-15);
 
-  const conversationMessages = [
-    ...priorTurns,
-    { role: 'user' as const, content: incomingMessage },
-  ].slice(-15);
-
-  // 2. Intent step before retrieval: Classify message into one of 7 intents
-  const intentResult = await classifyVisitorIntent({
+  const intent = await classifyVisitorIntent({
     message: incomingMessage,
     recentMessages: conversationMessages,
     providerConfig,
     workspaceName: brand,
+    topics: isConfigured(providerConfig) ? await helpCenterTopics(workspaceId) : [],
   });
 
-  const direct = generateIntentDirectResponse({
-    intentResult,
-    incomingMessage,
-    visitorName,
-    workspaceName: brand,
-  });
-
-  if (direct) {
-    // If a human has already replied, do not trigger handover lines or repeats
-    if (hasHumanReplied && direct.shouldHandover) {
-      // Proceed to docs retrieval instead of repeating a handover line
-    } else {
-      return {
-        replyText: direct.replyText,
-        shouldHandover: direct.shouldHandover,
-        handoverReason: direct.handoverReason,
-        canAnswerFromDocs: false,
-        intent: intentResult.intent,
-        internalNote: direct.createInternalNote,
-        disableAi: direct.shouldHandover, // only disable AI if explicit human or account issue
-        priority: direct.setPriorityHigh ? 'high' : 'normal',
-      };
-    }
-  }
-
-  // 3. For intent 'question' (or general question complaints), proceed to semantic retrieval
-  const replyTimeNotice = getExpectedReplyTimeNotice(langCode, isRomanUrdu);
-  const complaintApology =
-    intentResult.intent === 'complaint'
-      ? (isRomanUrdu
-          ? 'Hamein is pareshani par nihayat afsos hai.'
-          : langCode === 'ur'
-          ? 'ہمیں اس پریشانی پر دلی افسوس ہے۔'
-          : langCode === 'ar'
-          ? 'نعتذر بشدة عن أي إزعاج.'
-          : 'I am truly sorry for the frustration this has caused you.')
-      : '';
-
-  // For query rewriting: up to last 6 messages
-  const rewriteTurns = conversationMessages.slice(-6);
-
-  const context = await buildModelContext(workspaceId, incomingMessage, {
-    history,
-    turns: rewriteTurns,
-    limit: 6,
-    providerConfig,
-    helpCenterUrl,
-  });
-
-  const effectiveSearchQuery = context.rewrittenQuery || incomingMessage;
-
-  // 2. Ask whichever provider this workspace configured
-  if (isConfigured(providerConfig)) {
-    try {
-      const defaultComposingInstructions = [
-        `You are a knowledgeable and helpful customer support specialist for ${brand}.`,
-        'Your job is to compose a concise, accurate support answer based strictly on the provided knowledge base chunks.',
-        '',
-        '# MANDATORY INSTRUCTIONS:',
-        '1. ANSWER ONLY FROM CHUNKS: Answer strictly and exclusively from the provided knowledge base chunks. Do not extrapolate, assume, or use outside knowledge. If the chunks do not contain the answer, follow instruction 3.',
-        '2. ANSWER EVERY PART: If the visitor asks a multi-part question, answer every single part thoroughly and directly using the information in the chunks.',
-        '3. UNCOVERED QUESTIONS: If the provided chunks do not contain the answer (or do not cover part of the question), state clearly in exactly ONE sentence that you do not have that information, and ask one clarifying question or offer to connect them with a human team member. Never recommend or send an unrelated article. Append [NOT_COVERED] at the end.',
-        '4. STRICT WORD LIMIT: Keep your entire reply strictly under 120 words.',
-        '5. PER-MESSAGE LANGUAGE DYNAMICS (STRICT): You MUST reply in the EXACT language and script of the visitor\'s LATEST message (the final incoming message). If the visitor writes in English, reply in English. If in Hindi, reply in Hindi. If in Urdu (Arabic script or Roman Urdu), reply in Urdu in that exact script. If the visitor switched language from an earlier message in the conversation, you MUST immediately switch your language to match their newest message. NEVER stay in the language of older messages.',
-        '6. VISITOR DISPLAY NAME: Never use the visitor\'s display name inside your sentence or greeting if it resembles a greeting word (e.g. "Hi", "Hello", "Hey", "Guest", etc.).',
-        '7. LINKS: Add at most ONE "Read more" link to the single most relevant article URL provided in the chunks, formatted as [Read more](url) (or translated, e.g. [Mazeed parhein](url)). Never include more than one link, and never invent a URL.',
-        '8. FORMATTING: Output plain text or simple markdown only (bold, bullet lists, links). NEVER use markdown headings (no "#", "##", or "###"). Use **bold** text for titles or emphasis.',
-      ].join('\n');
-
-      const systemPromptParts: string[] = [];
-      if (systemPrompt && systemPrompt.trim()) {
-        systemPromptParts.push(systemPrompt.trim(), '');
-      }
-      systemPromptParts.push(defaultComposingInstructions, '');
-      if (cleanName) {
-        systemPromptParts.push(`Visitor Name: ${cleanName}`, '');
-      }
-      systemPromptParts.push(
-        '# KNOWLEDGE BASE CHUNKS:',
-        context.text && !context.belowThreshold
-          ? context.text
-          : 'No relevant documentation available for this question.'
-      );
-
-      const system = systemPromptParts.join('\n');
-
-      const result = await chat(providerConfig!, {
-        system,
-        messages: conversationMessages,
-        maxTokens: 1200,
-        temperature: 0.1,
-        reasoning: 'fast',
-      });
-
-      let rawText = (result.text || '').trim();
-      if (rawText) {
-        const gap =
-          rawText.match(/\[(?:NOT_COVERED|HANDOVER):\s*([^\]]*)\]/i) ||
-          rawText.includes('[NOT_COVERED]');
-        const text = sanitizeComposedAnswer(rawText);
-
-        if (gap || context.belowThreshold) {
-          if (intentResult.intent === 'question') {
-            await recordUnanswered(
-              workspaceId,
-              incomingMessage,
-              `Model could not answer or below threshold: ${gap ? 'not covered' : 'below threshold'}`,
-              conversationId,
-              context.queryEmbedding
-            );
-          }
-          const baseReply = text || getFallbackNotSureReply(langCode, incomingMessage, cleanName);
-          // With a human already on the thread there is nobody new to hand
-          // over to, and no reply-time promise to make.
-          const notice = hasHumanReplied ? '' : replyTimeNotice;
-          const fullReply = (complaintApology
-            ? `${complaintApology} ${baseReply} ${notice}`
-            : `${baseReply} ${notice}`
-          ).trim();
-
-          return {
-            replyText: fullReply,
-            shouldHandover: !hasHumanReplied,
-            handoverReason: hasHumanReplied ? undefined : 'Inquiry not covered in knowledge base.',
-            canAnswerFromDocs: false,
-            intent: intentResult.intent,
-            disableAi: false, // Handover Rule 1: A failed answer must NOT turn the bot off!
-            priority: 'normal',
-          };
-        }
-
-        const fullReply = complaintApology ? `${complaintApology} ${text}` : text;
-        return {
-          replyText: fullReply,
-          shouldHandover: false,
-          canAnswerFromDocs: true,
-          intent: intentResult.intent,
-          disableAi: false,
-        };
-      }
-    } catch (err) {
-      const e = err as ProviderError;
-      console.warn(
-        `[ai] ${e?.provider || 'provider'} call failed: ${e?.message}. Falling back to help-centre retrieval.`
-      );
-    }
-  }
-
-  // 3. Fallback: Answer from workspace knowledge base directly (No API key or provider call failed)
-  const answer = await answerFromHelpCenter({
-    workspaceId,
-    conversationId,
-    message: effectiveSearchQuery,
-    history,
-    visitorName: cleanName,
-    helpCenterUrl,
-    chunks: context.chunks,
-    belowThreshold: context.belowThreshold,
-    queryEmbedding: context.queryEmbedding,
-    intent: intentResult.intent,
-    providerConfig,
-  });
-
-  if (answer.text) {
-    const text = sanitizeComposedAnswer(answer.text);
-    const fullReply = complaintApology ? `${complaintApology} ${text}` : text;
-    return {
-      replyText: fullReply,
-      shouldHandover: false,
-      canAnswerFromDocs: true,
-      intent: intentResult.intent,
-      disableAi: false,
-    };
-  }
-
-  // Warm, human fallback when documentation has no answer ("not sure" reply)
-  if (intentResult.intent === 'question') {
-    await recordUnanswered(
-      workspaceId,
-      incomingMessage,
-      'Question not found in documentation fallback',
-      conversationId,
-      context.queryEmbedding
-    );
-  }
-
-  const baseReply = getFallbackNotSureReply(langCode, incomingMessage, cleanName);
-  const fullReply = complaintApology
-    ? `${complaintApology} ${baseReply} ${hasHumanReplied ? '' : replyTimeNotice}`
-    : `${baseReply} ${hasHumanReplied ? '' : replyTimeNotice}`;
-
-  return {
-    replyText: fullReply.trim(),
-    shouldHandover: !hasHumanReplied,
-    handoverReason: hasHumanReplied ? undefined : 'Question not found in documentation.',
+  const handover = (
+    replyText: string,
+    opts: { disableAi: boolean; priority: 'normal' | 'high' }
+  ): HelpDeskResponseResult => ({
+    replyText,
+    shouldHandover: true,
+    handoverReason: intent.reason,
     canAnswerFromDocs: false,
-    intent: intentResult.intent,
-    disableAi: false, // Handover Rule 1: A failed answer must NOT turn the bot off!
-    priority: 'normal',
-  };
+    intent: intent.intent,
+    intentSource: intent.source,
+    internalNote: buildHandoverSummary({ intent, message: incomingMessage, recentMessages: conversationMessages, lang }),
+    disableAi: opts.disableAi,
+    priority: opts.priority,
+  });
+
+  switch (intent.intent) {
+    case 'small_talk':
+      return {
+        replyText: smallTalkReply(intent.smallTalkKind ?? 'greeting', lang, brand, name),
+        shouldHandover: false,
+        canAnswerFromDocs: false,
+        intent: intent.intent,
+        intentSource: intent.source,
+        disableAi: false,
+      };
+
+    case 'wants_human':
+      // The bot steps aside until the conversation is resolved.
+      return handover(wantsHumanReply(lang, hasHumanReplied), { disableAi: true, priority: 'high' });
+
+    case 'account_specific':
+      // Only someone with access to their records can help.
+      return handover(accountSpecificReply(lang, intent), { disableAi: true, priority: 'high' });
+
+    case 'out_of_scope':
+      // The bot stays on: the visitor's next message may well be in scope.
+      return handover(outOfScopeReply(lang, brand), { disableAi: false, priority: 'normal' });
+
+    case 'help_center_question':
+    default:
+      return answerHelpCenterQuestion({
+        workspaceId,
+        conversationId,
+        incomingMessage,
+        intent,
+        lang,
+        brand,
+        providerConfig,
+        systemPrompt,
+        history,
+        conversationMessages,
+        helpCenterUrl,
+      });
+  }
 }
 
 /**
