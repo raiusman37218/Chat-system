@@ -498,6 +498,9 @@ export interface Workspace {
   } | null;
   merged_into_workspace_id?: string | null;
   auto_close_days?: number | null;
+  /** IANA zone and language code; see 20261013090000_settings_hub.sql. */
+  timezone?: string | null;
+  language?: string | null;
   created_at: string;
 }
 

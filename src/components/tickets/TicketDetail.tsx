@@ -47,6 +47,8 @@ import type { TicketGroup, TicketPriority, TicketStatus, TicketType } from '@/ty
 import { ChannelIcon, StatusBadge, fullTime, inputClass, timeAgo } from './TicketBits';
 import { roleCan, type Role } from '@/lib/team/permissions';
 import { CollisionBanner, usePresence } from './Presence';
+import { applyMacroAction } from '@/app/actions/automation';
+import { useMacroSlash } from './MacroMenu';
 import { ChannelBanner, DeliveryStatus, StoryContextCard, TemplateComposer, channelNotice, useServiceWindow } from './ChannelBits';
 
 interface Props {
@@ -282,6 +284,7 @@ export function TicketDetail({ workspaceId, ticketId, agents, groups, me, onBack
               <Composer
                 key={ticket.id}
                 workspaceId={workspaceId}
+                ticketId={ticket.id}
                 status={ticket.status}
                 channel={ticket.channel}
                 channelState={detail.channelState}
@@ -291,6 +294,10 @@ export function TicketDetail({ workspaceId, ticketId, agents, groups, me, onBack
                 onSendTemplate={async (template) => {
                   const result = await sendTicketTemplateAction(workspaceId, ticketId, template);
                   setNotice(channelNotice(result.channel, detail.channelState?.label || 'the channel'));
+                  load();
+                  onChanged();
+                }}
+                onMacroApplied={() => {
                   load();
                   onChanged();
                 }}
@@ -436,6 +443,7 @@ function Thread({
 
 function Composer({
   workspaceId,
+  ticketId,
   status,
   channel,
   channelState,
@@ -444,8 +452,12 @@ function Composer({
   onActivity,
   onSend,
   onSendTemplate,
+  onMacroApplied,
 }: {
   workspaceId: string;
+  ticketId: string;
+  /** Called after a macro's field changes were applied, so the screen refreshes. */
+  onMacroApplied: () => void;
   status: TicketStatus;
   channel: Detail['ticket']['channel'];
   /** Set for tickets from WhatsApp (and later other channels): window and connection state. */
@@ -463,6 +475,8 @@ function Composer({
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const win = useServiceWindow(channelState);
+  // "/" in a public reply lists macros. Notes and light agents do not use them.
+  const macro = useMacroSlash({ workspaceId, ticketId, body, setBody, enabled: canReply && !internal, canChangeFields: canEditStatus });
   // Outside the window only templates may go out; notes are always fine.
   const templateOnly = Boolean(channelState && !internal && win && !win.open && channelState.templates);
   const channelDown = Boolean(channelState && !internal && channelState.connectionStatus === 'disconnected');
@@ -474,8 +488,16 @@ function Composer({
     setSending(true);
     setError(null);
     try {
-      await onSend(body, internal, internal || !canEditStatus ? undefined : submitAs);
+      // A macro that sets the status decides it; otherwise "Submit as" does.
+      const macroSetsStatus = macro.pending?.actions.some((a) => a.type === 'set_status');
+      await onSend(body, internal, internal || !canEditStatus || macroSetsStatus ? undefined : submitAs);
       setBody('');
+      if (macro.pending && !internal) {
+        const applied = await applyMacroAction(workspaceId, ticketId, macro.pending.id);
+        macro.clearPending();
+        if (applied.success) onMacroApplied();
+        else setError(`Reply sent, but the macro's changes were not applied: ${applied.error}`);
+      }
       onActivity('viewing');
     } catch (err) {
       setError((err as Error).message);
@@ -524,13 +546,18 @@ function Composer({
         <TemplateComposer workspaceId={workspaceId} channel={channelState!.channel} onSend={onSendTemplate} />
       ) : (
         <>
+          {macro.chip}
+          <div className="relative">
+          {macro.menu}
           <textarea
+            {...macro.comboProps}
             value={body}
             onChange={(e) => {
               setBody(e.target.value);
               onActivity(e.target.value.trim() ? (internal ? 'noting' : 'replying') : 'viewing');
             }}
             onKeyDown={(e) => {
+              if (macro.onKeyDown(e)) return;
               if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) send();
             }}
             rows={3}
@@ -545,6 +572,8 @@ function Composer({
             }
             className={cn(inputClass, 'h-auto py-2 resize-y min-h-[76px]', internal && 'bg-surface border-warn-line')}
           />
+          </div>
+          {!internal && canReply && !body && <p className="text-2xs text-ink-3 mt-1">Type / to insert a macro.</p>}
           {error && <p className="text-xs text-danger mt-1.5">{error}</p>}
           <div className="flex items-center justify-end gap-2 mt-2">
             {!canReply && <span className="mr-auto text-xs text-ink-3">Light agents can add internal notes only.</span>}

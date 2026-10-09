@@ -1854,6 +1854,7 @@ export default function DashboardPage() {
             initialSection={settingsInitialSection}
             sectionNonce={settingsNonce}
             onWorkspaceUpdated={(ws) => setCurrentWorkspace(ws)}
+            onNavigate={(view) => setActiveView(view as typeof activeView)}
           />
         </div>
       )}

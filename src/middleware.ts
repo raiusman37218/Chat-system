@@ -214,6 +214,17 @@ export async function middleware(request: NextRequest) {
       loginUrl.searchParams.set('redirect', pathname + request.nextUrl.search);
       return NextResponse.redirect(loginUrl);
     }
+
+    // An account with an authenticator app must finish the code step before
+    // it sees the inbox. getAuthenticatorAssuranceLevel reads the session's
+    // own token, so this costs no extra request.
+    const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+    if (aal && aal.nextLevel === 'aal2' && aal.currentLevel !== 'aal2') {
+      const loginUrl = new URL('/login', request.url);
+      loginUrl.searchParams.set('mfa', '1');
+      loginUrl.searchParams.set('redirect', pathname + request.nextUrl.search);
+      return NextResponse.redirect(loginUrl);
+    }
   }
 
   // Platform super admin protection for /admin routes

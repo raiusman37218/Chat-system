@@ -10,7 +10,9 @@
  * actions only ask for changes and report the database's answer.
  */
 
+import { after } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { processAutomationOutbox } from '@/lib/automation/outbox';
 import { getWorkspaceAccess } from '@/lib/team/access';
 import { roleCan, type Capability, type Role } from '@/lib/team/permissions';
 import { isValidEmail, sendSmtpEmail } from '@/lib/email/smtp';
@@ -425,7 +427,16 @@ export async function updateTicketAction(workspaceId: string, ticketId: string, 
     .select('*')
     .maybeSingle();
   if (error || !data) throw dbError(error, 'Ticket not found.');
+  sendQueuedAutomationMail(workspaceId);
   return data as Ticket;
+}
+
+/**
+ * Rules queue emails and webhooks in the database; send them now instead of
+ * at the next hourly run. After the response, so the agent is not kept waiting.
+ */
+function sendQueuedAutomationMail(workspaceId: string) {
+  after(() => processAutomationOutbox({ workspaceId, limit: 10 }).catch((e) => console.error('[Automation Outbox Error]:', e)));
 }
 
 /* ── Replies and notes ────────────────────────────────────────────────── */
@@ -492,6 +503,7 @@ export async function replyToTicketAction(
       .eq('id', ticketId);
     if (statusError) throw dbError(statusError, 'Reply sent, but the status could not be changed.');
   }
+  sendQueuedAutomationMail(workspaceId);
 
   // WhatsApp and other channels: the database queued the reply; send it now
   // so the agent sees at once whether it went out.

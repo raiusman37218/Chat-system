@@ -1,6 +1,16 @@
 {
   "crons": [
-    { "path": "/api/cron/close-solved-tickets", "schedule": "17 3 * * *" },
-    { "path": "/api/cron/channel-outbound", "schedule": "23 4 * * *" }
+    {
+      "path": "/api/cron/close-solved-tickets",
+      "schedule": "17 3 * * *"
+    },
+    {
+      "path": "/api/cron/channel-outbound",
+      "schedule": "23 4 * * *"
+    },
+    {
+      "path": "/api/cron/run-automations",
+      "schedule": "7 * * * *"
+    }
   ]
 }
