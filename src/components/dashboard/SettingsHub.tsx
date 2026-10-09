@@ -35,6 +35,7 @@ import {
   IntegrationsSettings,
   type IntegrationTab,
 } from '@/components/dashboard/IntegrationsSettings';
+import { ChannelsSettings } from '@/components/channels/ChannelsSettings';
 import {
   AdminSettingsPanel,
   type AdminTab,
@@ -161,7 +162,7 @@ const SETTING_GROUPS: SettingGroup[] = [
       {
         id: 'channels',
         label: 'Omnichannel Chat',
-        description: 'Connect WhatsApp, Facebook Messenger, Instagram & Slack alerts',
+        description: 'Connect WhatsApp through the official Business API, plus Messenger, LinkedIn & Slack alerts',
         Icon: Share2,
         adminOnly: true,
         keywords: [
@@ -542,11 +543,12 @@ export function SettingsHub({
 
   const [active, setActive] = useState<SectionId>(initialSection || 'widget');
   const [searchQuery, setSearchQuery] = useState('');
-  const [channelTab, setChannelTab] = useState<IntegrationTab>('whatsapp');
+  const [channelTab, setChannelTab] = useState<IntegrationTab | 'channels'>('channels');
   const [copiedWsId, setCopiedWsId] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [topDropdownOpen, setTopDropdownOpen] = useState(false);
   const [integrations, setIntegrations] = useState<any>(null);
+  const [liveChannels, setLiveChannels] = useState(0);
   const contentRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -566,17 +568,23 @@ export function SettingsHub({
       .then(({ data }: { data: any }) => {
         if (data) setIntegrations(data);
       });
+    // Channels on the channel framework (WhatsApp today).
+    supabase
+      .from('channel_connections')
+      .select('id', { count: 'exact', head: true })
+      .eq('workspace_id', workspace.id)
+      .neq('status', 'disconnected')
+      .then(({ count }: { count: number | null }) => setLiveChannels(count || 0));
   }, [workspace?.id]);
 
   const connectedChannelsCount = useMemo(() => {
-    if (!integrations) return 0;
-    let count = 0;
-    if (integrations.whatsapp_enabled && integrations.whatsapp_access_token?.trim()) count++;
+    let count = liveChannels;
+    if (!integrations) return count;
     if (integrations.meta_enabled && integrations.meta_page_access_token?.trim()) count++;
     if (integrations.linkedin_enabled && integrations.linkedin_access_token?.trim()) count++;
     if (integrations.slack_enabled && integrations.slack_webhook_url?.trim()) count++;
     return count;
-  }, [integrations]);
+  }, [integrations, liveChannels]);
 
   // Scroll content to top whenever switching tabs
   useEffect(() => {
@@ -1046,11 +1054,11 @@ export function SettingsHub({
                     <div className="flex items-center gap-1.5 p-1 rounded-xl bg-surface-2 border-2 border-line-2 w-fit shrink-0 shadow-2xs">
                       {(
                         [
-                          ['whatsapp', 'WhatsApp'],
-                          ['meta', 'Messenger & Instagram'],
+                          ['channels', 'Channels'],
+                          ['meta', 'Messenger'],
                           ['linkedin', 'LinkedIn'],
                           ['slack', 'Slack'],
-                        ] as [IntegrationTab, string][]
+                        ] as [IntegrationTab | 'channels', string][]
                       ).map(([id, label]) => (
                         <button
                           key={id}
@@ -1094,7 +1102,11 @@ export function SettingsHub({
               {/* Omnichannel Chat Channels */}
               {active === 'channels' && (
                 <div className="space-y-6">
-                  {renderIntegrations(channelTab)}
+                  {channelTab === 'channels' ? (
+                    workspace && <ChannelsSettings workspaceId={workspace.id} />
+                  ) : (
+                    renderIntegrations(channelTab)
+                  )}
                 </div>
               )}
 

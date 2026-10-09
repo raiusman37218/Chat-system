@@ -95,7 +95,9 @@ The dashboard is the central hub for support agents and workspace owners.
   - `POST /api/conversations/merge` (Merge duplicate visitor conversations)
   - `POST /api/conversations/snooze` (Snooze conversation until later)
   - `POST /api/conversations/auto-assign` (Round-robin / workload-based agent auto-assignment)
-  - `POST /api/channels/dispatch` (Outbound multi-channel dispatch to WhatsApp / Meta / LinkedIn)
+  - `POST /api/channels/dispatch` (Outbound dispatch: nudges the channel queue for WhatsApp; legacy direct send for Meta / LinkedIn)
+  - `GET|POST /api/channels/[channel]/webhook` and `/api/channels/[channel]/webhook/[connectionId]` (Signed channel webhooks: WhatsApp Cloud API)
+  - `GET|POST /api/cron/channel-outbound` (Retries queued channel sends; `CRON_SECRET`)
   - `POST /api/upload` (Upload image attachments via Cloudinary)
   - `POST /api/notifications/dispatch` (Browser push / email alerts)
 - **Supabase Tables**:

@@ -62,7 +62,7 @@ export async function GET(req: NextRequest) {
 }
 
 /**
- * POST Handler for Incoming WhatsApp, Facebook Messenger, Instagram, and Threads Messages
+ * POST Handler for Incoming Facebook Messenger, Instagram, and Threads Messages (legacy)
  */
 export async function POST(req: NextRequest) {
   try {
@@ -79,36 +79,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ status: 'no_workspace_configured' }, { status: 200 });
     }
 
-    // 1. Process WhatsApp Business Messages
-    if (body.object === 'whatsapp_business_account' || body.entry?.[0]?.changes?.[0]?.value?.messages) {
-      for (const entry of body.entry || []) {
-        for (const change of entry.changes || []) {
-          const value = change.value;
-          if (value?.messages) {
-            for (const msg of value.messages) {
-              if (msg.type === 'text' && msg.text?.body) {
-                const phone = msg.from;
-                const contactName = value.contacts?.[0]?.profile?.name || `WhatsApp +${phone}`;
-                const textContent = msg.text.body;
-
-                await handleIncomingChannelMessage({
-                  supabase,
-                  workspaceId: defaultWorkspaceId,
-                  channel: 'whatsapp',
-                  senderId: phone,
-                  senderName: contactName,
-                  textContent,
-                  metadata: {
-                    whatsapp_msg_id: msg.id,
-                    phone_number_id: value.metadata?.phone_number_id,
-                  },
-                });
-              }
-            }
-          }
-        }
-      }
-      return NextResponse.json({ status: 'EVENT_RECEIVED' }, { status: 200 });
+    // WhatsApp moved to the channel framework: /api/channels/whatsapp/webhook
+    // verifies Meta's signature and routes each number to its own workspace.
+    // This legacy route did neither, so it no longer accepts WhatsApp events.
+    if (body.object === 'whatsapp_business_account') {
+      return NextResponse.json({ status: 'ignored_use_channels_webhook' }, { status: 200 });
     }
 
     // 2. Process Facebook Messenger, Instagram, or Threads

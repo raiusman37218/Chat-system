@@ -114,6 +114,8 @@ export interface Conversation {
   sentiment?: 'positive' | 'neutral' | 'negative' | null;
   /** Where the conversation's next message goes. */
   current_ticket_id?: string | null;
+  /** When the customer last wrote on an outside channel (WhatsApp's 24-hour window starts here). */
+  channel_last_inbound_at?: string | null;
 }
 
 export type ConversationInsert = Partial<Conversation>;
@@ -144,6 +146,35 @@ export interface Message {
   email_notified_at?: string | null;
   /** The ticket this message belongs to (see supabase/migrations/20261009110000_ticketing.sql). */
   ticket_id?: string | null;
+  /** The provider's id for the message on an outside channel (WhatsApp "wamid"). */
+  channel_message_id?: string | null;
+  /** How far an outbound channel message got (supabase/migrations/20261011090000_channels.sql). */
+  channel_status?: ChannelMessageStatus | null;
+  channel_error?: string | null;
+}
+
+export type ChannelMessageStatus = 'queued' | 'sent' | 'delivered' | 'read' | 'failed';
+export type ChannelConnectionStatus = 'connected' | 'needs_attention' | 'disconnected';
+
+/** One workspace's connection to an outside channel. Credentials live in channel_secrets, server-side only. */
+export interface ChannelConnection {
+  id: string;
+  workspace_id: string;
+  channel: string;
+  status: ChannelConnectionStatus;
+  setup_method: 'embedded_signup' | 'manual' | null;
+  display_name: string | null;
+  external_account_id: string | null;
+  external_business_id: string | null;
+  settings: Record<string, unknown>;
+  last_error: string | null;
+  last_error_at: string | null;
+  last_inbound_at: string | null;
+  last_outbound_at: string | null;
+  connected_at: string | null;
+  connected_by: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export type MessageInsert = Partial<Message>;
@@ -621,7 +652,7 @@ export interface Database {
 export type TicketStatus = 'new' | 'open' | 'pending' | 'on_hold' | 'solved' | 'closed';
 export type TicketPriority = 'low' | 'normal' | 'high' | 'urgent';
 export type TicketType = 'question' | 'incident' | 'problem' | 'task';
-export type TicketChannel = 'chat' | 'email' | 'web_form';
+export type TicketChannel = 'chat' | 'email' | 'web_form' | 'whatsapp';
 
 export interface Ticket {
   id: string;

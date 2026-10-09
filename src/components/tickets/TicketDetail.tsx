@@ -12,6 +12,7 @@ import {
   MessageSquare,
   Monitor,
   Paperclip,
+  Phone,
   Plus,
   Send,
   X,
@@ -25,6 +26,8 @@ import { Menu } from '@/components/ui/Menu';
 import {
   getTicketAction,
   replyToTicketAction,
+  retryTicketMessageAction,
+  sendTicketTemplateAction,
   updateTicketAction,
   type TicketDetail as Detail,
   type TicketPatch,
@@ -44,6 +47,7 @@ import type { TicketGroup, TicketPriority, TicketStatus, TicketType } from '@/ty
 import { ChannelIcon, StatusBadge, fullTime, inputClass, timeAgo } from './TicketBits';
 import { roleCan, type Role } from '@/lib/team/permissions';
 import { CollisionBanner, usePresence } from './Presence';
+import { ChannelBanner, DeliveryStatus, TemplateComposer, channelNotice, useServiceWindow } from './ChannelBits';
 
 interface Props {
   workspaceId: string;
@@ -257,18 +261,44 @@ export function TicketDetail({ workspaceId, ticketId, agents, groups, me, onBack
 
         {tab === 'conversation' ? (
           <>
-            <Thread detail={detail} people={people} />
+            <Thread
+              detail={detail}
+              people={people}
+              onRetry={
+                canReply
+                  ? async (messageId) => {
+                      const result = await retryTicketMessageAction(workspaceId, messageId).catch((e: Error) => {
+                        setNotice(e.message);
+                        return null;
+                      });
+                      const text = result && channelNotice(result.channel, detail.channelState?.label || 'the channel');
+                      setNotice(text || null);
+                      load();
+                    }
+                  : undefined
+              }
+            />
             {!closed && (
               <Composer
                 key={ticket.id}
+                workspaceId={workspaceId}
                 status={ticket.status}
                 channel={ticket.channel}
+                channelState={detail.channelState}
                 canReply={canReply}
                 canEditStatus={canEdit}
                 onActivity={report}
+                onSendTemplate={async (template) => {
+                  const result = await sendTicketTemplateAction(workspaceId, ticketId, template);
+                  setNotice(channelNotice(result.channel, detail.channelState?.label || 'the channel'));
+                  load();
+                  onChanged();
+                }}
                 onSend={async (body, internal, submitAs) => {
                   const result = await replyToTicketAction(workspaceId, ticketId, { body, internal, submitAs });
-                  if (result.emailError) setNotice(result.emailError);
+                  const sentNotice = channelNotice(result.channel, detail.channelState?.label || 'the channel');
+                  if (sentNotice) setNotice(sentNotice);
+                  else if (result.emailError) setNotice(result.emailError);
                   else if (result.emailed) setNotice('Reply emailed to the requester.');
                   // Not awaited: the composer clears as soon as the reply is saved,
                   // so nothing typed meanwhile is wiped by a late clear.
@@ -317,7 +347,15 @@ function SubjectEditor({ value, disabled, onSave }: { value: string; disabled: b
 
 /* ── Conversation ─────────────────────────────────────────────────────── */
 
-function Thread({ detail, people }: { detail: Detail; people: Record<string, string> }) {
+function Thread({
+  detail,
+  people,
+  onRetry,
+}: {
+  detail: Detail;
+  people: Record<string, string>;
+  onRetry?: (messageId: string) => Promise<void>;
+}) {
   const endRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     endRef.current?.scrollIntoView({ block: 'end' });
@@ -383,6 +421,9 @@ function Thread({ detail, people }: { detail: Detail; people: Record<string, str
                   </a>
                 )}
               </div>
+              {!fromCustomer && m.channel_status && (
+                <DeliveryStatus status={m.channel_status} error={m.channel_error} onRetry={onRetry ? () => onRetry(m.id) : undefined} />
+              )}
             </div>
           </div>
         );
@@ -393,15 +434,22 @@ function Thread({ detail, people }: { detail: Detail; people: Record<string, str
 }
 
 function Composer({
+  workspaceId,
   status,
   channel,
+  channelState,
   canReply,
   canEditStatus,
   onActivity,
   onSend,
+  onSendTemplate,
 }: {
+  workspaceId: string;
   status: TicketStatus;
   channel: Detail['ticket']['channel'];
+  /** Set for tickets from WhatsApp (and later other channels): window and connection state. */
+  channelState: Detail['channelState'];
+  onSendTemplate: (template: { name: string; language: string; body: string; params: string[] }) => Promise<void>;
   /** Light agents cannot reply to customers: the composer is notes only. */
   canReply: boolean;
   canEditStatus: boolean;
@@ -413,6 +461,10 @@ function Composer({
   const [submitAs, setSubmitAs] = useState<TicketStatus>(status === 'new' ? 'open' : status);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const win = useServiceWindow(channelState);
+  // Outside the window only templates may go out; notes are always fine.
+  const templateOnly = Boolean(channelState && !internal && win && !win.open && channelState.templates);
+  const channelDown = Boolean(channelState && !internal && channelState.connectionStatus === 'disconnected');
 
   const send = async () => {
     if (!body.trim() || sending) return;
@@ -451,41 +503,61 @@ function Composer({
                 : 'text-ink-3 hover:text-ink-2'
             )}
           >
-            {isNote ? <Lock className="w-3.5 h-3.5" /> : channel === 'chat' ? <MessageSquare className="w-3.5 h-3.5" /> : <Mail className="w-3.5 h-3.5" />}
-            {isNote ? 'Internal note' : channel === 'chat' ? 'Public reply (chat)' : 'Public reply (email)'}
+            {isNote ? (
+              <Lock className="w-3.5 h-3.5" />
+            ) : channelState ? (
+              <Phone className="w-3.5 h-3.5" />
+            ) : channel === 'chat' ? (
+              <MessageSquare className="w-3.5 h-3.5" />
+            ) : (
+              <Mail className="w-3.5 h-3.5" />
+            )}
+            {isNote ? 'Internal note' : channelState ? `Public reply (${channelState.label})` : channel === 'chat' ? 'Public reply (chat)' : 'Public reply (email)'}
           </button>
         ))}
       </div>
-      <textarea
-        value={body}
-        onChange={(e) => {
-          setBody(e.target.value);
-          onActivity(e.target.value.trim() ? (internal ? 'noting' : 'replying') : 'viewing');
-        }}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) send();
-        }}
-        rows={3}
-        aria-label={internal ? 'Internal note' : 'Reply'}
-        placeholder={internal ? 'Only your team can see this note' : 'Write a reply to the customer'}
-        className={cn(inputClass, 'h-auto py-2 resize-y min-h-[76px]', internal && 'bg-surface border-warn-line')}
-      />
-      {error && <p className="text-xs text-danger mt-1.5">{error}</p>}
-      <div className="flex items-center justify-end gap-2 mt-2">
-        {!canReply && <span className="mr-auto text-xs text-ink-3">Light agents can add internal notes only.</span>}
-        {!internal && canEditStatus && (
-          <Menu<TicketStatus>
-            value={submitAs}
-            onChange={setSubmitAs}
-            label="Status after sending"
-            side="top"
-            options={SETTABLE_STATUSES.filter((s) => s !== 'closed').map((s) => ({ value: s, label: `Submit as ${STATUS_LABEL[s]}` }))}
+      {channelState && !internal && <ChannelBanner state={channelState} window={win} />}
+      {templateOnly && !channelDown ? (
+        <TemplateComposer workspaceId={workspaceId} channel={channelState!.channel} onSend={onSendTemplate} />
+      ) : (
+        <>
+          <textarea
+            value={body}
+            onChange={(e) => {
+              setBody(e.target.value);
+              onActivity(e.target.value.trim() ? (internal ? 'noting' : 'replying') : 'viewing');
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) send();
+            }}
+            rows={3}
+            aria-label={internal ? 'Internal note' : 'Reply'}
+            placeholder={internal ? 'Only your team can see this note' : 'Write a reply to the customer'}
+            className={cn(inputClass, 'h-auto py-2 resize-y min-h-[76px]', internal && 'bg-surface border-warn-line')}
           />
-        )}
-        <button type="button" className={cn('btn btn-sm', internal ? 'btn-secondary' : 'btn-accent')} onClick={send} disabled={sending || !body.trim()}>
-          <Send className="w-3.5 h-3.5" /> {sending ? 'Sending…' : internal ? 'Add note' : 'Send'}
-        </button>
-      </div>
+          {error && <p className="text-xs text-danger mt-1.5">{error}</p>}
+          <div className="flex items-center justify-end gap-2 mt-2">
+            {!canReply && <span className="mr-auto text-xs text-ink-3">Light agents can add internal notes only.</span>}
+            {!internal && canEditStatus && (
+              <Menu<TicketStatus>
+                value={submitAs}
+                onChange={setSubmitAs}
+                label="Status after sending"
+                side="top"
+                options={SETTABLE_STATUSES.filter((s) => s !== 'closed').map((s) => ({ value: s, label: `Submit as ${STATUS_LABEL[s]}` }))}
+              />
+            )}
+            <button
+              type="button"
+              className={cn('btn btn-sm', internal ? 'btn-secondary' : 'btn-accent')}
+              onClick={send}
+              disabled={sending || !body.trim() || channelDown}
+            >
+              <Send className="w-3.5 h-3.5" /> {sending ? 'Sending…' : internal ? 'Add note' : 'Send'}
+            </button>
+          </div>
+        </>
+      )}
     </div>
   );
 }
