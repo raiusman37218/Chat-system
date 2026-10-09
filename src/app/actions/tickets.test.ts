@@ -91,6 +91,8 @@ describe('ticket actions refuse another workspace before touching its data', () 
     ['getTicketAction', () => actions.getTicketAction(WS_B, T1)],
     ['updateTicketAction', () => actions.updateTicketAction(WS_B, T1, { status: 'solved' })],
     ['replyToTicketAction', () => actions.replyToTicketAction(WS_B, T1, { body: 'hi', internal: false })],
+    ['sendTicketTemplateAction', () => actions.sendTicketTemplateAction(WS_B, T1, { name: 'order_update', language: 'en_US', body: 'Hi', params: [] })],
+    ['retryTicketMessageAction', () => actions.retryTicketMessageAction(WS_B, T1)],
     ['bulkUpdateTicketsAction', () => actions.bulkUpdateTicketsAction(WS_B, [T1], { status: 'solved' })],
     ['mergeTicketsAction', () => actions.mergeTicketsAction(WS_B, T1, [T2])],
     ['searchTicketsAction', () => actions.searchTicketsAction(WS_B, 'refund')],

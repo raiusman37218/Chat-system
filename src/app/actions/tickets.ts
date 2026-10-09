@@ -15,10 +15,13 @@ import { getWorkspaceAccess } from '@/lib/team/access';
 import { roleCan, type Capability, type Role } from '@/lib/team/permissions';
 import { isValidEmail, sendSmtpEmail } from '@/lib/email/smtp';
 import { sanitizeTicketPatch, type TicketPatch } from '@/lib/tickets/patch';
+import { getAdapter } from '@/lib/channels/registry';
+import { processOutboundQueue } from '@/lib/channels/outbound';
+import { renderTemplate } from '@/lib/channels/templates';
 import {
   SETTABLE_STATUSES,
   SYSTEM_VIEWS,
-  TICKET_CHANNELS,
+  MANUAL_TICKET_CHANNELS,
   applyTicketFilters,
   normalizeFilters,
   normalizeSort,
@@ -252,9 +255,21 @@ export interface TicketDetail {
   ticket: Ticket;
   messages: Pick<
     Message,
-    'id' | 'conversation_id' | 'sender_type' | 'sender_id' | 'content' | 'attachment_url' | 'created_at' | 'is_internal' | 'metadata'
+    | 'id'
+    | 'conversation_id'
+    | 'sender_type'
+    | 'sender_id'
+    | 'content'
+    | 'attachment_url'
+    | 'created_at'
+    | 'is_internal'
+    | 'metadata'
+    | 'channel_status'
+    | 'channel_error'
   >[];
   events: TicketEvent[];
+  /** For tickets from an outside channel: what the composer needs to know before a reply is sent. */
+  channelState: TicketChannelState | null;
   requester: Pick<
     Visitor,
     'id' | 'name' | 'email' | 'location' | 'ip_location_city' | 'ip_location_country' | 'browser' | 'os' | 'device' | 'current_page_url' | 'last_seen_at' | 'first_seen_at' | 'timezone' | 'language'
@@ -264,6 +279,36 @@ export interface TicketDetail {
   related: Pick<Ticket, 'id' | 'number' | 'subject' | 'status' | 'follow_up_of_id' | 'merged_into_id'>[];
   /** Names for every agent and visitor that appears in the thread or log. */
   people: Record<string, string>;
+}
+
+export interface TicketChannelState {
+  channel: string;
+  label: string;
+  /** When the customer last wrote on the channel; the service window counts from here. */
+  lastInboundAt: string | null;
+  /** Hours free-form replies are allowed after that; null when the channel has no window. */
+  windowHours: number | null;
+  templates: boolean;
+  connectionStatus: 'connected' | 'needs_attention' | 'disconnected';
+  connectionName: string | null;
+}
+
+async function channelStateFor(supabase: Supabase, workspaceId: string, ticket: Ticket): Promise<TicketChannelState | null> {
+  const adapter = getAdapter(ticket.channel);
+  if (!adapter || !ticket.conversation_id) return null;
+  const [{ data: conv }, { data: conn }] = await Promise.all([
+    supabase.from('conversations').select('channel_last_inbound_at').eq('id', ticket.conversation_id).eq('workspace_id', workspaceId).maybeSingle(),
+    supabase.from('channel_connections').select('status, display_name').eq('workspace_id', workspaceId).eq('channel', adapter.id).maybeSingle(),
+  ]);
+  return {
+    channel: adapter.id,
+    label: adapter.label,
+    lastInboundAt: conv?.channel_last_inbound_at ?? null,
+    windowHours: adapter.capabilities.serviceWindowHours,
+    templates: adapter.capabilities.templates,
+    connectionStatus: conn?.status ?? 'disconnected',
+    connectionName: conn?.display_name ?? null,
+  };
 }
 
 export async function getTicketAction(workspaceId: string, ticketId: string): Promise<TicketDetail> {
@@ -282,7 +327,7 @@ export async function getTicketAction(workspaceId: string, ticketId: string): Pr
   const [{ data: messages }, { data: events }, { data: requester }, { data: previous }, { data: related }] = await Promise.all([
     supabase
       .from('messages')
-      .select('id, conversation_id, sender_type, sender_id, content, attachment_url, created_at, is_internal, metadata')
+      .select('id, conversation_id, sender_type, sender_id, content, attachment_url, created_at, is_internal, metadata, channel_status, channel_error')
       .eq('ticket_id', t.id)
       .order('created_at', { ascending: true })
       .limit(1000),
@@ -334,6 +379,7 @@ export async function getTicketAction(workspaceId: string, ticketId: string): Pr
     ticket: t,
     messages: (messages as TicketDetail['messages']) || [],
     events: (events as TicketEvent[]) || [],
+    channelState: await channelStateFor(supabase, workspaceId, t),
     requester: (requester as TicketDetail['requester']) || null,
     previousTickets: (previous as TicketDetail['previousTickets']) || [],
     related: (related as TicketDetail['related']) || [],
@@ -389,7 +435,7 @@ export async function replyToTicketAction(
   workspaceId: string,
   ticketId: string,
   input: { body: string; internal: boolean; submitAs?: TicketStatus }
-): Promise<{ emailed: boolean; emailError?: string }> {
+): Promise<ReplyOutcome> {
   // Internal notes are open to light agents; customer replies and status changes are not.
   const caller = await assertTicketAccess(workspaceId, input.internal ? 'add_note' : 'reply');
   if (input.submitAs && !roleCan(caller.role, 'edit_ticket')) {
@@ -421,15 +467,19 @@ export async function replyToTicketAction(
   const conversationId = lastCustomer?.conversation_id || ticket.conversation_id;
   if (!conversationId) throw new Error('This ticket has no conversation to reply in.');
 
-  const { error } = await caller.supabase.from('messages').insert({
-    conversation_id: conversationId,
-    ticket_id: ticketId,
-    sender_type: 'agent',
-    sender_id: caller.agent.id,
-    content: body,
-    is_internal: input.internal,
-  });
-  if (error) throw dbError(error, 'Could not send the reply.');
+  const { data: inserted, error } = await caller.supabase
+    .from('messages')
+    .insert({
+      conversation_id: conversationId,
+      ticket_id: ticketId,
+      sender_type: 'agent',
+      sender_id: caller.agent.id,
+      content: body,
+      is_internal: input.internal,
+    })
+    .select('id')
+    .single();
+  if (error || !inserted) throw dbError(error, 'Could not send the reply.');
 
   if (input.submitAs && SETTABLE_STATUSES.includes(input.submitAs) && input.submitAs !== ticket.status) {
     const { error: statusError } = await caller.supabase
@@ -438,6 +488,12 @@ export async function replyToTicketAction(
       .eq('workspace_id', workspaceId)
       .eq('id', ticketId);
     if (statusError) throw dbError(statusError, 'Reply sent, but the status could not be changed.');
+  }
+
+  // WhatsApp and other channels: the database queued the reply; send it now
+  // so the agent sees at once whether it went out.
+  if (!input.internal && getAdapter(ticket.channel)) {
+    return { emailed: false, channel: await sendQueued(caller.supabase, inserted.id) };
   }
 
   // Chat replies reach the widget in real time. Email and web-form tickets
@@ -458,6 +514,78 @@ export async function replyToTicketAction(
     html: `<div style="font-family:sans-serif;white-space:pre-wrap;line-height:1.5">${escapeHtml(body)}</div>`,
   });
   return sent.success ? { emailed: true } : { emailed: false, emailError: sent.error || 'Email could not be sent.' };
+}
+
+export interface ReplyOutcome {
+  emailed: boolean;
+  emailError?: string;
+  /** Set for replies on an outside channel. */
+  channel?: { status: 'sent' | 'queued' | 'failed'; error?: string };
+}
+
+async function sendQueued(supabase: Supabase, messageId: string): Promise<NonNullable<ReplyOutcome['channel']>> {
+  await processOutboundQueue({ messageId, limit: 1 });
+  const { data } = await supabase.from('messages').select('channel_status, channel_error').eq('id', messageId).maybeSingle();
+  const status = data?.channel_status;
+  if (status === 'failed') return { status: 'failed', error: data?.channel_error || 'Could not send.' };
+  if (status === 'queued') return { status: 'queued', error: 'Not sent yet; it will be retried automatically.' };
+  return { status: 'sent' };
+}
+
+/**
+ * Sends an approved template on a channel ticket: the only thing WhatsApp
+ * accepts once the customer has been quiet for 24 hours. The transcript
+ * shows the filled-in body; the template itself rides in the metadata,
+ * which is what the database's window rule and the outbound worker read.
+ */
+export async function sendTicketTemplateAction(
+  workspaceId: string,
+  ticketId: string,
+  input: { name: string; language: string; body: string; params: string[] }
+): Promise<ReplyOutcome> {
+  const caller = await assertTicketAccess(workspaceId, 'reply');
+  const name = (input.name || '').trim();
+  const language = (input.language || '').trim();
+  if (!/^[a-z0-9_]{1,512}$/.test(name) || !/^[a-zA-Z_]{2,10}$/.test(language)) throw new Error('Choose a template.');
+  const params = (input.params || []).map((p) => String(p ?? '').trim());
+  if (params.some((p) => !p)) throw new Error('Fill in every placeholder.');
+  if (params.some((p) => p.length > 1000)) throw new Error('A placeholder value is too long.');
+
+  const { data: ticket } = await caller.supabase
+    .from('tickets')
+    .select('id, number, status, conversation_id, channel')
+    .eq('workspace_id', workspaceId)
+    .eq('id', ticketId)
+    .maybeSingle();
+  if (!ticket) throw new Error('Ticket not found.');
+  if (ticket.status === 'closed') throw new Error(`Ticket #${ticket.number} is closed. Create a follow-up instead.`);
+  const adapter = getAdapter(ticket.channel);
+  if (!adapter?.capabilities.templates || !ticket.conversation_id) throw new Error('Templates are only for channel tickets.');
+
+  const { data: inserted, error } = await caller.supabase
+    .from('messages')
+    .insert({
+      conversation_id: ticket.conversation_id,
+      ticket_id: ticketId,
+      sender_type: 'agent',
+      sender_id: caller.agent.id,
+      content: renderTemplate(input.body || `Template: ${name}`, params).slice(0, 4096),
+      is_internal: false,
+      metadata: { channel_template: { name, language, body_params: params } },
+    })
+    .select('id')
+    .single();
+  if (error || !inserted) throw dbError(error, 'Could not send the template.');
+  return { emailed: false, channel: await sendQueued(caller.supabase, inserted.id) };
+}
+
+/** Puts a message that failed for good back in the queue (after fixing the connection, say). */
+export async function retryTicketMessageAction(workspaceId: string, messageId: string): Promise<ReplyOutcome> {
+  const caller = await assertTicketAccess(workspaceId, 'reply');
+  if (!UUID.test(messageId)) throw new Error('Message not found.');
+  const { error } = await caller.supabase.rpc('fn_retry_channel_message', { p_message_id: messageId });
+  if (error) throw dbError(error, 'Could not retry.');
+  return { emailed: false, channel: await sendQueued(caller.supabase, messageId) };
 }
 
 /* ── Creating tickets ─────────────────────────────────────────────────── */
@@ -485,7 +613,7 @@ export async function createTicketAction(
   if (!isValidEmail(email)) throw new Error('Enter the requester’s email address.');
   if (!subject) throw new Error('Give the ticket a subject.');
   if (!body) throw new Error('Describe the request.');
-  const channel: TicketChannel = TICKET_CHANNELS.includes(input.channel) ? input.channel : 'email';
+  const channel: TicketChannel = MANUAL_TICKET_CHANNELS.includes(input.channel) ? input.channel : 'email';
 
   const patch = sanitizeTicketPatch({
     priority: input.priority,

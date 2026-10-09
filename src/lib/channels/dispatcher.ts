@@ -1,4 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
+import { getAdapter } from './registry';
+import { processOutboundQueue } from './outbound';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://vfjsaynnubxywdbevxtx.supabase.co';
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZmanNheW5udWJ4eXdkYmV2eHR4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgyNTA5MDEsImV4cCI6MjEwMzgyNjkwMX0.YyBCXMqwrOk5BRhQafYLFw8tiM5PC8lc8Yocodw9wf0';
@@ -15,7 +17,9 @@ export interface DispatchOutboundParams {
 }
 
 /**
- * Forwards an agent or AI message out to external messaging channels (WhatsApp, Facebook, Instagram, LinkedIn).
+ * Forwards an agent or AI message out to external messaging channels. WhatsApp goes through the
+ * channel framework (src/lib/channels/registry.ts); Messenger, Instagram and LinkedIn are the older
+ * direct integrations.
  */
 export async function dispatchOutboundMessage(params: DispatchOutboundParams) {
   const { conversationId, workspaceId, content, channel } = params;
@@ -23,6 +27,15 @@ export async function dispatchOutboundMessage(params: DispatchOutboundParams) {
   // Web messages are automatically picked up by Supabase Realtime in widget.js
   if (channel === 'web' || !channel) {
     return { success: true, channel: 'web' };
+  }
+
+  // Channels with an adapter never send from here: a database trigger queued
+  // the message when it was stored (channel_outbound_queue), whoever wrote it.
+  // Sending here as well would deliver it twice, so this only nudges the
+  // worker to send what is due now instead of waiting for the cron.
+  if (getAdapter(channel)) {
+    await processOutboundQueue();
+    return { success: true, channel, queued: true };
   }
 
   const supabase = getSupabase();
@@ -56,37 +69,6 @@ export async function dispatchOutboundMessage(params: DispatchOutboundParams) {
 
     // 3. Dispatch to respective provider
     switch (channel.toLowerCase()) {
-      case 'whatsapp': {
-        if (!integration.whatsapp_access_token || !integration.whatsapp_phone_number_id) {
-          console.warn('[Dispatcher] WhatsApp credentials not configured.');
-          return { success: false, error: 'WhatsApp credentials missing' };
-        }
-
-        const url = `https://graph.facebook.com/v20.0/${integration.whatsapp_phone_number_id}/messages`;
-        const res = await fetch(url, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${integration.whatsapp_access_token}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            messaging_product: 'whatsapp',
-            recipient_type: 'individual',
-            to: recipientId,
-            type: 'text',
-            text: { preview_url: false, body: content },
-          }),
-        });
-
-        const data = await res.json();
-        if (!res.ok) {
-          console.error('[WhatsApp Outbound Error]:', data);
-          return { success: false, error: data };
-        }
-        console.log(`✓ [WhatsApp] Sent message to ${recipientId}:`, data.messages?.[0]?.id);
-        return { success: true, providerMsgId: data.messages?.[0]?.id };
-      }
-
       case 'facebook':
       case 'messenger':
       case 'instagram': {
@@ -148,8 +130,9 @@ export async function dispatchOutboundMessage(params: DispatchOutboundParams) {
       default:
         return { success: true, channel };
     }
-  } catch (err: any) {
-    console.error(`[Dispatcher Error for ${channel}]:`, err.message);
-    return { success: false, error: err.message };
+  } catch (err) {
+    const message = (err as Error).message;
+    console.error(`[Dispatcher Error for ${channel}]:`, message);
+    return { success: false, error: message };
   }
 }

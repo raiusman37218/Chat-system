@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { Trash2 } from 'lucide-react';
 import {
   CHANNEL_LABEL,
+  MANUAL_TICKET_CHANNELS,
   PRIORITY_LABEL,
   SORT_FIELDS,
   SORT_LABEL,
@@ -262,7 +263,7 @@ export function NewTicketDialog({
       <div className="grid grid-cols-3 gap-3">
         <Field label="Channel">
           <select className={selectClass} value={form.channel} onChange={change('channel')}>
-            {TICKET_CHANNELS.filter((c) => c !== 'chat').map((c) => (
+            {MANUAL_TICKET_CHANNELS.map((c) => (
               <option key={c} value={c}>
                 {CHANNEL_LABEL[c]}
               </option>
