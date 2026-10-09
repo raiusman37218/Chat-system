@@ -157,6 +157,13 @@ export async function updateBusinessHoursAction(
     .single();
 
   if (error) throw new Error(error.message);
+
+  // Business-hour SLA timers count against these hours, so open tickets have
+  // to be re-timed. The hours are saved either way; a failure here is logged
+  // and the next ticket change or the SLA cron brings the timers in line.
+  const { error: slaError } = await supabase.rpc('fn_sla_reapply_workspace', { p_workspace_id: workspaceId });
+  if (slaError) console.error('[SLA Error]: could not re-time tickets after a business hours change:', slaError.message);
+
   return { success: true, workspace: updated as Workspace };
 }
 

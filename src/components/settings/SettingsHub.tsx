@@ -43,6 +43,7 @@ import { Tabs } from '@/components/ui/Tabs';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { AutomationPage } from '@/components/automation/AutomationPage';
+import { SlaPage } from '@/components/sla/SlaPage';
 import { AuditLogPanel, SessionsPanel, TwoFactorPanel } from './SecurityPanels';
 import { NotificationPreferences } from './NotificationPreferences';
 import { WorkspaceGeneral } from './WorkspaceGeneral';
@@ -437,6 +438,9 @@ function Page({
           <AutoCloseCard workspace={workspace} onWorkspaceUpdated={onWorkspaceUpdated} />
         </div>
       );
+    case 'automation:sla':
+    case 'automation:sla-calendar':
+      return <SlaPage workspaceId={workspace.id} tab={tab.id === 'sla' ? 'policies' : 'calendar'} />;
     case 'automation:macros':
     case 'automation:triggers':
     case 'automation:automations':

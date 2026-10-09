@@ -178,3 +178,25 @@ describe('what gets stored', () => {
     expect(stored.actions).toEqual([{ type: 'email_requester', subject: 'Hi', body: 'Body' }, { type: 'add_tags', value: ['reminded'] }]);
   });
 });
+
+describe('SLA conditions', () => {
+  const sla = (conditions: RuleDraft['conditions'], kind: RuleDraft['kind'] = 'trigger') => validateRuleDraft(draft({ kind, conditions }));
+
+  it('offers both conditions to triggers and automations', () => {
+    for (const kind of ['trigger', 'automation'] as const) {
+      expect(hasErrors(sla([{ field: 'sla_breached', op: 'is', value: 'yes' }], kind))).toBe(false);
+      expect(hasErrors(sla([{ field: 'hours_until_breach', op: 'lte', value: 2 }], kind))).toBe(false);
+    }
+  });
+
+  it('lets hours until breach go negative, but keeps the time-since conditions non-negative', () => {
+    expect(hasErrors(sla([{ field: 'hours_until_breach', op: 'lte', value: -4 }]))).toBe(false);
+    expect(hasErrors(sla([{ field: 'hours_until_breach', op: 'lte', value: -9000 }]))).toBe(true);
+    expect(hasErrors(sla([{ field: 'hours_since_created', op: 'gte', value: -1 }], 'automation'))).toBe(true);
+  });
+
+  it('stores the number as a number', () => {
+    const stored = toStoredRule(draft({ conditions: [{ field: 'hours_until_breach', op: 'lte', value: '1.5' }] }));
+    expect(stored.conditions[0]).toEqual({ field: 'hours_until_breach', op: 'lte', value: 1.5 });
+  });
+});

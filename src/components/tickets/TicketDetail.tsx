@@ -45,6 +45,8 @@ import {
 } from '@/lib/tickets/views';
 import type { TicketGroup, TicketPriority, TicketStatus, TicketType } from '@/types/database';
 import { ChannelIcon, StatusBadge, fullTime, inputClass, timeAgo } from './TicketBits';
+import { SlaBadge, useNow } from './SlaBadge';
+import { METRIC_LABEL, formatMinutes, formatRemaining } from '@/lib/sla/policy';
 import { roleCan, type Role } from '@/lib/team/permissions';
 import { CollisionBanner, usePresence } from './Presence';
 import { EmailMessageExtras, isEmailMessage } from './EmailBits';
@@ -179,6 +181,7 @@ export function TicketDetail({ workspaceId, ticketId, agents, groups, me, onBack
               <ChannelIcon channel={ticket.channel} />
               <span className="tabular-nums">#{ticket.number}</span>
               <StatusBadge status={ticket.status} />
+              <SlaBadge ticket={ticket} />
               <span>· {CHANNEL_LABEL[ticket.channel]} · opened {timeAgo(ticket.created_at)}</span>
             </div>
             <SubjectEditor
@@ -322,6 +325,7 @@ export function TicketDetail({ workspaceId, ticketId, agents, groups, me, onBack
       </section>
 
       <aside className="w-[300px] shrink-0 overflow-y-auto bg-surface hidden md:block" aria-label="Ticket details">
+        <SlaSection detail={detail} />
         <Properties detail={detail} agents={agents} groups={groups} disabled={closed || !canEdit} readOnlyReason={!canEdit ? 'Your role can view tickets and add internal notes.' : null} onUpdate={update} />
         <Requester detail={detail} onOpenTicket={onOpenTicket} />
       </aside>
@@ -621,6 +625,55 @@ function AuditLog({ detail, people, groups }: { detail: Detail; people: Record<s
 }
 
 /* ── Sidebar ──────────────────────────────────────────────────────────── */
+
+/** Each SLA timer on the ticket: what it is, where it stands, and when it is due. */
+function SlaSection({ detail }: { detail: Detail }) {
+  const now = useNow();
+  const { ticket, sla } = detail;
+  if (sla.timers.length === 0) return null;
+  return (
+    <section className="p-4 border-b border-line" aria-label="SLA">
+      <h3 className="text-2xs font-bold uppercase tracking-wide text-ink-3 mb-1">SLA</h3>
+      {sla.policyName && <p className="text-xs text-ink-3 mb-2">Policy: {sla.policyName}</p>}
+      <ul className="space-y-2">
+        {sla.timers.map((t) => {
+          const due = t.due_at ? new Date(t.due_at) : null;
+          let state: string;
+          let tone: 'neutral' | 'success' | 'warn' | 'danger' = 'neutral';
+          if (t.status === 'met') {
+            state = t.breached_at ? 'Met late' : 'Met';
+            tone = t.breached_at ? 'danger' : 'success';
+          } else if (t.breached_at || (t.status === 'running' && due && due <= now)) {
+            state = `Breached ${formatRemaining(now.getTime() - new Date(t.breached_at ?? t.due_at!).getTime())} ago`;
+            tone = 'danger';
+          } else if (t.status === 'paused') {
+            state = 'Paused';
+          } else if (due) {
+            state = `Due in ${formatRemaining(due.getTime() - now.getTime())}`;
+            if (t.warn_at && new Date(t.warn_at) <= now) tone = 'warn';
+          } else {
+            state = 'Running';
+          }
+          return (
+            <li key={t.metric} className="text-ui">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-ink font-medium">{METRIC_LABEL[t.metric]}</span>
+                <span className={cn('pill', `pill-${tone}`)}>{state}</span>
+              </div>
+              <p className="text-xs text-ink-3 mt-0.5">
+                Target {formatMinutes(t.target_minutes)}
+                {t.business_hours ? ' of business time' : ''}
+                {due && t.status !== 'met' && ` · ${fullTime(t.due_at!)}`}
+                {t.status === 'met' && t.met_at && ` · at ${fullTime(t.met_at)}`}
+              </p>
+            </li>
+          );
+        })}
+      </ul>
+      {ticket.status === 'pending' || ticket.status === 'on_hold' ? <p className="text-xs text-ink-3 mt-2">The clock is paused while the ticket is {ticket.status === 'pending' ? 'Pending' : 'On-hold'}.</p> : null}
+    </section>
+  );
+}
 
 function Properties({
   detail,

@@ -101,10 +101,15 @@ export interface TicketListItem {
   created_at: string;
   updated_at: string;
   solved_at: string | null;
+  sla_state: 'running' | 'paused' | 'met' | null;
+  sla_next_due_at: string | null;
+  sla_next_warn_at: string | null;
+  sla_next_metric: 'first_reply' | 'next_reply' | 'resolution' | null;
+  sla_breached_at: string | null;
 }
 
 const LIST_COLUMNS =
-  'id, number, subject, status, priority, type, channel, tags, assignee_id, group_id, created_at, updated_at, solved_at, requester:visitors(id, name, email)';
+  'id, number, subject, status, priority, type, channel, tags, assignee_id, group_id, created_at, updated_at, solved_at, sla_state, sla_next_due_at, sla_next_warn_at, sla_next_metric, sla_breached_at, requester:visitors(id, name, email)';
 
 export interface TicketsBootstrap {
   me: { id: string; name: string; isAdmin: boolean; role: Role };
@@ -281,6 +286,22 @@ export interface TicketDetail {
   related: Pick<Ticket, 'id' | 'number' | 'subject' | 'status' | 'follow_up_of_id' | 'merged_into_id'>[];
   /** Names for every agent and visitor that appears in the thread or log. */
   people: Record<string, string>;
+  /** The SLA policy applied to this ticket and each of its timers. */
+  sla: TicketSla;
+}
+
+export interface TicketSla {
+  policyName: string | null;
+  timers: {
+    metric: 'first_reply' | 'next_reply' | 'resolution';
+    status: 'running' | 'paused' | 'met' | 'cancelled';
+    target_minutes: number;
+    business_hours: boolean;
+    due_at: string | null;
+    warn_at: string | null;
+    breached_at: string | null;
+    met_at: string | null;
+  }[];
 }
 
 export interface TicketChannelState {
@@ -343,7 +364,7 @@ export async function getTicketAction(workspaceId: string, ticketId: string): Pr
   const t = ticket as Ticket;
 
   const linkIds = [t.follow_up_of_id, t.merged_into_id].filter(Boolean) as string[];
-  const [{ data: messages }, { data: events }, { data: requester }, { data: previous }, { data: related }] = await Promise.all([
+  const [{ data: messages }, { data: events }, { data: requester }, { data: previous }, { data: related }, { data: slaTimers }, { data: slaPolicy }] = await Promise.all([
     supabase
       .from('messages')
       .select('id, conversation_id, sender_type, sender_id, content, attachment_url, created_at, is_internal, metadata, channel_status, channel_error')
@@ -374,6 +395,14 @@ export async function getTicketAction(workspaceId: string, ticketId: string): Pr
       .select('id, number, subject, status, follow_up_of_id, merged_into_id')
       .eq('workspace_id', workspaceId)
       .or([`follow_up_of_id.eq.${t.id}`, `merged_into_id.eq.${t.id}`, ...linkIds.map((id) => `id.eq.${id}`)].join(',')),
+    supabase
+      .from('ticket_sla_timers')
+      .select('metric, status, target_minutes, business_hours, due_at, warn_at, breached_at, met_at')
+      .eq('ticket_id', t.id)
+      .eq('workspace_id', workspaceId),
+    t.sla_policy_id
+      ? supabase.from('sla_policies').select('name').eq('id', t.sla_policy_id).eq('workspace_id', workspaceId).maybeSingle()
+      : Promise.resolve({ data: null }),
   ]);
 
   const agentIds = new Set<string>();
@@ -403,6 +432,10 @@ export async function getTicketAction(workspaceId: string, ticketId: string): Pr
     previousTickets: (previous as TicketDetail['previousTickets']) || [],
     related: (related as TicketDetail['related']) || [],
     people,
+    sla: {
+      policyName: (slaPolicy as { name: string } | null)?.name ?? null,
+      timers: ((slaTimers as TicketSla['timers'] | null) || []).filter((x) => x.status !== 'cancelled'),
+    },
   };
 }
 

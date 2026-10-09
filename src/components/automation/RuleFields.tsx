@@ -89,7 +89,7 @@ function ConditionValue({ cond, lookups, onChange, label }: { cond: Condition; l
     );
   }
   if (def.value === 'number') {
-    return <Input aria-label={label} type="number" min={0} max={8760} className="w-28" value={String(cond.value ?? '')} onChange={(e) => onChange(e.target.value)} />;
+    return <Input aria-label={label} type="number" min={def.id === 'hours_until_breach' ? -8760 : 0} max={8760} className="w-28" value={String(cond.value ?? '')} onChange={(e) => onChange(e.target.value)} />;
   }
   return (
     <Input
