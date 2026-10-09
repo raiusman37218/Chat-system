@@ -1,1 +1,172 @@
 @AGENTS.md
+
+# Zentry: guide for working in this repo
+
+Zentry (also written "Zen-try"; older code, CSS classes and seed data say "Chatify") is a multi-workspace live chat support platform, similar to Intercom. It has five surfaces:
+
+| Surface | Route / artifact | Who uses it |
+|---|---|---|
+| Marketing site + auth | `/`, `/login`, `/signup`, `/onboarding` | Prospects, new workspace owners |
+| Agent inbox + workspace settings | `/dashboard` (a single client page with views: inbox, radar, reports, helpdesk, settings) | Agents, admins and owners of one workspace |
+| Public help center | `/help/[workspaceId]/...`, served on `<slug>.$HELP_BASE_DOMAIN` or a verified custom domain via host rewriting in `src/middleware.ts` | End customers |
+| Embeddable chat widget | `public/widget.js`, built from `widget/src/index.ts` | Visitors on customer websites |
+| Platform-owner admin | `/admin`, `/admin/audit` | Platform super admins (`agents.is_super_admin`) |
+
+The AI bot (auto-reply, suggested replies, summaries, sentiment, translation) runs in route handlers under `src/app/api/ai/*` and `src/lib/ai/*`.
+
+`docs/ARCHITECTURE.md` maps each surface to its files, routes and tables in more detail. `docs/AUDIT.md` lists known bugs and security issues. **Read the workspace isolation section of the audit before you touch RLS, API routes or server actions.**
+
+---
+
+## Tech stack
+
+- **Next.js 16.3 (App Router) + React 19.2 + TypeScript 5** (`strict: true`, path alias `@/*` → `src/*`). This Next.js version has breaking changes from older ones, so read `node_modules/next/dist/docs/` before using a Next API (see `AGENTS.md`). For example, `middleware.ts` is deprecated in 16 in favour of `proxy.ts`, but this repo still uses `src/middleware.ts`.
+- **Supabase**: Postgres with Row Level Security, Auth (email/password, Google OAuth, custom 6-digit OTP signup), Realtime (`postgres_changes` on `messages`, `conversations`, `internal_notes`, `visitors`), and `pgvector` for semantic search. Clients come from `@supabase/ssr` and `@supabase/supabase-js`.
+- **Tailwind CSS v4** (`@tailwindcss/postcss`). Design tokens are CSS variables (`--ds-*`) in `src/app/globals.css`. Dark mode is driven by `data-theme` on `<html>` through `@custom-variant dark`; there is no `.dark` class toggle.
+- **UI libraries**: `lucide-react` icons, `recharts` charts, `clsx` + `tailwind-merge` via `cn()` in `src/lib/utils.ts`. There is no component library; shared primitives live in `src/components/ui/`.
+- **AI**: a multi-provider layer in `src/lib/ai/provider.ts` (Anthropic via `@anthropic-ai/sdk`, plus OpenAI, Google, DeepSeek and OpenAI-compatible endpoints over `fetch`). Each workspace stores its own provider and key in `workspaces.ai_settings`. Retrieval is BM25 (`src/lib/ai/retrieval.ts`) plus pgvector hybrid search (`src/lib/ai/semantic-retrieval.ts`, RPC `fn_hybrid_search_chunks`).
+- **Other services**: Cloudinary (attachments, `src/lib/cloudinary.ts`), Nodemailer SMTP (`src/lib/email/smtp.ts`; each workspace has its own SMTP, and the platform SMTP is stored in `platform_settings`), Resend (offline-agent emails), the Vercel SDK (custom-domain provisioning, `src/lib/vercel-domains.ts`), and Meta/WhatsApp/LinkedIn webhooks with an optional external LangGraph agent (`src/lib/agent/langgraph.ts`, `src/lib/channels/dispatcher.ts`).
+- **Widget**: a separate package in `widget/` that is plain TypeScript in a Shadow DOM, bundled by esbuild into an IIFE at `public/widget.js`. It talks to Supabase directly with the anon key, and to this app's `/api/*` routes with CORS `*`.
+- **Hosting**: Vercel. The repo has no `vercel.json`, so cron routes are not scheduled from here.
+
+---
+
+## Folder structure
+
+```
+src/
+  middleware.ts            Session refresh, host-based help-center routing (slug subdomain / custom
+                           domain → /help/[id]), /dashboard login gate, /admin super-admin gate
+  app/
+    page.tsx               Marketing landing page (embeds /widget.js for the demo workspace)
+    login/ signup/ onboarding/   Auth flows; onboarding calls createWorkspaceAction
+    auth/callback/route.ts OAuth code exchange
+    dashboard/page.tsx     The whole agent app (~1.9k lines, client component): loads agent +
+                           workspace, subscribes to realtime, switches views
+    admin/                 Super-admin panel (server page → AdminClientLayout → components/admin/*)
+    help/                  Public help center (+ sitemap.xml route)
+    widget/page.tsx        Iframe/preview host for the React ChatWidget
+    actions/               Server Actions ('use server'), the main write path from the UI
+      admin.ts             Workspace settings, team, canned replies, AI/SMTP settings, create workspace
+                           (exports assertAdminUser)
+      helpdesk.ts          Sections and articles CRUD (assertAgent)
+      knowledge.ts         Internal notes, knowledge gaps, AI provider test
+      domain.ts            Custom domain + help-center slug management (Vercel)
+      platform.ts          Super-admin actions (assertSuperAdmin, audit log)
+      auth-verification.ts Signup OTP send/verify
+    api/                   Route handlers (widget-facing, AI, cron, webhooks; see docs/ARCHITECTURE.md)
+  components/
+    dashboard/             Inbox (ConversationList, ChatThread, VisitorDetailsSidebar), HelpDeskDashboard,
+                           KnowledgePanel, SettingsHub, IntegrationsSettings, LiveVisitorsRadar, ...
+    admin/                 Super-admin + analytics + SMTP settings components
+    help/ marketing/ pwa/ ui/ widget/ (ChatWidget.tsx = React re-implementation of the widget for previews)
+  lib/
+    supabase/              client.ts (browser singleton), server.ts (cookie session), service.ts
+                           (service-role client, server only), realtime.ts (unused helpers)
+    ai/                    provider, anthropic (reply/handover/tags/summary/sentiment), help-answer,
+                           retrieval, semantic-retrieval, translator, inbound-translation, intent
+    agent/ channels/       LangGraph + outbound WhatsApp/Meta/LinkedIn dispatch
+    email/                 SMTP transport + templates, domain notification emails
+    domain.ts dns-provider.ts vercel-domains.ts   Custom-domain logic
+    ...                    slug, geo, visitor-meta, onboarding-presets, sound, favicon, pwa, csv-export
+  types/database.ts        Hand-written row types (not generated by Supabase)
+widget/                    Embeddable widget source (separate package.json, esbuild)
+public/                    widget.js (build output, committed), tracker.js, sw.js, demo.html, icons
+supabase/migrations/       SQL migrations (YYYYMMDDHHMMSS_description.sql)
+docs/                      ARCHITECTURE.md, AUDIT.md
+verify_*.mjs, scratch/     Ad-hoc scripts that run against the live Supabase project (not tests)
+demo-site/                 Static page that simulates a customer website embedding the widget
+```
+
+---
+
+## Running locally
+
+Prerequisites: Node 20+ and npm (the lockfile is `package-lock.json`).
+
+```bash
+npm install
+cp .env.example .env.local        # then fill in real values, see below
+npm run dev                        # http://localhost:3000  (.claude/launch.json uses the same)
+```
+
+Environment variables (the full list is in `docs/ARCHITECTURE.md` §4):
+
+- `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`: required. Many files fall back to a hardcoded production project URL and anon key when these are missing. Set them explicitly so you don't hit production by accident.
+- `SUPABASE_SERVICE_ROLE_KEY`: needed by `serviceClient()` (AI auto-reply, invites, signup OTP, crons). Without it these routes fall back to the anon key and silently do nothing.
+- `NEXT_PUBLIC_APP_URL`, `HELP_BASE_DOMAIN` / `NEXT_PUBLIC_HELP_BASE_DOMAIN`, `NEXT_PUBLIC_PLATFORM_HOSTS`: control routing and links. Host routing treats any non-platform host as a possible custom domain.
+- Optional: `CLOUDINARY_*`, `RESEND_API_KEY`, `VERCEL_API_TOKEN`/`VERCEL_TOKEN` + `VERCEL_PROJECT_ID` (+ `VERCEL_TEAM_ID`), `META_VERIFY_TOKEN`, `SLACK_WEBHOOK_URL`, and AI keys (normally stored per workspace in `ai_settings`, not in env).
+- Never commit env files. `.gitignore` covers `.env` and `.env*.local`, but `env.download` was committed with real secrets (see `docs/AUDIT.md`).
+
+Widget:
+
+```bash
+cd widget && npm install
+npm run build      # esbuild → ../public/widget.js (minified IIFE); commit the output
+npm run watch      # rebuild on change while testing with /demo.html?workspaceId=<uuid>
+```
+
+Database: there is no `supabase/config.toml`, and the migrations are **not** a complete schema. Core tables (`workspaces`, `articles`, `workspace_integrations`, `platform_settings`, `email_verifications`), many columns (`workspace_id` on agents/visitors/conversations, `messages.is_internal`/`metadata`, `conversations.ai_mode`/`channel`/`tags`), and RPCs such as `fn_upsert_visitor`, `fn_visitor_heartbeat` and `fn_get_or_create_conversation` were created outside the repo. You cannot build a fresh local database from `supabase/migrations/` alone. New migrations are applied to the linked project with the Supabase CLI (`supabase db push`) or the SQL editor.
+
+## Testing and checks
+
+- **There is no automated test suite** (no test runner in `package.json`).
+- `npx tsc --noEmit`: type-checks cleanly today; keep it that way.
+- `npm run lint` (ESLint 9 + `eslint-config-next`) currently fails with ~530 errors, mostly `no-explicit-any`, plus `react-hooks/*` and the generated `public/widget.js`. Don't add new errors in files you touch. For a scoped run: `npx eslint src/path/to/file.tsx`.
+- `npm run build`: the production build check.
+- `verify_*.mjs` and `scratch/*.mjs` are manual smoke scripts run with `node <file>`. They use a **hardcoded production Supabase URL and keys**, and many of them create users and write rows. Do not run them unless you mean to touch production.
+- To check a UI change, run `npm run dev`, sign up, finish onboarding, then open `/demo.html?workspaceId=<your workspace id>` in a second tab to talk to your own inbox.
+
+---
+
+## Database schema overview
+
+All tenant data hangs off `workspaces.id`. Some child tables carry `workspace_id` directly; others are scoped through their parent row.
+
+| Table | Purpose / key columns | Tenant key |
+|---|---|---|
+| `workspaces` | Tenant. Branding (`brand_color`, `logo_url`, greeting, widget placement), `slug` (help-center subdomain), `custom_domain*`, `business_hours`, `auto_assignment`, `ai_settings` (provider, model, **api_key**), `smtp_settings` (**password**), `navbar_trigger_config`, `help_center_*`, `industry`, plan/limits, `is_suspended`, `deleted_at`, `merged_into_workspace_id`, `owner_id` → auth.users | `id` |
+| `public_workspaces` (view) | Non-secret projection of `workspaces` for anon reads (middleware routing, help center) | `id` |
+| `agents` | One row per auth user (`id` = `auth.users.id`). `workspace_id` (an agent belongs to **one** workspace), `role` ∈ owner/admin/agent, `status` online/away/offline, `is_super_admin` | `workspace_id` |
+| `visitors` | Widget/channel end users: name, email, page, geo, device, `ip_address`, `timezone`, `language`, `channel`, `channel_user_id` | `workspace_id` |
+| `visitor_page_history` | Browsing trail | via `visitor_id` |
+| `conversations` | `visitor_id`, `assigned_agent_id`, `status` open/closed/snoozed/pending, `priority`, `channel`, `ai_mode` autopilot/copilot/disabled, `tags[]`, `csat_rating`, `summary`, `sentiment`, `snoozed_until`, `merged_into`, `last_resolved_at`, `channel_metadata` | `workspace_id` |
+| `messages` | `conversation_id`, `sender_type` visitor/agent/ai/system, `sender_id`, `content`, `attachment_url`, `is_internal`, `metadata` (translations, AI idempotency keys), `reply_to_message_id`, `delivered_at`, `read_at`, `email_notified_at` | via conversation |
+| `internal_notes`, `conversation_tags` | Legacy per-conversation notes/tags (internal notes are now mostly `messages.is_internal`) | via conversation |
+| `canned_responses` | Saved replies (`shortcut`, `title`, `content`; `agent_id` null = team-wide) | `workspace_id` |
+| `help_sections`, `articles` | Help center collections and articles (`slug` unique per workspace, `status` published/draft, `order_index`, view/helpful counters) | `workspace_id` |
+| `article_feedback`, `article_slug_redirects`, `article_chunks` | Votes, old-slug redirects, pgvector(768) chunks + FTS for RAG | `workspace_id` |
+| `knowledge_notes` | Private team notes; `visibility` agent_only / assistant (assistant notes reach the bot via `fn_assistant_notes`) | `workspace_id` |
+| `unanswered_questions` | Deduplicated questions the bot could not answer (with embedding) | `workspace_id` |
+| `workspace_integrations` | Slack/Meta/WhatsApp/LinkedIn/LangGraph config and tokens | `workspace_id` |
+| `super_admin_audit_logs`, `platform_settings`, `email_verifications` | Platform-level: admin audit trail, platform SMTP/branding, signup OTP codes | none |
+
+Main RPCs:
+
+- Called by the widget as anon (`SECURITY DEFINER`): `fn_get_workspace_config`, `fn_upsert_visitor`, `fn_update_visitor_meta`, `fn_visitor_heartbeat`, `fn_get_or_create_conversation`, `fn_get_visitor_conversations`, `fn_mark_messages_delivered`/`_read`, `fn_submit_article_feedback`, `fn_track_article_view`, `fn_record_unanswered_question(_semantic)`, `fn_assistant_notes`, `fn_hybrid_search_chunks`.
+- Super-admin: `fn_get_platform_companies_summary`, `fn_get_platform_analytics`, `fn_get_company_analytics`, `fn_merge_workspaces`.
+- RLS helpers: `fn_is_workspace_member`, `fn_is_workspace_admin`, `current_user_workspace_ids()`, `is_current_user_super_admin()`.
+
+Triggers: `fn_auto_assign_conversation_on_create` (least-loaded online agent), `handle_new_message` (bumps `updated_at`, reopens on a visitor message, assigns on the first agent reply), `fn_conversation_resolution_bookkeeping`, and `fn_protect_agent_super_admin`.
+
+**Isolation model:** RLS is meant to scope authenticated users to `current_user_workspace_ids()`. The widget runs as `anon`, and anon policies on `conversations`, `messages`, `visitors` and `agents` are currently wide open (see `docs/AUDIT.md`). Server code that uses `serviceClient()` bypasses RLS completely, so those call sites must check tenancy themselves.
+
+---
+
+## Coding conventions
+
+Follow the patterns already in the code:
+
+- **Formatting**: 2-space indent, single quotes, semicolons, trailing commas in multi-line literals. Components are `PascalCase.tsx` with a default or named export; lib modules are `kebab-case.ts`.
+- **Imports**: always use `@/…` for `src/` (no deep relative paths). Types come from `@/types/database`. When you add a column, update the hand-written interface there.
+- **Client vs server**: interactive components start with `'use client'`. Most pages, including `/dashboard`, are client components that query Supabase directly with `createClient()` from `@/lib/supabase/client`. Server Components and actions use `await createClient()` from `@/lib/supabase/server`.
+- **Server Actions** (`src/app/actions/*.ts`, `'use server'`) are the default write path from the UI. Every action takes `workspaceId` as its first argument and must call a guard first: `assertAdminUser(workspaceId)` (admin.ts; admin/owner roles), `assertAgent(workspaceId)` (helpdesk.ts / knowledge.ts; any member), or `assertSuperAdmin()` (platform.ts). After the guard, use the cookie-session client so RLS applies, and **also** filter by `.eq('workspace_id', workspaceId)`. Actions either `throw new Error('Forbidden: …')` or return `{ success: false, error }`; match the file you're in. Super-admin mutations call `recordSuperAdminAudit`.
+- **Route handlers** (`src/app/api/**/route.ts`) parse `await req.json()` inside `try/catch` and return `NextResponse.json({ error }, { status })`. Routes called by the widget export `OPTIONS` and add `CORS_HEADERS` (`Access-Control-Allow-Origin: *`) to every response.
+- **Privileged access**: use `serviceClient()` from `@/lib/supabase/service` (server-only). Never import it into a client component, and never create a new `createClient(SUPABASE_URL, ANON_KEY)` in a route; the older routes that do are a known problem, not a pattern to copy. Any code that uses the service role must verify the caller and the conversation→workspace relationship itself.
+- **Widget** (`widget/src/index.ts`): no framework. It builds DOM with template strings in a Shadow DOM. Run every dynamic value through `this.escapeHTML()` before putting it in `innerHTML`, including values inside attributes. After changing it, rebuild `public/widget.js`. If the behaviour also exists in `src/components/widget/ChatWidget.tsx`, keep the two in sync.
+- **Styling**: Tailwind utility classes that use the design tokens (`text-ink`, `text-ink-2`, `bg-surface`, `border-line`, `text-accent`, …) rather than raw colours. Merge conditional classes with `cn()`.
+- **Comments**: explain *why*, often in multi-line prose blocks above a function or SQL statement (see `src/lib/supabase/service.ts` and the migrations). Keep that style; don't narrate *what* the code does.
+- **Migrations**: `supabase/migrations/YYYYMMDDHHMMSS_snake_description.sql`. Start with a comment block explaining the problem being fixed. Make every migration idempotent (`ADD COLUMN IF NOT EXISTS`, `CREATE OR REPLACE FUNCTION`, `DROP POLICY IF EXISTS` before `CREATE POLICY`). `SECURITY DEFINER` functions must `SET search_path = public` and must check `auth.uid()` membership themselves. Never decide privilege from `current_user` inside a definer function, because it is always the owner. Grant `EXECUTE` explicitly and revoke it from `PUBLIC`/`anon` for anything that isn't meant for the widget.
+- **AI code**: every model call goes through `chat()` in `src/lib/ai/provider.ts` with a `ProviderConfig` built by `providerConfigFrom(workspace.ai_settings)`, and each caller must have a deterministic fallback for when no provider is configured. Auto-replies must stay idempotent: `reply_to_message_id` plus the unique indexes on `messages`.
+- **Errors**: log with a bracketed tag (`console.error('[Auto-Close Error]:', err)`). Don't swallow errors silently in new code. Check `{ error }` on every Supabase call that writes.
+- **Git**: commit messages in this repo are not descriptive. Write clear, imperative ones. Don't commit `env.download`, `tsconfig.tsbuildinfo` changes or scratch scripts with keys.
