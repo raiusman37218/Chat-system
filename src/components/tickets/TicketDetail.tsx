@@ -8,6 +8,7 @@ import {
   History,
   Lock,
   Mail,
+  Globe,
   MapPin,
   MessageSquare,
   Monitor,
@@ -52,7 +53,7 @@ import { CollisionBanner, usePresence } from './Presence';
 import { EmailMessageExtras, isEmailMessage } from './EmailBits';
 import { applyMacroAction } from '@/app/actions/automation';
 import { useMacroSlash } from './MacroMenu';
-import { ChannelBanner, DeliveryStatus, StoryContextCard, TemplateComposer, channelNotice, useServiceWindow } from './ChannelBits';
+import { ChannelBanner, DeliveryStatus, PostedPublicly, PrivateReplyNotice, PublicItemChip, PublicReplyNotice, StoryContextCard, TemplateComposer, channelNotice, useServiceWindow } from './ChannelBits';
 
 interface Props {
   workspaceId: string;
@@ -416,6 +417,7 @@ function Thread({
                 <span className="font-semibold text-ink-2">{author}</span> · {time}
               </div>
               {fromCustomer && m.metadata?.channel_story && <StoryContextCard story={m.metadata.channel_story} />}
+              {fromCustomer && m.metadata?.channel_public && <PublicItemChip item={m.metadata.channel_public} label={detail.channelState?.label || 'the platform'} />}
               <div
                 className={cn(
                   'inline-block text-left rounded-2xl px-3.5 py-2 text-ui break-words',
@@ -438,6 +440,7 @@ function Thread({
               {!fromCustomer && m.channel_status && (
                 <DeliveryStatus status={m.channel_status} error={m.channel_error} onRetry={onRetry ? () => onRetry(m.id) : undefined} />
               )}
+              {!fromCustomer && m.metadata?.channel_visibility === 'public' && <PostedPublicly />}
             </div>
           </div>
         );
@@ -488,6 +491,10 @@ function Composer({
   const channelDown = Boolean(channelState && !internal && channelState.connectionStatus === 'disconnected');
   // Channels without templates (Instagram): past the window nothing may be sent.
   const replyLocked = Boolean(channelState && !internal && win && !win.open && !channelState.templates);
+  // A reply on a public post, comment or reply is posted where everyone can read it.
+  const publicReply = Boolean(channelState && !internal && channelState.audience === 'public');
+  const tooLong = publicReply && channelState!.maxReplyLength !== null && Array.from(body).length > channelState!.maxReplyLength!;
+  const nothingToAnswer = publicReply && !channelState!.publicTarget;
 
   const send = async () => {
     if (!body.trim() || sending) return;
@@ -536,6 +543,8 @@ function Composer({
           >
             {isNote ? (
               <Lock className="w-3.5 h-3.5" />
+            ) : channelState?.audience === 'public' ? (
+              <Globe className="w-3.5 h-3.5" />
             ) : channelState ? (
               <Phone className="w-3.5 h-3.5" />
             ) : channel === 'chat' ? (
@@ -543,11 +552,13 @@ function Composer({
             ) : (
               <Mail className="w-3.5 h-3.5" />
             )}
-            {isNote ? 'Internal note' : channelState ? `Public reply (${channelState.label})` : channel === 'chat' ? 'Public reply (chat)' : 'Public reply (email)'}
+            {isNote ? 'Internal note' : channelState?.audience === 'public' ? `Public reply on ${channelState.label}` : channelState ? `Public reply (${channelState.label})` : channel === 'chat' ? 'Public reply (chat)' : 'Public reply (email)'}
           </button>
         ))}
       </div>
       {channelState && !internal && <ChannelBanner state={channelState} window={win} />}
+      {publicReply && <PublicReplyNotice state={channelState!} length={Array.from(body).length} />}
+      {channelState && !internal && channelState.audience === 'private' && channelState.offersPublic && <PrivateReplyNotice state={channelState} />}
       {templateOnly && !channelDown ? (
         <TemplateComposer workspaceId={workspaceId} channel={channelState!.channel} onSend={onSendTemplate} />
       ) : (
@@ -568,13 +579,15 @@ function Composer({
             }}
             rows={3}
             disabled={replyLocked}
-            aria-label={internal ? 'Internal note' : 'Reply'}
+            aria-label={internal ? 'Internal note' : publicReply ? 'Public reply' : 'Reply'}
             placeholder={
               replyLocked
                 ? 'Replies are closed on this channel until the customer writes again'
                 : internal
                   ? 'Only your team can see this note'
-                  : 'Write a reply to the customer'
+                  : publicReply
+                    ? `Write a public reply on ${channelState!.label}`
+                    : 'Write a reply to the customer'
             }
             className={cn(inputClass, 'h-auto py-2 resize-y min-h-[76px]', internal && 'bg-surface border-warn-line')}
           />
@@ -596,9 +609,10 @@ function Composer({
               type="button"
               className={cn('btn btn-sm', internal ? 'btn-secondary' : 'btn-accent')}
               onClick={send}
-              disabled={sending || !body.trim() || channelDown || replyLocked}
+              disabled={sending || !body.trim() || channelDown || replyLocked || tooLong || nothingToAnswer}
             >
-              <Send className="w-3.5 h-3.5" /> {sending ? 'Sending…' : internal ? 'Add note' : 'Send'}
+              {publicReply ? <Globe className="w-3.5 h-3.5" /> : <Send className="w-3.5 h-3.5" />}{' '}
+              {sending ? (publicReply ? 'Posting…' : 'Sending…') : internal ? 'Add note' : publicReply ? 'Post public reply' : 'Send'}
             </button>
           </div>
         </>

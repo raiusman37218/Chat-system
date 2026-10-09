@@ -415,7 +415,7 @@ function Page({
       return (
         <div className="space-y-8">
           <ChannelsSettings workspaceId={workspace.id} />
-          {(['meta', 'linkedin', 'slack'] as const).map((t) => (
+          {(['meta', 'slack'] as const).map((t) => (
             <IntegrationsSettings key={t} embedded tab={t} workspace={workspace} />
           ))}
         </div>

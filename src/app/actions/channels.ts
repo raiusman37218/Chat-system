@@ -17,6 +17,13 @@ import { exchangeSignupCode } from '@/lib/channels/whatsapp/graph';
 import { normalizePhone, type WhatsAppCredentials } from '@/lib/channels/whatsapp/adapter';
 import type { InstagramCredentials } from '@/lib/channels/instagram/adapter';
 import { authorizeUrl, createState } from '@/lib/channels/instagram/oauth';
+import { createOAuthState, pkceFor, readOAuthState } from '@/lib/channels/oauth-state';
+import { isSocialChannel, socialAccess, type SocialAccessState } from '@/lib/channels/social-info';
+import { MANUAL_POLL_MIN_SECONDS, pollConnection } from '@/lib/channels/poll';
+import { xAuthorizeUrl } from '@/lib/channels/x/oauth';
+import { threadsAuthorizeUrl } from '@/lib/channels/threads/oauth';
+import { linkedinAuthorizeUrl } from '@/lib/channels/linkedin/oauth';
+import { tiktokAdapter } from '@/lib/channels/tiktok/adapter';
 import type { MessageTemplate } from '@/lib/channels/types';
 import type { Capability } from '@/lib/team/permissions';
 import type { ChannelConnection } from '@/types/database';
@@ -41,10 +48,22 @@ function appUrl(): string {
 
 /* ── Overview ─────────────────────────────────────────────────────────── */
 
+/** What the page needs to show a social channel honestly (the static facts are in social-info.ts). */
+export interface SocialCardState {
+  access: { state: SocialAccessState; missing: string[] };
+  /** Where the platform sends the admin back after sign-in; the app must list it. */
+  redirectUri: string | null;
+  /** The URL to register as the webhook, for channels that push. */
+  webhookUrl: string | null;
+  /** Minutes between checks for channels that are polled; null when not polled. */
+  pollEveryMinutes: number | null;
+}
+
 export interface ChannelCard extends ChannelCatalogEntry {
   connection: ChannelConnection | null;
   /** Manual setup: where to point the customer's Meta app, and the token to give it. */
   manualWebhook: { url: string; verifyToken: string } | null;
+  social: SocialCardState | null;
 }
 
 export interface ChannelsOverview {
@@ -80,7 +99,17 @@ export async function getChannelsOverviewAction(workspaceId: string): Promise<Re
           manualWebhook = { url: `${appUrl()}/api/channels/${entry.id}/webhook/${connection.id}`, verifyToken: loaded.credentials.verifyToken };
         }
       }
-      cards.push({ ...entry, connection, manualWebhook });
+      let social: SocialCardState | null = null;
+      if (isSocialChannel(entry.id)) {
+        const adapter = getAdapter(entry.id)!;
+        social = {
+          access: socialAccess(entry.id, process.env),
+          redirectUri: appUrl() && entry.id !== 'tiktok' ? `${appUrl()}/api/channels/oauth/${entry.id}` : null,
+          webhookUrl: appUrl() && entry.id !== 'linkedin' ? `${appUrl()}/api/channels/${entry.id}/webhook` : null,
+          pollEveryMinutes: adapter.poll && adapter.capabilities.pollIntervalSeconds ? Math.round(adapter.capabilities.pollIntervalSeconds / 60) : null,
+        };
+      }
+      cards.push({ ...entry, connection, manualWebhook, social });
     }
 
     const appId = process.env.META_APP_ID;
@@ -177,6 +206,7 @@ export async function sendChannelTestMessageAction(
   try {
     await guard(workspaceId, 'manage_settings');
     if (!isChannelId(channel)) throw new Error('Unknown channel.');
+    if (isSocialChannel(channel)) throw new Error('Test messages are not available for this channel: it only answers people who wrote to you.');
     if (channel === 'instagram') return await sendInstagramTest(workspaceId, input.to);
     const to = normalizePhone(input.to);
     if (to.length < 8) throw new Error('Enter the full number with its country code, e.g. +1 650 555 1234.');
@@ -322,6 +352,85 @@ export async function connectInstagramManualAction(
     return { success: true, connection };
   } catch (err) {
     return fail(err, 'Could not connect Instagram.');
+  }
+}
+
+/* ── X, Threads, LinkedIn, TikTok ─────────────────────────────────────── */
+
+/**
+ * The sign-in URL to send the admin to for X, Threads or LinkedIn. Refuses
+ * when the platform has not approved the app or the server lacks its
+ * credentials, so the page can explain instead of sending someone to an error.
+ */
+export async function startSocialConnectAction(workspaceId: string, channel: string, input: { pageId?: string } = {}): Promise<Result<{ url: string }>> {
+  try {
+    const { user } = await guard(workspaceId, 'manage_settings');
+    if (!isSocialChannel(channel) || channel === 'tiktok') throw new Error('This channel does not use a sign-in.');
+    const access = socialAccess(channel, process.env);
+    if (access.state === 'requires_approval') throw new Error('This channel needs approval from the platform first. Follow the steps on the card.');
+    if (access.state === 'server_setup') throw new Error(`The server is missing ${access.missing.join(', ')}.`);
+    if (!appUrl()) throw new Error('NEXT_PUBLIC_APP_URL must be set so the platform can send you back.');
+
+    if (channel === 'linkedin') {
+      const pageId = (input.pageId || '').trim();
+      if (!/^\d{3,15}$/.test(pageId)) throw new Error('Enter your Page’s numeric id: the number in linkedin.com/company/<number>/admin.');
+      return { success: true, url: linkedinAuthorizeUrl(appUrl(), createOAuthState('linkedin', { workspaceId, userId: user.id, extra: pageId })) };
+    }
+    const state = createOAuthState(channel, { workspaceId, userId: user.id });
+    if (channel === 'threads') return { success: true, url: threadsAuthorizeUrl(appUrl(), state) };
+    const nonce = readOAuthState('x', state)!.nonce;
+    return { success: true, url: xAuthorizeUrl(appUrl(), state, pkceFor(nonce).challenge) };
+  } catch (err) {
+    return fail(err, 'Could not start connecting.');
+  }
+}
+
+export async function connectTikTokAction(workspaceId: string, input: { businessId: string; accessToken: string }): Promise<Result<{ connection: ChannelConnection }>> {
+  try {
+    const { user } = await guard(workspaceId, 'manage_settings');
+    if (socialAccess('tiktok', process.env).state === 'requires_approval') {
+      throw new Error('TikTok has to approve your app first. Follow the steps on the card.');
+    }
+    const credentials = { accessToken: (input.accessToken || '').trim() };
+    const account = await tiktokAdapter.connect({ businessId: input.businessId }, credentials);
+    const connection = await saveConnection({ workspaceId, channel: 'tiktok', userId: user.id, setupMethod: 'manual', ...account, credentials });
+    return { success: true, connection };
+  } catch (err) {
+    return fail(err, 'Could not connect TikTok.');
+  }
+}
+
+/**
+ * X bills every event a DM poll returns, so reading DMs by polling is a
+ * choice an admin makes with the cost in front of them.
+ */
+export async function setXDmPollingAction(workspaceId: string, enabled: boolean): Promise<Result> {
+  try {
+    await guard(workspaceId, 'manage_settings');
+    const connection = await getConnection(workspaceId, 'x');
+    if (!connection || connection.status === 'disconnected') throw new Error('Connect X first.');
+    await updateConnection(connection.id, { settings: { ...connection.settings, poll_dms: enabled } });
+    return { success: true };
+  } catch (err) {
+    return fail(err, 'Could not change this setting.');
+  }
+}
+
+/** "Check now": poll once, no more often than once a minute. */
+export async function checkChannelNowAction(workspaceId: string, channel: string): Promise<Result<{ ingested: number; message: string }>> {
+  try {
+    await guard(workspaceId, 'manage_settings');
+    if (!isSocialChannel(channel)) throw new Error('This channel is not checked by polling.');
+    const connection = await getConnection(workspaceId, channel);
+    if (!connection || connection.status === 'disconnected') throw new Error('Connect the channel first.');
+    const r = await pollConnection(connection, appUrl() || '', { force: true });
+    if (r.outcome === 'failed') throw new Error(r.reason || 'Could not check for new items.');
+    if (r.outcome === 'skipped') {
+      return { success: true, ingested: 0, message: r.reason === 'Checked a moment ago.' ? `Checked less than ${MANUAL_POLL_MIN_SECONDS} seconds ago. Try again in a minute.` : r.reason || 'Nothing to check.' };
+    }
+    return { success: true, ingested: r.ingested, message: r.ingested ? `${r.ingested} new item${r.ingested === 1 ? '' : 's'} added as tickets.` : 'Nothing new.' };
+  } catch (err) {
+    return fail(err, 'Could not check for new items.');
   }
 }
 

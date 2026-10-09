@@ -12,7 +12,7 @@ import type { ChannelConnection } from '@/types/database';
 import type { EmailSendContext } from './email/types';
 
 /** Channels with an adapter. Add to this union when a new adapter lands. */
-export type ChannelId = 'whatsapp' | 'instagram' | 'email';
+export type ChannelId = 'whatsapp' | 'instagram' | 'email' | 'x' | 'linkedin' | 'tiktok' | 'threads';
 
 export type MediaKind = 'image' | 'video' | 'audio' | 'document' | 'sticker';
 
@@ -44,7 +44,34 @@ export interface InboundMessageEvent {
   replyToExternalId?: string;
   /** Instagram: the customer replied to, or mentioned the business in, a story. */
   story?: StoryContext;
+  /** X, LinkedIn, TikTok, Threads: this was said in public. */
+  public?: PublicItem;
 }
+
+/**
+ * Something said in public (a post that mentions the business, a reply to its
+ * post, a comment on its video) rather than sent to it privately.
+ *
+ * Public items arrive with a sender id of "pub:<author>" (see
+ * publicSender in ./public.ts), so a person's public posts and their direct
+ * messages are separate tickets, and the answer to a public item is public.
+ */
+export interface PublicItem {
+  kind: 'mention' | 'reply' | 'comment';
+  /** The provider's id for this item: what a reply is attached to. */
+  itemId: string;
+  /** The post, video or thread the item belongs to. */
+  rootId?: string;
+  /** The item this one answers, when it is itself a reply to a comment. */
+  parentId?: string;
+  /** Where the item can be seen on the platform. */
+  permalink?: string;
+  /** The author's @handle, for the agent to read and for the reply to address. */
+  handle?: string;
+}
+
+/** What a public reply is attached to, taken from the PublicItem it answers. */
+export type PublicTarget = PublicItem;
 
 export interface StoryContext {
   kind: 'reply' | 'mention';
@@ -82,6 +109,8 @@ export type OutboundContent =
       tag?: 'HUMAN_AGENT';
       /** Email: the ticket thread this reply belongs to. */
       email?: EmailSendContext;
+      /** X, LinkedIn, TikTok, Threads: the public item this reply answers. Absent for a direct message. */
+      publicTarget?: PublicTarget;
     }
   | { type: 'template'; template: TemplateRef };
 
@@ -148,6 +177,16 @@ export interface ChannelCapabilities {
   serviceWindowHours: number | null;
   /** Hours a person (not the bot) may still reply when the connection has Meta's Human Agent feature. */
   humanAgentWindowHours?: number | null;
+  /** Private one-to-one messages in and out. False for channels that only offer public items. */
+  directMessages?: boolean;
+  /** Public mentions, replies or comments in, and public replies out. */
+  publicReplies?: boolean;
+  /** Longest reply the platform accepts, in characters. */
+  maxReplyLength?: number;
+  /** Seconds between polls when the channel is polled (see ChannelAdapter.poll). */
+  pollIntervalSeconds?: number;
+  /** Access tokens too short-lived for the daily cron: renew them just before use. */
+  refreshesOnUse?: boolean;
 }
 
 export interface SenderProfile {
@@ -190,4 +229,27 @@ export interface ChannelAdapter<Credentials = unknown, ConnectInput = unknown> {
   getSenderProfile?(ctx: ChannelContext<Credentials>, senderId: string): Promise<SenderProfile | null>;
   /** Channels with expiring tokens: renew when due, or null when nothing needed doing. */
   refreshCredentials?(ctx: ChannelContext<Credentials>): Promise<RefreshedCredentials<Credentials> | null>;
+
+  /**
+   * Channels that cannot push (or whose push is gated behind approval): ask
+   * the platform what is new since `state`. Called by /api/cron/channel-poll
+   * no more often than capabilities.pollIntervalSeconds. Events must carry
+   * the connection's own account id; ids already stored are ignored by the
+   * database, so a poll that overlaps the last one is harmless.
+   */
+  poll?(ctx: ChannelContext<Credentials>, state: PollState): Promise<PollResult>;
+
+  /**
+   * Platforms whose webhook handshake is not "echo hub.challenge" (X and
+   * TikTok answer with JSON): the response to a GET, or null to refuse.
+   */
+  respondToChallenge?(query: URLSearchParams, secret: string): { contentType: string; body: string } | null;
+}
+
+/** What an adapter remembers between polls; kept in channel_connections.settings.poll_state. */
+export type PollState = Record<string, unknown>;
+
+export interface PollResult {
+  events: ChannelEvent[];
+  state: PollState;
 }

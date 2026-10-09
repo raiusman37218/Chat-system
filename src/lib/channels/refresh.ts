@@ -1,7 +1,23 @@
 import { serviceClient } from '@/lib/supabase/service';
 import { getAdapter } from './registry';
-import { loadConnectionById, recordConnectionError, updateConnection, updateSecrets } from './store';
+import { loadConnectionById, recordConnectionError, updateConnection, updateSecrets, type LoadedConnection } from './store';
 import type { ChannelConnection } from '@/types/database';
+
+/**
+ * Channels whose access tokens last hours, not months (X: two hours) cannot
+ * wait for the daily cron: renew the token just before it is used, and keep
+ * the new one (X's refresh tokens rotate, so the old one stops working).
+ * Channels without `refreshesOnUse` are left to the cron and pass through.
+ */
+export async function withFreshCredentials<C>(conn: LoadedConnection<C>): Promise<LoadedConnection<C>> {
+  const adapter = getAdapter(conn.connection.channel);
+  if (!adapter?.capabilities.refreshesOnUse || !adapter.refreshCredentials) return conn;
+  const fresh = await adapter.refreshCredentials(conn);
+  if (!fresh) return conn;
+  await updateSecrets(conn.connection.id, conn.connection.workspace_id, fresh.credentials);
+  await updateConnection(conn.connection.id, { settings: fresh.settings });
+  return { connection: { ...conn.connection, settings: fresh.settings }, credentials: fresh.credentials as C };
+}
 
 /**
  * Renews expiring tokens (Instagram's last 60 days) from the daily cron. A

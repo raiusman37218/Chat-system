@@ -2,7 +2,9 @@ import { serviceClient } from '@/lib/supabase/service';
 import { getAdapter } from './registry';
 import { loadEmailSendContext } from './email/outbound-context';
 import { loadConnection, recordConnectionError, updateConnection } from './store';
-import type { OutboundContent, OutboundMedia, SendResult } from './types';
+import { withFreshCredentials } from './refresh';
+import { isPublicSender } from './public';
+import type { OutboundContent, OutboundMedia, PublicTarget, SendResult } from './types';
 
 /**
  * The outbound worker. A trigger queues every public agent or bot message on
@@ -73,6 +75,33 @@ export function contentForMessage(
   };
 }
 
+/**
+ * The public item a reply answers: the message the agent chose to reply to,
+ * or else the newest public item from the customer.
+ */
+export async function resolvePublicTarget(conversationId: string, replyToMessageId: string | null): Promise<PublicTarget | null> {
+  const sb = serviceClient();
+  const fromMeta = (m: { metadata: Record<string, unknown> | null } | null | undefined) =>
+    ((m?.metadata?.channel_public as PublicTarget | undefined) || null);
+  if (replyToMessageId) {
+    const { data } = await sb.from('messages').select('metadata').eq('id', replyToMessageId).eq('conversation_id', conversationId).maybeSingle();
+    const chosen = fromMeta(data as { metadata: Record<string, unknown> | null } | null);
+    if (chosen) return chosen;
+  }
+  const { data } = await sb
+    .from('messages')
+    .select('metadata')
+    .eq('conversation_id', conversationId)
+    .eq('sender_type', 'visitor')
+    .order('created_at', { ascending: false })
+    .limit(10);
+  for (const m of (data as { metadata: Record<string, unknown> | null }[] | null) || []) {
+    const target = fromMeta(m);
+    if (target) return target;
+  }
+  return null;
+}
+
 type Attempt = SendResult & { connectionId?: string; connectionStatus?: string };
 
 async function sendOne(row: QueueRow): Promise<Attempt> {
@@ -89,9 +118,24 @@ async function sendOne(row: QueueRow): Promise<Attempt> {
     return { ok: false, error: 'This conversation has no customer address on the channel.', retryable: false };
   }
 
-  const conn = await loadConnection<unknown>(row.workspace_id, row.channel);
+  let conn = await loadConnection<unknown>(row.workspace_id, row.channel);
   if (!conn || conn.connection.status === 'disconnected') {
     return { ok: false, error: `${adapter.label} is not connected. Connect it in Settings → Channels.`, retryable: false };
+  }
+  try {
+    conn = await withFreshCredentials(conn);
+  } catch (err) {
+    return { ok: false, error: `Could not renew the ${adapter.label} sign-in: ${(err as Error).message}. Reconnect it in Settings → Channels.`, retryable: false, needsAttention: true };
+  }
+
+  // A conversation with a public sender (X mention, Threads reply, LinkedIn or
+  // TikTok comment) is answered in public, under the item it is about.
+  let publicTarget: PublicTarget | null = null;
+  if (isPublicSender(conv.channel_user_id)) {
+    publicTarget = await resolvePublicTarget(row.conversation_id, (msg as MessageRow).reply_to_message_id);
+    if (!publicTarget) {
+      return { ok: false, error: 'There is no public post, comment or reply in this conversation to answer.', retryable: false };
+    }
   }
 
   let replyTo: string | null = null;
@@ -107,10 +151,18 @@ async function sendOne(row: QueueRow): Promise<Attempt> {
     if (what.kind === 'media') what.media.email = email;
     else if (what.content.type === 'text') what.content.email = email;
   }
+  if (publicTarget && what.kind === 'content' && what.content.type === 'text') what.content.publicTarget = publicTarget;
   const result =
     what.kind === 'media'
       ? await adapter.sendMedia(conn, conv.channel_user_id, what.media)
       : await adapter.sendMessage(conn, conv.channel_user_id, what.content);
+  if (result.ok && publicTarget) {
+    // Remember that this one went out in public, so the thread can say so.
+    await sb
+      .from('messages')
+      .update({ metadata: { ...((msg as MessageRow).metadata || {}), channel_visibility: 'public' } })
+      .eq('id', (msg as MessageRow).id);
+  }
   if (result.ok) {
     // The business answering means the customer's messages were read: show them the blue ticks.
     const { data: last } = await sb

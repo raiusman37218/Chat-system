@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Camera, Globe, Mail, MessageCircle, Phone } from 'lucide-react';
+import { AtSign, Briefcase, Camera, Globe, Mail, MessageCircle, MessagesSquare, Music2, Phone } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { CHANNEL_LABEL, PRIORITY_LABEL, STATUS_LABEL } from '@/lib/tickets/views';
 import type { TicketChannel, TicketPriority, TicketStatus } from '@/types/database';
@@ -45,7 +45,7 @@ export function PriorityLabel({ priority, className }: { priority: TicketPriorit
   );
 }
 
-const CHANNEL_ICON: Record<TicketChannel, typeof Mail> = { chat: MessageCircle, email: Mail, web_form: Globe, whatsapp: Phone, instagram: Camera };
+const CHANNEL_ICON: Record<TicketChannel, typeof Mail> = { chat: MessageCircle, email: Mail, web_form: Globe, whatsapp: Phone, instagram: Camera, x: AtSign, threads: MessagesSquare, linkedin: Briefcase, tiktok: Music2 };
 
 export function ChannelIcon({ channel, className }: { channel: TicketChannel; className?: string }) {
   const Icon = CHANNEL_ICON[channel];

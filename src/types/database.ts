@@ -655,7 +655,7 @@ export interface Database {
 export type TicketStatus = 'new' | 'open' | 'pending' | 'on_hold' | 'solved' | 'closed';
 export type TicketPriority = 'low' | 'normal' | 'high' | 'urgent';
 export type TicketType = 'question' | 'incident' | 'problem' | 'task';
-export type TicketChannel = 'chat' | 'email' | 'web_form' | 'whatsapp' | 'instagram';
+export type TicketChannel = 'chat' | 'email' | 'web_form' | 'whatsapp' | 'instagram' | 'x' | 'linkedin' | 'tiktok' | 'threads';
 
 export interface Ticket {
   id: string;
