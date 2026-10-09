@@ -1,4 +1,5 @@
 import { serviceClient } from '@/lib/supabase/service';
+import { autoAssignConversation } from '@/lib/team/auto-assign';
 import {
   answerFromHelpCenter,
   buildModelContext,
@@ -570,14 +571,11 @@ export async function executeHandoverToHuman({
       .eq('id', workspaceId)
       .maybeSingle();
 
-      const appUrl = (process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || '').replace(/\/+$/, '');
-      if (appUrl) {
-        fetch(`${appUrl}/api/conversations/auto-assign`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ conversation_id: conversationId }),
-        }).catch((e) => console.warn('[Auto-Assign Error during Handover]:', e));
-      }
+    try {
+      await autoAssignConversation(serviceClient(), conversationId);
+    } catch (e) {
+      console.warn('[Auto-Assign Error during Handover]:', e);
+    }
   } catch (err: any) {
     if (err?.code === '23505') {
       return;

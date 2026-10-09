@@ -20,6 +20,8 @@ import { ChannelIcon, Modal, PriorityLabel, StatusBadge, inputClass, timeAgo } f
 export const PAGE_SIZE = 50;
 
 interface Props {
+  /** False for roles that cannot change tickets: no selection, no bulk bar. */
+  canEdit: boolean;
   tickets: (TicketListItem & { matched_on?: string })[];
   total: number;
   page: number;
@@ -53,7 +55,7 @@ export function TicketList(props: Props) {
 
   return (
     <div className="flex-1 flex flex-col min-h-0">
-      {selected.size > 0 ? (
+      {props.canEdit && selected.size > 0 ? (
         <BulkBar {...props} />
       ) : (
         <div className="h-11 px-4 flex items-center justify-between border-b border-line text-[12px] text-ink-3 shrink-0">
@@ -89,13 +91,13 @@ export function TicketList(props: Props) {
           <thead className="sticky top-0 z-[1] bg-surface-2 text-[11px] uppercase tracking-wide text-ink-3">
             <tr>
               <th className="w-10 px-4 py-2 border-b border-line text-left">
-                <input
+                {props.canEdit && (<input
                   type="checkbox"
                   aria-label="Select all tickets on this page"
                   checked={allSelected}
                   onChange={(e) => props.onToggleAll(e.target.checked)}
                   className="accent-[var(--ds-accent)]"
-                />
+                />)}
               </th>
               <th className="px-2 py-2 border-b border-line text-left font-semibold">Ticket</th>
               <th className="px-2 py-2 border-b border-line text-left font-semibold hidden md:table-cell">Requester</th>
@@ -115,6 +117,7 @@ export function TicketList(props: Props) {
                   className={cn('cursor-pointer group', isSelected ? 'bg-accent-soft/60' : 'hover:bg-surface-2')}
                 >
                   <td className="px-4 py-2.5 border-b border-line" onClick={(e) => e.stopPropagation()}>
+                    {props.canEdit && (
                     <input
                       type="checkbox"
                       aria-label={`Select ticket #${t.number}`}
@@ -122,6 +125,7 @@ export function TicketList(props: Props) {
                       onChange={() => props.onToggle(t.id)}
                       className="accent-[var(--ds-accent)]"
                     />
+                    )}
                   </td>
                   <td className="px-2 py-2.5 border-b border-line max-w-0 w-[45%]">
                     <div className="flex items-center gap-2 min-w-0">

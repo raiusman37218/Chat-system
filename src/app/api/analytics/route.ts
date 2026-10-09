@@ -1,14 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { guardWorkspace } from '@/lib/team/route-guard';
 
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
-    const workspaceId = searchParams.get('workspace_id') || 'a0000000-0000-0000-0000-000000000001';
+    const workspaceId = searchParams.get('workspace_id');
+    const guard = await guardWorkspace(workspaceId, 'view');
+    if (!guard.ok) return guard.response;
+    if (!workspaceId) return NextResponse.json({ error: 'Missing workspace_id' }, { status: 400 });
     const timeRange = searchParams.get('range') || '30d'; // '7d' | '30d' | '90d'
     const granularity = searchParams.get('granularity') || 'daily'; // 'daily' | 'weekly' | 'monthly'
 
-    const supabase = await createClient();
+    const supabase = guard.access.supabase;
 
     // Determine cutoff date
     const now = new Date();

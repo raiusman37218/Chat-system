@@ -96,8 +96,7 @@ describe('ticket actions refuse another workspace before touching its data', () 
     ['searchTicketsAction', () => actions.searchTicketsAction(WS_B, 'refund')],
     ['saveTicketViewAction', () => actions.saveTicketViewAction(WS_B, { name: 'x', filters: {}, sort: {}, shared: false })],
     ['deleteTicketViewAction', () => actions.deleteTicketViewAction(WS_B, T1)],
-    ['createTicketGroupAction', () => actions.createTicketGroupAction(WS_B, 'Billing')],
-    ['deleteTicketGroupAction', () => actions.deleteTicketGroupAction(WS_B, T1)],
+    ['setTicketPresenceAction', () => actions.setTicketPresenceAction(WS_B, T1, 'viewing')],
     [
       'createTicketAction',
       () =>

@@ -7,7 +7,6 @@ import { testAiProviderAction } from '@/app/actions/knowledge';
 import {
   Palette,
   Clock,
-  Users,
   MessageSquareText,
   Sliders,
   Code,
@@ -72,9 +71,6 @@ import {
   updateAISettingsAction,
   updateHelpCenterBrandingAction,
   updateNavbarTriggerConfigAction,
-  inviteAgentAction,
-  updateAgentRoleAction,
-  removeAgentAction,
   createCannedResponseAction,
   updateCannedResponseAction,
   deleteCannedResponseAction,
@@ -224,7 +220,6 @@ const COLOR_PRESETS = [
 export function AdminSettingsPanel({
   workspace: initialWorkspace,
   currentAgent,
-  initialAgents,
   initialCannedResponses,
   onWorkspaceUpdated,
   tab,
@@ -237,7 +232,6 @@ export function AdminSettingsPanel({
 
   // Workspace state
   const [workspace, setWorkspace] = useState<Workspace>(initialWorkspace);
-  const [agents, setAgents] = useState<Agent[]>(initialAgents);
   const [cannedResponses, setCannedResponses] = useState<CannedResponse[]>(() =>
     (initialCannedResponses || []).filter(
       (c) => c.shortcut !== 'sla_guarantee' && c.shortcut !== '/sla_guarantee'
@@ -568,84 +562,6 @@ export function AdminSettingsPanel({
       },
     }));
     showStatus('Copied Monday schedule to Tuesday-Friday');
-  };
-
-  // ──────────────────────────────────────────────────────────────────────────
-  // SECTION 3: TEAM MANAGEMENT STATE
-  // ──────────────────────────────────────────────────────────────────────────
-  const [inviteModalOpen, setInviteModalOpen] = useState(false);
-  const [inviteName, setInviteName] = useState('');
-  const [inviteEmail, setInviteEmail] = useState('');
-  const [inviteRole, setInviteRole] = useState<'admin' | 'agent'>('agent');
-  const [inviting, setInviting] = useState(false);
-
-  const handleInviteAgent = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!inviteName.trim() || !inviteEmail.trim()) return;
-
-    setInviting(true);
-    try {
-      const res = await inviteAgentAction(workspace.id, {
-        name: inviteName.trim(),
-        email: inviteEmail.trim(),
-        role: inviteRole,
-      });
-
-      if (!res.success) {
-        showStatus(res.error || 'Failed to invite agent', 'error');
-        return;
-      }
-
-      if (res.agent) {
-        setAgents((prev) => {
-          const exists = prev.some((a) => a.id === res.agent!.id);
-          if (exists) {
-            return prev.map((a) => (a.id === res.agent!.id ? res.agent! : a));
-          }
-          return [...prev, res.agent!];
-        });
-        setInviteModalOpen(false);
-        setInviteName('');
-        setInviteEmail('');
-        showStatus(`Invited ${res.agent.name} as ${res.agent.role}`);
-      }
-    } catch (err: any) {
-      showStatus(err.message || 'Failed to invite agent', 'error');
-    } finally {
-      setInviting(false);
-    }
-  };
-
-  const handleUpdateRole = async (agentId: string, newRole: 'admin' | 'agent') => {
-    try {
-      const res = await updateAgentRoleAction(workspace.id, agentId, newRole);
-      if (!res.success) {
-        showStatus(res.error || 'Failed to update agent role', 'error');
-        return;
-      }
-      if (res.agent) {
-        setAgents((prev) => prev.map((a) => (a.id === agentId ? res.agent! : a)));
-        showStatus(`Updated role to ${newRole}`);
-      }
-    } catch (err: any) {
-      showStatus(err.message || 'Failed to update agent role', 'error');
-    }
-  };
-
-  const handleRemoveAgent = async (agentId: string, agentName: string) => {
-    if (!confirm(`Are you sure you want to remove ${agentName} from the workspace?`)) return;
-
-    try {
-      const res = await removeAgentAction(workspace.id, agentId);
-      if (!res.success) {
-        showStatus(res.error || 'Failed to remove agent', 'error');
-        return;
-      }
-      setAgents((prev) => prev.filter((a) => a.id !== agentId));
-      showStatus(`Removed ${agentName}`);
-    } catch (err: any) {
-      showStatus(err.message || 'Failed to remove agent', 'error');
-    }
   };
 
   // ──────────────────────────────────────────────────────────────────────────
@@ -1264,7 +1180,6 @@ export function AdminSettingsPanel({
           { id: 'helpcenter', label: 'Help Center Branding', icon: BookOpen },
           { id: 'domain', label: 'Custom Domains', icon: Globe },
           { id: 'hours', label: 'Business Hours', icon: Clock },
-          { id: 'team', label: 'Team & Roles', icon: Users, badge: agents.length },
           { id: 'canned', label: 'Canned Replies', icon: MessageSquareText, badge: cannedResponses.length },
           { id: 'assignment', label: 'Auto-Assignment', icon: Sliders },
           { id: 'ai', label: 'AI assistant', icon: Sparkles },
@@ -2906,181 +2821,6 @@ export function AdminSettingsPanel({
           </div>
         )}
 
-        {/* ─────────────────────────────────────────────────────────────────── */}
-        {/* TAB 3: TEAM MANAGEMENT & ROLE SWITCHER */}
-        {/* ─────────────────────────────────────────────────────────────────── */}
-        {activeTab === 'team' && (
-          <div className="space-y-6 animate-rise">
-            <div className="card p-6 space-y-6">
-              <div className="flex items-center justify-between border-b border-line pb-4">
-                <div>
-                  <h3 className="text-[16px] font-semibold text-ink">Agents & Team Permissions</h3>
-                  <p className="text-[12.5px] text-ink-3 mt-0.5">
-                    Invite team members, assign administrator privileges, or revoke access.
-                  </p>
-                </div>
-                <button
-                  onClick={() => setInviteModalOpen(true)}
-                  className="btn btn-sm btn-primary gap-1.5 shadow-xs"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span>Invite Agent</span>
-                </button>
-              </div>
-
-              {/* Agents Table */}
-              <div className="border border-line rounded-xl overflow-hidden divide-y divide-line">
-                {agents.map((agent) => {
-                  const isSelf = agent.id === currentAgent.id;
-                  const isOwner = agent.role === 'owner';
-                  return (
-                    <div
-                      key={agent.id}
-                      className="p-4 px-4 sm:px-6 flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 hover:bg-surface-2/40 transition-colors"
-                    >
-                      <div className="flex items-center gap-3.5 min-w-0">
-                        <div className="relative shrink-0">
-                          <div className="w-10 h-10 rounded-full bg-accent/10 text-accent font-bold text-sm flex items-center justify-center">
-                            {agent.name.slice(0, 2).toUpperCase()}
-                          </div>
-                          <span
-                            className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white dark:border-slate-900 ${
-                              agent.status === 'online'
-                                ? 'bg-emerald-500'
-                                : agent.status === 'away'
-                                ? 'bg-amber-500'
-                                : 'bg-slate-400'
-                            }`}
-                          />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="font-semibold text-[13.5px] text-ink break-words">
-                              {agent.name}
-                            </span>
-                            {isSelf && (
-                              <span className="text-[10.5px] px-1.5 py-0.5 rounded bg-surface-2 text-ink-2 font-medium shrink-0">
-                                You
-                              </span>
-                            )}
-                          </div>
-                          <div className="text-[12px] text-ink-3 break-all">{agent.email}</div>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-3 flex-wrap sm:shrink-0 self-start sm:self-auto pl-13 sm:pl-0">
-                        {/* Role Selector */}
-                        {isOwner ? (
-                          <span className="px-3 py-1 rounded-full bg-purple-500/10 text-purple-600 font-semibold text-xs flex items-center gap-1 shrink-0">
-                            <ShieldCheck className="w-3.5 h-3.5" />
-                            Owner
-                          </span>
-                        ) : (
-                          <select
-                            value={agent.role}
-                            disabled={isSelf}
-                            onChange={(e) =>
-                              handleUpdateRole(agent.id, e.target.value as 'admin' | 'agent')
-                            }
-                            className="input py-1 text-xs font-semibold w-28 shrink-0"
-                          >
-                            <option value="agent">Agent</option>
-                            <option value="admin">Admin</option>
-                          </select>
-                        )}
-
-                        {/* Remove Action */}
-                        {!isSelf && !isOwner && (
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveAgent(agent.id, agent.name)}
-                            title="Remove agent"
-                            className="p-1.5 rounded-lg text-ink-3 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors shrink-0"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Invite Agent Modal */}
-            {inviteModalOpen && (
-              <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade">
-                <div className="card max-w-md w-full p-6 space-y-5 animate-rise shadow-2xl">
-                  <div className="flex items-center justify-between border-b border-line pb-3">
-                    <h3 className="text-[16px] font-semibold text-ink">Invite New Agent</h3>
-                    <button
-                      onClick={() => setInviteModalOpen(false)}
-                      className="text-ink-3 hover:text-ink"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  </div>
-
-                  <form onSubmit={handleInviteAgent} className="space-y-4">
-                    <div>
-                      <label className="field-label">Full Name</label>
-                      <input
-                        type="text"
-                        required
-                        value={inviteName}
-                        onChange={(e) => setInviteName(e.target.value)}
-                        placeholder="Sarah Connor"
-                        className="input"
-                      />
-                    </div>
-                    <div>
-                      <label className="field-label">Email Address</label>
-                      <input
-                        type="email"
-                        required
-                        value={inviteEmail}
-                        onChange={(e) => setInviteEmail(e.target.value)}
-                        placeholder="sarah@company.com"
-                        className="input"
-                      />
-                    </div>
-                    <div>
-                      <label className="field-label">Workspace Role</label>
-                      <select
-                        value={inviteRole}
-                        onChange={(e) => setInviteRole(e.target.value as any)}
-                        className="input font-medium"
-                      >
-                        <option value="agent">Support Agent (Respond to chats)</option>
-                        <option value="admin">Administrator (Full settings & team access)</option>
-                      </select>
-                    </div>
-
-                    <div className="flex justify-end gap-2 pt-2">
-                      <button
-                        type="button"
-                        onClick={() => setInviteModalOpen(false)}
-                        className="btn btn-sm btn-ghost"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        type="submit"
-                        disabled={inviting}
-                        className="btn btn-sm btn-primary"
-                      >
-                        {inviting ? 'Inviting…' : 'Send Invitation'}
-                      </button>
-                    </div>
-                  </form>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* ─────────────────────────────────────────────────────────────────── */}
-        {/* TAB 4: CANNED RESPONSES (SAVED REPLIES CRUD) */}
         {/* ─────────────────────────────────────────────────────────────────── */}
         {activeTab === 'canned' && (
           <div className="space-y-6 animate-rise">

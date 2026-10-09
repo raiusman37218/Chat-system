@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { guardConversation } from '@/lib/team/route-guard';
 import { translateVisitorMessage } from '@/lib/ai/inbound-translation';
 
 const CORS_HEADERS = {
@@ -20,6 +21,12 @@ export async function POST(req: NextRequest) {
     if (!messageId) {
       return NextResponse.json({ error: 'Missing messageId' }, { status: 400, headers: CORS_HEADERS });
     }
+
+    // Only for messages in the caller's own workspace (the lookup goes through their session).
+    const { createClient } = await import('@/lib/supabase/server');
+    const { data: row } = await (await createClient()).from('messages').select('conversation_id').eq('id', messageId).maybeSingle();
+    const guard = await guardConversation(row?.conversation_id, 'view');
+    if (!guard.ok) return NextResponse.json(await guard.response.json(), { status: guard.response.status, headers: CORS_HEADERS });
 
     const result = await translateVisitorMessage(messageId);
     if (!result) {

@@ -10,6 +10,8 @@ import {
 import { generateSlug } from '@/lib/slug';
 import { after } from 'next/server';
 import { invalidateHelpIndex } from '@/lib/ai/help-answer';
+import { getWorkspaceAccess } from '@/lib/team/access';
+import type { Capability } from '@/lib/team/permissions';
 
 /**
  * Brings the assistant's knowledge up to date after a help-centre change.
@@ -30,49 +32,15 @@ function refreshKnowledge(workspaceId: string, task: () => Promise<unknown>) {
 }
 
 /**
- * Ensures the requesting user is authenticated and belongs to the specified workspace.
+ * Ensures the caller is an active member of the workspace whose role allows
+ * `capability`: reading needs `view`, changing articles `edit_content`.
  */
-async function assertAgent(workspaceId: string): Promise<{ user: any; agent: Agent }> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-    error: authErr,
-  } = await supabase.auth.getUser();
-
-  if (authErr || !user) {
-    throw new Error('Unauthorized: Authentication required.');
-  }
-
-  const { data: agent, error: agentErr } = await supabase
-    .from('agents')
-    .select('*')
-    .eq('id', user.id)
-    .single();
-
-  if (agentErr || !agent) {
-    throw new Error('Forbidden: Agent profile not found.');
-  }
-
-  // Tenancy check: agent must belong to the workspace, or be the workspace owner
-  let isAuthorized = agent.workspace_id === workspaceId;
-
-  if (!isAuthorized) {
-    const { data: ws } = await supabase
-      .from('workspaces')
-      .select('owner_id')
-      .eq('id', workspaceId)
-      .maybeSingle();
-
-    if (ws && ws.owner_id === user.id) {
-      isAuthorized = true;
-    }
-  }
-
-  if (!isAuthorized) {
-    throw new Error('Forbidden: Agent does not belong to this workspace.');
-  }
-
-  return { user, agent: agent as Agent };
+async function assertAgent(
+  workspaceId: string,
+  capability: Capability = 'edit_content'
+): Promise<{ user: { id: string }; agent: Agent }> {
+  const { user, agent } = await getWorkspaceAccess(workspaceId, capability);
+  return { user, agent: agent as unknown as Agent };
 }
 
 
@@ -130,7 +98,7 @@ export async function ensureUniqueArticleSlug(
  * Fetch all sections, articles, and calculated KPI metrics for the Help Desk.
  */
 export async function getHelpDeskDataAction(workspaceId: string) {
-  await assertAgent(workspaceId);
+  await assertAgent(workspaceId, 'view');
   const supabase = await createClient();
 
   const [sectionsRes, articlesRes] = await Promise.all([
@@ -218,7 +186,7 @@ export async function getArticleAction(
   workspaceId: string,
   articleId: string
 ): Promise<Article> {
-  await assertAgent(workspaceId);
+  await assertAgent(workspaceId, 'view');
   const supabase = await createClient();
 
   const { data, error } = await supabase
@@ -247,7 +215,7 @@ export async function searchArticleBodiesAction(
   const q = query.trim();
   if (q.length < 2) return [];
 
-  await assertAgent(workspaceId);
+  await assertAgent(workspaceId, 'view');
   const supabase = await createClient();
 
   // PostgREST treats these as pattern metacharacters inside a filter list.
@@ -903,7 +871,7 @@ export async function updateHelpTabSettingsAction(
     icon?: string;
   }
 ) {
-  await assertAgent(workspaceId);
+  await assertAgent(workspaceId, 'manage_settings');
   const supabase = await createClient();
 
   const { data: updated, error } = await supabase

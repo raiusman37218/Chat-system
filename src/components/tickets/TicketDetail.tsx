@@ -41,19 +41,36 @@ import {
 } from '@/lib/tickets/views';
 import type { TicketGroup, TicketPriority, TicketStatus, TicketType } from '@/types/database';
 import { ChannelIcon, StatusBadge, fullTime, inputClass, timeAgo } from './TicketBits';
+import { roleCan, type Role } from '@/lib/team/permissions';
+import { CollisionBanner, usePresence } from './Presence';
 
 interface Props {
   workspaceId: string;
   ticketId: string;
-  agents: { id: string; name: string }[];
-  groups: TicketGroup[];
+  agents: Teammate[];
+  groups: (TicketGroup & { member_ids?: string[] })[];
+  /** The signed-in agent; decides what the screen offers. Null until the workspace has loaded. */
+  me: { id: string; role: Role } | null;
   onBack: () => void;
   onOpenTicket: (id: string) => void;
   /** Something changed that the list and counts should reflect. */
   onChanged: () => void;
 }
 
-export function TicketDetail({ workspaceId, ticketId, agents, groups, onBack, onOpenTicket, onChanged }: Props) {
+export interface Teammate {
+  id: string;
+  name: string;
+  status?: string;
+  role?: Role;
+  is_active?: boolean;
+  max_open_tickets?: number | null;
+  open_tickets?: number;
+}
+
+export function TicketDetail({ workspaceId, ticketId, agents, groups, me, onBack, onOpenTicket, onChanged }: Props) {
+  const canEdit = roleCan(me?.role, 'edit_ticket');
+  const canReply = roleCan(me?.role, 'reply');
+  const { others, report } = usePresence(workspaceId, ticketId);
   const [detail, setDetail] = useState<Detail | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -212,6 +229,8 @@ export function TicketDetail({ workspaceId, ticketId, agents, groups, onBack, on
           </div>
         )}
 
+        <CollisionBanner others={others} />
+
         <div className="flex items-center gap-1 px-4 pt-2 border-b border-line shrink-0" role="tablist">
           {(
             [
@@ -243,6 +262,9 @@ export function TicketDetail({ workspaceId, ticketId, agents, groups, onBack, on
                 key={ticket.id}
                 status={ticket.status}
                 channel={ticket.channel}
+                canReply={canReply}
+                canEditStatus={canEdit}
+                onActivity={report}
                 onSend={async (body, internal, submitAs) => {
                   const result = await replyToTicketAction(workspaceId, ticketId, { body, internal, submitAs });
                   if (result.emailError) setNotice(result.emailError);
@@ -261,7 +283,7 @@ export function TicketDetail({ workspaceId, ticketId, agents, groups, onBack, on
       </section>
 
       <aside className="w-[300px] shrink-0 overflow-y-auto bg-surface hidden md:block" aria-label="Ticket details">
-        <Properties detail={detail} agents={agents} groups={groups} disabled={closed} onUpdate={update} />
+        <Properties detail={detail} agents={agents} groups={groups} disabled={closed || !canEdit} readOnlyReason={!canEdit ? 'Your role can view tickets and add internal notes.' : null} onUpdate={update} />
         <Requester detail={detail} onOpenTicket={onOpenTicket} />
       </aside>
     </div>
@@ -372,13 +394,20 @@ function Thread({ detail, people }: { detail: Detail; people: Record<string, str
 function Composer({
   status,
   channel,
+  canReply,
+  canEditStatus,
+  onActivity,
   onSend,
 }: {
   status: TicketStatus;
   channel: Detail['ticket']['channel'];
+  /** Light agents cannot reply to customers: the composer is notes only. */
+  canReply: boolean;
+  canEditStatus: boolean;
+  onActivity: (state: 'viewing' | 'replying' | 'noting') => void;
   onSend: (body: string, internal: boolean, submitAs?: TicketStatus) => Promise<void>;
 }) {
-  const [internal, setInternal] = useState(false);
+  const [internal, setInternal] = useState(!canReply);
   const [body, setBody] = useState('');
   const [submitAs, setSubmitAs] = useState<TicketStatus>(status === 'new' ? 'open' : status);
   const [sending, setSending] = useState(false);
@@ -389,8 +418,9 @@ function Composer({
     setSending(true);
     setError(null);
     try {
-      await onSend(body, internal, internal ? undefined : submitAs);
+      await onSend(body, internal, internal || !canEditStatus ? undefined : submitAs);
       setBody('');
+      onActivity('viewing');
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -401,13 +431,16 @@ function Composer({
   return (
     <div className={cn('border-t px-4 py-3 shrink-0', internal ? 'border-warn-line bg-warn-soft/60' : 'border-line bg-surface')}>
       <div className="flex items-center gap-1 mb-2" role="tablist" aria-label="Reply type">
-        {([false, true] as const).map((isNote) => (
+        {([false, true] as const).filter((isNote) => canReply || isNote).map((isNote) => (
           <button
             key={String(isNote)}
             type="button"
             role="tab"
             aria-selected={internal === isNote}
-            onClick={() => setInternal(isNote)}
+            onClick={() => {
+              setInternal(isNote);
+              if (body.trim()) onActivity(isNote ? 'noting' : 'replying');
+            }}
             className={cn(
               'inline-flex items-center gap-1.5 px-2.5 h-7 rounded-lg text-[12px] font-semibold',
               internal === isNote
@@ -424,7 +457,10 @@ function Composer({
       </div>
       <textarea
         value={body}
-        onChange={(e) => setBody(e.target.value)}
+        onChange={(e) => {
+          setBody(e.target.value);
+          onActivity(e.target.value.trim() ? (internal ? 'noting' : 'replying') : 'viewing');
+        }}
         onKeyDown={(e) => {
           if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) send();
         }}
@@ -435,7 +471,8 @@ function Composer({
       />
       {error && <p className="text-[12px] text-danger mt-1.5">{error}</p>}
       <div className="flex items-center justify-end gap-2 mt-2">
-        {!internal && (
+        {!canReply && <span className="mr-auto text-[12px] text-ink-3">Light agents can add internal notes only.</span>}
+        {!internal && canEditStatus && (
           <Menu<TicketStatus>
             value={submitAs}
             onChange={setSubmitAs}
@@ -476,16 +513,19 @@ function Properties({
   agents,
   groups,
   disabled,
+  readOnlyReason,
   onUpdate,
 }: {
   detail: Detail;
-  agents: { id: string; name: string }[];
-  groups: TicketGroup[];
+  agents: Teammate[];
+  groups: (TicketGroup & { member_ids?: string[] })[];
   disabled: boolean;
+  readOnlyReason?: string | null;
   onUpdate: (patch: TicketPatch) => Promise<void>;
 }) {
   const { ticket } = detail;
   const [tag, setTag] = useState('');
+  const assignees = assigneeOptions(agents, groups, ticket.group_id, ticket.assignee_id);
   const row = (label: string, control: React.ReactNode) => (
     <div className="flex items-center justify-between gap-3 py-1.5">
       <span className="text-[12px] text-ink-3 shrink-0">{label}</span>
@@ -500,6 +540,7 @@ function Properties({
   return (
     <section className="p-4 border-b border-line">
       <h3 className="text-[11px] font-bold uppercase tracking-wide text-ink-3 mb-2">Properties</h3>
+      {readOnlyReason && <p className="text-[12px] text-ink-3 mb-2">{readOnlyReason}</p>}
       {row(
         'Status',
         <Menu<TicketStatus> value={ticket.status} label="Status" onChange={(status) => status !== 'new' && onUpdate({ status })} options={statusOptions} />
@@ -528,7 +569,7 @@ function Properties({
           value={ticket.assignee_id ?? '__none'}
           label="Assignee"
           onChange={(v) => onUpdate({ assignee_id: v === '__none' ? null : v })}
-          options={[{ value: '__none', label: 'Unassigned' }, ...agents.map((a) => ({ value: a.id, label: a.name }))]}
+          options={[{ value: '__none', label: 'Unassigned' }, ...assignees]}
         />
       )}
       {row(
@@ -671,4 +712,29 @@ function Requester({ detail, onOpenTicket }: { detail: Detail; onOpenTicket: (id
       </section>
     </>
   );
+}
+
+/**
+ * Who a ticket can be assigned to: active agents (not light agents), only the
+ * group's members when the ticket has a group, with their status and load so
+ * the choice is informed. The current assignee stays listed even if they no
+ * longer qualify, so the control shows the truth.
+ */
+export function assigneeOptions(
+  agents: Teammate[],
+  groups: { id: string; member_ids?: string[] }[],
+  groupId: string | null,
+  currentId: string | null
+): { value: string; label: string; description?: string }[] {
+  const members = groupId ? groups.find((g) => g.id === groupId)?.member_ids : undefined;
+  return agents
+    .filter((a) => a.id === currentId || (a.is_active !== false && a.role !== 'light_agent' && (!members || members.includes(a.id))))
+    .map((a) => {
+      const open = a.open_tickets;
+      const parts = [
+        a.is_active === false ? 'Deactivated' : a.status ? a.status[0].toUpperCase() + a.status.slice(1) : null,
+        open !== undefined ? `${open}${a.max_open_tickets ? `/${a.max_open_tickets}` : ''} open` : null,
+      ].filter(Boolean);
+      return { value: a.id, label: a.name, description: parts.join(' · ') || undefined };
+    });
 }

@@ -1,9 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { guardMember } from '@/lib/team/route-guard';
 import { testSmtpConnection, sendSmtpEmail, isValidEmail, getEffectiveFromEmail } from '@/lib/email/smtp';
 import { SMTPSettingsConfig } from '@/types/database';
 
 export async function POST(req: NextRequest) {
   try {
+    const guard = await guardMember('manage_settings');
+    if (!guard.ok) return guard.response;
     const body = await req.json();
     const { config, sendTestTo } = body as {
       config: SMTPSettingsConfig;

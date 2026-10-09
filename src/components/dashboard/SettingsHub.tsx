@@ -24,6 +24,7 @@ import {
   Menu,
   ShieldCheck,
   Smartphone,
+  Network,
 } from 'lucide-react';
 import { Agent, CannedResponse, Workspace } from '@/types/database';
 import { cn } from '@/lib/utils';
@@ -38,6 +39,8 @@ import {
   AdminSettingsPanel,
   type AdminTab,
 } from '@/components/admin/AdminSettingsPanel';
+import { TeamSettings } from '@/components/team/TeamSettings';
+import { GroupsSettings } from '@/components/team/GroupsSettings';
 import { createClient } from '@/lib/supabase/client';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 
@@ -49,6 +52,7 @@ export type SectionId =
   | 'email'
   | 'domains'
   | 'team'
+  | 'groups'
   | 'routing'
   | 'replies'
   | 'ai';
@@ -252,7 +256,7 @@ const SETTING_GROUPS: SettingGroup[] = [
       {
         id: 'team',
         label: 'Team Members & Roles',
-        description: 'Invite colleagues, manage agent roles and assign permissions',
+        description: 'Invite colleagues by email, set roles, capacity and deactivate people',
         Icon: Users,
         adminOnly: true,
         keywords: [
@@ -271,6 +275,15 @@ const SETTING_GROUPS: SettingGroup[] = [
           text: `${agents.length} Member${agents.length === 1 ? '' : 's'}`,
           variant: 'neutral',
         }),
+      },
+      {
+        id: 'groups',
+        label: 'Groups & Routing',
+        description: 'Billing, Technical and other groups, who is in them, and round-robin assignment',
+        Icon: Network,
+        adminOnly: true,
+        keywords: ['group', 'groups', 'billing', 'technical', 'round robin', 'round-robin', 'assignment', 'queue', 'capacity', 'routing'],
+        getBadge: () => null,
       },
       {
         id: 'routing',
@@ -1085,7 +1098,10 @@ export function SettingsHub({
               {active === 'domains' && renderAdmin('domain')}
 
               {/* Team Members */}
-              {active === 'team' && renderAdmin('team')}
+              {active === 'team' && workspace && <TeamSettings workspaceId={workspace.id} />}
+
+              {/* Groups & Routing */}
+              {active === 'groups' && workspace && <GroupsSettings workspaceId={workspace.id} />}
 
               {/* Hours & Availability */}
               {active === 'routing' && (

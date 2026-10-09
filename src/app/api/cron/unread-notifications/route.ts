@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { guardMember } from '@/lib/team/route-guard';
 import { createClient } from '@supabase/supabase-js';
 import { sendSmtpEmail, generateUnreadAlertEmailHtml } from '@/lib/email/smtp';
 import { SMTPSettingsConfig, Workspace } from '@/types/database';
@@ -19,6 +20,13 @@ export async function POST(req: NextRequest) {
 }
 
 async function processUnreadNotifications(req: NextRequest) {
+  // The scheduler (CRON_SECRET) or a signed-in member of any role; it only
+  // emails customers about replies they have not read.
+  const secret = process.env.CRON_SECRET;
+  if (!(secret && req.headers.get('authorization') === `Bearer ${secret}`)) {
+    const guard = await guardMember('view');
+    if (!guard.ok) return guard.response;
+  }
   try {
     const supabase = getSupabase();
     const appBaseUrl = (process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || '').replace(/\/+$/, '');
