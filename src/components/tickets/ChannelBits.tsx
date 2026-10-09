@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, Check, CheckCheck, Clock, FileText, RotateCcw, Send } from 'lucide-react';
+import { AlertTriangle, Check, CheckCheck, Clock, FileText, Image as ImageIcon, RotateCcw, Send } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Field, Input, Select } from '@/components/ui/Input';
 import { SkeletonBlock } from '@/components/ui/States';
@@ -30,9 +30,20 @@ export function useMinuteClock(): Date {
   return now;
 }
 
+/**
+ * The window an agent replies in: the channel's own, or the longer Human
+ * Agent window when the connection has that feature (Instagram).
+ */
 export function useServiceWindow(state: TicketChannelState | null) {
   const now = useMinuteClock();
-  return useMemo(() => (state ? serviceWindow(state.lastInboundAt, state.windowHours, now) : null), [state, now]);
+  return useMemo(
+    () => (state ? serviceWindow(state.lastInboundAt, state.humanAgentHours ?? state.windowHours, now) : null),
+    [state, now]
+  );
+}
+
+function hoursText(hours: number): string {
+  return hours % 24 === 0 && hours > 24 ? `${hours / 24} days` : `${hours} hours`;
 }
 
 export function ChannelBanner({ state, window: win }: { state: TicketChannelState; window: ReturnType<typeof serviceWindow> | null }) {
@@ -55,18 +66,26 @@ export function ChannelBanner({ state, window: win }: { state: TicketChannelStat
       {win && state.windowHours !== null && win.open && (
         <p className="mb-2 flex items-center gap-1.5 text-xs text-ink-2">
           <Clock className="w-3.5 h-3.5 text-ink-3" aria-hidden="true" />
-          Customer service window open · {formatRemaining(win.remainingMs)} left to reply freely
+          {state.humanAgentHours && !serviceWindow(state.lastInboundAt, state.windowHours).open
+            ? `Past ${state.windowHours} hours: your reply goes out as a human agent · ${formatRemaining(win.remainingMs)} left`
+            : `Customer service window open · ${formatRemaining(win.remainingMs)} left to reply freely`}
         </p>
       )}
       {win && state.windowHours !== null && !win.open && (
         <div role="status" className="mb-2 rounded-md border border-line bg-surface-2 px-3 py-2 text-xs text-ink">
           <p className="font-semibold flex items-center gap-1.5">
-            <Clock className="w-3.5 h-3.5 text-ink-3" aria-hidden="true" /> The {state.windowHours}-hour window has closed
+            <Clock className="w-3.5 h-3.5 text-ink-3" aria-hidden="true" />
+            {state.templates
+              ? `The ${state.windowHours}-hour window has closed`
+              : `Replies are closed: ${state.label} allows them for ${hoursText(state.humanAgentHours ?? state.windowHours)}`}
           </p>
           <p className="mt-0.5 text-ink-2">
             {state.lastInboundAt ? `The customer last wrote ${timeAgo(state.lastInboundAt)}. ` : 'The customer has not written on this channel. '}
-            {state.label} only lets a business send pre-approved templates until the customer writes again. Their next message reopens the
-            window.
+            {state.templates
+              ? `${state.label} only lets a business send pre-approved templates until the customer writes again. Their next message reopens the window.`
+              : `${state.label} only lets a business answer within ${hoursText(state.windowHours)} of the customer's last message${
+                  state.humanAgentHours ? ` (${hoursText(state.humanAgentHours)} for a person, as a human agent)` : ''
+                }, and has no templates to start again. Internal notes still work; their next message reopens the conversation.`}
           </p>
         </div>
       )}
@@ -267,4 +286,36 @@ export function channelNotice(outcome: ReplyOutcome['channel'], label: string): 
   if (outcome.status === 'failed') return `Not sent on ${label}: ${outcome.error}`;
   if (outcome.status === 'queued') return `Saved. ${label} did not accept it yet; it will be retried automatically.`;
   return null;
+}
+
+interface StoryMeta {
+  kind?: 'reply' | 'mention';
+  url?: string;
+  media_url?: string;
+  media_type?: string;
+}
+
+/** What the customer was reacting to: the business's story, or theirs that mentions the business. */
+export function StoryContextCard({ story }: { story: StoryMeta }) {
+  const href = story.media_url || story.url;
+  const isImage = Boolean(story.media_url && (story.media_type || '').startsWith('image/'));
+  return (
+    <div className="mb-1.5 rounded-lg border border-line bg-surface-2 p-2 text-xs text-ink-2 max-w-xs">
+      <p className="font-semibold text-ink flex items-center gap-1.5">
+        <ImageIcon className="w-3.5 h-3.5 text-ink-3" aria-hidden="true" />
+        {story.kind === 'mention' ? 'Mentioned you in their story' : 'Replied to your story'}
+      </p>
+      {isImage && href ? (
+        <a href={href} target="_blank" rel="noopener noreferrer" className="mt-1.5 block">
+          {/* eslint-disable-next-line @next/next/no-img-element -- a stored copy on Cloudinary, not an app asset */}
+          <img src={href} alt="The story" className="max-h-40 rounded-md border border-line object-cover" />
+        </a>
+      ) : href ? (
+        <a href={href} target="_blank" rel="noopener noreferrer" className="mt-1 inline-block text-accent underline underline-offset-2">
+          Open the story
+        </a>
+      ) : null}
+      {!story.media_url && <p className="mt-1 text-ink-3">Stories expire after 24 hours, after which Instagram no longer shares them.</p>}
+    </div>
+  );
 }

@@ -399,6 +399,12 @@ export default function DashboardPage() {
     setActiveView('settings');
   }, []);
 
+  // Instagram's login sends the admin back here with ?settings=channels.
+  useEffect(() => {
+    const target = new URLSearchParams(window.location.search).get('settings');
+    if (target === 'channels') handleOpenSettingsSection('channels');
+  }, [handleOpenSettingsSection]);
+
   const handleOpenTickets = useCallback((target: { viewId?: string; ticketId?: string }) => {
     setTicketsRequest({ ...target, nonce: Date.now() });
     setActiveView('tickets');

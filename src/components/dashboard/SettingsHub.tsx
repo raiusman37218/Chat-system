@@ -162,7 +162,7 @@ const SETTING_GROUPS: SettingGroup[] = [
       {
         id: 'channels',
         label: 'Omnichannel Chat',
-        description: 'Connect WhatsApp through the official Business API, plus Messenger, LinkedIn & Slack alerts',
+        description: 'Connect WhatsApp and Instagram through Meta’s official APIs, plus Messenger, LinkedIn & Slack alerts',
         Icon: Share2,
         adminOnly: true,
         keywords: [

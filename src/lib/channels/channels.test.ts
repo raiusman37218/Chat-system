@@ -195,6 +195,6 @@ describe('handling a webhook', () => {
     const q = (token: string) => new URLSearchParams({ 'hub.mode': 'subscribe', 'hub.verify_token': token, 'hub.challenge': '42' });
     expect(await handleWebhookChallenge('whatsapp', q('platform-verify'))).toEqual({ status: 200, body: '42' });
     expect((await handleWebhookChallenge('whatsapp', q('nope'))).status).toBe(403);
-    expect((await handleWebhookChallenge('instagram', q('platform-verify'))).status).toBe(404);
+    expect((await handleWebhookChallenge('messenger', q('platform-verify'))).status).toBe(404);
   });
 });

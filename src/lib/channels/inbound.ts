@@ -29,6 +29,9 @@ export function platformWebhookSecrets(channel: string): { appSecret?: string; v
   if (channel === 'whatsapp') {
     return { appSecret: process.env.META_APP_SECRET, verifyToken: process.env.META_WEBHOOK_VERIFY_TOKEN };
   }
+  if (channel === 'instagram') {
+    return { appSecret: process.env.INSTAGRAM_APP_SECRET, verifyToken: process.env.INSTAGRAM_WEBHOOK_VERIFY_TOKEN };
+  }
   return {};
 }
 
@@ -66,6 +69,7 @@ function metadataFor(event: InboundMessageEvent): Record<string, unknown> {
     channel_type: event.type,
     ...(event.media ? { channel_media: event.media } : {}),
     ...(event.replyToExternalId ? { channel_reply_to: event.replyToExternalId } : {}),
+    ...(event.story ? { channel_story: event.story } : {}),
   };
 }
 
@@ -172,6 +176,14 @@ async function storeEvent(
         console.error('[Channels] Could not fetch inbound media:', err)
       );
     }
+    if (event.story?.url) {
+      await keepStory(adapter, conn, result.message_id, event.story.url, metadataFor(event)).catch((err) =>
+        console.error('[Channels] Could not keep the story media:', err)
+      );
+    }
+    if (!event.fromName && adapter.getSenderProfile) {
+      await nameSender(adapter, conn, event.from).catch((err) => console.error('[Channels] Could not look up the sender:', err));
+    }
     if ((result.ai_mode ?? 'autopilot') === 'autopilot' && result.conversation_id) {
       await fetch(`${origin}/api/ai/auto-respond`, {
         method: 'POST',
@@ -198,5 +210,45 @@ async function attachMedia(
     resourceType: file.mimeType.startsWith('image/') ? 'image' : 'auto',
   });
   const { error } = await serviceClient().from('messages').update({ attachment_url: uploaded.secure_url }).eq('id', messageId);
+  if (error) throw new Error(error.message);
+}
+
+/**
+ * Stories disappear after a day, and so do their URLs: keep a copy so the
+ * agent can still see what the customer replied to or mentioned.
+ */
+async function keepStory(
+  adapter: ChannelAdapter<unknown, unknown>,
+  conn: LoadedConnection<Creds>,
+  messageId: string,
+  storyUrl: string,
+  metadata: Record<string, unknown>
+) {
+  if (!isCloudinaryConfigured()) return;
+  const file = await adapter.downloadMedia(conn, storyUrl);
+  const uploaded = await uploadToCloudinary(file.data, {
+    folder: `channels/${conn.connection.workspace_id}/stories`,
+    resourceType: file.mimeType.startsWith('image/') ? 'image' : 'auto',
+  });
+  const story = { ...(metadata.channel_story as Record<string, unknown>), media_url: uploaded.secure_url, media_type: file.mimeType };
+  const { error } = await serviceClient()
+    .from('messages')
+    .update({ metadata: { ...metadata, channel_story: story } })
+    .eq('id', messageId);
+  if (error) throw new Error(error.message);
+}
+
+/** Webhooks that carry only an id for the sender: give the visitor a readable name. */
+async function nameSender(adapter: ChannelAdapter<unknown, unknown>, conn: LoadedConnection<Creds>, senderId: string) {
+  const profile = await adapter.getSenderProfile!(conn, senderId);
+  const name = profile?.name || (profile?.username ? `@${profile.username}` : null);
+  if (!name) return;
+  const { error } = await serviceClient()
+    .from('visitors')
+    .update({ name })
+    .eq('workspace_id', conn.connection.workspace_id)
+    .eq('channel', conn.connection.channel)
+    .eq('channel_user_id', senderId)
+    .eq('name', senderId);
   if (error) throw new Error(error.message);
 }

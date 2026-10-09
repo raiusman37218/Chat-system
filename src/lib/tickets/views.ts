@@ -13,7 +13,7 @@ import type { TicketChannel, TicketPriority, TicketStatus, TicketType } from '@/
 export const TICKET_STATUSES: readonly TicketStatus[] = ['new', 'open', 'pending', 'on_hold', 'solved', 'closed'];
 export const TICKET_PRIORITIES: readonly TicketPriority[] = ['low', 'normal', 'high', 'urgent'];
 export const TICKET_TYPES: readonly TicketType[] = ['question', 'incident', 'problem', 'task'];
-export const TICKET_CHANNELS: readonly TicketChannel[] = ['chat', 'email', 'web_form', 'whatsapp'];
+export const TICKET_CHANNELS: readonly TicketChannel[] = ['chat', 'email', 'web_form', 'whatsapp', 'instagram'];
 /** Channels an agent can log a ticket under by hand; the others start from the customer. */
 export const MANUAL_TICKET_CHANNELS: readonly TicketChannel[] = ['email', 'web_form'];
 /** Statuses an agent can choose. New is where tickets start, not a choice. */
@@ -30,7 +30,7 @@ export const STATUS_LABEL: Record<TicketStatus, string> = {
 };
 export const PRIORITY_LABEL: Record<TicketPriority, string> = { low: 'Low', normal: 'Normal', high: 'High', urgent: 'Urgent' };
 export const TYPE_LABEL: Record<TicketType, string> = { question: 'Question', incident: 'Incident', problem: 'Problem', task: 'Task' };
-export const CHANNEL_LABEL: Record<TicketChannel, string> = { chat: 'Chat', email: 'Email', web_form: 'Web form', whatsapp: 'WhatsApp' };
+export const CHANNEL_LABEL: Record<TicketChannel, string> = { chat: 'Chat', email: 'Email', web_form: 'Web form', whatsapp: 'WhatsApp', instagram: 'Instagram' };
 
 export interface TicketFilters {
   status?: TicketStatus[];

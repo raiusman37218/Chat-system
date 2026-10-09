@@ -15,6 +15,8 @@ import { CHANNEL_CATALOG, getAdapter, isChannelId, type ChannelCatalogEntry } fr
 import { deleteSecrets, getConnection, loadConnection, recordConnectionError, saveConnection, updateConnection } from '@/lib/channels/store';
 import { exchangeSignupCode } from '@/lib/channels/whatsapp/graph';
 import { normalizePhone, type WhatsAppCredentials } from '@/lib/channels/whatsapp/adapter';
+import type { InstagramCredentials } from '@/lib/channels/instagram/adapter';
+import { authorizeUrl, createState } from '@/lib/channels/instagram/oauth';
 import type { MessageTemplate } from '@/lib/channels/types';
 import type { Capability } from '@/lib/team/permissions';
 import type { ChannelConnection } from '@/types/database';
@@ -52,6 +54,8 @@ export interface ChannelsOverview {
   /** Present when the platform Meta app is configured for Embedded Signup. */
   embeddedSignup: { appId: string; configId: string; graphVersion: string } | null;
   platformWebhookUrl: string | null;
+  /** Present when the platform Instagram app is configured for Business Login. */
+  instagramLogin: { webhookUrl: string | null } | null;
 }
 
 export async function getChannelsOverviewAction(workspaceId: string): Promise<Result<{ overview: ChannelsOverview }>> {
@@ -91,6 +95,10 @@ export async function getChannelsOverviewAction(workspaceId: string): Promise<Re
             ? { appId, configId, graphVersion: process.env.META_GRAPH_API_VERSION || 'v23.0' }
             : null,
         platformWebhookUrl: appUrl() ? `${appUrl()}/api/channels/whatsapp/webhook` : null,
+        instagramLogin:
+          process.env.INSTAGRAM_APP_ID && process.env.INSTAGRAM_APP_SECRET && appUrl()
+            ? { webhookUrl: `${appUrl()}/api/channels/instagram/webhook` }
+            : null,
       },
     };
   } catch (err) {
@@ -169,6 +177,7 @@ export async function sendChannelTestMessageAction(
   try {
     await guard(workspaceId, 'manage_settings');
     if (!isChannelId(channel)) throw new Error('Unknown channel.');
+    if (channel === 'instagram') return await sendInstagramTest(workspaceId, input.to);
     const to = normalizePhone(input.to);
     if (to.length < 8) throw new Error('Enter the full number with its country code, e.g. +1 650 555 1234.');
     const conn = await loadConnection<unknown>(workspaceId, channel);
@@ -191,6 +200,128 @@ export async function sendChannelTestMessageAction(
     return { success: true, providerMessageId: result.providerMessageId };
   } catch (err) {
     return fail(err, 'Could not send the test message.');
+  }
+}
+
+/**
+ * Instagram lets a business message only people who wrote in the last 24
+ * hours, so the test goes to one of them, as plain text.
+ */
+async function sendInstagramTest(workspaceId: string, recipientId: string): Promise<Result<{ providerMessageId: string }>> {
+  const recipients = await recentRecipients(workspaceId, 'instagram');
+  if (!recipients.some((r) => r.id === recipientId)) {
+    throw new Error('Choose someone who messaged your Instagram account in the last 24 hours.');
+  }
+  const conn = await loadConnection<unknown>(workspaceId, 'instagram');
+  if (!conn || conn.connection.status === 'disconnected') throw new Error('Connect the channel first.');
+  const result = await getAdapter('instagram')!.sendMessage(conn, recipientId, {
+    type: 'text',
+    text: 'Test message from Zentry: your Instagram inbox is connected.',
+  });
+  if (!result.ok) {
+    await recordConnectionError(conn.connection.id, result.error, Boolean(result.needsAttention));
+    return { success: false, error: result.error };
+  }
+  await updateConnection(conn.connection.id, {
+    last_outbound_at: new Date().toISOString(),
+    last_error: null,
+    last_error_at: null,
+    ...(conn.connection.status === 'needs_attention' ? { status: 'connected' as const } : {}),
+  });
+  return { success: true, providerMessageId: result.providerMessageId };
+}
+
+export interface TestRecipient {
+  /** The customer's id on the channel (Instagram-scoped id). */
+  id: string;
+  name: string;
+  lastInboundAt: string;
+}
+
+async function recentRecipients(workspaceId: string, channel: string): Promise<TestRecipient[]> {
+  const { supabase } = await getWorkspaceAccess(workspaceId, 'manage_settings');
+  const since = new Date(Date.now() - 24 * 3_600_000).toISOString();
+  const { data, error } = await supabase
+    .from('conversations')
+    .select('channel_user_id, channel_last_inbound_at, visitor:visitors(name)')
+    .eq('workspace_id', workspaceId)
+    .eq('channel', channel)
+    .gt('channel_last_inbound_at', since)
+    .order('channel_last_inbound_at', { ascending: false })
+    .limit(20);
+  if (error) throw new Error(`Could not load recent conversations: ${error.message}`);
+  const seen = new Set<string>();
+  const out: TestRecipient[] = [];
+  for (const row of (data || []) as { channel_user_id: string | null; channel_last_inbound_at: string; visitor: { name: string | null } | { name: string | null }[] | null }[]) {
+    if (!row.channel_user_id || seen.has(row.channel_user_id)) continue;
+    seen.add(row.channel_user_id);
+    const visitor = Array.isArray(row.visitor) ? row.visitor[0] : row.visitor;
+    out.push({ id: row.channel_user_id, name: visitor?.name || row.channel_user_id, lastInboundAt: row.channel_last_inbound_at });
+  }
+  return out;
+}
+
+/** People a test message may go to on channels that only allow replies (Instagram). */
+export async function listTestRecipientsAction(workspaceId: string, channel: string): Promise<Result<{ recipients: TestRecipient[] }>> {
+  try {
+    if (!isChannelId(channel)) throw new Error('Unknown channel.');
+    return { success: true, recipients: await recentRecipients(workspaceId, channel) };
+  } catch (err) {
+    return fail(err, 'Could not load recent conversations.');
+  }
+}
+
+/* ── Instagram ────────────────────────────────────────────────────────── */
+
+/** The Instagram Business Login URL to send the admin to. */
+export async function startInstagramConnectAction(workspaceId: string): Promise<Result<{ url: string }>> {
+  try {
+    const { user } = await guard(workspaceId, 'manage_settings');
+    if (!process.env.INSTAGRAM_APP_ID || !process.env.INSTAGRAM_APP_SECRET) {
+      throw new Error('Instagram login is not set up on this server (INSTAGRAM_APP_ID / INSTAGRAM_APP_SECRET). Use manual setup instead.');
+    }
+    if (!appUrl()) throw new Error('NEXT_PUBLIC_APP_URL must be set so Instagram can send you back.');
+    return { success: true, url: authorizeUrl(appUrl(), createState(workspaceId, user.id)) };
+  } catch (err) {
+    return fail(err, 'Could not start connecting Instagram.');
+  }
+}
+
+export async function connectInstagramManualAction(
+  workspaceId: string,
+  input: { accessToken: string; appSecret: string }
+): Promise<Result<{ connection: ChannelConnection }>> {
+  try {
+    const { user } = await guard(workspaceId, 'manage_settings');
+    const appSecret = (input.appSecret || '').trim();
+    if (!/^[0-9a-f]{32}$/i.test(appSecret)) {
+      throw new Error('The app secret is the 32-character Instagram app secret under Instagram → API setup with Instagram login → Business login settings.');
+    }
+    const existing = await loadConnection<InstagramCredentials>(workspaceId, 'instagram').catch(() => null);
+    const credentials: InstagramCredentials = {
+      accessToken: (input.accessToken || '').trim(),
+      appSecret,
+      verifyToken: existing?.credentials.verifyToken || randomToken(),
+      // Dashboard-generated tokens are long-lived (60 days) and refreshable.
+      expiresAt: new Date(Date.now() + 60 * 86_400_000).toISOString(),
+    };
+    const account = await getAdapter('instagram')!.connect({}, credentials);
+    const connection = await saveConnection({
+      workspaceId,
+      channel: 'instagram',
+      userId: user.id,
+      setupMethod: 'manual',
+      ...account,
+      settings: {
+        ...account.settings,
+        human_agent: process.env.INSTAGRAM_HUMAN_AGENT_ENABLED === 'true',
+        webhook_verified_at: existing?.connection.settings?.webhook_verified_at ?? null,
+      },
+      credentials,
+    });
+    return { success: true, connection };
+  } catch (err) {
+    return fail(err, 'Could not connect Instagram.');
   }
 }
 
