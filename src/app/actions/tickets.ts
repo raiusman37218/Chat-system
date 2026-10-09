@@ -297,8 +297,22 @@ export interface TicketChannelState {
   connectionName: string | null;
 }
 
-async function channelStateFor(supabase: Supabase, workspaceId: string, ticket: Ticket): Promise<TicketChannelState | null> {
+/**
+ * The channel adapter that carries this ticket's replies, if any. An adapter
+ * handles a ticket only when its conversation really arrived on that channel:
+ * an email ticket an agent logged by hand (conversation channel "web") keeps
+ * replying through the workspace SMTP.
+ */
+async function adapterFor(supabase: Supabase, workspaceId: string, ticket: { channel: string; conversation_id: string | null }) {
   const adapter = getAdapter(ticket.channel);
+  if (!adapter || !ticket.conversation_id) return null;
+  if (adapter.id !== 'email') return adapter;
+  const { data } = await supabase.from('conversations').select('channel').eq('id', ticket.conversation_id).eq('workspace_id', workspaceId).maybeSingle();
+  return data?.channel === 'email' ? adapter : null;
+}
+
+async function channelStateFor(supabase: Supabase, workspaceId: string, ticket: Ticket): Promise<TicketChannelState | null> {
+  const adapter = await adapterFor(supabase, workspaceId, ticket);
   if (!adapter || !ticket.conversation_id) return null;
   const [{ data: conv }, { data: conn }] = await Promise.all([
     supabase.from('conversations').select('channel_last_inbound_at').eq('id', ticket.conversation_id).eq('workspace_id', workspaceId).maybeSingle(),
@@ -507,7 +521,7 @@ export async function replyToTicketAction(
 
   // WhatsApp and other channels: the database queued the reply; send it now
   // so the agent sees at once whether it went out.
-  if (!input.internal && getAdapter(ticket.channel)) {
+  if (!input.internal && (await adapterFor(caller.supabase, workspaceId, ticket))) {
     return { emailed: false, channel: await sendQueued(caller.supabase, inserted.id) };
   }
 

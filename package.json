@@ -14,12 +14,15 @@
     "@anthropic-ai/sdk": "^0.123.0",
     "@supabase/ssr": "^0.12.5",
     "@supabase/supabase-js": "^2.112.4",
+    "@types/mailparser": "^3.9.0",
     "@types/qrcode": "^1.5.6",
+    "@types/sanitize-html": "^2.16.2",
     "@vercel/sdk": "^1.28.38",
     "cloudinary": "^2.11.0",
     "clsx": "^2.1.1",
     "jpeg-js": "^0.4.4",
     "lucide-react": "^1.38.0",
+    "mailparser": "^3.9.37",
     "next": "16.3.4",
     "nodemailer": "^10.0.10",
     "pngjs": "^7.0.0",
@@ -27,6 +30,7 @@
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "recharts": "^3.10.1",
+    "sanitize-html": "^2.18.0",
     "tailwind-merge": "^3.6.0"
   },
   "devDependencies": {

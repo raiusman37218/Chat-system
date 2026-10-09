@@ -1,6 +1,7 @@
 import type { ChannelAdapter, ChannelId } from './types';
 import { whatsappAdapter } from './whatsapp/adapter';
 import { instagramAdapter } from './instagram/adapter';
+import { emailAdapter } from './email/adapter';
 
 /**
  * Every channel the app can talk to. The integrations page, the webhook
@@ -12,6 +13,7 @@ import { instagramAdapter } from './instagram/adapter';
 const ADAPTERS: Record<ChannelId, ChannelAdapter<any, any>> = {
   whatsapp: whatsappAdapter,
   instagram: instagramAdapter,
+  email: emailAdapter,
 };
 
 export function getAdapter(channel: string | null | undefined): ChannelAdapter<unknown, unknown> | null {
@@ -41,6 +43,12 @@ export const CHANNEL_CATALOG: ChannelCatalogEntry[] = [
     id: 'instagram',
     label: 'Instagram',
     description: 'Answer Instagram DMs, story replies and story mentions as tickets, for a professional (Business or Creator) account.',
+    available: true,
+  },
+  {
+    id: 'email',
+    label: 'Email',
+    description: 'Give your team a support address: emails become tickets, and replies go out as branded emails from your address.',
     available: true,
   },
   {

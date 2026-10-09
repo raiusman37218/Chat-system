@@ -13,6 +13,12 @@ import { serviceClient } from '@/lib/supabase/service';
 import { isValidEmail, sendSmtpEmail } from '@/lib/email/smtp';
 import { isPrivateAddress, isSafeWebhookUrl } from '@/lib/automation/rules';
 import type { SMTPSettingsConfig } from '@/types/database';
+import { emailConfig } from '@/lib/channels/email/config';
+import { composeNotification } from '@/lib/channels/email/compose';
+import { getEmailProvider } from '@/lib/channels/email/providers';
+import { isSuppressed, loadBrand, senderSettingsFrom, type EmailSettings } from '@/lib/channels/email/runtime';
+import type { NotificationTemplate } from '@/lib/channels/email/template';
+import { getConnection } from '@/lib/channels/store';
 
 const MAX_ATTEMPTS = 5;
 const CLAIM_MINUTES = 5;
@@ -34,9 +40,38 @@ export function retryDelayMinutes(attemptsSoFar: number): number {
   return Math.pow(5, Math.max(0, attemptsSoFar - 1));
 }
 
+/** The requester notifications (received / replied / solved): branded mail through the email channel. */
+async function sendNotification(row: OutboxRow, to: string): Promise<{ ok: boolean; error?: string; permanent?: boolean }> {
+  const template = String(row.payload.template) as NotificationTemplate;
+  if (!['received', 'replied', 'solved'].includes(template)) return { ok: false, error: 'Unknown notification.', permanent: true };
+  const connection = await getConnection(row.workspace_id, 'email');
+  if (!connection || connection.status === 'disconnected') {
+    return { ok: false, error: 'The email channel is not enabled (Settings → Channels → Email).', permanent: true };
+  }
+  const cfg = emailConfig();
+  const provider = getEmailProvider();
+  if (!cfg.tokenSecret || !provider.isConfigured()) return { ok: false, error: 'The email provider is not configured on the server.', permanent: true };
+  if (await isSuppressed(row.workspace_id, to)) return { ok: false, error: `${to} is blocked because an earlier email to it bounced.`, permanent: true };
+
+  const email = composeNotification({
+    workspace: await loadBrand(row.workspace_id),
+    sender: senderSettingsFrom((connection.settings || {}) as EmailSettings, connection.external_account_id || ''),
+    tokenSecret: cfg.tokenSecret,
+    to: { email: to, name: String(row.payload.requester_name ?? '') || undefined },
+    template,
+    ticket: { number: Number(row.payload.ticket_number), subject: String(row.payload.ticket_subject ?? '') },
+    agentName: String(row.payload.agent_name ?? '') || null,
+    reply: String(row.payload.reply ?? '') || null,
+  });
+  const result = await provider.send(email);
+  if (result.ok) return { ok: true };
+  return { ok: false, error: result.error, permanent: !result.retryable };
+}
+
 async function sendEmail(row: OutboxRow): Promise<{ ok: boolean; error?: string; permanent?: boolean }> {
   const to = String(row.payload.to ?? '');
   if (!isValidEmail(to)) return { ok: false, error: 'The recipient has no valid email address.', permanent: true };
+  if (row.payload.template) return sendNotification(row, to);
   const { data: ws } = await serviceClient().from('workspaces').select('smtp_settings').eq('id', row.workspace_id).maybeSingle();
   const smtp = ws?.smtp_settings as SMTPSettingsConfig | null | undefined;
   if (!smtp?.enabled || !smtp.host || !smtp.user || !smtp.pass) {

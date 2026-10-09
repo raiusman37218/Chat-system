@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useCallback, useEffect, useState } from 'react';
-import { AlertTriangle, Camera, CheckCircle2, Copy, Link2, MessageCircle, Phone, Send, Unplug } from 'lucide-react';
+import { AlertTriangle, Camera, CheckCircle2, Copy, Link2, Mail, MessageCircle, Phone, Send, Settings2, Unplug } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Badge, type BadgeTone } from '@/components/ui/Badge';
 import { Field, Input, Select } from '@/components/ui/Input';
@@ -10,6 +10,7 @@ import { Tabs } from '@/components/ui/Tabs';
 import { ErrorState, SkeletonBlock } from '@/components/ui/States';
 import { useToast } from '@/components/ui/Toast';
 import { timeAgo } from '@/components/tickets/TicketBits';
+import { EmailChannelPanel } from './EmailChannelPanel';
 import {
   completeWhatsAppSignupAction,
   connectInstagramManualAction,
@@ -41,6 +42,7 @@ const IG_PROFESSIONAL_HELP = 'Instagram only allows messaging for professional a
 const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   whatsapp: Phone,
   instagram: Camera,
+  email: Mail,
   messenger: MessageCircle,
 };
 
@@ -192,6 +194,15 @@ export function ChannelsSettings({ workspaceId }: { workspaceId: string }) {
         ))}
       </div>
 
+      {connecting && connecting.id === 'email' && (
+        <EmailChannelPanel
+          workspaceId={workspaceId}
+          onClose={() => {
+            setConnecting(null);
+            load();
+          }}
+        />
+      )}
       {connecting && connecting.id === 'instagram' && (
         <ConnectInstagramModal
           workspaceId={workspaceId}
@@ -281,7 +292,7 @@ function ChannelCardView({
           <div className="min-w-0">
             <dt className="text-ink-3">Setup</dt>
             <dd className="text-ink truncate">
-              {c.setup_method === 'embedded_signup' ? (card.id === 'instagram' ? 'Signed in with Instagram' : 'Signed up with Meta') : 'Manual (your Meta app)'}
+              {card.id === 'email' ? 'Platform support address' : c.setup_method === 'embedded_signup' ? (card.id === 'instagram' ? 'Signed in with Instagram' : 'Signed up with Meta') : 'Manual (your Meta app)'}
             </dd>
           </div>
           {card.id === 'whatsapp' && (
@@ -316,14 +327,20 @@ function ChannelCardView({
         <div className="flex flex-wrap gap-2 mt-auto">
           {!live && (
             <Button variant="primary" size="sm" onClick={onConnect}>
-              <Link2 className="w-3.5 h-3.5" aria-hidden="true" /> Connect {card.label}
+              <Link2 className="w-3.5 h-3.5" aria-hidden="true" /> {card.id === 'email' ? 'Set up email' : `Connect ${card.label}`}
             </Button>
           )}
           {live && (
             <>
-              <Button size="sm" onClick={onTest}>
-                <Send className="w-3.5 h-3.5" aria-hidden="true" /> Send test message
-              </Button>
+              {card.id === 'email' ? (
+                <Button size="sm" variant="primary" onClick={onConnect}>
+                  <Settings2 className="w-3.5 h-3.5" aria-hidden="true" /> Manage email
+                </Button>
+              ) : (
+                <Button size="sm" onClick={onTest}>
+                  <Send className="w-3.5 h-3.5" aria-hidden="true" /> Send test message
+                </Button>
+              )}
               {state === 'needs_attention' && (
                 <Button size="sm" variant="primary" onClick={onConnect}>
                   Reconnect
@@ -934,7 +951,11 @@ function DisconnectModal({ workspaceId, card, onClose, onDone }: { workspaceId: 
         <p>
           New {card.label} messages stop arriving and replies on {card.label} tickets can no longer be sent. Existing tickets and their history stay.
         </p>
-        <p>The stored access token is deleted. To reconnect later you will need to sign in or paste a token again.</p>
+        <p>
+          {card.id === 'email'
+            ? 'Your support address stays reserved for you. Turn email on again at any time to start receiving mail.'
+            : 'The stored access token is deleted. To reconnect later you will need to sign in or paste a token again.'}
+        </p>
         {error && (
           <p role="alert" className="text-danger font-medium">
             {error}

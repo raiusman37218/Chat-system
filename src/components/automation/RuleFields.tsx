@@ -220,6 +220,12 @@ export function ActionRows({
   );
 }
 
+const NOTIFICATION_OPTIONS = [
+  { value: 'received', label: 'Ticket received' },
+  { value: 'replied', label: 'Agent replied' },
+  { value: 'solved', label: 'Ticket solved' },
+];
+
 function ActionValue({ action, lookups, macro, label, onChange }: { action: RuleAction; lookups: Lookups; macro?: boolean; label: string; onChange: (a: RuleAction) => void }) {
   const choose = (options: { value: string; label: string }[]) => (
     <Select aria-label={`${label} value`} value={String(action.value ?? '')} onChange={(e) => onChange({ ...action, value: e.target.value })}>
@@ -255,6 +261,13 @@ function ActionValue({ action, lookups, macro, label, onChange }: { action: Rule
           defaultValue={Array.isArray(action.value) ? action.value.join(', ') : ''}
           onChange={(e) => onChange({ ...action, value: parseTags(e.target.value) })}
         />
+      );
+    case 'notify_requester':
+      return (
+        <div className="space-y-1">
+          {choose(NOTIFICATION_OPTIONS)}
+          <p className="text-2xs text-ink-3">Sent as a branded email from your support address. Needs the email channel (Settings → Channels).</p>
+        </div>
       );
     case 'email_requester':
     case 'email_agent':

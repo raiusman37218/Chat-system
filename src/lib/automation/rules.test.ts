@@ -81,6 +81,20 @@ describe('rule form validation', () => {
   });
 });
 
+describe('requester notifications', () => {
+  it('is a trigger action with three templates', () => {
+    const ok = draft({ actions: [{ type: 'notify_requester', value: 'solved' }] });
+    expect(hasErrors(validateRuleDraft(ok))).toBe(false);
+    const bad = validateRuleDraft(draft({ actions: [{ type: 'notify_requester', value: 'spam' }] }));
+    expect(bad.actions[0]).toMatch(/Choose which notification/);
+  });
+
+  it('is not available in macros, which cannot send mail', () => {
+    const e = validateMacroDraft({ title: 't', content: 'x', shared: true, is_active: true, actions: [{ type: 'notify_requester', value: 'solved' }] });
+    expect(e.actions[0]).toBeTruthy();
+  });
+});
+
 describe('macro validation', () => {
   it('needs a title and a reply or an action', () => {
     expect(validateMacroDraft({ title: '', content: 'x', shared: true, is_active: true, actions: [] }).title).toBeTruthy();
