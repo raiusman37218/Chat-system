@@ -82,10 +82,10 @@ export function PlatformAnalyticsView({
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h2 className="text-[16px] font-bold text-ink">Platform Executive Radar</h2>
+              <h2 className="text-base font-bold text-ink">Platform Executive Radar</h2>
               {loading && <RefreshCw className="w-3.5 h-3.5 animate-spin text-accent" />}
             </div>
-            <p className="text-[12px] text-ink-3">
+            <p className="text-xs text-ink-3">
               {analytics
                 ? `Window: ${analytics.start_date} to ${analytics.end_date} (${rangeDays} days)`
                 : 'Loading platform intelligence metrics...'}
@@ -103,7 +103,7 @@ export function PlatformAnalyticsView({
                 onClick={() => onRangeChange(days)}
                 disabled={loading}
                 className={cn(
-                  'h-7.5 px-3 rounded-lg text-[12px] font-semibold transition-all disabled:opacity-50',
+                  'h-7.5 px-3 rounded-lg text-xs font-semibold transition-all disabled:opacity-50',
                   rangeDays === days
                     ? 'bg-accent text-accent-ink shadow-xs'
                     : 'text-ink-3 hover:text-ink hover:bg-surface/50'
@@ -119,7 +119,7 @@ export function PlatformAnalyticsView({
             type="button"
             onClick={onRefresh}
             disabled={refreshing || loading}
-            className="h-8.5 px-3 rounded-xl border border-line bg-surface hover:bg-surface-2 text-ink text-[12px] font-medium flex items-center gap-1.5 transition-colors disabled:opacity-50"
+            className="h-8.5 px-3 rounded-xl border border-line bg-surface hover:bg-surface-2 text-ink text-xs font-medium flex items-center gap-1.5 transition-colors disabled:opacity-50"
             title="Refresh analytics data"
           >
             <RefreshCw className={cn('w-3.5 h-3.5 text-ink-3', (refreshing || loading) && 'animate-spin')} />
@@ -130,7 +130,7 @@ export function PlatformAnalyticsView({
           <button
             type="button"
             onClick={onExportCsv}
-            className="h-8.5 px-3.5 rounded-xl border border-line bg-surface hover:bg-surface-2 text-ink text-[12px] font-semibold flex items-center gap-1.5 transition-colors shadow-2xs"
+            className="h-8.5 px-3.5 rounded-xl border border-line bg-surface hover:bg-surface-2 text-ink text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-2xs"
             title="Download full platform companies CSV report"
           >
             <Download className="w-3.5 h-3.5 text-accent" />
@@ -144,18 +144,18 @@ export function PlatformAnalyticsView({
         {/* 1. Active Companies (had conversation in last 7 days) */}
         <div className="p-4.5 rounded-2xl border border-line bg-surface shadow-2xs flex flex-col justify-between space-y-3">
           <div className="flex items-center justify-between text-ink-3">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+            <span className="text-2xs font-bold uppercase tracking-wider text-success">
               Active Companies
             </span>
-            <div className="w-7 h-7 rounded-lg bg-emerald-500/10 text-emerald-600 flex items-center justify-center">
+            <div className="w-7 h-7 rounded-lg bg-success/10 text-success flex items-center justify-center">
               <Flame className="w-4 h-4" />
             </div>
           </div>
           <div>
-            <div className="text-[24px] font-extrabold text-ink tracking-tight">
+            <div className="text-2xl font-extrabold text-ink tracking-tight">
               {loading ? '—' : `${formatNumber(analytics?.active_companies_7d_count)} / ${formatNumber(analytics?.total_companies_count)}`}
             </div>
-            <div className="text-[11.5px] text-ink-3 font-medium mt-0.5">
+            <div className="text-xs text-ink-3 font-medium mt-0.5">
               {loading ? 'Calculating...' : `${analytics?.active_companies_7d_percent ?? 0}% had chats in last 7d`}
             </div>
           </div>
@@ -164,18 +164,18 @@ export function PlatformAnalyticsView({
         {/* 2. New Companies in Range */}
         <div className="p-4.5 rounded-2xl border border-line bg-surface shadow-2xs flex flex-col justify-between space-y-3">
           <div className="flex items-center justify-between text-ink-3">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">
+            <span className="text-2xs font-bold uppercase tracking-wider text-accent">
               New Companies
             </span>
-            <div className="w-7 h-7 rounded-lg bg-blue-500/10 text-blue-600 flex items-center justify-center">
+            <div className="w-7 h-7 rounded-lg bg-accent/10 text-accent flex items-center justify-center">
               <Building2 className="w-4 h-4" />
             </div>
           </div>
           <div>
-            <div className="text-[24px] font-extrabold text-ink tracking-tight">
+            <div className="text-2xl font-extrabold text-ink tracking-tight">
               {loading ? '—' : `+${formatNumber(analytics?.totals?.total_new_companies)}`}
             </div>
-            <div className="text-[11.5px] text-ink-3 font-medium mt-0.5">
+            <div className="text-xs text-ink-3 font-medium mt-0.5">
               Joined in past {rangeDays} days
             </div>
           </div>
@@ -184,18 +184,18 @@ export function PlatformAnalyticsView({
         {/* 3. Conversations */}
         <div className="p-4.5 rounded-2xl border border-line bg-surface shadow-2xs flex flex-col justify-between space-y-3">
           <div className="flex items-center justify-between text-ink-3">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+            <span className="text-2xs font-bold uppercase tracking-wider text-success">
               Conversations
             </span>
-            <div className="w-7 h-7 rounded-lg bg-emerald-500/10 text-emerald-600 flex items-center justify-center">
+            <div className="w-7 h-7 rounded-lg bg-success/10 text-success flex items-center justify-center">
               <MessageSquare className="w-4 h-4" />
             </div>
           </div>
           <div>
-            <div className="text-[24px] font-extrabold text-ink tracking-tight">
+            <div className="text-2xl font-extrabold text-ink tracking-tight">
               {loading ? '—' : formatNumber(analytics?.totals?.total_conversations)}
             </div>
-            <div className="text-[11.5px] text-ink-3 font-medium mt-0.5">
+            <div className="text-xs text-ink-3 font-medium mt-0.5">
               Total volume in {rangeDays}d
             </div>
           </div>
@@ -204,18 +204,18 @@ export function PlatformAnalyticsView({
         {/* 4. Messages */}
         <div className="p-4.5 rounded-2xl border border-line bg-surface shadow-2xs flex flex-col justify-between space-y-3">
           <div className="flex items-center justify-between text-ink-3">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
+            <span className="text-2xs font-bold uppercase tracking-wider text-accent">
               Messages
             </span>
-            <div className="w-7 h-7 rounded-lg bg-indigo-500/10 text-indigo-600 flex items-center justify-center">
+            <div className="w-7 h-7 rounded-lg bg-accent/10 text-accent flex items-center justify-center">
               <MessageSquare className="w-4 h-4" />
             </div>
           </div>
           <div>
-            <div className="text-[24px] font-extrabold text-ink tracking-tight">
+            <div className="text-2xl font-extrabold text-ink tracking-tight">
               {loading ? '—' : formatNumber(analytics?.totals?.total_messages)}
             </div>
-            <div className="text-[11.5px] text-ink-3 font-medium mt-0.5">
+            <div className="text-xs text-ink-3 font-medium mt-0.5">
               Sum across all tenants
             </div>
           </div>
@@ -224,18 +224,18 @@ export function PlatformAnalyticsView({
         {/* 5. Visitors */}
         <div className="p-4.5 rounded-2xl border border-line bg-surface shadow-2xs flex flex-col justify-between space-y-3">
           <div className="flex items-center justify-between text-ink-3">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">
+            <span className="text-2xs font-bold uppercase tracking-wider text-warn">
               Total Visitors
             </span>
-            <div className="w-7 h-7 rounded-lg bg-amber-500/10 text-amber-600 flex items-center justify-center">
+            <div className="w-7 h-7 rounded-lg bg-warn/10 text-warn flex items-center justify-center">
               <Radio className="w-4 h-4" />
             </div>
           </div>
           <div>
-            <div className="text-[24px] font-extrabold text-ink tracking-tight">
+            <div className="text-2xl font-extrabold text-ink tracking-tight">
               {loading ? '—' : formatNumber(analytics?.totals?.total_visitors)}
             </div>
-            <div className="text-[11.5px] text-ink-3 font-medium mt-0.5">
+            <div className="text-xs text-ink-3 font-medium mt-0.5">
               Unique tracked visitors
             </div>
           </div>
@@ -244,18 +244,18 @@ export function PlatformAnalyticsView({
         {/* 6. AI Replies & Cost Estimate */}
         <div className="p-4.5 rounded-2xl border border-line bg-surface shadow-2xs flex flex-col justify-between space-y-3">
           <div className="flex items-center justify-between text-ink-3">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400">
+            <span className="text-2xs font-bold uppercase tracking-wider text-accent">
               AI Cost Estimate
             </span>
-            <div className="w-7 h-7 rounded-lg bg-purple-500/10 text-purple-600 flex items-center justify-center">
+            <div className="w-7 h-7 rounded-lg bg-accent/10 text-accent flex items-center justify-center">
               <DollarSign className="w-4 h-4" />
             </div>
           </div>
           <div>
-            <div className="text-[24px] font-extrabold text-ink tracking-tight">
+            <div className="text-2xl font-extrabold text-ink tracking-tight">
               {loading ? '—' : formatCurrency(analytics?.total_estimated_ai_cost)}
             </div>
-            <div className="text-[11.5px] text-ink-3 font-medium mt-0.5" title="$0.002 per AI message reply">
+            <div className="text-xs text-ink-3 font-medium mt-0.5" title="$0.002 per AI message reply">
               {loading ? '—' : `${formatNumber(analytics?.totals?.total_ai_replies)} replies ($0.002/ea)`}
             </div>
           </div>
@@ -268,21 +268,21 @@ export function PlatformAnalyticsView({
         <div className="p-6 rounded-2xl border border-line bg-surface shadow-2xs space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-[14.5px] font-bold text-ink flex items-center gap-2">
-                <MessageSquare className="w-4 h-4 text-emerald-500" />
+              <h3 className="text-sm font-bold text-ink flex items-center gap-2">
+                <MessageSquare className="w-4 h-4 text-success" />
                 <span>Conversations &amp; Messages per Day</span>
               </h3>
-              <p className="text-[11.5px] text-ink-3">
+              <p className="text-xs text-ink-3">
                 Daily activity volume across all active tenants
               </p>
             </div>
-            <div className="flex items-center gap-3 text-[11px] font-medium text-ink-3">
+            <div className="flex items-center gap-3 text-2xs font-medium text-ink-3">
               <span className="flex items-center gap-1.5">
-                <span className="w-2.5 h-2.5 rounded-full bg-indigo-500" />
+                <span className="w-2.5 h-2.5 rounded-full bg-accent" />
                 Messages
               </span>
               <span className="flex items-center gap-1.5">
-                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
+                <span className="w-2.5 h-2.5 rounded-full bg-success" />
                 Conversations
               </span>
             </div>
@@ -298,12 +298,12 @@ export function PlatformAnalyticsView({
                 <AreaChart data={timeSeries} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                   <defs>
                     <linearGradient id="msgGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#6366f1" stopOpacity={0.4} />
-                      <stop offset="95%" stopColor="#6366f1" stopOpacity={0.0} />
+                      <stop offset="5%" stopColor="var(--ds-accent)" stopOpacity={0.4} />
+                      <stop offset="95%" stopColor="var(--ds-accent)" stopOpacity={0.0} />
                     </linearGradient>
                     <linearGradient id="convGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.4} />
-                      <stop offset="95%" stopColor="#10b981" stopOpacity={0.0} />
+                      <stop offset="5%" stopColor="var(--ds-success)" stopOpacity={0.4} />
+                      <stop offset="95%" stopColor="var(--ds-success)" stopOpacity={0.0} />
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" opacity={0.15} vertical={false} />
@@ -336,7 +336,7 @@ export function PlatformAnalyticsView({
                     type="monotone"
                     dataKey="messages"
                     name="Messages"
-                    stroke="#6366f1"
+                    stroke="var(--ds-accent)"
                     strokeWidth={2}
                     fillOpacity={1}
                     fill="url(#msgGradient)"
@@ -345,7 +345,7 @@ export function PlatformAnalyticsView({
                     type="monotone"
                     dataKey="conversations"
                     name="Conversations"
-                    stroke="#10b981"
+                    stroke="var(--ds-success)"
                     strokeWidth={2}
                     fillOpacity={1}
                     fill="url(#convGradient)"
@@ -360,16 +360,16 @@ export function PlatformAnalyticsView({
         <div className="p-6 rounded-2xl border border-line bg-surface shadow-2xs space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-[14.5px] font-bold text-ink flex items-center gap-2">
-                <Radio className="w-4 h-4 text-amber-500" />
+              <h3 className="text-sm font-bold text-ink flex items-center gap-2">
+                <Radio className="w-4 h-4 text-warn" />
                 <span>Total Visitors per Day</span>
               </h3>
-              <p className="text-[11.5px] text-ink-3">
+              <p className="text-xs text-ink-3">
                 Daily unique visitor radar across all customer widgets
               </p>
             </div>
-            <div className="flex items-center gap-1.5 text-[11px] font-medium text-ink-3">
-              <span className="w-2.5 h-2.5 rounded-full bg-amber-500" />
+            <div className="flex items-center gap-1.5 text-2xs font-medium text-ink-3">
+              <span className="w-2.5 h-2.5 rounded-full bg-warn" />
               Unique Visitors
             </div>
           </div>
@@ -384,8 +384,8 @@ export function PlatformAnalyticsView({
                 <AreaChart data={timeSeries} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                   <defs>
                     <linearGradient id="visGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.4} />
-                      <stop offset="95%" stopColor="#f59e0b" stopOpacity={0.0} />
+                      <stop offset="5%" stopColor="var(--ds-warn)" stopOpacity={0.4} />
+                      <stop offset="95%" stopColor="var(--ds-warn)" stopOpacity={0.0} />
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" opacity={0.15} vertical={false} />
@@ -418,7 +418,7 @@ export function PlatformAnalyticsView({
                     type="monotone"
                     dataKey="visitors"
                     name="Visitors"
-                    stroke="#f59e0b"
+                    stroke="var(--ds-warn)"
                     strokeWidth={2}
                     fillOpacity={1}
                     fill="url(#visGradient)"
@@ -436,15 +436,15 @@ export function PlatformAnalyticsView({
         <div className="p-6 rounded-2xl border border-line bg-surface shadow-2xs space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-[14.5px] font-bold text-ink flex items-center gap-2">
-                <Bot className="w-4 h-4 text-purple-500" />
+              <h3 className="text-sm font-bold text-ink flex items-center gap-2">
+                <Bot className="w-4 h-4 text-accent" />
                 <span>AI Replies per Day &amp; AI Cost Estimate</span>
               </h3>
-              <p className="text-[11.5px] text-ink-3">
+              <p className="text-xs text-ink-3">
                 Daily bot responses with estimated OpenAI/Anthropic token cost ($0.002/reply)
               </p>
             </div>
-            <div className="text-[11px] font-bold text-purple-600 dark:text-purple-400 bg-purple-500/10 px-2 py-0.5 rounded-full">
+            <div className="text-2xs font-bold text-accent bg-accent/10 px-2 py-0.5 rounded-full">
               {formatCurrency(analytics?.total_estimated_ai_cost)} total
             </div>
           </div>
@@ -492,7 +492,7 @@ export function PlatformAnalyticsView({
                   <Bar
                     dataKey="ai_replies"
                     name="AI Replies"
-                    fill="#8b5cf6"
+                    fill="var(--ds-accent)"
                     radius={[4, 4, 0, 0]}
                   />
                 </BarChart>
@@ -505,15 +505,15 @@ export function PlatformAnalyticsView({
         <div className="p-6 rounded-2xl border border-line bg-surface shadow-2xs space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-[14.5px] font-bold text-ink flex items-center gap-2">
-                <Building2 className="w-4 h-4 text-blue-500" />
+              <h3 className="text-sm font-bold text-ink flex items-center gap-2">
+                <Building2 className="w-4 h-4 text-accent" />
                 <span>New Companies per Week (Last 12 Weeks)</span>
               </h3>
-              <p className="text-[11.5px] text-ink-3">
+              <p className="text-xs text-ink-3">
                 Weekly tenant signup velocity and onboarding momentum
               </p>
             </div>
-            <div className="text-[11px] font-bold text-blue-600 dark:text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded-full">
+            <div className="text-2xs font-bold text-accent bg-accent/10 px-2 py-0.5 rounded-full">
               {weeklyCompanies.reduce((acc, curr) => acc + curr.new_companies, 0)} new companies
             </div>
           </div>
@@ -568,24 +568,24 @@ export function PlatformAnalyticsView({
       <section className="p-6 rounded-2xl border border-line bg-surface shadow-2xs space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <div>
-            <h3 className="text-[15.5px] font-bold text-ink flex items-center gap-2">
-              <Award className="w-4.5 h-4.5 text-amber-500" />
+            <h3 className="text-md font-bold text-ink flex items-center gap-2">
+              <Award className="w-4.5 h-4.5 text-warn" />
               <span>Top 10 Companies by Conversations</span>
             </h3>
-            <p className="text-[12px] text-ink-3">
+            <p className="text-xs text-ink-3">
               Highest volume tenants ranked by total conversations handled in the selected period
             </p>
           </div>
-          <span className="text-[11.5px] font-medium text-ink-3">
+          <span className="text-xs font-medium text-ink-3">
             Ranked by conversation share %
           </span>
         </div>
 
         <div className="border border-line rounded-xl overflow-hidden bg-surface">
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse text-[12.5px]">
+            <table className="w-full text-left border-collapse text-xs">
               <thead>
-                <tr className="border-b border-line bg-surface-2/60 text-ink-3 font-semibold uppercase text-[10.5px] tracking-wider">
+                <tr className="border-b border-line bg-surface-2/60 text-ink-3 font-semibold uppercase text-2xs tracking-wider">
                   <th className="py-3 px-4 w-14">Rank</th>
                   <th className="py-3 px-4">Company</th>
                   <th className="py-3 px-4">Plan</th>
@@ -610,11 +610,11 @@ export function PlatformAnalyticsView({
                           className={cn(
                             'w-6 h-6 rounded-full inline-flex items-center justify-center font-bold text-xs shadow-2xs',
                             rank === 1
-                              ? 'bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/40'
+                              ? 'bg-warn/20 text-warn border border-warn/40'
                               : rank === 2
-                              ? 'bg-slate-400/20 text-slate-600 dark:text-slate-300 border border-slate-400/40'
+                              ? 'bg-ink-3/20 text-ink-2 border border-line-3/40'
                               : rank === 3
-                              ? 'bg-amber-700/20 text-amber-700 dark:text-amber-500 border border-amber-700/40'
+                              ? 'bg-warn/20 text-warn border border-warn/40'
                               : 'bg-surface-3 text-ink-3'
                           )}
                         >
@@ -626,8 +626,8 @@ export function PlatformAnalyticsView({
                       <td className="py-3 px-4">
                         <div className="flex items-center gap-2.5 min-w-[180px]">
                           <div
-                            className="w-8 h-8 rounded-xl shrink-0 flex items-center justify-center font-bold text-white shadow-2xs text-[13px]"
-                            style={{ backgroundColor: c.brand_color || '#2563eb' }}
+                            className="w-8 h-8 rounded-xl shrink-0 flex items-center justify-center font-bold text-white shadow-2xs text-ui"
+                            style={{ backgroundColor: c.brand_color || 'var(--ds-accent)' }}
                           >
                             {c.name.charAt(0).toUpperCase()}
                           </div>
@@ -638,13 +638,13 @@ export function PlatformAnalyticsView({
                                 href={c.website_url.startsWith('http') ? c.website_url : `https://${c.website_url}`}
                                 target="_blank"
                                 rel="noreferrer"
-                                className="text-[11px] text-accent hover:underline flex items-center gap-1 truncate max-w-[160px]"
+                                className="text-2xs text-accent hover:underline flex items-center gap-1 truncate max-w-[160px]"
                               >
                                 <span>{c.website_url.replace(/^https?:\/\//, '')}</span>
                                 <ExternalLink className="w-2.5 h-2.5 opacity-70" />
                               </a>
                             ) : (
-                              <span className="text-[11px] text-ink-3 italic">No website domain</span>
+                              <span className="text-2xs text-ink-3 italic">No website domain</span>
                             )}
                           </div>
                         </div>
@@ -652,14 +652,14 @@ export function PlatformAnalyticsView({
 
                       {/* Plan Badge */}
                       <td className="py-3 px-4">
-                        <span className="px-2 py-0.5 rounded text-[10.5px] font-bold bg-purple-500/10 text-purple-600 dark:text-purple-400 uppercase tracking-wider">
+                        <span className="px-2 py-0.5 rounded text-2xs font-bold bg-accent/10 text-accent uppercase tracking-wider">
                           {c.plan || 'Free'}
                         </span>
                       </td>
 
                       {/* Conversations Count */}
                       <td className="py-3 px-4">
-                        <span className="font-bold text-ink text-[13.5px]">
+                        <span className="font-bold text-ink text-ui">
                           {formatNumber(c.conversations_count)}
                         </span>
                       </td>
@@ -667,13 +667,13 @@ export function PlatformAnalyticsView({
                       {/* Volume Share % Bar */}
                       <td className="py-3 px-4">
                         <div className="space-y-1">
-                          <div className="flex items-center justify-between text-[11px]">
+                          <div className="flex items-center justify-between text-2xs">
                             <span className="text-ink-3 font-medium">Platform Share</span>
                             <span className="font-bold text-ink">{c.share_percent}%</span>
                           </div>
                           <div className="w-full h-2 rounded-full bg-surface-3 overflow-hidden">
                             <div
-                              className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-teal-400 transition-all duration-500"
+                              className="h-full rounded-full bg-success transition-all duration-500"
                               style={{ width: `${Math.min(100, Math.max(2, c.share_percent))}%` }}
                             />
                           </div>
@@ -695,7 +695,7 @@ export function PlatformAnalyticsView({
                         <button
                           type="button"
                           onClick={() => onOpenCompanyInsights(c.id)}
-                          className="h-7.5 px-3 rounded-lg border border-line bg-surface hover:bg-surface-2 text-ink text-[11.5px] font-medium inline-flex items-center gap-1 transition-colors shadow-2xs"
+                          className="h-7.5 px-3 rounded-lg border border-line bg-surface hover:bg-surface-2 text-ink text-xs font-medium inline-flex items-center gap-1 transition-colors shadow-2xs"
                         >
                           <span>Insights</span>
                           <ChevronRight className="w-3 h-3 text-ink-3" />

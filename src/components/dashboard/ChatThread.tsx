@@ -1475,7 +1475,7 @@ export function ChatThread({
       rendered.push(
         <div key={`day-${key}`} className="flex items-center gap-3 py-2">
           <span className="flex-1 h-px bg-line" />
-          <span className="text-[11px] font-medium text-ink-3">
+          <span className="text-2xs font-medium text-ink-3">
             {dayLabel(msg.created_at)}
           </span>
           <span className="flex-1 h-px bg-line" />
@@ -1488,19 +1488,19 @@ export function ChatThread({
         <div
           key={msg.id}
           id={`msg-${msg.id}`}
-          className="rounded-xl border border-amber-300/80 dark:border-amber-600/40 bg-amber-500/10 dark:bg-amber-950/40 px-4 py-3 group/note relative shadow-xs"
+          className="rounded-xl border border-warn-line/80 bg-warn/10 px-4 py-3 group/note relative shadow-xs"
         >
           <div className="flex items-center justify-between gap-3 mb-1.5">
-            <span className="inline-flex items-center gap-1.5 text-[11.5px] font-semibold text-amber-800 dark:text-amber-200">
-              <Lock className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+            <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-warn">
+              <Lock className="w-3.5 h-3.5 text-warn" />
               Internal note · {msg.agent?.name || 'Teammate'}
             </span>
             <div className="flex items-center gap-2">
-              <span className="text-[11px] text-amber-700/70 dark:text-amber-300/70 tabular-nums">
+              <span className="text-2xs text-warn/70 tabular-nums">
                 {formatTime(msg.created_at)}
               </span>
               {msg.metadata?.is_edited && (
-                <span className="text-[10px] text-amber-700/70 dark:text-amber-300/70 italic">(edited)</span>
+                <span className="text-2xs text-warn/70 italic">(edited)</span>
               )}
               <button
                 type="button"
@@ -1510,8 +1510,8 @@ export function ChatThread({
                 className={cn(
                   'transition-opacity p-0.5 cursor-pointer',
                   copiedMessageId === msg.id
-                    ? 'opacity-100 text-emerald-600'
-                    : 'opacity-0 group-hover/note:opacity-100 text-amber-700/70 hover:text-amber-800 dark:text-amber-300/70 dark:hover:text-amber-200'
+                    ? 'opacity-100 text-success'
+                    : 'opacity-0 group-hover/note:opacity-100 text-warn/70 hover:text-warn'
                 )}
               >
                 {copiedMessageId === msg.id ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
@@ -1520,7 +1520,7 @@ export function ChatThread({
                 type="button"
                 title="Edit note"
                 onClick={() => startEditing(msg)}
-                className="opacity-0 group-hover/note:opacity-100 text-amber-700/70 hover:text-amber-800 dark:text-amber-300/70 dark:hover:text-amber-200 transition-opacity p-0.5 cursor-pointer"
+                className="opacity-0 group-hover/note:opacity-100 text-warn/70 hover:text-warn transition-opacity p-0.5 cursor-pointer"
               >
                 <Pencil className="w-3 h-3" />
               </button>
@@ -1528,7 +1528,7 @@ export function ChatThread({
                 type="button"
                 title="Delete note"
                 onClick={() => setDeleteConfirmMsg(msg)}
-                className="opacity-0 group-hover/note:opacity-100 text-amber-700/70 hover:text-danger dark:text-amber-300/70 transition-opacity p-0.5 cursor-pointer"
+                className="opacity-0 group-hover/note:opacity-100 text-warn/70 hover:text-danger transition-opacity p-0.5 cursor-pointer"
               >
                 <Trash2 className="w-3 h-3" />
               </button>
@@ -1550,11 +1550,11 @@ export function ChatThread({
                 }}
                 autoFocus
                 rows={3}
-                className="w-full rounded-lg bg-surface border border-amber-300/80 p-2 text-[13.5px] text-ink focus:outline-none focus:ring-1 focus:ring-amber-500 resize-none"
+                className="w-full rounded-lg bg-surface border border-warn-line/80 p-2 text-ui text-ink focus:outline-none focus:ring-1 focus:ring-warn resize-none"
                 placeholder="Edit internal note..."
               />
-              <div className="mt-1.5 flex items-center justify-between gap-2 text-[11px]">
-                <span className="text-amber-700/80 dark:text-amber-300/80 text-[10px]">Esc to cancel • Enter to save</span>
+              <div className="mt-1.5 flex items-center justify-between gap-2 text-2xs">
+                <span className="text-warn/80 text-2xs">Esc to cancel • Enter to save</span>
                 <div className="flex items-center gap-1.5">
                   <button
                     type="button"
@@ -1568,7 +1568,7 @@ export function ChatThread({
                     type="button"
                     onClick={() => handleSaveEdit(msg.id)}
                     disabled={isSavingEdit || !editingContent.trim()}
-                    className="px-2.5 py-0.5 rounded bg-amber-600 text-white font-medium hover:bg-amber-700 transition-colors flex items-center gap-1 shadow-xs disabled:opacity-50 cursor-pointer"
+                    className="px-2.5 py-0.5 rounded bg-warn text-white font-medium hover:bg-warn transition-colors flex items-center gap-1 shadow-xs disabled:opacity-50 cursor-pointer"
                   >
                     {isSavingEdit ? (
                       <>
@@ -1586,11 +1586,11 @@ export function ChatThread({
               </div>
             </div>
           ) : (
-            <p className="whitespace-pre-wrap text-[13.5px] leading-relaxed text-amber-950 dark:text-amber-100">
+            <p className="whitespace-pre-wrap text-ui leading-relaxed text-warn">
               {msg.content}
             </p>
           )}
-          <p className="mt-2 text-[11px] text-amber-700/80 dark:text-amber-400/80 font-medium">
+          <p className="mt-2 text-2xs text-warn/80 font-medium">
             🔒 Only visible to your team — never sent to the visitor.
           </p>
         </div>
@@ -1642,7 +1642,7 @@ export function ChatThread({
           {/* Message Action Toolbar (Copy, Reply, Edit, Delete) */}
           <div
             className={cn(
-              'absolute top-0 z-10 flex items-center gap-0.5 rounded-full border border-line bg-surface p-0.5 shadow-sm transition-opacity focus-within:opacity-100 group-hover/msg:opacity-100 backdrop-blur-sm',
+              'absolute top-0 z-10 flex items-center gap-0.5 rounded-full border border-line bg-surface p-0.5 shadow-sm transition-opacity focus-within:opacity-100 group-hover/msg:opacity-100',
               copiedMessageId === msg.id ? 'opacity-100' : 'opacity-0',
               isAgent ? '-left-[7.75rem]' : '-right-[4.25rem]'
             )}
@@ -1654,7 +1654,7 @@ export function ChatThread({
               onClick={() => copyMessage(msg)}
               className={cn(
                 'w-6 h-6 grid place-items-center rounded-full hover:bg-surface-2 transition-colors cursor-pointer',
-                copiedMessageId === msg.id ? 'text-emerald-600' : 'text-ink-3 hover:text-ink'
+                copiedMessageId === msg.id ? 'text-success' : 'text-ink-3 hover:text-ink'
               )}
             >
               {copiedMessageId === msg.id ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
@@ -1694,7 +1694,7 @@ export function ChatThread({
 
           <div
             className={cn(
-              'px-3.5 py-2 text-[14px] leading-relaxed whitespace-pre-wrap break-words',
+              'px-3.5 py-2 text-sm leading-relaxed whitespace-pre-wrap break-words',
               isAgent
                 ? 'rounded-2xl rounded-br-xs bg-bubble-out text-bubble-out-ink shadow-xs font-normal'
                 : isAI
@@ -1703,7 +1703,7 @@ export function ChatThread({
             )}
           >
             {isAI && (
-              <span className="flex items-center gap-1 mb-1 text-[10.5px] font-bold uppercase tracking-wide text-accent">
+              <span className="flex items-center gap-1 mb-1 text-2xs font-bold uppercase tracking-wide text-accent">
                 {isGreeting ? <Bot className="w-3 h-3" /> : <Sparkles className="w-3 h-3" />}
                 {isGreeting ? 'Bot Greeting' : 'AI'}
               </span>
@@ -1715,7 +1715,7 @@ export function ChatThread({
                     src={msg.attachment_url}
                     alt="Attachment"
                     onLoad={() => scrollToBottom(false)}
-                    className="rounded-xl max-h-56 w-auto max-w-full object-cover cursor-pointer hover:opacity-90 transition-opacity border border-black/10 dark:border-white/10 shadow-xs"
+                    className="rounded-xl max-h-56 w-auto max-w-full object-cover cursor-pointer hover:opacity-90 transition-opacity border border-black/10 shadow-xs"
                     onClick={() => setPreviewImageModalUrl(msg.attachment_url)}
                   />
                 ) : (
@@ -1723,7 +1723,7 @@ export function ChatThread({
                     href={msg.attachment_url}
                     target="_blank"
                     rel="noreferrer"
-                    className="flex items-center gap-2 p-2 bg-black/10 dark:bg-white/10 rounded-lg text-xs hover:underline"
+                    className="flex items-center gap-2 p-2 bg-black/10 rounded-lg text-xs hover:underline"
                   >
                     <FileText className="w-4 h-4 shrink-0" />
                     <span className="truncate">View Attachment</span>
@@ -1747,11 +1747,11 @@ export function ChatThread({
                   }}
                   autoFocus
                   rows={Math.min(6, Math.max(2, editingContent.split('\n').length))}
-                  className="w-full rounded-lg bg-black/15 text-white placeholder-white/50 p-2 text-[13.5px] border border-white/20 focus:outline-none focus:ring-1 focus:ring-white/40 resize-none font-normal"
+                  className="w-full rounded-lg bg-black/15 text-white placeholder-white/50 p-2 text-ui border border-white/20 focus:outline-none focus:ring-1 focus:ring-white/40 resize-none font-normal"
                   placeholder="Edit message..."
                 />
-                <div className="mt-1.5 flex items-center justify-between gap-2 text-[11px]">
-                  <span className="text-white/70 text-[10px]">
+                <div className="mt-1.5 flex items-center justify-between gap-2 text-2xs">
+                  <span className="text-white/70 text-2xs">
                     Esc to cancel • Enter to save
                   </span>
                   <div className="flex items-center gap-1.5">
@@ -1914,7 +1914,7 @@ export function ChatThread({
                   return (
                     <div>
                       <p className="whitespace-pre-wrap leading-relaxed">{msg.content}</p>
-                      <span className="mt-1 inline-flex items-center gap-1 text-[11px] text-ink-3">
+                      <span className="mt-1 inline-flex items-center gap-1 text-2xs text-ink-3">
                         <Globe className="w-3 h-3 shrink-0 animate-pulse" />
                         Translating…
                       </span>
@@ -1941,12 +1941,12 @@ export function ChatThread({
 
           <div
             className={cn(
-              'mt-1 flex items-center gap-1.5 px-1 text-[10.5px] text-ink-3',
+              'mt-1 flex items-center gap-1.5 px-1 text-2xs text-ink-3',
               (isAgent || isAI) && 'justify-end'
             )}
           >
             {isGreeting ? (
-              <span className="font-semibold text-purple-600 dark:text-purple-400 inline-flex items-center gap-1">
+              <span className="font-semibold text-accent inline-flex items-center gap-1">
                 <Bot className="w-3 h-3" />
                 <span>Bot</span>
                 {' ·'}
@@ -1959,7 +1959,7 @@ export function ChatThread({
                 {' ·'}
               </span>
             ) : isAI ? (
-              <span className="font-semibold text-purple-600 dark:text-purple-400 inline-flex items-center gap-1">
+              <span className="font-semibold text-accent inline-flex items-center gap-1">
                 <Sparkles className="w-3 h-3" />
                 <span>AI</span>
                 {' ·'}
@@ -1967,7 +1967,7 @@ export function ChatThread({
             ) : null}
             <span className="tabular-nums">{formatTime(msg.created_at)}</span>
             {msg.metadata?.is_edited && (
-              <span className="italic text-[10px] text-ink-3/70 ml-0.5">(edited)</span>
+              <span className="italic text-2xs text-ink-3/70 ml-0.5">(edited)</span>
             )}
             {isAgent && (
               <MessageTicks
@@ -2028,7 +2028,7 @@ export function ChatThread({
             <h2
               // Long visitor names end in an ellipsis instead of being cut
               // off mid-letter by the action buttons.
-              className="text-[13.5px] sm:text-[14px] font-bold tracking-tight text-ink min-w-0 truncate"
+              className="text-ui sm:text-sm font-bold tracking-tight text-ink min-w-0 truncate"
               title={displayName}
             >
               {displayName}
@@ -2042,10 +2042,10 @@ export function ChatThread({
             )}
 
             {/* Plain text status & location info (No fake button pills) */}
-            <span className="text-[11.5px] text-ink-3 truncate hidden sm:inline-flex items-center gap-1 ml-1 min-w-0 shrink">
+            <span className="text-xs text-ink-3 truncate hidden sm:inline-flex items-center gap-1 ml-1 min-w-0 shrink">
               <span>·</span>
               {isOnline ? (
-                <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-medium shrink-0">
+                <span className="inline-flex items-center gap-1 text-success font-medium shrink-0">
                   <span className="live-dot" />
                   Active now
                 </span>
@@ -2100,7 +2100,7 @@ export function ChatThread({
                   className="w-1.5 h-1.5 rounded-full shrink-0"
                   style={{ background: active?.dot }}
                 />
-                <span className="text-[12px] font-medium text-ink">{active?.label}</span>
+                <span className="text-xs font-medium text-ink">{active?.label}</span>
                 <ChevronDown
                   className={cn(
                     'w-3.5 h-3.5 text-ink-3 transition-transform duration-150',
@@ -2119,7 +2119,7 @@ export function ChatThread({
               aria-label="Resolve conversation"
             >
               <CheckCircle2 className="w-3.5 h-3.5" />
-              <span className="text-[12px] font-semibold">Resolve</span>
+              <span className="text-xs font-semibold">Resolve</span>
             </button>
           ) : (
             <button
@@ -2129,7 +2129,7 @@ export function ChatThread({
               aria-label="Reopen conversation"
             >
               <RotateCcw className="w-3.5 h-3.5" />
-              <span className="text-[12px] font-semibold">Reopen</span>
+              <span className="text-xs font-semibold">Reopen</span>
             </button>
           )}
 
@@ -2218,7 +2218,7 @@ export function ChatThread({
       <div className="shrink-0 px-3 sm:px-4 py-1 flex items-center gap-1.5 border-b border-line bg-surface-2/60 min-h-[32px] overflow-x-auto no-scrollbar">
         {/* Language selector chip moved from header to metadata row */}
         <label
-          className="h-6 px-2 rounded-md bg-surface border border-line hover:border-line-3 text-[11px] font-semibold text-ink flex items-center gap-1 shrink-0 cursor-pointer relative shadow-2xs transition-colors"
+          className="h-6 px-2 rounded-md bg-surface border border-line hover:border-line-3 text-2xs font-semibold text-ink flex items-center gap-1 shrink-0 cursor-pointer relative shadow-2xs transition-colors"
           title={
             languageOverride
               ? `Language set manually: ${getLanguageInfo(detectedVisitorLang).name}`
@@ -2226,7 +2226,7 @@ export function ChatThread({
           }
         >
           <Globe className="w-3 h-3 text-ink-3 shrink-0" />
-          <span className="uppercase text-[10.5px]">{detectedVisitorLang}</span>
+          <span className="uppercase text-2xs">{detectedVisitorLang}</span>
           {languageOverride && <span className="w-1.5 h-1.5 rounded-full bg-accent shrink-0" aria-hidden />}
           <ChevronDown className="w-2.5 h-2.5 text-ink-3 shrink-0 opacity-60" />
           <select
@@ -2284,7 +2284,7 @@ export function ChatThread({
                 )
               }
               className={cn(
-                'shrink-0 h-6 px-2 rounded-md transition-all cursor-pointer inline-flex items-center gap-1 text-[11px]',
+                'shrink-0 h-6 px-2 rounded-md transition-all cursor-pointer inline-flex items-center gap-1 text-2xs',
                 isFullAutopilot
                   ? 'bg-accent text-accent-ink font-semibold shadow-xs'
                   : isWorkspaceFirstReplyOn
@@ -2312,7 +2312,7 @@ export function ChatThread({
         })()}
 
         {conversation.status === "snoozed" && conversation.snoozed_until && (
-          <span className="inline-flex items-center gap-1 h-6 px-1.5 rounded-md text-[10.5px] font-medium bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 shrink-0">
+          <span className="inline-flex items-center gap-1 h-6 px-1.5 rounded-md text-2xs font-medium bg-warn/10 text-warn border border-warn/20 shrink-0">
             <Clock className="w-3 h-3" />
             Snoozed {formatTimeAgo(conversation.snoozed_until)}
           </span>
@@ -2324,7 +2324,7 @@ export function ChatThread({
 
         {conversation.tags?.length ? (
           conversation.tags.map((t) => (
-            <span key={t} className="inline-flex items-center gap-1 h-6 px-1.5 rounded-md text-[10.5px] font-medium bg-accent/10 text-accent border border-accent/20 group shrink-0">
+            <span key={t} className="inline-flex items-center gap-1 h-6 px-1.5 rounded-md text-2xs font-medium bg-accent/10 text-accent border border-accent/20 group shrink-0">
               {t}
               <button
                 onClick={() => handleToggleTag(t)}
@@ -2340,7 +2340,7 @@ export function ChatThread({
         <div ref={tagPickerRef} className="relative shrink-0">
           <button
             onClick={() => setShowTagPicker((s) => !s)}
-            className="inline-flex items-center gap-1 h-6 px-2 rounded-md border border-dashed border-line-2 text-[10.5px] font-medium text-ink-3 hover:text-ink hover:border-line-3 transition-colors shrink-0 whitespace-nowrap"
+            className="inline-flex items-center gap-1 h-6 px-2 rounded-md border border-dashed border-line-2 text-2xs font-medium text-ink-3 hover:text-ink hover:border-line-3 transition-colors shrink-0 whitespace-nowrap"
           >
             <Plus className="w-3 h-3 shrink-0" />
             <span className="whitespace-nowrap">Tag</span>
@@ -2368,7 +2368,7 @@ export function ChatThread({
                         key={pt}
                         onClick={() => handleToggleTag(pt)}
                         className={cn(
-                          'w-full flex items-center justify-between px-2 py-1.5 rounded-lg text-[12.5px] transition-colors cursor-pointer',
+                          'w-full flex items-center justify-between px-2 py-1.5 rounded-lg text-xs transition-colors cursor-pointer',
                           active
                             ? 'bg-accent-soft text-accent font-medium'
                             : 'text-ink hover:bg-surface-3'
@@ -2403,7 +2403,7 @@ export function ChatThread({
 
         {conversation.csat_rating && (
           <span
-            className="inline-flex items-center gap-1 h-6 px-1.5 rounded-md text-[10.5px] font-medium bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 shrink-0"
+            className="inline-flex items-center gap-1 h-6 px-1.5 rounded-md text-2xs font-medium bg-warn/10 text-warn border border-warn/20 shrink-0"
             title={
               conversation.csat_feedback
                 ? `CSAT ${conversation.csat_rating}/5 — ${conversation.csat_feedback}`
@@ -2418,9 +2418,9 @@ export function ChatThread({
 
       {/* ── Collision Warning Banner ── */}
       {collisionAgents.length > 0 && (
-        <div className="bg-amber-500/10 border-b border-amber-500/25 px-5 py-2.5 flex items-center justify-between text-xs text-amber-800 dark:text-amber-300 animate-in fade-in slide-in-from-top-1 duration-200">
+        <div className="bg-warn/10 border-b border-warn/25 px-5 py-2.5 flex items-center justify-between text-xs text-warn animate-in fade-in slide-in-from-top-1 duration-200">
           <div className="flex items-center gap-2">
-            <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0" />
+            <AlertTriangle className="w-4 h-4 text-warn shrink-0" />
             <span>
               <strong>Collision Warning:</strong>{' '}
               {collisionAgents.map((a) => a.name).join(', ')}{' '}
@@ -2455,7 +2455,7 @@ export function ChatThread({
           <button
             type="button"
             onClick={() => scrollToBottom(true)}
-            className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 h-8 pl-3 pr-3.5 rounded-full bg-surface border border-line shadow-lg text-[12px] font-semibold text-ink hover:border-accent hover:text-accent transition-colors inline-flex items-center gap-1.5 cursor-pointer animate-pop"
+            className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 h-8 pl-3 pr-3.5 rounded-full bg-surface border border-line shadow-lg text-xs font-semibold text-ink hover:border-accent hover:text-accent transition-colors inline-flex items-center gap-1.5 cursor-pointer animate-pop"
           >
             <ChevronDown className="w-3.5 h-3.5" />
             {unseenCount > 0
@@ -2475,7 +2475,7 @@ export function ChatThread({
           >
             <div className="flex items-center gap-2 min-w-0">
               <AlertTriangle className="w-4 h-4 shrink-0 text-white" />
-              <span className="text-[12px] font-medium leading-snug">{noteErrorToast}</span>
+              <span className="text-xs font-medium leading-snug">{noteErrorToast}</span>
             </div>
             <button
               type="button"
@@ -2495,7 +2495,7 @@ export function ChatThread({
                 <Zap className="w-3 h-3 text-accent" />
                 Saved Quick Replies
               </span>
-              <span className="text-[11px] text-ink-3">
+              <span className="text-2xs text-ink-3">
                 Type <span className="kbd font-mono">/</span> to open
               </span>
             </div>
@@ -2511,7 +2511,7 @@ export function ChatThread({
 
             <div className="max-h-56 overflow-y-auto space-y-0.5">
               {filteredMacros.length === 0 ? (
-                <p className="py-4 text-center text-[12px] text-ink-3">
+                <p className="py-4 text-center text-xs text-ink-3">
                   No matching replies. Add them in Settings &gt; Saved Quick Replies.
                 </p>
               ) : (
@@ -2523,14 +2523,14 @@ export function ChatThread({
                     className="w-full text-left px-2.5 py-2 rounded-lg hover:bg-surface-3 transition-colors group cursor-pointer"
                   >
                     <div className="flex items-baseline justify-between gap-2">
-                      <span className="text-[12.5px] font-semibold font-mono text-accent group-hover:text-accent-hover transition-colors">
+                      <span className="text-xs font-semibold font-mono text-accent group-hover:text-accent-hover transition-colors">
                         /{macro.shortcut}
                       </span>
-                      <span className="text-[11px] text-ink-3 shrink-0">
+                      <span className="text-2xs text-ink-3 shrink-0">
                         {macro.title}
                       </span>
                     </div>
-                    <p className="mt-0.5 text-[11.5px] text-ink-3 truncate">
+                    <p className="mt-0.5 text-xs text-ink-3 truncate">
                       {macro.content}
                     </p>
                   </button>
@@ -2544,7 +2544,7 @@ export function ChatThread({
         {showMentions && isInternalMode && (
           <div className="absolute bottom-[calc(100%-4px)] left-5 z-50 rounded-xl border border-line bg-surface shadow-xl p-2 w-64 animate-pop">
             <div className="flex items-center justify-between mb-1.5 px-1.5">
-              <span className="eyebrow flex items-center gap-1 text-[11px] text-amber-600 dark:text-amber-400 font-semibold">
+              <span className="eyebrow flex items-center gap-1 text-2xs text-warn font-semibold">
                 <AtSign className="w-3 h-3" />
                 Mention teammate
               </span>
@@ -2564,10 +2564,10 @@ export function ChatThread({
                   >
                     <Avatar name={agent.name} seed={agent.id} size="xs" />
                     <div className="min-w-0 flex-1">
-                      <p className="text-[12px] font-semibold text-ink truncate">
+                      <p className="text-xs font-semibold text-ink truncate">
                         {agent.name}
                       </p>
-                      <p className="text-[10.5px] text-ink-3 truncate">
+                      <p className="text-2xs text-ink-3 truncate">
                         {agent.email}
                       </p>
                     </div>
@@ -2580,7 +2580,7 @@ export function ChatThread({
         {/* Suggested replies from the configured model provider */}
         {suggestedReplies.length > 0 && (
           <div className="mb-3 p-2.5 rounded-xl bg-accent-soft/40 border border-accent-line flex flex-col gap-1.5 animate-rise">
-            <div className="flex items-center justify-between text-[11px] text-accent font-semibold px-0.5">
+            <div className="flex items-center justify-between text-2xs text-accent font-semibold px-0.5">
               <span className="flex items-center gap-1.5">
                 <Sparkles className="w-3.5 h-3.5" />
                 Suggested replies (click to insert):
@@ -2606,14 +2606,14 @@ export function ChatThread({
                       textareaRef.current.focus();
                     }
                   }}
-                  className="shrink-0 max-w-[260px] text-left p-2 rounded-lg bg-surface text-ink text-[12px] border border-line hover:border-accent hover:shadow-xs transition-all group"
+                  className="shrink-0 max-w-[260px] text-left p-2 rounded-lg bg-surface text-ink text-xs border border-line hover:border-accent hover:shadow-xs transition-all group"
                   title={sr.text}
                 >
-                  <span className="font-semibold text-[11px] text-accent flex items-center gap-1 mb-0.5">
+                  <span className="font-semibold text-2xs text-accent flex items-center gap-1 mb-0.5">
                     <Sparkles className="w-2.5 h-2.5" />
                     {sr.title}
                   </span>
-                  <span className="line-clamp-2 text-[11.5px] leading-snug text-ink-2 group-hover:text-ink">
+                  <span className="line-clamp-2 text-xs leading-snug text-ink-2 group-hover:text-ink">
                     {sr.text}
                   </span>
                 </button>
@@ -2627,7 +2627,7 @@ export function ChatThread({
           className={cn(
             'rounded-2xl border transition-all duration-200 shadow-xs focus-within:shadow-md relative bg-surface',
             isInternalMode
-              ? 'bg-amber-500/5 border-amber-500/40 focus-within:border-amber-500/80 focus-within:ring-2 focus-within:ring-amber-500/20'
+              ? 'bg-warn/5 border-warn/40 focus-within:border-warn/80 focus-within:ring-2 focus-within:ring-warn/20'
               : 'bg-surface border-line focus-within:border-accent/80 focus-within:ring-2 focus-within:ring-accent/20'
           )}
         >
@@ -2637,10 +2637,10 @@ export function ChatThread({
             <div className="flex items-start gap-2 px-3 pt-2.5 pb-2 border-b border-line/40 bg-accent-soft/30 rounded-t-2xl">
               <span className="mt-0.5 w-0.5 self-stretch rounded-full bg-accent shrink-0" />
               <div className="min-w-0 flex-1">
-                <p className="text-[11px] font-semibold text-accent">
+                <p className="text-2xs font-semibold text-accent">
                   Replying to {replyPreview.who}
                 </p>
-                <p className="text-[12px] text-ink-2 truncate">
+                <p className="text-xs text-ink-2 truncate">
                   {replyPreview.text}
                 </p>
               </div>
@@ -2670,7 +2670,7 @@ export function ChatThread({
                 type="button"
                 onClick={() => setComposerMode('reply')}
                 className={cn(
-                  'h-6 px-2.5 rounded-md text-[11.5px] font-semibold transition-all inline-flex items-center gap-1.5 whitespace-nowrap cursor-pointer',
+                  'h-6 px-2.5 rounded-md text-xs font-semibold transition-all inline-flex items-center gap-1.5 whitespace-nowrap cursor-pointer',
                   composerMode === 'reply'
                     ? 'bg-surface text-ink font-bold shadow-xs'
                     : 'text-ink-3 hover:text-ink'
@@ -2684,9 +2684,9 @@ export function ChatThread({
                 type="button"
                 onClick={() => setComposerMode('internal')}
                 className={cn(
-                  'h-6 px-2.5 rounded-md text-[11.5px] font-semibold transition-all inline-flex items-center gap-1.5 whitespace-nowrap cursor-pointer',
+                  'h-6 px-2.5 rounded-md text-xs font-semibold transition-all inline-flex items-center gap-1.5 whitespace-nowrap cursor-pointer',
                   composerMode === 'internal'
-                    ? 'bg-amber-500/20 text-amber-700 dark:text-amber-300 font-bold shadow-xs'
+                    ? 'bg-warn/20 text-warn font-bold shadow-xs'
                     : 'text-ink-3 hover:text-ink'
                 )}
               >
@@ -2696,9 +2696,9 @@ export function ChatThread({
             </div>
 
             {/* Subtle Context / Author info */}
-            <div className="text-[11px] text-ink-3 truncate">
+            <div className="text-2xs text-ink-3 truncate">
               {isInternalMode ? (
-                <span className="text-amber-600 dark:text-amber-400 font-medium flex items-center gap-1">
+                <span className="text-warn font-medium flex items-center gap-1">
                   <span>🔒 Only visible to team</span>
                 </span>
               ) : (
@@ -2746,10 +2746,10 @@ export function ChatThread({
                 </div>
               )}
               <div className="min-w-0 flex-1">
-                <p className="text-[12px] font-semibold text-ink truncate">
+                <p className="text-xs font-semibold text-ink truncate">
                   {pendingAttachment.file.name}
                 </p>
-                <p className="text-[10.5px] text-ink-3">
+                <p className="text-2xs text-ink-3">
                   {(pendingAttachment.file.size / 1024).toFixed(0)} KB · Ready to send via Cloudinary
                 </p>
               </div>
@@ -2770,7 +2770,7 @@ export function ChatThread({
           )}
 
           {replyLocked && (
-            <div className="px-3 py-2 flex items-center gap-2 border-b border-line/40 bg-accent/10 text-[11.5px] text-ink">
+            <div className="px-3 py-2 flex items-center gap-2 border-b border-line/40 bg-accent/10 text-xs text-ink">
               <Bot className="w-3.5 h-3.5 text-accent shrink-0" />
               <span className="flex-1 min-w-0">
                 AI assistant is replying to this conversation. Take over to reply yourself, or leave a note.
@@ -2779,7 +2779,7 @@ export function ChatThread({
                 <button
                   type="button"
                   onClick={() => onToggleAiMode('disabled')}
-                  className="h-6 px-2.5 rounded-md text-[11px] font-bold bg-accent hover:bg-accent-hover text-accent-ink shrink-0 cursor-pointer"
+                  className="h-6 px-2.5 rounded-md text-2xs font-bold bg-accent hover:bg-accent-hover text-accent-ink shrink-0 cursor-pointer"
                 >
                   Take over
                 </button>
@@ -2806,7 +2806,7 @@ export function ChatThread({
                   ? 'Add a caption for this picture (optional)…'
                   : `Reply to ${displayName}…`
               }
-              className="w-full bg-transparent text-[13px] leading-relaxed text-ink resize-none focus:outline-none placeholder:text-ink-3 min-h-[66px] max-h-[220px] overflow-y-auto"
+              className="w-full bg-transparent text-ui leading-relaxed text-ink resize-none focus:outline-none placeholder:text-ink-3 min-h-[66px] max-h-[220px] overflow-y-auto"
             />
           </div>
 
@@ -2816,7 +2816,7 @@ export function ChatThread({
           {sendError && (
             <div
               role="alert"
-              className="px-3 py-2 flex items-center gap-2 border-t border-danger-line bg-danger-soft text-[11.5px] text-danger"
+              className="px-3 py-2 flex items-center gap-2 border-t border-danger-line bg-danger-soft text-xs text-danger"
             >
               <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
               <span className="flex-1 min-w-0">{sendError}</span>
@@ -2845,7 +2845,7 @@ export function ChatThread({
                 value={emojiSearchQuery}
                 onChange={(e) => setEmojiSearchQuery(e.target.value)}
                 placeholder="Search emojis..."
-                className="w-full px-2.5 py-1 text-[12px] rounded-lg border border-line bg-surface-2 focus:outline-none focus:ring-1 focus:ring-accent"
+                className="w-full px-2.5 py-1 text-xs rounded-lg border border-line bg-surface-2 focus:outline-none focus:ring-1 focus:ring-accent"
               />
               {/* Category tabs */}
               <div className="flex items-center gap-1 overflow-x-auto pb-1 border-b border-line">
@@ -2889,7 +2889,7 @@ export function ChatThread({
           )}
 
           {/* Composer Footer Action Bar */}
-          <div className="@container px-3 py-2 bg-surface-2/40 border-t border-line/40 flex items-center justify-between text-[11px] text-ink-3 rounded-b-2xl min-h-[42px] gap-2">
+          <div className="@container px-3 py-2 bg-surface-2/40 border-t border-line/40 flex items-center justify-between text-2xs text-ink-3 rounded-b-2xl min-h-[42px] gap-2">
             {/* Left Action Tools */}
             <div className="flex items-center gap-1 min-w-0 flex-nowrap">
               {/* Attachment Buttons */}
@@ -2938,10 +2938,10 @@ export function ChatThread({
               <button
                 type="button"
                 onClick={() => setShowMacros((s) => !s)}
-                className="h-7 px-2 rounded-lg text-[11px] font-medium text-ink-3 hover:text-ink hover:bg-surface-3 transition-colors inline-flex items-center gap-1 cursor-pointer shrink-0 whitespace-nowrap"
+                className="h-7 px-2 rounded-lg text-2xs font-medium text-ink-3 hover:text-ink hover:bg-surface-3 transition-colors inline-flex items-center gap-1 cursor-pointer shrink-0 whitespace-nowrap"
                 title="Saved canned responses (/)"
               >
-                <Zap className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                <Zap className="w-3.5 h-3.5 text-warn shrink-0" />
                 <span className="hidden @min-[520px]:inline">Replies</span>
               </button>
 
@@ -2950,7 +2950,7 @@ export function ChatThread({
                 type="button"
                 onClick={handleGenerateAiSuggestion}
                 disabled={aiDrafting}
-                className="h-7 px-2 rounded-lg text-[11px] font-semibold text-accent hover:bg-accent/10 transition-colors inline-flex items-center gap-1 cursor-pointer shrink-0 whitespace-nowrap"
+                className="h-7 px-2 rounded-lg text-2xs font-semibold text-accent hover:bg-accent/10 transition-colors inline-flex items-center gap-1 cursor-pointer shrink-0 whitespace-nowrap"
                 title="Ask AI Copilot to draft a response"
               >
                 <Sparkles className={cn('w-3.5 h-3.5 shrink-0', aiDrafting && 'animate-spin')} />
@@ -2964,9 +2964,9 @@ export function ChatThread({
                     type="button"
                     onClick={() => setShowTranslateMenu((prev) => !prev)}
                     className={cn(
-                      'h-7 px-2 rounded-lg text-[11px] font-medium transition-all inline-flex items-center gap-1.5 cursor-pointer shadow-2xs shrink-0 whitespace-nowrap',
+                      'h-7 px-2 rounded-lg text-2xs font-medium transition-all inline-flex items-center gap-1.5 cursor-pointer shadow-2xs shrink-0 whitespace-nowrap',
                       autoTranslateEnabled && targetLanguage !== 'en'
-                        ? 'bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/30 hover:bg-blue-500/25 font-bold'
+                        ? 'bg-accent/15 text-accent border border-accent/30 hover:bg-accent/25 font-bold'
                         : 'text-ink-3 hover:text-ink hover:bg-surface-3 border border-transparent'
                     )}
                     title={
@@ -2975,7 +2975,7 @@ export function ChatThread({
                         : `Translate replies into customer's language. Click to enable.`
                     }
                   >
-                    <Globe className={cn('w-3.5 h-3.5 shrink-0', autoTranslateEnabled && targetLanguage !== 'en' ? 'text-blue-500' : 'text-ink-3')} />
+                    <Globe className={cn('w-3.5 h-3.5 shrink-0', autoTranslateEnabled && targetLanguage !== 'en' ? 'text-accent' : 'text-ink-3')} />
                     {autoTranslateEnabled && targetLanguage !== 'en' ? (
                       <span className="inline-flex items-center gap-1">
                         {/* Narrow composer (phones): the code only, so the
@@ -2993,9 +2993,9 @@ export function ChatThread({
                   {/* Popover Dropdown Menu (Opens Upward from Toolbar) */}
                   {showTranslateMenu && (
                     <div className="absolute left-0 bottom-full mb-2 z-50 w-80 max-h-[min(520px,calc(100vh-140px))] overflow-y-auto overscroll-contain bg-surface rounded-2xl border border-line shadow-2xl p-3.5 space-y-3 animate-pop focus:outline-none">
-                      <div className="sticky -top-3.5 -mx-3.5 -mt-3.5 px-3.5 pt-3 pb-2.5 bg-surface/95 backdrop-blur-md border-b border-line/60 flex items-center justify-between z-10 rounded-t-2xl">
-                        <div className="flex items-center gap-1.5 text-[12px] font-bold text-ink">
-                          <Globe className="w-3.5 h-3.5 text-blue-500" />
+                      <div className="sticky -top-3.5 -mx-3.5 -mt-3.5 px-3.5 pt-3 pb-2.5 bg-surface border-b border-line/60 flex items-center justify-between z-10 rounded-t-2xl">
+                        <div className="flex items-center gap-1.5 text-xs font-bold text-ink">
+                          <Globe className="w-3.5 h-3.5 text-accent" />
                           <span>Translation Settings</span>
                         </div>
                         <button
@@ -3010,7 +3010,7 @@ export function ChatThread({
 
                       {/* Customer Native Language Status */}
                       <div className="bg-surface-2/70 rounded-lg p-2.5 space-y-2 border border-line/40">
-                        <div className="flex items-center justify-between text-[11px]">
+                        <div className="flex items-center justify-between text-2xs">
                           <span className="text-ink-3 font-medium">Customer speaks:</span>
                           <span className="font-bold text-ink flex items-center gap-1">
                             <span>{getLanguageInfo(detectedVisitorLang).flag}</span>
@@ -3029,7 +3029,7 @@ export function ChatThread({
                             setTargetLanguage(detectedVisitorLang);
                             setAutoTranslateEnabled(detectedVisitorLang !== 'en');
                           }}
-                          className="w-full py-1.5 px-2.5 rounded-lg text-[11px] font-semibold bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/60 dark:hover:bg-blue-900/60 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800 transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
+                          className="w-full py-1.5 px-2.5 rounded-lg text-2xs font-semibold bg-accent-soft hover:bg-accent-soft text-accent border border-accent-line transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
                         >
                           <RotateCcw className="w-3 h-3 shrink-0" />
                           <span>Auto-lock to Customer ({getLanguageInfo(detectedVisitorLang).name})</span>
@@ -3038,12 +3038,12 @@ export function ChatThread({
 
                       {/* Manual Override Dropdown */}
                       <div className="space-y-1.5">
-                        <div className="flex items-center justify-between text-[11px]">
+                        <div className="flex items-center justify-between text-2xs">
                           <label className="font-semibold text-ink">
                             Customer Receives Replies In:
                           </label>
                           {targetLanguage !== detectedVisitorLang && (
-                            <span className="text-[10px] text-amber-600 dark:text-amber-400 font-bold bg-amber-500/10 px-1.5 py-0.5 rounded">
+                            <span className="text-2xs text-warn font-bold bg-warn/10 px-1.5 py-0.5 rounded">
                               Custom Override
                             </span>
                           )}
@@ -3057,7 +3057,7 @@ export function ChatThread({
                             handleLanguageOverride(e.target.value);
                           }}
                           aria-label="Select Customer Language"
-                          className="w-full text-[11.5px] font-semibold bg-surface border border-line-2 rounded-lg px-2.5 py-1.5 text-ink focus:outline-none focus:ring-2 focus:ring-accent cursor-pointer shadow-2xs"
+                          className="w-full text-xs font-semibold bg-surface border border-line-2 rounded-lg px-2.5 py-1.5 text-ink focus:outline-none focus:ring-2 focus:ring-accent cursor-pointer shadow-2xs"
                         >
                           <option value="en">🇬🇧 English (Original / No Translation)</option>
                           {Object.values(SUPPORTED_LANGUAGES)
@@ -3074,16 +3074,16 @@ export function ChatThread({
                       {/* On / Off Toggle */}
                       <div className="pt-2 border-t border-line/60 flex items-center justify-between">
                         <div className="space-y-0.5">
-                          <p className="text-[11px] font-bold text-ink">Auto-Translation</p>
-                          <p className="text-[10px] text-ink-3">Translate agent replies automatically</p>
+                          <p className="text-2xs font-bold text-ink">Auto-Translation</p>
+                          <p className="text-2xs text-ink-3">Translate agent replies automatically</p>
                         </div>
                         <button
                           type="button"
                           onClick={() => setAutoTranslateEnabled(!autoTranslateEnabled)}
                           className={cn(
-                            'text-[10.5px] px-2.5 py-1 rounded-md font-bold transition-all cursor-pointer shadow-2xs',
+                            'text-2xs px-2.5 py-1 rounded-md font-bold transition-all cursor-pointer shadow-2xs',
                             autoTranslateEnabled
-                              ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                              ? 'bg-accent hover:bg-accent text-white'
                               : 'bg-surface-2 hover:bg-surface-3 text-ink-2 border border-line'
                           )}
                         >
@@ -3091,7 +3091,7 @@ export function ChatThread({
                         </button>
                       </div>
 
-                      <div className="text-[10px] text-ink-3 bg-surface-2/40 p-2 rounded-lg border border-line/30 leading-snug">
+                      <div className="text-2xs text-ink-3 bg-surface-2/40 p-2 rounded-lg border border-line/30 leading-snug">
                         ✨ <strong>Workflow:</strong> Write in English or any language. The customer receives your reply in {getLanguageInfo(targetLanguage).name}. Customer replies will always appear in English for you.
                       </div>
                     </div>
@@ -3113,7 +3113,7 @@ export function ChatThread({
                     return next;
                   });
                 }}
-                className="hidden @min-[640px]:inline-flex items-center gap-1 text-[10.5px] text-ink-3 hover:text-ink transition-colors cursor-pointer group"
+                className="hidden @min-[640px]:inline-flex items-center gap-1 text-2xs text-ink-3 hover:text-ink transition-colors cursor-pointer group"
                 title={
                   sendOnEnter
                     ? "Pressing Enter sends. Click to switch to Ctrl+Enter."
@@ -3121,7 +3121,7 @@ export function ChatThread({
                 }
               >
                 <span>Press</span>
-                <span className="kbd text-[9px] group-hover:border-accent group-hover:text-accent transition-colors font-semibold">
+                <span className="kbd text-2xs group-hover:border-accent group-hover:text-accent transition-colors font-semibold">
                   {sendOnEnter ? '↵' : 'Ctrl ↵'}
                 </span>
                 <span>to send</span>
@@ -3138,13 +3138,13 @@ export function ChatThread({
                     : 'Send reply (Ctrl+Enter)'
                 }
                 className={cn(
-                  'h-8 md:h-7 px-3 rounded-lg flex items-center shrink-0 whitespace-nowrap gap-1.5 text-[11.5px] font-bold transition-all shadow-xs cursor-pointer',
+                  'h-8 md:h-7 px-3 rounded-lg flex items-center shrink-0 whitespace-nowrap gap-1.5 text-xs font-bold transition-all shadow-xs cursor-pointer',
                   (!inputText.trim() && !pendingAttachment) || isSending || isTranslating || replyLocked
                     ? 'bg-surface-3 text-ink-3 cursor-not-allowed opacity-50'
                     : isInternalMode
-                    ? 'bg-amber-600 hover:bg-amber-700 text-white shadow-sm hover:scale-102'
+                    ? 'bg-warn hover:bg-warn text-white shadow-sm hover:scale-102'
                     : autoTranslateEnabled && targetLanguage !== 'en'
-                    ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-sm hover:scale-102'
+                    ? 'bg-accent hover:bg-accent text-white shadow-sm hover:scale-102'
                     : 'bg-accent hover:bg-accent-hover text-accent-ink shadow-sm hover:scale-102'
                 )}
               >
@@ -3183,11 +3183,11 @@ export function ChatThread({
 
       {/* ── Snooze Modal ── */}
       {showSnoozeModal && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-surface rounded-2xl border border-line shadow-2xl max-w-sm w-full p-5 animate-pop space-y-4">
+        <div className="fixed inset-0 z-50 bg-overlay flex items-center justify-center p-4">
+          <div className="popover rounded-2xl border border-line shadow-2xl max-w-sm w-full p-5 animate-pop space-y-4">
             <div className="flex items-center justify-between">
-              <h3 className="text-[15px] font-bold text-ink flex items-center gap-2">
-                <Clock className="w-4 h-4 text-amber-500" />
+              <h3 className="text-md font-bold text-ink flex items-center gap-2">
+                <Clock className="w-4 h-4 text-warn" />
                 Snooze Conversation
               </h3>
               <button
@@ -3197,7 +3197,7 @@ export function ChatThread({
                 <X className="w-4 h-4" />
               </button>
             </div>
-            <p className="text-[12px] text-ink-2 leading-relaxed">
+            <p className="text-xs text-ink-2 leading-relaxed">
               This conversation will be hidden until the chosen time, then
               automatically reopen in your inbox.
             </p>
@@ -3205,10 +3205,10 @@ export function ChatThread({
             <div className="space-y-2">
               <button
                 onClick={() => handleSnooze(60)}
-                className="w-full text-left p-2.5 rounded-xl border border-line hover:border-accent hover:bg-surface-2 transition-all flex items-center justify-between text-[12.5px] font-medium"
+                className="w-full text-left p-2.5 rounded-xl border border-line hover:border-accent hover:bg-surface-2 transition-all flex items-center justify-between text-xs font-medium"
               >
                 <span>In 1 hour</span>
-                <span className="text-[11px] text-ink-3">
+                <span className="text-2xs text-ink-3">
                   {new Date(Date.now() + 3600000).toLocaleTimeString([], {
                     hour: '2-digit',
                     minute: '2-digit',
@@ -3223,10 +3223,10 @@ export function ChatThread({
                   d.setHours(9, 0, 0, 0);
                   handleSnooze(d.toISOString());
                 }}
-                className="w-full text-left p-2.5 rounded-xl border border-line hover:border-accent hover:bg-surface-2 transition-all flex items-center justify-between text-[12.5px] font-medium"
+                className="w-full text-left p-2.5 rounded-xl border border-line hover:border-accent hover:bg-surface-2 transition-all flex items-center justify-between text-xs font-medium"
               >
                 <span>Tomorrow morning</span>
-                <span className="text-[11px] text-ink-3">9:00 AM</span>
+                <span className="text-2xs text-ink-3">9:00 AM</span>
               </button>
 
               <button
@@ -3236,16 +3236,16 @@ export function ChatThread({
                   d.setHours(9, 0, 0, 0);
                   handleSnooze(d.toISOString());
                 }}
-                className="w-full text-left p-2.5 rounded-xl border border-line hover:border-accent hover:bg-surface-2 transition-all flex items-center justify-between text-[12.5px] font-medium"
+                className="w-full text-left p-2.5 rounded-xl border border-line hover:border-accent hover:bg-surface-2 transition-all flex items-center justify-between text-xs font-medium"
               >
                 <span>Next Monday</span>
-                <span className="text-[11px] text-ink-3">9:00 AM</span>
+                <span className="text-2xs text-ink-3">9:00 AM</span>
               </button>
             </div>
 
             {/* Custom Datetime Picker */}
             <div className="pt-2 border-t border-line space-y-2">
-              <label className="block text-[11px] font-semibold text-ink-3 uppercase tracking-wider">
+              <label className="block text-2xs font-semibold text-ink-3 uppercase tracking-wider">
                 Custom time
               </label>
               <div className="flex gap-2">
@@ -3253,7 +3253,7 @@ export function ChatThread({
                   type="datetime-local"
                   value={customSnoozeDate}
                   onChange={(e) => setCustomSnoozeDate(e.target.value)}
-                  className="input input-sm flex-1 text-[12px]"
+                  className="input input-sm flex-1 text-xs"
                 />
                 <button
                   disabled={!customSnoozeDate}
@@ -3270,10 +3270,10 @@ export function ChatThread({
 
       {/* ── Merge Conversations Modal ── */}
       {showMergeModal && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-surface rounded-2xl border border-line shadow-2xl max-w-md w-full p-5 animate-pop space-y-4">
+        <div className="fixed inset-0 z-50 bg-overlay flex items-center justify-center p-4">
+          <div className="popover rounded-2xl border border-line shadow-2xl max-w-md w-full p-5 animate-pop space-y-4">
             <div className="flex items-center justify-between">
-              <h3 className="text-[15px] font-bold text-ink flex items-center gap-2">
+              <h3 className="text-md font-bold text-ink flex items-center gap-2">
                 <GitMerge className="w-4 h-4 text-accent" />
                 Merge Conversations
               </h3>
@@ -3285,19 +3285,19 @@ export function ChatThread({
               </button>
             </div>
 
-            <p className="text-[12px] text-ink-2 leading-relaxed">
+            <p className="text-xs text-ink-2 leading-relaxed">
               Consolidate messages and internal notes from another conversation
               into this active thread (<strong>#{conversation.id.slice(0, 8)}</strong>).
             </p>
 
             {/* Other Conversations from this Visitor */}
             <div className="space-y-2">
-              <label className="block text-[11px] font-semibold text-ink-3 uppercase tracking-wider">
+              <label className="block text-2xs font-semibold text-ink-3 uppercase tracking-wider">
                 Visitor&apos;s other conversations
               </label>
 
               {mergeCandidates.length === 0 ? (
-                <p className="text-[12px] text-ink-3 py-3 text-center border border-dashed border-line rounded-xl">
+                <p className="text-xs text-ink-3 py-3 text-center border border-dashed border-line rounded-xl">
                   No other conversations found for this visitor.
                 </p>
               ) : (
@@ -3308,10 +3308,10 @@ export function ChatThread({
                       className="p-2.5 rounded-xl border border-line hover:border-accent hover:bg-surface-2 flex items-center justify-between gap-2 transition-colors"
                     >
                       <div className="min-w-0">
-                        <span className="font-mono text-[11.5px] font-semibold text-ink block">
+                        <span className="font-mono text-xs font-semibold text-ink block">
                           #{cand.id.slice(0, 8)}
                         </span>
-                        <span className="text-[11px] text-ink-3">
+                        <span className="text-2xs text-ink-3">
                           {formatTimeAgo(cand.created_at)} · {cand.status}
                         </span>
                       </div>
@@ -3330,7 +3330,7 @@ export function ChatThread({
 
             {/* Manual ID Input */}
             <div className="pt-2 border-t border-line space-y-2">
-              <label className="block text-[11px] font-semibold text-ink-3 uppercase tracking-wider">
+              <label className="block text-2xs font-semibold text-ink-3 uppercase tracking-wider">
                 Or enter another Conversation ID
               </label>
               <div className="flex gap-2">
@@ -3339,7 +3339,7 @@ export function ChatThread({
                   placeholder="Paste conversation UUID…"
                   value={selectedMergeId}
                   onChange={(e) => setSelectedMergeId(e.target.value.trim())}
-                  className="input input-sm flex-1 font-mono text-[11.5px]"
+                  className="input input-sm flex-1 font-mono text-xs"
                 />
                 <button
                   disabled={!selectedMergeId || isMerging}
@@ -3357,13 +3357,13 @@ export function ChatThread({
       {/* ── Image Lightbox Modal ── */}
       {previewImageModalUrl && (
         <div
-          className="fixed inset-0 z-50 bg-black/85 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150"
+          className="fixed inset-0 z-50 bg-black/85 flex items-center justify-center p-4 animate-in fade-in duration-150"
           onClick={() => setPreviewImageModalUrl(null)}
         >
           <div className="relative max-w-3xl max-h-[90vh] flex flex-col items-center">
             <button
               onClick={() => setPreviewImageModalUrl(null)}
-              className="absolute -top-10 right-0 text-white hover:text-slate-300 p-1.5 rounded-full bg-white/10 hover:bg-white/20 transition-colors cursor-pointer"
+              className="absolute -top-10 right-0 text-white hover:text-ink-3 p-1.5 rounded-full bg-white/10 hover:bg-white/20 transition-colors cursor-pointer"
               title="Close image"
             >
               <X className="w-5 h-5" />
@@ -3380,7 +3380,7 @@ export function ChatThread({
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={(e) => e.stopPropagation()}
-                className="text-xs text-blue-300 hover:text-blue-200 hover:underline inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/10 transition-colors"
+                className="text-xs text-accent hover:text-blue-200 hover:underline inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/10 transition-colors"
               >
                 <span>Open original in new tab</span>
                 <ExternalLink className="w-3.5 h-3.5" />
@@ -3393,11 +3393,11 @@ export function ChatThread({
       {/* ── Delete Message Confirmation Modal ── */}
       {deleteConfirmMsg && (
         <div
-          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150"
+          className="fixed inset-0 z-50 bg-overlay flex items-center justify-center p-4 animate-in fade-in duration-150"
           onClick={() => !isDeleting && setDeleteConfirmMsg(null)}
         >
           <div
-            className="w-full max-w-md rounded-2xl border border-line bg-surface p-5 shadow-2xl animate-in zoom-in-95 duration-150"
+            className="w-full max-w-md rounded-2xl border border-line popover p-5 shadow-2xl animate-in zoom-in-95 duration-150"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center gap-3 text-danger mb-3">
@@ -3478,11 +3478,11 @@ function TranslationToggle({
   return (
     <div
       className={cn(
-        'mt-1.5 pt-1.5 border-t flex items-center gap-1.5 text-[11px] leading-4 select-none min-w-0',
+        'mt-1.5 pt-1.5 border-t flex items-center gap-1.5 text-2xs leading-4 select-none min-w-0',
         tone === 'out'
           ? 'border-white/20 text-white/75'
           : tone === 'ai'
-          ? 'border-purple-500/15 text-ink-3'
+          ? 'border-accent/15 text-ink-3'
           : 'border-line text-ink-3'
       )}
     >
@@ -3494,7 +3494,7 @@ function TranslationToggle({
         onClick={onToggle}
         className={cn(
           'shrink-0 font-semibold underline-offset-2 hover:underline cursor-pointer',
-          tone === 'out' ? 'text-white' : tone === 'ai' ? 'text-purple-600 dark:text-purple-400' : 'text-accent'
+          tone === 'out' ? 'text-white' : tone === 'ai' ? 'text-accent' : 'text-accent'
         )}
       >
         {showingOriginal ? 'English' : showText}
@@ -3554,15 +3554,15 @@ function QuotedMessage({
       <span className="min-w-0 flex-1">
         {quoted ? (
           <>
-            <span className="block text-[10.5px] font-semibold text-accent">
+            <span className="block text-2xs font-semibold text-accent">
               {who}
             </span>
-            <span className="block text-[12px] text-ink-2 line-clamp-2">
+            <span className="block text-xs text-ink-2 line-clamp-2">
               {quoted.content}
             </span>
           </>
         ) : (
-          <span className="block text-[12px] italic text-ink-3">
+          <span className="block text-xs italic text-ink-3">
             Original message deleted
           </span>
         )}

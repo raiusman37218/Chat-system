@@ -64,7 +64,7 @@ function Row({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex items-start justify-between gap-3 px-3 py-2 text-[12px]">
+    <div className="flex items-start justify-between gap-3 px-3 py-2 text-xs">
       <span className="flex items-center gap-2 text-ink-3 shrink-0">
         <Icon className="w-3.5 h-3.5" />
         {label}
@@ -88,7 +88,7 @@ function Section({
   return (
     <div className="space-y-1.5">
       <div className="flex items-center justify-between px-1">
-        <h3 className="eyebrow text-[11px] font-bold tracking-wider text-ink-3">
+        <h3 className="eyebrow text-2xs font-bold tracking-wider text-ink-3">
           {title}
         </h3>
         {action}
@@ -211,7 +211,7 @@ export function VisitorDetailsSidebar({
         <div className="w-10 h-10 rounded-xl bg-surface-2 border border-line flex items-center justify-center text-ink-3">
           <User className="w-5 h-5" />
         </div>
-        <p className="text-[12.5px] text-ink-3">No visitor profile available</p>
+        <p className="text-xs text-ink-3">No visitor profile available</p>
       </aside>
     );
   }
@@ -303,9 +303,9 @@ export function VisitorDetailsSidebar({
           size="lg"
           muted={!liveVisitor.name && !liveVisitor.email}
           online={isOnline}
-          className="rounded-full shadow-sm ring-2 ring-black/5 dark:ring-white/10"
+          className="rounded-full shadow-sm ring-2 ring-black/5"
         />
-        <h2 className="mt-3 text-[15px] font-bold tracking-tight text-ink">
+        <h2 className="mt-3 text-md font-bold tracking-tight text-ink">
           {displayName}
         </h2>
 
@@ -313,7 +313,7 @@ export function VisitorDetailsSidebar({
           <div className="mt-1 flex items-center gap-1.5 max-w-full">
             <a
               href={`mailto:${liveVisitor.email}`}
-              className="inline-flex items-center gap-1.5 text-[12px] text-ink-2 hover:text-accent transition-colors truncate font-medium"
+              className="inline-flex items-center gap-1.5 text-xs text-ink-2 hover:text-accent transition-colors truncate font-medium"
             >
               <Mail className="w-3.5 h-3.5 shrink-0 text-ink-3" />
               <span className="truncate">{liveVisitor.email}</span>
@@ -321,18 +321,18 @@ export function VisitorDetailsSidebar({
             <button
               onClick={() => handleCopyEmail(liveVisitor.email!)}
               title={copiedEmail ? 'Copied!' : 'Copy email'}
-              className="text-[10px] text-ink-3 hover:text-ink px-1.5 py-0.5 rounded bg-surface-3 hover:bg-surface-2 transition-colors shrink-0"
+              className="text-2xs text-ink-3 hover:text-ink px-1.5 py-0.5 rounded bg-surface-3 hover:bg-surface-2 transition-colors shrink-0"
             >
               {copiedEmail ? 'Copied' : 'Copy'}
             </button>
           </div>
         )}
 
-        <div className="mt-2 flex items-center gap-1.5 text-[12px] text-ink-3">
+        <div className="mt-2 flex items-center gap-1.5 text-xs text-ink-3">
           {isOnline ? (
             <>
               <span className="live-dot" />
-              <span className="text-emerald-600 dark:text-emerald-400 font-medium">Active on website</span>
+              <span className="text-success font-medium">Active on website</span>
             </>
           ) : (
             <span>Last seen {formatTimeAgo(liveVisitor.last_seen || liveVisitor.last_seen_at)}</span>
@@ -353,11 +353,11 @@ export function VisitorDetailsSidebar({
             >
               <Globe className="w-3.5 h-3.5 text-accent mt-0.5 shrink-0" />
               <span className="min-w-0 flex-1">
-                <span className="block font-mono text-[11px] leading-relaxed text-accent break-all group-hover:underline">
+                <span className="block font-mono text-2xs leading-relaxed text-accent break-all group-hover:underline">
                   {formattedUrl}
                 </span>
                 {displayPageTitle && (
-                  <span className="block text-[10.5px] text-ink-3 truncate mt-0.5">
+                  <span className="block text-2xs text-ink-3 truncate mt-0.5">
                     {displayPageTitle}
                   </span>
                 )}
@@ -374,7 +374,7 @@ export function VisitorDetailsSidebar({
           {(place.label || !localTime) && (
             <div className="px-3 py-2.5 flex items-center gap-2.5">
               <CountryFlag flag={place.flag} countryCode={place.countryCode} className="w-4 h-3 shrink-0" />
-              <span className="text-[12.5px] font-medium text-ink truncate">
+              <span className="text-xs font-medium text-ink truncate">
                 {place.label || 'Location unavailable'}
               </span>
             </div>
@@ -383,7 +383,7 @@ export function VisitorDetailsSidebar({
           {localTime && (
             <div className="px-3 py-2.5 flex items-center gap-2.5">
               <Clock className="w-4 h-4 text-ink-3 shrink-0" />
-              <span className="text-[12.5px] font-medium text-ink truncate">
+              <span className="text-xs font-medium text-ink truncate">
                 {localTime}
                 <span className="ml-1.5 font-normal text-ink-3">
                   ({timezone})
@@ -395,7 +395,7 @@ export function VisitorDetailsSidebar({
           {liveVisitor.language && (
             <div className="px-3 py-2.5 flex items-center gap-2.5">
               <Globe className="w-4 h-4 text-ink-3 shrink-0" />
-              <span className="text-[12.5px] font-medium text-ink truncate">
+              <span className="text-xs font-medium text-ink truncate">
                 {languageLabel(liveVisitor.language)}
               </span>
             </div>
@@ -404,7 +404,7 @@ export function VisitorDetailsSidebar({
           {liveVisitor.ip_address && (
             <div className="px-3 py-2.5 flex items-center gap-2.5">
               <Hash className="w-4 h-4 text-ink-3 shrink-0" />
-              <span className="font-mono text-[12px] text-ink truncate">
+              <span className="font-mono text-xs text-ink truncate">
                 {liveVisitor.ip_address}
               </span>
             </div>
@@ -415,7 +415,7 @@ export function VisitorDetailsSidebar({
         <Section title="Device">
           <div className="px-3 py-2.5 flex items-center gap-2.5">
             <BrowserIcon browser={ua.browser} title={ua.browserName} />
-            <span className="text-[12.5px] font-medium text-ink truncate">
+            <span className="text-xs font-medium text-ink truncate">
               {ua.browserName}
               {ua.browserVersion && (
                 <span className="ml-1 font-normal text-ink-2">
@@ -427,7 +427,7 @@ export function VisitorDetailsSidebar({
 
           <div className="px-3 py-2.5 flex items-center gap-2.5">
             <OsIcon os={ua.os} title={ua.osName} />
-            <span className="text-[12.5px] font-medium text-ink truncate">
+            <span className="text-xs font-medium text-ink truncate">
               {ua.osName}
               {ua.osVersion && (
                 <span className="ml-1 font-normal text-ink-2">
@@ -439,7 +439,7 @@ export function VisitorDetailsSidebar({
 
           <div className="px-3 py-2.5 flex items-center gap-2.5">
             <DeviceIcon device={ua.device} />
-            <span className="text-[12.5px] font-medium text-ink capitalize truncate">
+            <span className="text-xs font-medium text-ink capitalize truncate">
               {ua.device}
             </span>
           </div>
@@ -464,7 +464,7 @@ export function VisitorDetailsSidebar({
           action={
             <button
               onClick={() => setShowTagInput(!showTagInput)}
-              className="text-[11px] text-accent hover:underline flex items-center gap-0.5 font-semibold"
+              className="text-2xs text-accent hover:underline flex items-center gap-0.5 font-semibold"
             >
               <Plus className="w-3 h-3" />
               Add
@@ -475,14 +475,14 @@ export function VisitorDetailsSidebar({
             <div className="flex flex-wrap gap-1.5">
               {(conversation.tags || []).length === 0 && !showTagInput ? (
                 <div className="py-2 text-center w-full">
-                  <p className="text-[11.5px] text-ink-3 mb-2">No tags applied yet</p>
+                  <p className="text-xs text-ink-3 mb-2">No tags applied yet</p>
                   <div className="flex flex-wrap justify-center gap-1">
                     {PRESET_TAGS.slice(0, 4).map((preset) => (
                       <button
                         key={preset}
                         type="button"
                         onClick={() => handleToggleTag(preset)}
-                        className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-surface-2 text-ink-2 border border-line hover:border-accent hover:text-accent transition-colors"
+                        className="text-2xs font-semibold px-2 py-0.5 rounded-full bg-surface-2 text-ink-2 border border-line hover:border-accent hover:text-accent transition-colors"
                       >
                         +{preset}
                       </button>
@@ -493,7 +493,7 @@ export function VisitorDetailsSidebar({
                 (conversation.tags || []).map((tag) => (
                   <span
                     key={tag}
-                    className="inline-flex items-center gap-1 bg-surface-3 text-ink text-[11px] font-medium px-2 py-0.5 rounded-md border border-line"
+                    className="inline-flex items-center gap-1 bg-surface-3 text-ink text-2xs font-medium px-2 py-0.5 rounded-md border border-line"
                   >
                     #{tag}
                     <button
@@ -517,7 +517,7 @@ export function VisitorDetailsSidebar({
                       type="button"
                       onClick={() => handleToggleTag(preset)}
                       className={cn(
-                        'text-[10.5px] px-1.5 py-0.5 rounded border transition-colors',
+                        'text-2xs px-1.5 py-0.5 rounded border transition-colors',
                         (conversation.tags || []).includes(preset)
                           ? 'bg-accent text-white border-accent'
                           : 'bg-surface text-ink-2 border-line hover:border-accent'
@@ -534,7 +534,7 @@ export function VisitorDetailsSidebar({
                     placeholder="New tag…"
                     value={customTag}
                     onChange={(e) => setCustomTag(e.target.value)}
-                    className="input input-xs flex-1 text-[11px]"
+                    className="input input-xs flex-1 text-2xs"
                   />
                   <button type="submit" className="btn btn-xs btn-primary">
                     Add
@@ -549,13 +549,13 @@ export function VisitorDetailsSidebar({
         <Section
           title="Other Conversations"
           action={
-            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-surface-3 text-ink-2 border border-line">
+            <span className="text-2xs font-bold px-2 py-0.5 rounded-full bg-surface-3 text-ink-2 border border-line">
               {pastConversations.length}
             </span>
           }
         >
           <div className="p-2 space-y-1.5 max-h-52 overflow-y-auto">
-            <p className="text-[11px] font-medium text-ink-3 px-1.5 pt-0.5">
+            <p className="text-2xs font-medium text-ink-3 px-1.5 pt-0.5">
               {pastConversations.length === 0
                 ? 'No other conversations from this visitor'
                 : `${pastConversations.length} other conversation${pastConversations.length === 1 ? '' : 's'} from this visitor`}
@@ -570,21 +570,21 @@ export function VisitorDetailsSidebar({
                     className="w-full text-left p-2 rounded-lg hover:bg-surface-3 transition-colors flex items-center justify-between gap-2 group cursor-pointer border border-transparent hover:border-line/60"
                   >
                     <div className="min-w-0">
-                      <span className="font-mono text-[11px] text-ink font-semibold block">
+                      <span className="font-mono text-2xs text-ink font-semibold block">
                         #{past.id.slice(0, 8)}
                       </span>
-                      <span className="text-[10.5px] text-ink-3">
+                      <span className="text-2xs text-ink-3">
                         {formatTimeAgo(past.updated_at || past.created_at)}
                       </span>
                     </div>
                     <span
                       className={cn(
-                        'text-[10px] uppercase font-bold px-1.5 py-0.5 rounded',
+                        'text-2xs uppercase font-bold px-1.5 py-0.5 rounded',
                         past.status === 'closed'
-                          ? 'bg-slate-200/80 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
+                          ? 'bg-surface-3/80 text-ink-2'
                           : past.status === 'snoozed'
-                          ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
-                          : 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
+                          ? 'bg-warn/15 text-warn'
+                          : 'bg-success/15 text-success'
                       )}
                     >
                       {past.status}

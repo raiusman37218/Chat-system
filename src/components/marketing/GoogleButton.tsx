@@ -45,7 +45,7 @@ export function GoogleButton({
       type="button"
       onClick={onClick}
       disabled={disabled || loading}
-      className={`relative w-full h-11 px-4 rounded-xl border border-line-2 bg-surface hover:bg-surface-2 active:bg-surface-3 text-ink font-medium text-[13.5px] flex items-center justify-center gap-3 transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed shadow-xs hover:border-line-3 ${className}`}
+      className={`relative w-full h-11 px-4 rounded-xl border border-line-2 bg-surface hover:bg-surface-2 active:bg-surface-3 text-ink font-medium text-ui flex items-center justify-center gap-3 transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed shadow-xs hover:border-line-3 ${className}`}
     >
       {loading ? (
         <>

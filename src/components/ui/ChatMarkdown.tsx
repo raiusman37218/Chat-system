@@ -23,7 +23,7 @@ function inline(text: string, keyPrefix: string): React.ReactNode[] {
     }
     if (part.startsWith('`') && part.endsWith('`') && part.length > 2) {
       return (
-        <code key={key} className="px-1 py-px rounded bg-black/5 dark:bg-white/10 text-[0.92em] font-mono">
+        <code key={key} className="px-1 py-px rounded bg-black/5 text-[0.92em] font-mono">
           {part.slice(1, -1)}
         </code>
       );

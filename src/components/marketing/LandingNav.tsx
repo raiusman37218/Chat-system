@@ -10,14 +10,14 @@ export function LandingNav() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   return (
-    <header className="sticky top-0 z-50 border-b border-line bg-surface/80 backdrop-blur-md">
+    <header className="sticky top-0 z-50 border-b border-line bg-surface">
       <div className="u-container h-16 flex items-center justify-between gap-4 sm:gap-6 flex-nowrap">
         <Link href="/" className="flex items-center min-h-11 shrink-0 whitespace-nowrap">
           <Logo size={34} />
         </Link>
 
         {/* Desktop Navigation Links: visible at >= 1024px, never wrap to two lines */}
-        <nav className="hidden lg:flex items-center gap-1 text-[13.5px] font-medium shrink-0 whitespace-nowrap">
+        <nav className="hidden lg:flex items-center gap-1 text-ui font-medium shrink-0 whitespace-nowrap">
           {[
             ['Product', '#product'],
             ['How it works', '#how'],
@@ -77,8 +77,8 @@ export function LandingNav() {
 
       {/* Mobile/Tablet Menu Dropdown Drawer (below 1024px) */}
       {mobileMenuOpen && (
-        <div className="lg:hidden border-b border-line bg-surface/95 backdrop-blur-xl px-5 py-4 space-y-3 animate-in fade-in slide-in-from-top-2 duration-150 shadow-lg">
-          <nav className="flex flex-col space-y-1 text-[14px] font-medium">
+        <div className="lg:hidden border-b border-line bg-surface px-5 py-4 space-y-3 animate-in fade-in slide-in-from-top-2 duration-150 shadow-lg">
+          <nav className="flex flex-col space-y-1 text-sm font-medium">
             <a
               href="#product"
               onClick={() => setMobileMenuOpen(false)}

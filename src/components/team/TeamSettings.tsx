@@ -51,7 +51,7 @@ export function TeamSettings({ workspaceId }: { workspaceId: string }) {
         <h2 id="team-heading" className="sr-only">
           Team members
         </h2>
-        <p className="text-[12.5px] text-ink-3 min-w-0 flex-1 basis-56">
+        <p className="text-xs text-ink-3 min-w-0 flex-1 basis-56">
           {team ? `${active.length} active member${active.length === 1 ? '' : 's'}${inactive.length ? `, ${inactive.length} deactivated` : ''}.` : 'Invite people, set what they can do, and manage who is on the team.'}
         </p>
         {team && (
@@ -65,7 +65,7 @@ export function TeamSettings({ workspaceId }: { workspaceId: string }) {
         <div
           role={notice.tone === 'error' ? 'alert' : 'status'}
           className={cn(
-            'px-3 py-2 rounded-lg border text-[12.5px]',
+            'px-3 py-2 rounded-lg border text-xs',
             notice.tone === 'error' ? 'bg-danger-soft border-danger-line text-danger' : 'bg-success-soft border-success-line text-ink'
           )}
         >
@@ -172,8 +172,8 @@ function RoleLegend() {
     <dl className="grid grid-cols-1 sm:grid-cols-2 gap-2">
       {(['owner', 'admin', 'agent', 'light_agent'] as Role[]).map((r) => (
         <div key={r} className="p-3 rounded-xl border border-line bg-surface-2">
-          <dt className="text-[12.5px] font-semibold text-ink">{ROLE_LABELS[r]}</dt>
-          <dd className="text-[12px] text-ink-3 mt-0.5">{ROLE_DESCRIPTIONS[r]}</dd>
+          <dt className="text-xs font-semibold text-ink">{ROLE_LABELS[r]}</dt>
+          <dd className="text-xs text-ink-3 mt-0.5">{ROLE_DESCRIPTIONS[r]}</dd>
         </div>
       ))}
     </dl>
@@ -214,11 +214,11 @@ function MemberRow({
       <div className="flex items-center gap-3 min-w-0 flex-1 basis-56">
         <Avatar name={m.name} seed={m.id} size="md" online={m.is_active && m.status === 'online'} />
         <div className="min-w-0">
-          <div className="text-[13px] font-semibold text-ink truncate">
+          <div className="text-ui font-semibold text-ink truncate">
             {m.name}
             {m.id === team.me.id && <span className="text-ink-3 font-normal"> (you)</span>}
           </div>
-          <div className="text-[12px] text-ink-3 truncate">{m.email}</div>
+          <div className="text-xs text-ink-3 truncate">{m.email}</div>
         </div>
       </div>
 
@@ -226,7 +226,7 @@ function MemberRow({
         {manageable && m.is_active && onRole && roleOptions.length > 0 ? (
           <select
             aria-label={`Role for ${m.name}`}
-            className={cn(selectClass, 'h-8 text-[12.5px] w-auto')}
+            className={cn(selectClass, 'h-8 text-xs w-auto')}
             value={m.role}
             disabled={busy}
             onChange={(e) => onRole(e.target.value as Role)}
@@ -246,7 +246,7 @@ function MemberRow({
       {m.is_active && (
         <div className="basis-44 space-y-1">
           <StatusDot status={m.status} />
-          <div className={cn('text-[12px]', atCapacity ? 'text-warn font-medium' : 'text-ink-3')}>
+          <div className={cn('text-xs', atCapacity ? 'text-warn font-medium' : 'text-ink-3')}>
             {m.role === 'light_agent'
               ? 'Not assignable'
               : `${m.open_tickets} open${m.max_open_tickets !== null ? ` of ${m.max_open_tickets}` : ' · no limit'}`}
@@ -351,7 +351,7 @@ function InviteDialog({
           <ChipGroup label="Groups" options={team.groups.map((g) => ({ value: g.id, label: g.name }))} value={groupIds} onChange={setGroupIds} />
         )}
         {error && (
-          <p role="alert" className="text-[12.5px] text-danger">
+          <p role="alert" className="text-xs text-danger">
             {error}
           </p>
         )}
@@ -409,9 +409,9 @@ function CapacityDialog({
         >
           <input className={inputClass} type="number" min={1} max={1000} inputMode="numeric" value={value} onChange={(e) => setValue(e.target.value)} placeholder="No limit" autoFocus />
         </Field>
-        <p className="text-[12px] text-ink-3">Currently {member.open_tickets} open.</p>
+        <p className="text-xs text-ink-3">Currently {member.open_tickets} open.</p>
         {error && (
-          <p role="alert" className="text-[12.5px] text-danger">
+          <p role="alert" className="text-xs text-danger">
             {error}
           </p>
         )}
@@ -472,11 +472,11 @@ function DeactivateDialog({
         </>
       }
     >
-      <p className="text-[13px] text-ink-2">
+      <p className="text-ui text-ink-2">
         They will be signed out of this workspace immediately. Their history stays. You can reactivate them later.
       </p>
       <fieldset className="space-y-2">
-        <legend className="text-[11.5px] font-semibold text-ink-2 mb-1.5">
+        <legend className="text-xs font-semibold text-ink-2 mb-1.5">
           {member.open_tickets > 0 ? `${member.open_tickets} open ticket${member.open_tickets === 1 ? '' : 's'} to reassign` : 'Open tickets'}
         </legend>
         {options.map((o) => (
@@ -490,8 +490,8 @@ function DeactivateDialog({
           >
             <input type="radio" name="reassign" className="mt-0.5 accent-[var(--ds-accent)]" checked={mode === o.value} disabled={o.disabled} onChange={() => setMode(o.value)} />
             <span className="min-w-0">
-              <span className="block text-[13px] font-medium text-ink">{o.label}</span>
-              <span className="block text-[12px] text-ink-3">{o.hint}</span>
+              <span className="block text-ui font-medium text-ink">{o.label}</span>
+              <span className="block text-xs text-ink-3">{o.hint}</span>
             </span>
           </label>
         ))}
@@ -508,7 +508,7 @@ function DeactivateDialog({
         </Field>
       )}
       {error && (
-        <p role="alert" className="text-[12.5px] text-danger">
+        <p role="alert" className="text-xs text-danger">
           {error}
         </p>
       )}

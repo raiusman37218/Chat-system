@@ -1109,22 +1109,22 @@ export function AdminSettingsPanel({
           role="status"
           aria-live="polite"
           className={cn(
-            'fixed top-5 right-5 z-[9999] px-4 py-2.5 rounded-xl text-xs font-semibold flex items-center gap-2.5 shadow-2xl border animate-rise transition-all backdrop-blur-md',
+            'fixed top-5 right-5 z-[9999] px-4 py-2.5 rounded-xl text-xs font-semibold flex items-center gap-2.5 shadow-2xl border animate-rise transition-all',
             statusMessage.type === 'success'
-              ? 'bg-emerald-50/95 text-emerald-900 border-emerald-300 dark:bg-emerald-950/95 dark:text-emerald-100 dark:border-emerald-700'
-              : 'bg-rose-50/95 text-rose-900 border-rose-300 dark:bg-rose-950/95 dark:text-rose-100 dark:border-rose-700'
+              ? 'bg-success-soft/95 text-success border-success-line'
+              : 'bg-danger-soft/95 text-danger border-danger-line'
           )}
         >
           {statusMessage.type === 'success' ? (
-            <div className="w-5 h-5 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0">
+            <div className="w-5 h-5 rounded-full bg-success text-white flex items-center justify-center shrink-0">
               <Check className="w-3.5 h-3.5 stroke-[3]" />
             </div>
           ) : (
-            <div className="w-5 h-5 rounded-full bg-rose-500 text-white flex items-center justify-center shrink-0">
+            <div className="w-5 h-5 rounded-full bg-danger text-white flex items-center justify-center shrink-0">
               <AlertCircle className="w-3.5 h-3.5 stroke-[3]" />
             </div>
           )}
-          <span className="text-[13px]">{statusMessage.text}</span>
+          <span className="text-ui">{statusMessage.text}</span>
           <button
             type="button"
             onClick={() => setStatusMessage(null)}
@@ -1144,12 +1144,12 @@ export function AdminSettingsPanel({
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-[17px] font-bold text-ink tracking-tight">Admin Settings</h1>
-              <span className="text-[11px] px-2 py-0.5 rounded-full bg-accent/10 text-accent font-semibold">
+              <h1 className="text-lg font-bold text-ink tracking-tight">Admin Settings</h1>
+              <span className="text-2xs px-2 py-0.5 rounded-full bg-accent/10 text-accent font-semibold">
                 Admin Role Required
               </span>
             </div>
-            <p className="text-[12px] text-ink-3">
+            <p className="text-xs text-ink-3">
               Configure workspace customization, business hours, permissions, and routing.
             </p>
           </div>
@@ -1159,8 +1159,8 @@ export function AdminSettingsPanel({
           <div
             className={`px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 shadow-sm animate-rise ${
               statusMessage.type === 'success'
-                ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
-                : 'bg-red-50 text-red-700 dark:bg-red-950/50 dark:text-red-300 border border-red-200 dark:border-red-800'
+                ? 'bg-success-soft text-success border border-success-line'
+                : 'bg-danger-soft text-danger border border-danger-line'
             }`}
           >
             {statusMessage.type === 'success' ? (
@@ -1192,7 +1192,7 @@ export function AdminSettingsPanel({
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id as any)}
-              className={`flex items-center gap-2 px-4 py-3 text-[13px] font-medium border-b-2 transition-colors -mb-px ${
+              className={`flex items-center gap-2 px-4 py-3 text-ui font-medium border-b-2 transition-colors -mb-px ${
                 active
                   ? 'border-accent text-accent font-semibold'
                   : 'border-transparent text-ink-3 hover:text-ink hover:border-line-2'
@@ -1201,7 +1201,7 @@ export function AdminSettingsPanel({
               <Icon className="w-4 h-4" />
               <span>{tab.label}</span>
               {tab.badge !== undefined && (
-                <span className="text-[11px] px-1.5 py-0.5 rounded-full bg-surface-2 text-ink-2">
+                <span className="text-2xs px-1.5 py-0.5 rounded-full bg-surface-2 text-ink-2">
                   {tab.badge}
                 </span>
               )}
@@ -1219,8 +1219,8 @@ export function AdminSettingsPanel({
           <div
             className={`px-4 py-3 rounded-xl text-sm font-semibold flex items-center gap-2.5 shadow-2xl border ${
               statusMessage.type === 'success'
-                ? 'bg-emerald-600 text-white border-emerald-500'
-                : 'bg-rose-600 text-white border-rose-500'
+                ? 'bg-success text-white border-success'
+                : 'bg-danger text-white border-danger'
             }`}
           >
             {statusMessage.type === 'success' ? (
@@ -1246,12 +1246,12 @@ export function AdminSettingsPanel({
               <div className="card p-5.5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-surface border-2 border-line-2 shadow-xs">
                 <div>
                   <div className="flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse shadow-xs" />
-                    <h3 className="text-[17px] font-extrabold text-ink tracking-tight">
+                    <span className="w-2.5 h-2.5 rounded-full bg-success animate-pulse shadow-xs" />
+                    <h3 className="text-lg font-extrabold text-ink tracking-tight">
                       Live Chat Widget Configuration
                     </h3>
                   </div>
-                  <p className="text-[13px] text-ink-2 mt-0.5">
+                  <p className="text-ui text-ink-2 mt-0.5">
                     Customize brand colors, logo, floating launcher button &amp; greetings in real time.
                   </p>
                 </div>
@@ -1264,8 +1264,8 @@ export function AdminSettingsPanel({
                     1
                   </span>
                   <div>
-                    <h4 className="text-[15px] font-bold text-ink">Brand Color &amp; Accent</h4>
-                    <p className="text-[12.5px] text-ink-2 mt-0.5">
+                    <h4 className="text-md font-bold text-ink">Brand Color &amp; Accent</h4>
+                    <p className="text-xs text-ink-2 mt-0.5">
                       Themes the widget header, floating launcher button, and active chat elements.
                     </p>
                   </div>
@@ -1291,14 +1291,14 @@ export function AdminSettingsPanel({
                           placeholder="#2563eb"
                           className="input w-36 font-mono font-bold text-sm uppercase text-ink border-2 border-line-2 focus:border-accent shadow-xs"
                         />
-                        <span className="text-[12px] font-semibold text-ink-2">Custom Hex Code</span>
+                        <span className="text-xs font-semibold text-ink-2">Custom Hex Code</span>
                       </div>
                     </div>
                   </div>
 
                   {/* Preset Swatches */}
                   <div>
-                    <div className="text-[11.5px] font-extrabold text-ink-2 uppercase tracking-wider mb-2.5">
+                    <div className="text-xs font-extrabold text-ink-2 uppercase tracking-wider mb-2.5">
                       Popular Brand Themes
                     </div>
                     <div className="flex flex-wrap items-center gap-2.5">
@@ -1318,7 +1318,7 @@ export function AdminSettingsPanel({
                             type="button"
                             onClick={() => setBrandColor(color)}
                             className={cn(
-                              'flex items-center gap-2 px-3 py-1.5 rounded-xl border-2 text-[12px] font-bold transition-all shadow-2xs',
+                              'flex items-center gap-2 px-3 py-1.5 rounded-xl border-2 text-xs font-bold transition-all shadow-2xs',
                               isSelected
                                 ? 'border-accent bg-accent/15 text-accent ring-2 ring-accent/30 shadow-xs'
                                 : 'border-line-2 bg-surface hover:bg-surface-2 text-ink hover:border-line-3'
@@ -1344,8 +1344,8 @@ export function AdminSettingsPanel({
                     2
                   </span>
                   <div>
-                    <h4 className="text-[15px] font-bold text-ink">Logo &amp; Floating Launcher Icon</h4>
-                    <p className="text-[12.5px] text-ink-2 mt-0.5">
+                    <h4 className="text-md font-bold text-ink">Logo &amp; Floating Launcher Icon</h4>
+                    <p className="text-xs text-ink-2 mt-0.5">
                       Choose the floating chat button icon for your website and customize your brand logo.
                     </p>
                   </div>
@@ -1355,10 +1355,10 @@ export function AdminSettingsPanel({
                 <div className="p-5 rounded-2xl border-2 border-line-2 bg-surface-2/60 space-y-4 shadow-2xs">
                   <div className="flex items-center justify-between">
                     <div>
-                      <h5 className="text-[15px] font-bold text-ink flex items-center gap-2">
+                      <h5 className="text-md font-bold text-ink flex items-center gap-2">
                         <span>Widget Icon</span>
                       </h5>
-                      <p className="text-[12px] text-ink-2 mt-0.5">
+                      <p className="text-xs text-ink-2 mt-0.5">
                         Choose the launcher icon style visitors see before opening chat.
                       </p>
                     </div>
@@ -1384,7 +1384,7 @@ export function AdminSettingsPanel({
                         className={cn(
                           'w-13 h-13 rounded-full flex items-center justify-center transition-all cursor-pointer relative shadow-sm',
                           widgetIcon === 'smile_bubble'
-                            ? 'ring-4 ring-purple-500/25 ring-offset-2 ring-offset-surface scale-105 border-2 border-purple-600 dark:border-purple-400'
+                            ? 'ring-4 ring-accent/25 ring-offset-2 ring-offset-surface scale-105 border-2 border-accent'
                             : 'hover:scale-105 opacity-90 hover:opacity-100'
                         )}
                         title="Smile Bubble (Intercom Style)"
@@ -1417,7 +1417,7 @@ export function AdminSettingsPanel({
                         className={cn(
                           'w-13 h-13 rounded-full flex items-center justify-center transition-all cursor-pointer relative shadow-sm',
                           widgetIcon === 'double_bubble'
-                            ? 'ring-4 ring-purple-500/25 ring-offset-2 ring-offset-surface scale-105 border-2 border-purple-600 dark:border-purple-400'
+                            ? 'ring-4 ring-accent/25 ring-offset-2 ring-offset-surface scale-105 border-2 border-accent'
                             : 'hover:scale-105 opacity-90 hover:opacity-100'
                         )}
                         title="Double Chat Cards"
@@ -1450,7 +1450,7 @@ export function AdminSettingsPanel({
                         className={cn(
                           'w-13 h-13 rounded-full flex items-center justify-center transition-all cursor-pointer relative shadow-sm',
                           widgetIcon === 'dots_bubble'
-                            ? 'ring-4 ring-purple-500/25 ring-offset-2 ring-offset-surface scale-105 border-2 border-purple-600 dark:border-purple-400'
+                            ? 'ring-4 ring-accent/25 ring-offset-2 ring-offset-surface scale-105 border-2 border-accent'
                             : 'hover:scale-105 opacity-90 hover:opacity-100'
                         )}
                         title="Chat Bubble with Dots"
@@ -1483,7 +1483,7 @@ export function AdminSettingsPanel({
                         className={cn(
                           'w-13 h-13 rounded-full flex items-center justify-center transition-all cursor-pointer relative shadow-sm',
                           widgetIcon === 'smile_line'
-                            ? 'ring-4 ring-purple-500/25 ring-offset-2 ring-offset-surface scale-105 border-2 border-purple-600 dark:border-purple-400'
+                            ? 'ring-4 ring-accent/25 ring-offset-2 ring-offset-surface scale-105 border-2 border-accent'
                             : 'hover:scale-105 opacity-90 hover:opacity-100'
                         )}
                         title="Smile Curve Bubble"
@@ -1518,9 +1518,9 @@ export function AdminSettingsPanel({
                         className={cn(
                           'w-13 h-13 rounded-full flex items-center justify-center transition-all cursor-pointer relative shadow-sm',
                           widgetIcon === 'custom_logo'
-                            ? 'ring-4 ring-purple-500/25 ring-offset-2 ring-offset-surface scale-105 border-2 border-purple-600 dark:border-purple-400'
+                            ? 'ring-4 ring-accent/25 ring-offset-2 ring-offset-surface scale-105 border-2 border-accent'
                             : 'hover:scale-105 opacity-90 hover:opacity-100',
-                          logoUrl ? 'p-1 bg-white dark:bg-slate-900 border-2 border-line-2' : 'bg-slate-100 dark:bg-slate-800 text-ink-2'
+                          logoUrl ? 'p-1 bg-surface border-2 border-line-2' : 'bg-surface-2 text-ink-2'
                         )}
                         title={logoUrl ? 'Display uploaded logo on floating launcher' : 'Upload custom logo'}
                       >
@@ -1581,7 +1581,7 @@ export function AdminSettingsPanel({
                               setShowLauncherLogo(false);
                             }
                           }}
-                          className="text-[12px] font-semibold text-rose-500 hover:text-rose-600 hover:underline px-2 py-1 cursor-pointer"
+                          className="text-xs font-semibold text-danger hover:text-danger hover:underline px-2 py-1 cursor-pointer"
                         >
                           Remove Logo
                         </button>
@@ -1592,9 +1592,9 @@ export function AdminSettingsPanel({
                       placeholder="Or paste direct image URL (https://example.com/logo.png)"
                       value={logoUrl}
                       onChange={(e) => setLogoUrl(e.target.value)}
-                      className="input text-[12.5px] border-2 border-line-2 focus:border-accent text-ink font-medium"
+                      className="input text-xs border-2 border-line-2 focus:border-accent text-ink font-medium"
                     />
-                    <p className="text-[11.5px] text-ink-2">
+                    <p className="text-xs text-ink-2">
                       {widgetIcon === 'custom_logo'
                         ? '✓ Uploaded logo is displayed on both the website floating button and chat header.'
                         : '✓ Uploaded logo is displayed inside the chat header. The floating button uses your selected preset icon above.'}
@@ -1610,8 +1610,8 @@ export function AdminSettingsPanel({
                     3
                   </span>
                   <div>
-                    <h4 className="text-[15px] font-bold text-ink">Screen Placement</h4>
-                    <p className="text-[12.5px] text-ink-2 mt-0.5">
+                    <h4 className="text-md font-bold text-ink">Screen Placement</h4>
+                    <p className="text-xs text-ink-2 mt-0.5">
                       Position of the floating chat launcher on your website.
                     </p>
                   </div>
@@ -1634,13 +1634,13 @@ export function AdminSettingsPanel({
                         ) : (
                           <div className="w-4 h-4 rounded-full border-2 border-line-2" />
                         )}
-                        <span className="font-bold text-[13.5px] text-ink">Bottom Right</span>
+                        <span className="font-bold text-ui text-ink">Bottom Right</span>
                       </div>
-                      <span className="text-[10.5px] px-2 py-0.5 rounded-full bg-accent text-white font-extrabold shadow-2xs">
+                      <span className="text-2xs px-2 py-0.5 rounded-full bg-accent text-white font-extrabold shadow-2xs">
                         Recommended
                       </span>
                     </div>
-                    <div className="text-ink-2 text-[12px] leading-relaxed pl-6">
+                    <div className="text-ink-2 text-xs leading-relaxed pl-6">
                       Standard placement on 95% of websites. Maximum visibility for visitors.
                     </div>
                   </button>
@@ -1661,13 +1661,13 @@ export function AdminSettingsPanel({
                         ) : (
                           <div className="w-4 h-4 rounded-full border-2 border-line-2" />
                         )}
-                        <span className="font-bold text-[13.5px] text-ink">Bottom Left</span>
+                        <span className="font-bold text-ui text-ink">Bottom Left</span>
                       </div>
-                      <span className="text-[10.5px] px-2 py-0.5 rounded-full bg-surface-3 text-ink-2 font-bold border border-line-2">
+                      <span className="text-2xs px-2 py-0.5 rounded-full bg-surface-3 text-ink-2 font-bold border border-line-2">
                         Alternate
                       </span>
                     </div>
-                    <div className="text-ink-2 text-[12px] leading-relaxed pl-6">
+                    <div className="text-ink-2 text-xs leading-relaxed pl-6">
                       Great if your website already has a WhatsApp button or Back-to-Top on the right.
                     </div>
                   </button>
@@ -1676,14 +1676,14 @@ export function AdminSettingsPanel({
                 {/* Launcher Offsets & Widget Z-Index */}
                 <div className="pt-4 border-t border-line-2 space-y-3.5">
                   <div>
-                    <h5 className="text-[13px] font-bold text-ink">Launcher Offsets &amp; Z-Index</h5>
-                    <p className="text-[11.5px] text-ink-2">
+                    <h5 className="text-ui font-bold text-ink">Launcher Offsets &amp; Z-Index</h5>
+                    <p className="text-xs text-ink-2">
                       Adjust exact pixel spacing and stack order so the chat button never blocks your site's navigation or buttons.
                     </p>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <div>
-                      <label className="field-label text-ink font-semibold text-[12px] mb-1 block">
+                      <label className="field-label text-ink font-semibold text-xs mb-1 block">
                         Bottom Offset (px)
                       </label>
                       <input
@@ -1695,11 +1695,11 @@ export function AdminSettingsPanel({
                         className="input text-xs border-2 border-line-2 focus:border-accent text-ink font-semibold"
                         placeholder="20"
                       />
-                      <p className="text-[11px] text-ink-2 mt-1">Default: 20px</p>
+                      <p className="text-2xs text-ink-2 mt-1">Default: 20px</p>
                     </div>
 
                     <div>
-                      <label className="field-label text-ink font-semibold text-[12px] mb-1 block">
+                      <label className="field-label text-ink font-semibold text-xs mb-1 block">
                         Side Offset (px)
                       </label>
                       <input
@@ -1711,11 +1711,11 @@ export function AdminSettingsPanel({
                         className="input text-xs border-2 border-line-2 focus:border-accent text-ink font-semibold"
                         placeholder="20"
                       />
-                      <p className="text-[11px] text-ink-2 mt-1">Default: 20px</p>
+                      <p className="text-2xs text-ink-2 mt-1">Default: 20px</p>
                     </div>
 
                     <div>
-                      <label className="field-label text-ink font-semibold text-[12px] mb-1 block">
+                      <label className="field-label text-ink font-semibold text-xs mb-1 block">
                         Widget Z-Index
                       </label>
                       <input
@@ -1727,7 +1727,7 @@ export function AdminSettingsPanel({
                         className="input text-xs border-2 border-line-2 focus:border-accent text-ink font-semibold"
                         placeholder="2147483000"
                       />
-                      <p className="text-[11px] text-ink-2 mt-1">Default: 2147483000</p>
+                      <p className="text-2xs text-ink-2 mt-1">Default: 2147483000</p>
                     </div>
                   </div>
                 </div>
@@ -1740,8 +1740,8 @@ export function AdminSettingsPanel({
                     4
                   </span>
                   <div>
-                    <h4 className="text-[15px] font-bold text-ink">Greeting &amp; Welcome Message</h4>
-                    <p className="text-[12.5px] text-ink-2 mt-0.5">
+                    <h4 className="text-md font-bold text-ink">Greeting &amp; Welcome Message</h4>
+                    <p className="text-xs text-ink-2 mt-0.5">
                       The first messages visitors read when opening the live chat.
                     </p>
                   </div>
@@ -1749,7 +1749,7 @@ export function AdminSettingsPanel({
 
                 <div className="space-y-3.5">
                   <div>
-                    <label className="field-label text-ink font-bold text-[13px]">Greeting Title</label>
+                    <label className="field-label text-ink font-bold text-ui">Greeting Title</label>
                     <input
                       type="text"
                       value={greetingTitle}
@@ -1759,15 +1759,15 @@ export function AdminSettingsPanel({
                     />
                   </div>
                   <div>
-                    <label className="field-label text-ink font-bold text-[13px]">Welcome Message Text</label>
+                    <label className="field-label text-ink font-bold text-ui">Welcome Message Text</label>
                     <textarea
                       rows={3}
                       value={greetingMessage}
                       onChange={(e) => setGreetingMessage(e.target.value)}
                       placeholder={`Welcome to ${workspace.name || 'our support'}`}
-                      className="input resize-none text-[13px] leading-relaxed border-2 border-line-2 focus:border-accent text-ink"
+                      className="input resize-none text-ui leading-relaxed border-2 border-line-2 focus:border-accent text-ink"
                     />
-                    <p className="text-[11px] text-ink-2 mt-1">
+                    <p className="text-2xs text-ink-2 mt-1">
                       Customise the welcome message sent when visitors start a conversation.
                     </p>
                   </div>
@@ -1776,10 +1776,10 @@ export function AdminSettingsPanel({
                   <div className="p-4 rounded-xl border-2 border-line-2 bg-surface-2/70 space-y-3">
                     <div className="flex items-center justify-between">
                       <div className="space-y-0.5 pr-4">
-                        <label className="text-[13.5px] font-bold text-ink cursor-pointer" htmlFor="toggle-proactive-welcome">
+                        <label className="text-ui font-bold text-ink cursor-pointer" htmlFor="toggle-proactive-welcome">
                           Proactive Welcome Bubble
                         </label>
-                        <p className="text-[12px] text-ink-2">
+                        <p className="text-xs text-ink-2">
                           Show an unobtrusive bubble invitation next to the launcher. Automatically delayed and suppressed when host page modals or overlays are open.
                         </p>
                       </div>
@@ -1791,17 +1791,17 @@ export function AdminSettingsPanel({
                           onChange={(e) => setEnableProactiveWelcome(e.target.checked)}
                           className="sr-only peer"
                         />
-                        <div className="w-11 h-6 bg-line-2 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-accent shadow-xs"></div>
+                        <div className="w-11 h-6 bg-line-2 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-line-2 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-accent shadow-xs"></div>
                       </label>
                     </div>
 
                     {enableProactiveWelcome && (
                       <div className="pt-2 border-t border-line-2 flex items-center justify-between gap-4">
                         <div>
-                          <label className="text-[12px] font-semibold text-ink block">
+                          <label className="text-xs font-semibold text-ink block">
                             Display Delay (Seconds)
                           </label>
-                          <span className="text-[11px] text-ink-2">Minimum delay is 8 seconds after page load</span>
+                          <span className="text-2xs text-ink-2">Minimum delay is 8 seconds after page load</span>
                         </div>
                         <input
                           type="number"
@@ -1824,8 +1824,8 @@ export function AdminSettingsPanel({
                     5
                   </span>
                   <div>
-                    <h4 className="text-[15px] font-bold text-ink">Self-Service Help Center Tab</h4>
-                    <p className="text-[12.5px] text-ink-2 mt-0.5">
+                    <h4 className="text-md font-bold text-ink">Self-Service Help Center Tab</h4>
+                    <p className="text-xs text-ink-2 mt-0.5">
                       Allow visitors to browse knowledge base articles directly inside the chat window.
                     </p>
                   </div>
@@ -1834,8 +1834,8 @@ export function AdminSettingsPanel({
                 <div className="space-y-3.5">
                   <div className="flex items-center justify-between p-4 rounded-xl border-2 border-line-2 bg-surface-2/70 shadow-2xs">
                     <div>
-                      <div className="text-[13.5px] font-bold text-ink">Show Help Tab in Widget</div>
-                      <p className="text-[12px] text-ink-2">
+                      <div className="text-ui font-bold text-ink">Show Help Tab in Widget</div>
+                      <p className="text-xs text-ink-2">
                         Visitors can search helpful articles without leaving the chat launcher.
                       </p>
                     </div>
@@ -1846,12 +1846,12 @@ export function AdminSettingsPanel({
                         onChange={(e) => setShowHelpTab(e.target.checked)}
                         className="sr-only peer"
                       />
-                      <div className="w-11 h-6 bg-line-2 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-accent shadow-xs"></div>
+                      <div className="w-11 h-6 bg-line-2 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-line-2 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-accent shadow-xs"></div>
                     </label>
                   </div>
 
                   <div>
-                    <label className="field-label text-ink font-bold text-[13px]">Help Tab Custom Button Label</label>
+                    <label className="field-label text-ink font-bold text-ui">Help Tab Custom Button Label</label>
                     <input
                       type="text"
                       value={helpTabLabel}
@@ -1870,8 +1870,8 @@ export function AdminSettingsPanel({
                     6
                   </span>
                   <div>
-                    <h4 className="text-[15px] font-bold text-ink">Widget Visibility &amp; Device Rules</h4>
-                    <p className="text-[12.5px] text-ink-2 mt-0.5">
+                    <h4 className="text-md font-bold text-ink">Widget Visibility &amp; Device Rules</h4>
+                    <p className="text-xs text-ink-2 mt-0.5">
                       Control which devices show the widget and configure live presence visibility.
                     </p>
                   </div>
@@ -1880,9 +1880,9 @@ export function AdminSettingsPanel({
                 <div className="space-y-4">
                   {/* Device Visibility Selector */}
                   <div>
-                    <label className="field-label text-ink font-bold text-[13px] mb-2.5 flex items-center justify-between">
+                    <label className="field-label text-ink font-bold text-ui mb-2.5 flex items-center justify-between">
                       <span>Device Visibility</span>
-                      <span className="text-[11.5px] text-accent font-semibold">Active: {widgetVisibilityDevice === 'all' ? 'All Devices' : widgetVisibilityDevice === 'desktop' ? 'Desktop Only' : 'Mobile Only'}</span>
+                      <span className="text-xs text-accent font-semibold">Active: {widgetVisibilityDevice === 'all' ? 'All Devices' : widgetVisibilityDevice === 'desktop' ? 'Desktop Only' : 'Mobile Only'}</span>
                     </label>
                     <div className="grid grid-cols-3 gap-2.5">
                       {[
@@ -1909,8 +1909,8 @@ export function AdminSettingsPanel({
                             )}
                           >
                             <Icon className="w-5 h-5" />
-                            <div className="text-[12px] font-bold leading-tight">{item.label}</div>
-                            <div className="text-[10px] text-ink-2 leading-none font-medium">{item.sub}</div>
+                            <div className="text-xs font-bold leading-tight">{item.label}</div>
+                            <div className="text-2xs text-ink-2 leading-none font-medium">{item.sub}</div>
                           </button>
                         );
                       })}
@@ -1920,11 +1920,11 @@ export function AdminSettingsPanel({
                   {/* Online Presence Status Toggle */}
                   <div className="flex items-center justify-between p-4 rounded-xl border-2 border-line-2 bg-surface-2/80 shadow-2xs">
                     <div>
-                      <div className="text-[13.5px] font-bold text-ink flex items-center gap-2">
+                      <div className="text-ui font-bold text-ink flex items-center gap-2">
                         <span>Show Live Presence Indicator</span>
-                        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse inline-block" />
+                        <span className="w-2 h-2 rounded-full bg-success animate-pulse inline-block" />
                       </div>
-                      <p className="text-[12px] text-ink-2 mt-0.5">
+                      <p className="text-xs text-ink-2 mt-0.5">
                         Display a green &ldquo;We reply immediately&rdquo; status badge in the chat window header.
                       </p>
                     </div>
@@ -1935,14 +1935,14 @@ export function AdminSettingsPanel({
                         onChange={(e) => setShowOnlineStatusBadge(e.target.checked)}
                         className="sr-only peer"
                       />
-                      <div className="w-11 h-6 bg-line-2 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-accent shadow-xs"></div>
+                      <div className="w-11 h-6 bg-line-2 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-line-2 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-accent shadow-xs"></div>
                     </label>
                   </div>
                 </div>
               </div>
 
               {/* Slim Sticky Footer Bar */}
-              <div className="sticky bottom-0 z-20 px-6 py-3 border-t border-line bg-surface/95 backdrop-blur-sm flex items-center justify-between gap-4 shadow-sm -mx-6 md:-mx-8">
+              <div className="sticky bottom-0 z-20 px-6 py-3 border-t border-line bg-surface flex items-center justify-between gap-4 shadow-sm -mx-6 md:-mx-8">
                 <div className="flex items-center gap-2 text-xs text-ink-2 truncate">
                   <Sparkles className="w-3.5 h-3.5 text-accent shrink-0" />
                   <span className="truncate">Changes apply to your website immediately after clicking save.</span>
@@ -1974,7 +1974,7 @@ export function AdminSettingsPanel({
                 <div className="flex items-center justify-between border-b border-line-2 pb-2.5">
                   <div className="flex items-center gap-2">
                     <Sparkles className="w-4 h-4 text-accent" />
-                    <span className="text-[14px] font-extrabold text-ink">Interactive Live Preview</span>
+                    <span className="text-sm font-extrabold text-ink">Interactive Live Preview</span>
                   </div>
 
                   {/* Device Toggle + Open/Close */}
@@ -1984,7 +1984,7 @@ export function AdminSettingsPanel({
                         type="button"
                         onClick={() => setPreviewDevice('desktop')}
                         className={cn(
-                          'p-1 rounded-md text-[11px] font-bold transition-all flex items-center gap-1',
+                          'p-1 rounded-md text-2xs font-bold transition-all flex items-center gap-1',
                           previewDevice === 'desktop'
                             ? 'bg-surface text-accent shadow-xs'
                             : 'text-ink-2 hover:text-ink'
@@ -1998,7 +1998,7 @@ export function AdminSettingsPanel({
                         type="button"
                         onClick={() => setPreviewDevice('mobile')}
                         className={cn(
-                          'p-1 rounded-md text-[11px] font-bold transition-all flex items-center gap-1',
+                          'p-1 rounded-md text-2xs font-bold transition-all flex items-center gap-1',
                           previewDevice === 'mobile'
                             ? 'bg-surface text-accent shadow-xs'
                             : 'text-ink-2 hover:text-ink'
@@ -2013,7 +2013,7 @@ export function AdminSettingsPanel({
                     <button
                       type="button"
                       onClick={() => setPreviewOpen(!previewOpen)}
-                      className="text-[12px] font-bold text-accent hover:underline px-2.5 py-1 rounded-md hover:bg-accent/10 border border-accent/20"
+                      className="text-xs font-bold text-accent hover:underline px-2.5 py-1 rounded-md hover:bg-accent/10 border border-accent/20"
                     >
                       {previewOpen ? 'Minimize' : 'Open'}
                     </button>
@@ -2024,17 +2024,17 @@ export function AdminSettingsPanel({
                 <div
                   className={cn(
                     'relative h-[530px] rounded-2xl bg-canvas border-2 border-line-2 overflow-hidden flex flex-col justify-between shadow-inner transition-all duration-300',
-                    previewDevice === 'mobile' ? 'max-w-[340px] mx-auto ring-4 ring-black/10 dark:ring-white/10' : 'w-full'
+                    previewDevice === 'mobile' ? 'max-w-[340px] mx-auto ring-4 ring-black/10' : 'w-full'
                   )}
                 >
                   {/* Browser Window Title Bar */}
                   <div className="h-8.5 bg-surface border-b border-line-2 px-3 flex items-center gap-2 shrink-0 select-none shadow-2xs">
                     <div className="flex items-center gap-1.5">
-                      <span className="w-2.5 h-2.5 rounded-full bg-rose-500 inline-block shadow-2xs" />
-                      <span className="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block shadow-2xs" />
-                      <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block shadow-2xs" />
+                      <span className="w-2.5 h-2.5 rounded-full bg-danger inline-block shadow-2xs" />
+                      <span className="w-2.5 h-2.5 rounded-full bg-warn inline-block shadow-2xs" />
+                      <span className="w-2.5 h-2.5 rounded-full bg-success inline-block shadow-2xs" />
                     </div>
-                    <div className="flex-1 max-w-[220px] mx-auto h-5.5 rounded-md bg-surface-2 border border-line-2 px-2.5 flex items-center justify-center gap-1.5 text-[11px] font-mono text-ink font-semibold truncate shadow-2xs">
+                    <div className="flex-1 max-w-[220px] mx-auto h-5.5 rounded-md bg-surface-2 border border-line-2 px-2.5 flex items-center justify-center gap-1.5 text-2xs font-mono text-ink font-semibold truncate shadow-2xs">
                       <Globe className="w-3 h-3 text-accent shrink-0" />
                       <span className="truncate">{cleanDomain(workspace.website_url) || 'yourwebsite.com'}</span>
                     </div>
@@ -2045,14 +2045,14 @@ export function AdminSettingsPanel({
                     <div className="flex items-center justify-between pb-2 border-b-2 border-line-2">
                       <div className="flex items-center gap-2">
                         <div
-                          className="w-6 h-6 rounded-lg flex items-center justify-center text-[11px] text-white font-extrabold shadow-xs"
+                          className="w-6 h-6 rounded-lg flex items-center justify-center text-2xs text-white font-extrabold shadow-xs"
                           style={{ backgroundColor: brandColor }}
                         >
                           {(workspace.name || 'W').charAt(0)}
                         </div>
-                        <span className="font-extrabold text-[13px] text-ink">{workspace.name}</span>
+                        <span className="font-extrabold text-ui text-ink">{workspace.name}</span>
                       </div>
-                      <div className="flex gap-2.5 text-[11px] text-ink-2 font-semibold">
+                      <div className="flex gap-2.5 text-2xs text-ink-2 font-semibold">
                         <span className="text-ink font-bold border-b border-ink">Home</span>
                         <span>Catalog</span>
                         <span>Support</span>
@@ -2060,22 +2060,22 @@ export function AdminSettingsPanel({
                     </div>
 
                     <div className="p-4 rounded-xl bg-surface border-2 border-line-2 shadow-xs space-y-2 mt-2">
-                      <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-[10.5px] font-bold text-emerald-700 dark:text-emerald-300">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" />
+                      <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-success/15 border border-success/30 text-2xs font-bold text-success">
+                        <span className="w-1.5 h-1.5 rounded-full bg-success inline-block" />
                         <span>Support Team Available</span>
                       </div>
-                      <div className="font-extrabold text-[14px] text-ink leading-tight">Welcome to our Online Store</div>
-                      <p className="text-[12px] text-ink-2 leading-relaxed font-normal">
+                      <div className="font-extrabold text-sm text-ink leading-tight">Welcome to our Online Store</div>
+                      <p className="text-xs text-ink-2 leading-relaxed font-normal">
                         Have a question about an order, shipment, or feature? Chat with our team in real-time.
                       </p>
                       <div className="pt-1 flex gap-2">
                         <div
-                          className="px-3 py-1.5 rounded-lg text-[11px] font-bold text-white shadow-xs cursor-default"
+                          className="px-3 py-1.5 rounded-lg text-2xs font-bold text-white shadow-xs cursor-default"
                           style={{ backgroundColor: brandColor }}
                         >
                           Explore Products
                         </div>
-                        <div className="px-3 py-1.5 rounded-lg text-[11px] font-bold bg-surface-2 border border-line-2 text-ink cursor-default">
+                        <div className="px-3 py-1.5 rounded-lg text-2xs font-bold bg-surface-2 border border-line-2 text-ink cursor-default">
                           Contact Sales
                         </div>
                       </div>
@@ -2104,18 +2104,18 @@ export function AdminSettingsPanel({
                             {logoUrl ? (
                               <img src={logoUrl} alt="Logo" className="w-full h-full object-cover" />
                             ) : (
-                              <span className="text-[12px] font-bold text-white uppercase flex items-center justify-center w-full h-full select-none">
+                              <span className="text-xs font-bold text-white uppercase flex items-center justify-center w-full h-full select-none">
                                 {(workspace.name || 'W').charAt(0)}
                               </span>
                             )}
                           </div>
                           <div className="min-w-0">
-                            <div className="font-extrabold text-[13px] leading-tight truncate text-white drop-shadow-xs">
+                            <div className="font-extrabold text-ui leading-tight truncate text-white drop-shadow-xs">
                               {workspace.name}
                             </div>
                             {showOnlineStatusBadge && (
-                              <div className="text-[10.5px] text-white/95 flex items-center gap-1 font-semibold">
-                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-300 inline-block animate-pulse" />
+                              <div className="text-2xs text-white/95 flex items-center gap-1 font-semibold">
+                                <span className="w-1.5 h-1.5 rounded-full bg-success inline-block animate-pulse" />
                                 <span>We reply immediately</span>
                               </div>
                             )}
@@ -2140,8 +2140,8 @@ export function AdminSettingsPanel({
                       <div className="p-3.5 space-y-3 flex-1 overflow-y-auto bg-surface-2/70 text-xs">
                         {/* Welcome Card */}
                         <div className="p-3.5 rounded-xl bg-surface border-2 border-line-2 shadow-xs space-y-1">
-                          <div className="font-extrabold text-[13.5px] text-ink">{greetingTitle}</div>
-                          <p className="text-ink-2 text-[12px] leading-relaxed font-normal">
+                          <div className="font-extrabold text-ui text-ink">{greetingTitle}</div>
+                          <p className="text-ink-2 text-xs leading-relaxed font-normal">
                             {greetingMessage}
                           </p>
                         </div>
@@ -2149,24 +2149,24 @@ export function AdminSettingsPanel({
                         {/* Sample Bot/Agent Bubble */}
                         <div className="flex gap-2 items-start">
                           <div
-                            className="w-6.5 h-6.5 rounded-full flex items-center justify-center text-[10.5px] text-white font-extrabold shrink-0 shadow-xs"
+                            className="w-6.5 h-6.5 rounded-full flex items-center justify-center text-2xs text-white font-extrabold shrink-0 shadow-xs"
                             style={{ backgroundColor: brandColor }}
                           >
                             {(workspace.name || 'A').charAt(0)}
                           </div>
-                          <div className="p-3 rounded-2xl rounded-tl-xs bg-surface border-2 border-line-2 text-ink text-[12px] shadow-xs font-semibold leading-relaxed">
+                          <div className="p-3 rounded-2xl rounded-tl-xs bg-surface border-2 border-line-2 text-ink text-xs shadow-xs font-semibold leading-relaxed">
                             How can our support team assist you today?
                           </div>
                         </div>
 
                         {/* Self Service Help Center preview pill if enabled */}
                         {showHelpTab && (
-                          <div className="p-2.5 rounded-xl bg-accent/10 border border-accent/25 flex items-center justify-between text-[11.5px] text-accent font-bold">
+                          <div className="p-2.5 rounded-xl bg-accent/10 border border-accent/25 flex items-center justify-between text-xs text-accent font-bold">
                             <span className="flex items-center gap-1.5">
                               <BookOpen className="w-3.5 h-3.5" />
                               <span>{helpTabLabel || 'Help Articles'}</span>
                             </span>
-                            <span className="text-[10px] bg-accent text-white px-2 py-0.5 rounded-md font-extrabold">Instant</span>
+                            <span className="text-2xs bg-accent text-white px-2 py-0.5 rounded-md font-extrabold">Instant</span>
                           </div>
                         )}
                       </div>
@@ -2177,7 +2177,7 @@ export function AdminSettingsPanel({
                           type="text"
                           disabled
                           placeholder="Send a message…"
-                          className="flex-1 text-[12px] px-3 py-1.5 rounded-lg bg-surface-2 border border-line-2 text-ink placeholder:text-ink-2 outline-none font-medium"
+                          className="flex-1 text-xs px-3 py-1.5 rounded-lg bg-surface-2 border border-line-2 text-ink placeholder:text-ink-2 outline-none font-medium"
                         />
                         <button
                           type="button"
@@ -2206,7 +2206,7 @@ export function AdminSettingsPanel({
                       type="button"
                       onClick={() => setPreviewOpen(!previewOpen)}
                       style={{ backgroundColor: brandColor }}
-                      className="w-13 h-13 rounded-full text-white flex items-center justify-center shadow-2xl ring-4 ring-black/15 dark:ring-white/15 transition-transform hover:scale-105 active:scale-95"
+                      className="w-13 h-13 rounded-full text-white flex items-center justify-center shadow-2xl ring-4 ring-black/15 transition-transform hover:scale-105 active:scale-95"
                       title={previewOpen ? 'Close widget preview' : 'Open widget preview'}
                     >
                       {previewOpen ? (
@@ -2243,8 +2243,8 @@ export function AdminSettingsPanel({
               <div className="card p-6 space-y-5">
                 <div className="flex items-center justify-between border-b border-line pb-4">
                   <div>
-                    <h3 className="text-[15px] font-semibold text-ink">Help Center Identity</h3>
-                    <p className="text-[12px] text-ink-3">
+                    <h3 className="text-md font-semibold text-ink">Help Center Identity</h3>
+                    <p className="text-xs text-ink-3">
                       Customize your public knowledge base branding, titles, and messaging.
                     </p>
                   </div>
@@ -2278,7 +2278,7 @@ export function AdminSettingsPanel({
                     placeholder={`${workspace.name} Help Center`}
                     className="input"
                   />
-                  <p className="text-[11.5px] text-ink-3 mt-1">
+                  <p className="text-xs text-ink-3 mt-1">
                     Appears in the header navigation, browser tab, and search engine previews.
                   </p>
                 </div>
@@ -2293,7 +2293,7 @@ export function AdminSettingsPanel({
                     placeholder="Search our guides, troubleshooting steps, and documentation for instant answers."
                     className="input resize-none"
                   />
-                  <p className="text-[11.5px] text-ink-3 mt-1">
+                  <p className="text-xs text-ink-3 mt-1">
                     Displayed prominently below the main heading in the hero search area.
                   </p>
                 </div>
@@ -2334,7 +2334,7 @@ export function AdminSettingsPanel({
                           <button
                             type="button"
                             onClick={() => setHelpCenterLogoUrl(logoUrl)}
-                            className="btn btn-xs btn-ghost text-ink-3 hover:text-ink text-[11px]"
+                            className="btn btn-xs btn-ghost text-ink-3 hover:text-ink text-2xs"
                           >
                             Use Main Workspace Logo
                           </button>
@@ -2343,7 +2343,7 @@ export function AdminSettingsPanel({
                           <button
                             type="button"
                             onClick={() => setHelpCenterLogoUrl('')}
-                            className="btn btn-xs btn-ghost text-rose-500 hover:text-rose-600 text-[11px]"
+                            className="btn btn-xs btn-ghost text-danger hover:text-danger text-2xs"
                           >
                             Reset
                           </button>
@@ -2363,7 +2363,7 @@ export function AdminSettingsPanel({
                 {/* Collections Layout Variation (Intercom-style) */}
                 <div>
                   <label className="field-label">Default Section Layout (Intercom Style)</label>
-                  <p className="text-[11.5px] text-ink-3 mb-2.5">
+                  <p className="text-xs text-ink-3 mb-2.5">
                     Choose how collections and sections are displayed on your public Help Center.
                   </p>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
@@ -2416,11 +2416,11 @@ export function AdminSettingsPanel({
                             >
                               <Icon className="w-4 h-4" />
                             </div>
-                            <span className="text-[12.5px] font-semibold text-ink">
+                            <span className="text-xs font-semibold text-ink">
                               {opt.label}
                             </span>
                           </div>
-                          <p className="text-[10.5px] text-ink-3 leading-tight">
+                          <p className="text-2xs text-ink-3 leading-tight">
                             {opt.desc}
                           </p>
                         </button>
@@ -2439,7 +2439,7 @@ export function AdminSettingsPanel({
                     placeholder={`© ${new Date().getFullYear()} ${workspace.name}. Powered by Zen-try.`}
                     className="input"
                   />
-                  <p className="text-[11.5px] text-ink-3 mt-1">
+                  <p className="text-xs text-ink-3 mt-1">
                     Displayed at the bottom of every Help Center page and article.
                   </p>
                 </div>
@@ -2448,8 +2448,8 @@ export function AdminSettingsPanel({
               {/* Card 2: Header Navigation Links */}
               <div className="card p-6 space-y-5">
                 <div className="border-b border-line pb-4">
-                  <h3 className="text-[15px] font-semibold text-ink">Header Navigation Links</h3>
-                  <p className="text-[12px] text-ink-3">
+                  <h3 className="text-md font-semibold text-ink">Header Navigation Links</h3>
+                  <p className="text-xs text-ink-3">
                     Add custom links in the Help Center navigation bar (e.g. to your main website, API docs, or status page).
                   </p>
                 </div>
@@ -2457,7 +2457,7 @@ export function AdminSettingsPanel({
                 {/* Current Links List */}
                 <div className="space-y-2">
                   {helpCenterHeaderLinks.length === 0 ? (
-                    <div className="p-4 rounded-xl border border-dashed border-line text-center text-[12px] text-ink-3">
+                    <div className="p-4 rounded-xl border border-dashed border-line text-center text-xs text-ink-3">
                       No custom header links added yet. Use the form below to add navigation links.
                     </div>
                   ) : (
@@ -2465,22 +2465,22 @@ export function AdminSettingsPanel({
                       {helpCenterHeaderLinks.map((link, idx) => (
                         <div
                           key={idx}
-                          className="flex items-center justify-between p-3 rounded-xl border border-line bg-surface-2/60 text-[13px]"
+                          className="flex items-center justify-between p-3 rounded-xl border border-line bg-surface-2/60 text-ui"
                         >
                           <div className="flex items-center gap-2.5 min-w-0">
                             <LinkIcon className="w-3.5 h-3.5 text-ink-3 shrink-0" />
                             <span className="font-semibold text-ink truncate">{link.label}</span>
-                            <span className="text-ink-3 text-[11.5px] truncate font-mono">
+                            <span className="text-ink-3 text-xs truncate font-mono">
                               ({link.url})
                             </span>
-                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-surface border border-line text-ink-3 font-mono">
+                            <span className="text-2xs px-1.5 py-0.5 rounded bg-surface border border-line text-ink-3 font-mono">
                               {link.target === '_self' ? 'Same Tab' : 'New Tab'}
                             </span>
                           </div>
                           <button
                             type="button"
                             onClick={() => handleRemoveHeaderLink(idx)}
-                            className="text-ink-3 hover:text-rose-500 p-1 transition-colors"
+                            className="text-ink-3 hover:text-danger p-1 transition-colors"
                             title="Remove Link"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
@@ -2493,10 +2493,10 @@ export function AdminSettingsPanel({
 
                 {/* Add Link Form */}
                 <div className="pt-2 border-t border-line/60 space-y-3">
-                  <h4 className="text-[13px] font-semibold text-ink">Add Navigation Link</h4>
+                  <h4 className="text-ui font-semibold text-ink">Add Navigation Link</h4>
                   <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5 items-end">
                     <div className="sm:col-span-4 space-y-1">
-                      <label className="text-[11px] font-medium text-ink-3">Link Label</label>
+                      <label className="text-2xs font-medium text-ink-3">Link Label</label>
                       <input
                         type="text"
                         value={newLinkLabel}
@@ -2506,7 +2506,7 @@ export function AdminSettingsPanel({
                       />
                     </div>
                     <div className="sm:col-span-5 space-y-1">
-                      <label className="text-[11px] font-medium text-ink-3">URL</label>
+                      <label className="text-2xs font-medium text-ink-3">URL</label>
                       <input
                         type="url"
                         value={newLinkUrl}
@@ -2534,24 +2534,24 @@ export function AdminSettingsPanel({
             {/* Right Column: Live Interactive Preview */}
             <div className="lg:col-span-5 sticky top-32 space-y-3">
               <div className="flex items-center justify-between px-1">
-                <span className="text-[12px] font-semibold text-ink uppercase tracking-wider">
+                <span className="text-xs font-semibold text-ink uppercase tracking-wider">
                   Live Preview
                 </span>
-                <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                <span className="text-2xs font-medium px-2 py-0.5 rounded-full bg-success/10 text-success border border-success/20">
                   Updates in Real Time
                 </span>
               </div>
 
               {/* Mock Browser Container */}
-              <div className="rounded-2xl border border-line bg-surface shadow-md overflow-hidden text-[12px]">
+              <div className="rounded-2xl border border-line bg-surface shadow-md overflow-hidden text-xs">
                 {/* Browser Top Bar */}
                 <div className="px-3 py-2 bg-surface-2 border-b border-line flex items-center gap-2">
                   <div className="flex items-center gap-1.5">
-                    <div className="w-2.5 h-2.5 rounded-full bg-rose-400" />
-                    <div className="w-2.5 h-2.5 rounded-full bg-amber-400" />
-                    <div className="w-2.5 h-2.5 rounded-full bg-emerald-400" />
+                    <div className="w-2.5 h-2.5 rounded-full bg-danger" />
+                    <div className="w-2.5 h-2.5 rounded-full bg-warn" />
+                    <div className="w-2.5 h-2.5 rounded-full bg-success" />
                   </div>
-                  <div className="flex-1 px-2 py-0.5 rounded bg-surface border border-line text-[10.5px] font-mono text-ink-3 truncate text-center">
+                  <div className="flex-1 px-2 py-0.5 rounded bg-surface border border-line text-2xs font-mono text-ink-3 truncate text-center">
                     {getWorkspaceHelpCenterUrl(workspace)}
                   </div>
                 </div>
@@ -2567,14 +2567,14 @@ export function AdminSettingsPanel({
                       />
                     ) : (
                       <div
-                        className="w-6 h-6 rounded-lg flex items-center justify-center text-white font-bold text-[11px] shadow-xs shrink-0"
+                        className="w-6 h-6 rounded-lg flex items-center justify-center text-white font-bold text-2xs shadow-xs shrink-0"
                         style={{ backgroundColor: brandColor }}
                       >
                         {workspace.name.slice(0, 1).toUpperCase()}
                       </div>
                     )}
                     <div className="min-w-0">
-                      <span className="text-[12px] font-bold text-ink truncate block">
+                      <span className="text-xs font-bold text-ink truncate block">
                         {helpCenterTitle || workspace.name}
                       </span>
                     </div>
@@ -2582,12 +2582,12 @@ export function AdminSettingsPanel({
 
                   <div className="flex items-center gap-2 shrink-0">
                     {helpCenterHeaderLinks.slice(0, 2).map((l, i) => (
-                      <span key={i} className="text-[11px] text-ink-3 font-medium truncate max-w-[80px]">
+                      <span key={i} className="text-2xs text-ink-3 font-medium truncate max-w-[80px]">
                         {l.label}
                       </span>
                     ))}
                     <span
-                      className="px-2 py-1 rounded-md text-white text-[10.5px] font-semibold"
+                      className="px-2 py-1 rounded-md text-white text-2xs font-semibold"
                       style={{ backgroundColor: brandColor }}
                     >
                       Ask Support
@@ -2602,16 +2602,16 @@ export function AdminSettingsPanel({
                     background: `radial-gradient(ellipse 90% 60% at 50% -20%, ${brandColor}25, transparent 80%)`,
                   }}
                 >
-                  <h4 className="text-[16px] font-extrabold text-ink tracking-tight">
+                  <h4 className="text-base font-extrabold text-ink tracking-tight">
                     Advice and answers from the {helpCenterTitle || workspace.name} Team
                   </h4>
-                  <p className="text-[11.5px] text-ink-2 mt-1.5 max-w-xs mx-auto leading-relaxed">
+                  <p className="text-xs text-ink-2 mt-1.5 max-w-xs mx-auto leading-relaxed">
                     {helpCenterSubtitle ||
                       'Search our guides, troubleshooting steps, and documentation for instant answers.'}
                   </p>
 
                   <div className="mt-4 max-w-xs mx-auto">
-                    <div className="h-8 rounded-xl border border-line bg-surface text-ink-3 text-[11px] flex items-center px-3 gap-2 shadow-xs">
+                    <div className="h-8 rounded-xl border border-line bg-surface text-ink-3 text-2xs flex items-center px-3 gap-2 shadow-xs">
                       <span>🔍</span>
                       <span>Search for articles, features...</span>
                     </div>
@@ -2622,20 +2622,20 @@ export function AdminSettingsPanel({
                 <div className="p-4 bg-surface-2/40 border-t border-line space-y-2">
                   <div className="grid grid-cols-2 gap-2">
                     <div className="p-2.5 rounded-xl border border-line bg-surface space-y-1">
-                      <div className="text-[14px]">📚</div>
-                      <div className="text-[11px] font-bold text-ink truncate">Getting Started</div>
-                      <div className="text-[10px] text-ink-3">3 articles</div>
+                      <div className="text-sm">📚</div>
+                      <div className="text-2xs font-bold text-ink truncate">Getting Started</div>
+                      <div className="text-2xs text-ink-3">3 articles</div>
                     </div>
                     <div className="p-2.5 rounded-xl border border-line bg-surface space-y-1">
-                      <div className="text-[14px]">💳</div>
-                      <div className="text-[11px] font-bold text-ink truncate">Account & Billing</div>
-                      <div className="text-[10px] text-ink-3">2 articles</div>
+                      <div className="text-sm">💳</div>
+                      <div className="text-2xs font-bold text-ink truncate">Account & Billing</div>
+                      <div className="text-2xs text-ink-3">2 articles</div>
                     </div>
                   </div>
                 </div>
 
                 {/* Mock Footer */}
-                <div className="px-4 py-2.5 bg-surface border-t border-line text-center text-[10px] text-ink-3">
+                <div className="px-4 py-2.5 bg-surface border-t border-line text-center text-2xs text-ink-3">
                   {helpCenterFooterText || `© ${new Date().getFullYear()} ${workspace.name}. Powered by Zen-try.`}
                 </div>
               </div>
@@ -2651,8 +2651,8 @@ export function AdminSettingsPanel({
             <div className="card p-6 space-y-6">
               <div className="flex items-start justify-between border-b border-line pb-4">
                 <div>
-                  <h3 className="text-[16px] font-semibold text-ink">Operational Business Hours</h3>
-                  <p className="text-[12.5px] text-ink-3 mt-0.5">
+                  <h3 className="text-base font-semibold text-ink">Operational Business Hours</h3>
+                  <p className="text-xs text-ink-3 mt-0.5">
                     Define when your support agents are active. Outside these hours, the chat widget automatically displays an "Offline" message and prompts visitors to leave their email.
                   </p>
                 </div>
@@ -2676,8 +2676,8 @@ export function AdminSettingsPanel({
               {/* Master Toggle */}
               <div className="flex items-center justify-between p-4 rounded-xl bg-surface-2 border border-line">
                 <div className="space-y-0.5">
-                  <div className="text-[13.5px] font-semibold text-ink">Enforce Business Hours</div>
-                  <div className="text-[12px] text-ink-3">
+                  <div className="text-ui font-semibold text-ink">Enforce Business Hours</div>
+                  <div className="text-xs text-ink-3">
                     Automatically switch widget status to Offline outside the scheduled times.
                   </div>
                 </div>
@@ -2690,7 +2690,7 @@ export function AdminSettingsPanel({
                     }
                     className="sr-only peer"
                   />
-                  <div className="w-11 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-accent" />
+                  <div className="w-11 h-6 bg-line-2 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-line-2 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-accent" />
                 </label>
               </div>
 
@@ -2750,7 +2750,7 @@ export function AdminSettingsPanel({
                     </div>
                   )}
                 </div>
-                <p className="text-[11px] text-ink-3">
+                <p className="text-2xs text-ink-3">
                   All active business hour evaluations run against this local timezone.
                 </p>
               </div>
@@ -2785,7 +2785,7 @@ export function AdminSettingsPanel({
                           }
                           className="w-4 h-4 accent-accent rounded cursor-pointer"
                         />
-                        <span className="text-[13px] font-medium text-ink">{dayLabel}</span>
+                        <span className="text-ui font-medium text-ink">{dayLabel}</span>
                       </div>
 
                       {schedule.enabled ? (
@@ -2827,8 +2827,8 @@ export function AdminSettingsPanel({
             <div className="card p-6 space-y-6">
               <div className="flex items-center justify-between border-b border-line pb-4">
                 <div>
-                  <h3 className="text-[16px] font-semibold text-ink">Canned Responses & Shortcuts</h3>
-                  <p className="text-[12.5px] text-ink-3 mt-0.5">
+                  <h3 className="text-base font-semibold text-ink">Canned Responses & Shortcuts</h3>
+                  <p className="text-xs text-ink-3 mt-0.5">
                     Create reusable canned messages. Agents can type <code className="font-mono text-accent">/shortcut</code> in any active chat thread to quickly paste them.
                   </p>
                 </div>
@@ -2858,7 +2858,7 @@ export function AdminSettingsPanel({
                       onClick={() => setCannedFilter(filter)}
                       className={`px-3 py-1 rounded-lg capitalize transition-colors ${
                         cannedFilter === filter
-                          ? 'bg-white dark:bg-slate-800 text-ink shadow-xs font-semibold'
+                          ? 'bg-surface text-ink shadow-xs font-semibold'
                           : 'text-ink-3 hover:text-ink'
                       }`}
                     >
@@ -2887,20 +2887,20 @@ export function AdminSettingsPanel({
                             <span className="font-mono font-bold text-accent text-xs px-2 py-0.5 rounded bg-accent/10">
                               {canned.shortcut}
                             </span>
-                            <span className="font-semibold text-[13.5px] text-ink">
+                            <span className="font-semibold text-ui text-ink">
                               {canned.title}
                             </span>
                             <span
-                              className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${
+                              className={`text-2xs px-2 py-0.5 rounded-full font-semibold ${
                                 isTeam
-                                  ? 'bg-blue-500/10 text-blue-600'
-                                  : 'bg-amber-500/10 text-amber-600'
+                                  ? 'bg-accent/10 text-accent'
+                                  : 'bg-warn/10 text-warn'
                               }`}
                             >
                               {isTeam ? 'Team-Wide' : 'Personal'}
                             </span>
                           </div>
-                          <p className="text-[12.5px] text-ink-3 line-clamp-2 leading-relaxed">
+                          <p className="text-xs text-ink-3 line-clamp-2 leading-relaxed">
                             {canned.content}
                           </p>
                         </div>
@@ -2918,7 +2918,7 @@ export function AdminSettingsPanel({
                             type="button"
                             onClick={() => handleDeleteCanned(canned.id, canned.shortcut)}
                             title="Delete shortcut"
-                            className="p-1.5 rounded-lg text-ink-3 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40"
+                            className="p-1.5 rounded-lg text-ink-3 hover:text-danger hover:bg-danger-soft"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
@@ -2932,10 +2932,10 @@ export function AdminSettingsPanel({
 
             {/* Create/Edit Modal */}
             {cannedModalOpen && (
-              <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade">
+              <div className="fixed inset-0 bg-overlay flex items-center justify-center p-4 z-50 animate-fade">
                 <div className="card max-w-lg w-full p-6 space-y-5 animate-rise shadow-2xl">
                   <div className="flex items-center justify-between border-b border-line pb-3">
-                    <h3 className="text-[16px] font-semibold text-ink">
+                    <h3 className="text-base font-semibold text-ink">
                       {editingCannedId ? 'Edit Canned Response' : 'New Canned Response'}
                     </h3>
                     <button
@@ -3023,10 +3023,10 @@ export function AdminSettingsPanel({
             <div className="card p-6 space-y-6">
               <div className="flex items-center justify-between border-b border-line pb-4">
                 <div>
-                  <h3 className="text-[16px] font-semibold text-ink">
+                  <h3 className="text-base font-semibold text-ink">
                     Round-Robin Auto-Assignment Rules
                   </h3>
-                  <p className="text-[12.5px] text-ink-3 mt-0.5">
+                  <p className="text-xs text-ink-3 mt-0.5">
                     Automatically balance incoming customer conversations among online team members.
                   </p>
                 </div>
@@ -3042,10 +3042,10 @@ export function AdminSettingsPanel({
               {/* Master Round-Robin Toggle */}
               <div className="flex items-center justify-between p-4 rounded-xl bg-surface-2 border border-line">
                 <div className="space-y-0.5">
-                  <div className="text-[13.5px] font-semibold text-ink">
+                  <div className="text-ui font-semibold text-ink">
                     Enable Round-Robin Distribution
                   </div>
-                  <div className="text-[12px] text-ink-3">
+                  <div className="text-xs text-ink-3">
                     New unassigned conversations are assigned to the online agent with the lowest open ticket count.
                   </div>
                 </div>
@@ -3058,7 +3058,7 @@ export function AdminSettingsPanel({
                     }
                     className="sr-only peer"
                   />
-                  <div className="w-11 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-accent" />
+                  <div className="w-11 h-6 bg-line-2 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-line-2 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-accent" />
                 </label>
               </div>
 
@@ -3079,7 +3079,7 @@ export function AdminSettingsPanel({
                     }
                     className="input w-32 text-sm font-semibold"
                   />
-                  <span className="text-[12px] text-ink-3">
+                  <span className="text-xs text-ink-3">
                     Limits concurrent open chats to prevent agent overload. Additional tickets stay in the Unassigned queue.
                   </span>
                 </div>
@@ -3096,11 +3096,11 @@ export function AdminSettingsPanel({
             <div className="card p-6 space-y-6">
               <div className="flex items-center justify-between border-b border-line pb-4">
                 <div>
-                  <h3 className="text-[16px] font-semibold text-ink flex items-center gap-2">
+                  <h3 className="text-base font-semibold text-ink flex items-center gap-2">
                     <Sparkles className="w-5 h-5 text-accent" />
                     AI Assistant & Knowledge Base Agent
                   </h3>
-                  <p className="text-[12.5px] text-ink-3 mt-0.5">
+                  <p className="text-xs text-ink-3 mt-0.5">
                     Unified AI support assistant and autonomous knowledge base agent across website live chat and omnichannel integrations.
                   </p>
                 </div>
@@ -3113,19 +3113,19 @@ export function AdminSettingsPanel({
                     <Bot className="w-5 h-5" />
                   </div>
                   <div>
-                    <div className="text-[14px] font-semibold text-ink flex items-center gap-2">
+                    <div className="text-sm font-semibold text-ink flex items-center gap-2">
                       Master AI Agent
                       {aiSettings.enabled ? (
-                        <span className="text-[10.5px] px-2 py-0.5 rounded-full bg-success-soft text-success font-bold">
+                        <span className="text-2xs px-2 py-0.5 rounded-full bg-success-soft text-success font-bold">
                           ACTIVE
                         </span>
                       ) : (
-                        <span className="text-[10.5px] px-2 py-0.5 rounded-full bg-surface-3 text-ink-3 font-medium">
+                        <span className="text-2xs px-2 py-0.5 rounded-full bg-surface-3 text-ink-3 font-medium">
                           DISABLED
                         </span>
                       )}
                     </div>
-                    <p className="text-[12px] text-ink-3">
+                    <p className="text-xs text-ink-3">
                       Master toggle for this workspace. Formulates responses directly from your published help desk articles and notes.
                     </p>
                   </div>
@@ -3137,7 +3137,7 @@ export function AdminSettingsPanel({
                     onChange={(e) => setAiSettings({ ...aiSettings, enabled: e.target.checked })}
                     className="sr-only peer"
                   />
-                  <div className="w-11 h-6 bg-surface-3 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-accent"></div>
+                  <div className="w-11 h-6 bg-surface-3 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-line-2 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-accent"></div>
                 </label>
               </div>
 
@@ -3145,12 +3145,12 @@ export function AdminSettingsPanel({
               <div className="p-5 rounded-2xl border border-line bg-surface space-y-3">
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <h4 className="text-[13.5px] font-semibold text-ink">System Prompt & Agent Persona</h4>
-                    <p className="text-[11.5px] text-ink-3">
+                    <h4 className="text-ui font-semibold text-ink">System Prompt & Agent Persona</h4>
+                    <p className="text-xs text-ink-3">
                       Defines who the assistant is, its tone, and response constraints. Facts are always anchored in your published articles.
                     </p>
                   </div>
-                  <span className="text-[10.5px] text-ink-3 font-mono shrink-0">
+                  <span className="text-2xs text-ink-3 font-mono shrink-0">
                     {(aiSettings.system_prompt || '').length.toLocaleString()} chars
                   </span>
                 </div>
@@ -3159,9 +3159,9 @@ export function AdminSettingsPanel({
                   onChange={(e) => setAiSettings({ ...aiSettings, system_prompt: e.target.value })}
                   rows={8}
                   placeholder="You are the support assistant for… Answer only from the knowledge base…"
-                  className="w-full px-3 py-2.5 rounded-xl border border-line bg-surface-2 text-[12.5px] leading-relaxed font-mono text-ink resize-y focus:outline-none focus:ring-1 focus:ring-accent"
+                  className="w-full px-3 py-2.5 rounded-xl border border-line bg-surface-2 text-xs leading-relaxed font-mono text-ink resize-y focus:outline-none focus:ring-1 focus:ring-accent"
                 />
-                <p className="text-[11px] text-ink-3">
+                <p className="text-2xs text-ink-3">
                   Leave empty to use the built-in default. Applies to web widget, WhatsApp, Messenger, Instagram, and LinkedIn.
                 </p>
               </div>
@@ -3172,12 +3172,12 @@ export function AdminSettingsPanel({
                 <div className="p-5 rounded-2xl border border-line bg-surface space-y-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2.5">
-                      <div className="w-8 h-8 rounded-lg bg-amber-500/10 text-amber-500 flex items-center justify-center">
+                      <div className="w-8 h-8 rounded-lg bg-warn/10 text-warn flex items-center justify-center">
                         <Zap className="w-4 h-4" />
                       </div>
                       <div>
-                        <h4 className="text-[13.5px] font-semibold text-ink">Auto First Reply</h4>
-                        <p className="text-[11.5px] text-ink-3">Answers incoming questions if no agent claims the chat</p>
+                        <h4 className="text-ui font-semibold text-ink">Auto First Reply</h4>
+                        <p className="text-xs text-ink-3">Answers incoming questions if no agent claims the chat</p>
                       </div>
                     </div>
                     <label className="relative inline-flex items-center cursor-pointer">
@@ -3187,7 +3187,7 @@ export function AdminSettingsPanel({
                         onChange={(e) => setAiSettings({ ...aiSettings, auto_response_enabled: e.target.checked })}
                         className="sr-only peer"
                       />
-                      <div className="w-9 h-5 bg-surface-3 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-accent"></div>
+                      <div className="w-9 h-5 bg-surface-3 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-line-2 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-accent"></div>
                     </label>
                   </div>
 
@@ -3212,7 +3212,7 @@ export function AdminSettingsPanel({
                       }
                       className="w-full accent-accent cursor-pointer"
                     />
-                    <p className="text-[11px] text-ink-3">
+                    <p className="text-2xs text-ink-3">
                       Waits this many seconds before consulting knowledge base articles to draft and send the first answer.
                     </p>
                   </div>
@@ -3222,12 +3222,12 @@ export function AdminSettingsPanel({
                 <div className="p-5 rounded-2xl border border-line bg-surface space-y-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2.5">
-                      <div className="w-8 h-8 rounded-lg bg-purple-500/10 text-purple-500 flex items-center justify-center">
+                      <div className="w-8 h-8 rounded-lg bg-accent/10 text-accent flex items-center justify-center">
                         <Sparkles className="w-4 h-4" />
                       </div>
                       <div>
-                        <h4 className="text-[13.5px] font-semibold text-ink">Full Autopilot</h4>
-                        <p className="text-[11.5px] text-ink-3">Continuously answers follow-up visitor messages</p>
+                        <h4 className="text-ui font-semibold text-ink">Full Autopilot</h4>
+                        <p className="text-xs text-ink-3">Continuously answers follow-up visitor messages</p>
                       </div>
                     </div>
                     <label className="relative inline-flex items-center cursor-pointer">
@@ -3237,12 +3237,12 @@ export function AdminSettingsPanel({
                         onChange={(e) => setAiSettings({ ...aiSettings, auto_pilot: e.target.checked })}
                         className="sr-only peer"
                       />
-                      <div className="w-9 h-5 bg-surface-3 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-accent"></div>
+                      <div className="w-9 h-5 bg-surface-3 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-line-2 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-accent"></div>
                     </label>
                   </div>
 
                   <div className="space-y-2 pt-2 border-t border-line text-xs">
-                    <p className="text-[12px] text-ink-2 leading-relaxed">
+                    <p className="text-xs text-ink-2 leading-relaxed">
                       Operates the AI as an autonomous knowledge agent throughout conversation lifecycles. Automatically yields back to human agents when escalated or claimed.
                     </p>
                   </div>
@@ -3255,8 +3255,8 @@ export function AdminSettingsPanel({
                 <div className="p-4 rounded-xl border border-line bg-surface space-y-2">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <MessageSquare className="w-4 h-4 text-blue-500" />
-                      <span className="text-[13px] font-semibold text-ink">Suggested Replies</span>
+                      <MessageSquare className="w-4 h-4 text-accent" />
+                      <span className="text-ui font-semibold text-ink">Suggested Replies</span>
                     </div>
                     <label className="relative inline-flex items-center cursor-pointer">
                       <input
@@ -3265,18 +3265,18 @@ export function AdminSettingsPanel({
                         onChange={(e) => setAiSettings({ ...aiSettings, suggested_replies_enabled: e.target.checked })}
                         className="sr-only peer"
                       />
-                      <div className="w-8 h-4 bg-surface-3 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[1px] after:left-[1px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3.5 after:w-3.5 after:transition-all peer-checked:bg-accent"></div>
+                      <div className="w-8 h-4 bg-surface-3 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[1px] after:left-[1px] after:bg-white after:border-line-2 after:border after:rounded-full after:h-3.5 after:w-3.5 after:transition-all peer-checked:bg-accent"></div>
                     </label>
                   </div>
-                  <p className="text-[11px] text-ink-3">Clickable pills above composer for agents.</p>
+                  <p className="text-2xs text-ink-3">Clickable pills above composer for agents.</p>
                 </div>
 
                 {/* Auto-Tagging */}
                 <div className="p-4 rounded-xl border border-line bg-surface space-y-2">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <Check className="w-4 h-4 text-emerald-500" />
-                      <span className="text-[13px] font-semibold text-ink">Auto-Tagging</span>
+                      <Check className="w-4 h-4 text-success" />
+                      <span className="text-ui font-semibold text-ink">Auto-Tagging</span>
                     </div>
                     <label className="relative inline-flex items-center cursor-pointer">
                       <input
@@ -3285,18 +3285,18 @@ export function AdminSettingsPanel({
                         onChange={(e) => setAiSettings({ ...aiSettings, auto_tagging_enabled: e.target.checked })}
                         className="sr-only peer"
                       />
-                      <div className="w-8 h-4 bg-surface-3 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[1px] after:left-[1px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3.5 after:w-3.5 after:transition-all peer-checked:bg-accent"></div>
+                      <div className="w-8 h-4 bg-surface-3 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[1px] after:left-[1px] after:bg-white after:border-line-2 after:border after:rounded-full after:h-3.5 after:w-3.5 after:transition-all peer-checked:bg-accent"></div>
                     </label>
                   </div>
-                  <p className="text-[11px] text-ink-3">Categorizes threads by intent (#Billing, #Bug).</p>
+                  <p className="text-2xs text-ink-3">Categorizes threads by intent (#Billing, #Bug).</p>
                 </div>
 
                 {/* Sentiment & Summary */}
                 <div className="p-4 rounded-xl border border-line bg-surface space-y-2">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <Sparkles className="w-4 h-4 text-purple-500" />
-                      <span className="text-[13px] font-semibold text-ink">Sentiment & Summary</span>
+                      <Sparkles className="w-4 h-4 text-accent" />
+                      <span className="text-ui font-semibold text-ink">Sentiment & Summary</span>
                     </div>
                     <label className="relative inline-flex items-center cursor-pointer">
                       <input
@@ -3305,10 +3305,10 @@ export function AdminSettingsPanel({
                         onChange={(e) => setAiSettings({ ...aiSettings, sentiment_enabled: e.target.checked, summary_enabled: e.target.checked })}
                         className="sr-only peer"
                       />
-                      <div className="w-8 h-4 bg-surface-3 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[1px] after:left-[1px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3.5 after:w-3.5 after:transition-all peer-checked:bg-accent"></div>
+                      <div className="w-8 h-4 bg-surface-3 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[1px] after:left-[1px] after:bg-white after:border-line-2 after:border after:rounded-full after:h-3.5 after:w-3.5 after:transition-all peer-checked:bg-accent"></div>
                     </label>
                   </div>
-                  <p className="text-[11px] text-ink-3">Mood flags and quick summaries on long threads.</p>
+                  <p className="text-2xs text-ink-3">Mood flags and quick summaries on long threads.</p>
                 </div>
               </div>
 
@@ -3316,12 +3316,12 @@ export function AdminSettingsPanel({
               <div className="p-5 rounded-2xl border border-line bg-surface-2 space-y-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h4 className="text-[14px] font-semibold text-ink">Model provider</h4>
-                    <p className="text-[12px] text-ink-3">
+                    <h4 className="text-sm font-semibold text-ink">Model provider</h4>
+                    <p className="text-xs text-ink-3">
                       Your API key is used strictly on server-side API routes and is never sent to browser clients.
                     </p>
                   </div>
-                  <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-surface border border-line text-ink-3">
+                  <span className="text-2xs font-mono px-2 py-0.5 rounded bg-surface border border-line text-ink-3">
                     Server-Side Only
                   </span>
                 </div>
@@ -3350,7 +3350,7 @@ export function AdminSettingsPanel({
                         <option value="deepseek">DeepSeek</option>
                         <option value="compatible">Other — OpenAI-compatible URL</option>
                       </select>
-                      <p className="text-[11px] text-ink-3">
+                      <p className="text-2xs text-ink-3">
                         {aiSettings.provider === 'compatible'
                           ? 'OpenRouter, Groq, Together, a local Ollama — anything that serves /chat/completions.'
                           : aiSettings.provider === 'deepseek'
@@ -3368,7 +3368,7 @@ export function AdminSettingsPanel({
                         placeholder={defaultAiModel || 'provider/model-name'}
                         className="input font-mono text-xs"
                       />
-                      <p className="text-[11px] text-ink-3">
+                      <p className="text-2xs text-ink-3">
                         {/* Typed rather than picked from a list: model names
                             change faster than this page can be redeployed. */}
                         {aiSettings.model
@@ -3390,7 +3390,7 @@ export function AdminSettingsPanel({
                         placeholder="https://openrouter.ai/api/v1"
                         className="input font-mono text-xs"
                       />
-                      <p className="text-[11px] text-ink-3">
+                      <p className="text-2xs text-ink-3">
                         Without the trailing <code className="font-mono">/chat/completions</code> — we add it.
                       </p>
                     </div>
@@ -3409,7 +3409,7 @@ export function AdminSettingsPanel({
                       onChange={(e) => setAiSettings({ ...aiSettings, api_key: e.target.value })}
                       className="input font-mono text-xs"
                     />
-                    <p className="text-[11px] text-ink-3">
+                    <p className="text-2xs text-ink-3">
                       Stored server-side and never sent to the browser. Leave blank to keep
                       the saved key. With no key, answers come from your help centre
                       articles and team notes — which still works.
@@ -3430,7 +3430,7 @@ export function AdminSettingsPanel({
                       {providerTest && (
                         <span
                           className={cn(
-                            'text-[12px] font-medium',
+                            'text-xs font-medium',
                             providerTest.ok ? 'text-success' : 'text-danger'
                           )}
                         >
@@ -3444,7 +3444,7 @@ export function AdminSettingsPanel({
                     {/* A server-side prerequisite the owner cannot see any
                         other way, and which silently disables everything. */}
                     {providerTest?.warning && (
-                      <p className="text-[12px] text-warn bg-warn-soft border border-warn-line rounded-lg px-3 py-2">
+                      <p className="text-xs text-warn bg-warn-soft border border-warn-line rounded-lg px-3 py-2">
                         {providerTest.warning}
                       </p>
                     )}
@@ -3453,7 +3453,7 @@ export function AdminSettingsPanel({
               </div>
 
               {/* Slim Sticky Footer Bar */}
-              <div className="sticky bottom-0 z-20 px-6 py-3 border-t border-line bg-surface/95 backdrop-blur-sm flex items-center justify-between gap-4 shadow-sm -mx-6 md:-mx-8">
+              <div className="sticky bottom-0 z-20 px-6 py-3 border-t border-line bg-surface flex items-center justify-between gap-4 shadow-sm -mx-6 md:-mx-8">
                 <div className="flex items-center gap-2 text-xs text-ink-2 truncate">
                   <Sparkles className="w-3.5 h-3.5 text-accent shrink-0" />
                   <span className="truncate">Changes to AI assistant settings take effect immediately.</span>
@@ -3504,8 +3504,8 @@ export function AdminSettingsPanel({
             <div className="card p-6 space-y-6">
               <div className="flex items-start justify-between border-b border-line pb-4">
                 <div>
-                  <h3 className="text-[16px] font-semibold text-ink">Live Chat Embed Snippet</h3>
-                  <p className="text-[12.5px] text-ink-3 mt-0.5">
+                  <h3 className="text-base font-semibold text-ink">Live Chat Embed Snippet</h3>
+                  <p className="text-xs text-ink-3 mt-0.5">
                     Embed this script tag into the <code className="font-mono text-accent">&lt;head&gt;</code> or bottom of the <code className="font-mono text-accent">&lt;body&gt;</code> of any website.
                   </p>
                 </div>
@@ -3519,27 +3519,27 @@ export function AdminSettingsPanel({
               </div>
 
               {/* Code Snippet Card */}
-              <div className="relative rounded-2xl bg-slate-950 p-5 font-mono text-[12.5px] text-slate-200 border border-slate-800 shadow-lg overflow-x-auto">
+              <div className="relative rounded-2xl bg-invert p-5 font-mono text-xs text-slate-200 border border-line-3 shadow-lg overflow-x-auto">
                 <pre>{installSnippetCode}</pre>
               </div>
 
               {/* Platform Guides */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
                 <div className="p-4 rounded-xl border border-line bg-surface-2 space-y-1.5">
-                  <div className="font-semibold text-[13px] text-ink">Custom HTML / Next.js</div>
-                  <p className="text-[11.5px] text-ink-3">
+                  <div className="font-semibold text-ui text-ink">Custom HTML / Next.js</div>
+                  <p className="text-xs text-ink-3">
                     Paste right before the closing <code className="font-mono text-ink">&lt;/body&gt;</code> tag in your layout or HTML file.
                   </p>
                 </div>
                 <div className="p-4 rounded-xl border border-line bg-surface-2 space-y-1.5">
-                  <div className="font-semibold text-[13px] text-ink">Shopify / Webflow</div>
-                  <p className="text-[11.5px] text-ink-3">
+                  <div className="font-semibold text-ui text-ink">Shopify / Webflow</div>
+                  <p className="text-xs text-ink-3">
                     Paste into Project Settings &rarr; Custom Code &rarr; Footer Code.
                   </p>
                 </div>
                 <div className="p-4 rounded-xl border border-line bg-surface-2 space-y-1.5">
-                  <div className="font-semibold text-[13px] text-ink">WordPress</div>
-                  <p className="text-[11.5px] text-ink-3">
+                  <div className="font-semibold text-ui text-ink">WordPress</div>
+                  <p className="text-xs text-ink-3">
                     Use any "Insert Headers and Footers" plugin to add the snippet into the footer.
                   </p>
                 </div>
@@ -3561,16 +3561,16 @@ export function AdminSettingsPanel({
                     <Globe className="w-5 h-5" />
                   </div>
                   <div>
-                    <h3 className="text-[15px] font-semibold text-ink">Ready-Made Public Help Center URL</h3>
-                    <p className="text-[12px] text-ink-3">
+                    <h3 className="text-md font-semibold text-ink">Ready-Made Public Help Center URL</h3>
+                    <p className="text-xs text-ink-3">
                       Every workspace has a live, ready-made Help Center with zero setup required.
                     </p>
                   </div>
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <span className="px-2.5 py-1 rounded-full text-[11px] font-bold tracking-wide uppercase flex items-center gap-1.5 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  <span className="px-2.5 py-1 rounded-full text-2xs font-bold tracking-wide uppercase flex items-center gap-1.5 bg-success/10 text-success border border-success/20">
+                    <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
                     <span>Live</span>
                   </span>
                 </div>
@@ -3579,12 +3579,12 @@ export function AdminSettingsPanel({
               {/* Resolved URL Display */}
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-3.5 rounded-xl bg-surface-2 border border-line">
                 <div className="flex items-center gap-2 min-w-0">
-                  <span className="text-[12px] text-ink-3 shrink-0 font-medium">Public URL:</span>
+                  <span className="text-xs text-ink-3 shrink-0 font-medium">Public URL:</span>
                   <a
                     href={getWorkspaceHelpCenterUrl(workspace)}
                     target="_blank"
                     rel="noreferrer"
-                    className="font-mono text-[13px] font-semibold text-accent hover:underline truncate"
+                    className="font-mono text-ui font-semibold text-accent hover:underline truncate"
                   >
                     {getWorkspaceHelpCenterUrl(workspace)}
                   </a>
@@ -3600,7 +3600,7 @@ export function AdminSettingsPanel({
                     }}
                     className="btn btn-sm btn-secondary gap-1.5"
                   >
-                    {copiedPublicUrl ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+                    {copiedPublicUrl ? <Check className="w-3.5 h-3.5 text-success" /> : <Copy className="w-3.5 h-3.5" />}
                     <span>{copiedPublicUrl ? 'Copied' : 'Copy'}</span>
                   </button>
 
@@ -3620,19 +3620,19 @@ export function AdminSettingsPanel({
               <div className="pt-4 border-t border-line space-y-3">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                   <div>
-                    <h4 className="text-[13.5px] font-semibold text-ink flex items-center gap-2">
+                    <h4 className="text-ui font-semibold text-ink flex items-center gap-2">
                       <span>Subdomain Slug</span>
                       {hasCustomizedSlug ? (
-                        <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-surface-3 text-ink-3 border border-line">
+                        <span className="px-2 py-0.5 rounded-md text-2xs font-semibold bg-surface-3 text-ink-3 border border-line">
                           Slug Customized (Locked)
                         </span>
                       ) : (
-                        <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-accent-soft text-accent border border-accent/20">
+                        <span className="px-2 py-0.5 rounded-md text-2xs font-semibold bg-accent-soft text-accent border border-accent/20">
                           1 Customization Allowed
                         </span>
                       )}
                     </h4>
-                    <p className="text-[12px] text-ink-3 mt-0.5">
+                    <p className="text-xs text-ink-3 mt-0.5">
                       {hasCustomizedSlug
                         ? 'Your subdomain slug has already been customized. It is locked to prevent broken links.'
                         : 'You can customize your ready-made subdomain slug once. Choose a permanent, unique name.'}
@@ -3646,7 +3646,7 @@ export function AdminSettingsPanel({
                         setSlugInput(workspace.slug || '');
                         setIsEditingSlug(true);
                       }}
-                      className="btn btn-sm btn-secondary text-[12px]"
+                      className="btn btn-sm btn-secondary text-xs"
                     >
                       Customize Slug
                     </button>
@@ -3656,7 +3656,7 @@ export function AdminSettingsPanel({
                 {isEditingSlug && !hasCustomizedSlug && isOwner ? (
                   <div className="p-4 rounded-xl bg-surface-2 border border-line space-y-3">
                     <div className="space-y-1.5">
-                      <label className="text-[12px] font-medium text-ink-2">
+                      <label className="text-xs font-medium text-ink-2">
                         Choose Subdomain Slug:
                       </label>
                       <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
@@ -3667,9 +3667,9 @@ export function AdminSettingsPanel({
                             onChange={(e) => setSlugInput(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
                             placeholder="my-company"
                             maxLength={48}
-                            className="flex-1 px-3 py-2 text-[13px] font-mono bg-transparent text-ink placeholder:text-ink-3 outline-none"
+                            className="flex-1 px-3 py-2 text-ui font-mono bg-transparent text-ink placeholder:text-ink-3 outline-none"
                           />
-                          <span className="px-3 py-2 text-[12.5px] font-mono text-ink-3 bg-surface-2 border-l border-line select-none">
+                          <span className="px-3 py-2 text-xs font-mono text-ink-3 bg-surface-2 border-l border-line select-none">
                             .{HELP_BASE_DOMAIN}
                           </span>
                         </div>
@@ -3706,19 +3706,19 @@ export function AdminSettingsPanel({
                     </div>
 
                     {/* Availability Status Feedback */}
-                    <div className="text-[12px]">
+                    <div className="text-xs">
                       {slugAvailability.checking ? (
                         <div className="flex items-center gap-1.5 text-ink-3">
                           <RefreshCw className="w-3.5 h-3.5 animate-spin" />
                           <span>Checking availability...</span>
                         </div>
                       ) : slugAvailability.available === true ? (
-                        <div className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-medium">
+                        <div className="flex items-center gap-1.5 text-success font-medium">
                           <CheckCircle2 className="w-3.5 h-3.5" />
                           <span>https://{slugAvailability.formattedSlug}.{HELP_BASE_DOMAIN} is available!</span>
                         </div>
                       ) : slugAvailability.error ? (
-                        <div className="flex items-center gap-1.5 text-rose-500 font-medium">
+                        <div className="flex items-center gap-1.5 text-danger font-medium">
                           <AlertCircle className="w-3.5 h-3.5" />
                           <span>{slugAvailability.error}</span>
                         </div>
@@ -3731,12 +3731,12 @@ export function AdminSettingsPanel({
 
                     {/* Confirmation Modal / Alert */}
                     {showSlugConfirm && (
-                      <div className="p-3.5 rounded-lg border border-amber-500/30 bg-amber-500/10 text-amber-900 dark:text-amber-200 text-[12.5px] space-y-2.5">
+                      <div className="p-3.5 rounded-lg border border-warn/30 bg-warn/10 text-warn text-xs space-y-2.5">
                         <div className="font-semibold flex items-center gap-2">
-                          <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                          <AlertTriangle className="w-4 h-4 text-warn shrink-0" />
                           <span>Are you sure you want to change your slug?</span>
                         </div>
-                        <p className="text-[12px] opacity-90 leading-relaxed">
+                        <p className="text-xs opacity-90 leading-relaxed">
                           Your Help Center will be permanently moved to <strong className="font-mono text-ink">https://{slugInput.trim().toLowerCase()}.{HELP_BASE_DOMAIN}</strong>. You can only customize this once.
                         </p>
                         <div className="flex items-center gap-2 pt-1">
@@ -3744,7 +3744,7 @@ export function AdminSettingsPanel({
                             type="button"
                             onClick={handleSaveSlug}
                             disabled={savingSlug}
-                            className="btn btn-sm btn-primary bg-amber-600 hover:bg-amber-700 text-white border-none"
+                            className="btn btn-sm btn-primary bg-warn hover:bg-warn text-white border-none"
                           >
                             {savingSlug ? 'Saving...' : 'Yes, Permanently Save Slug'}
                           </button>
@@ -3760,7 +3760,7 @@ export function AdminSettingsPanel({
                     )}
                   </div>
                 ) : (
-                  <div className="flex items-center gap-2 text-[13px] font-mono text-ink-2 bg-surface-2 px-3 py-2 rounded-lg border border-line">
+                  <div className="flex items-center gap-2 text-ui font-mono text-ink-2 bg-surface-2 px-3 py-2 rounded-lg border border-line">
                     <span className="text-ink font-semibold">{workspace.slug || workspace.id}</span>
                     <span className="text-ink-3">.{HELP_BASE_DOMAIN}</span>
                   </div>
@@ -3773,22 +3773,22 @@ export function AdminSettingsPanel({
               <div className="border-b border-line pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
                   <div className="flex items-center gap-2">
-                    <h3 className="text-[15px] font-semibold text-ink">Custom Help Center Domain</h3>
+                    <h3 className="text-md font-semibold text-ink">Custom Help Center Domain</h3>
                     {workspace.custom_domain && (
                       workspace.custom_domain_status === 'verified' ? (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-2xs font-bold bg-success/15 text-success border border-success/30">
                           <CheckCircle2 className="w-3 h-3" />
                           <span>Live</span>
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30">
-                          <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-2xs font-bold bg-warn/15 text-warn border border-warn/30">
+                          <span className="w-1.5 h-1.5 rounded-full bg-warn animate-pulse" />
                           <span>DNS Pending</span>
                         </span>
                       )
                     )}
                   </div>
-                  <p className="text-[12px] text-ink-3 mt-1">
+                  <p className="text-xs text-ink-3 mt-1">
                     Connect your own domain (e.g. <code className="font-mono text-ink">help.{cleanDomain(workspace.website_url) || 'yourcompany.com'}</code>) with a single CNAME record. SSL is automatically provisioned.
                   </p>
                 </div>
@@ -3797,7 +3797,7 @@ export function AdminSettingsPanel({
                   <button
                     type="button"
                     onClick={handleRemoveDomain}
-                    className="btn btn-sm btn-secondary text-rose-500 hover:text-rose-600 hover:bg-rose-500/10 gap-1.5 self-start sm:self-auto shrink-0"
+                    className="btn btn-sm btn-secondary text-danger hover:text-danger hover:bg-danger/10 gap-1.5 self-start sm:self-auto shrink-0"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                     <span>Remove Custom Domain</span>
@@ -3807,21 +3807,21 @@ export function AdminSettingsPanel({
 
               {/* Connected / Live State */}
               {workspace.custom_domain && (workspace.custom_domain_status === 'live' || workspace.custom_domain_status === 'verified') ? (
-                <div className="p-4 rounded-xl border border-emerald-500/30 bg-emerald-500/10 space-y-3">
+                <div className="p-4 rounded-xl border border-success/30 bg-success/10 space-y-3">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div className="space-y-1 min-w-0">
-                      <div className="text-[11px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-300">
+                      <div className="text-2xs font-bold uppercase tracking-wider text-success">
                         Active Custom Domain
                       </div>
                       <a
                         href={`https://${cleanDomain(workspace.custom_domain)}`}
                         target="_blank"
                         rel="noreferrer"
-                        className="font-mono text-[15px] font-bold text-emerald-800 dark:text-emerald-200 hover:underline truncate block"
+                        className="font-mono text-md font-bold text-success hover:underline truncate block"
                       >
                         https://{cleanDomain(workspace.custom_domain)}
                       </a>
-                      <p className="text-[11.5px] text-emerald-700 dark:text-emerald-300/80">
+                      <p className="text-xs text-success">
                         Your Help Center is live with active SSL encryption. Traffic to your platform subdomain (<span className="font-mono font-medium">{workspace.slug || workspace.id}.{HELP_BASE_DOMAIN}</span>) and widget links automatically redirect here.
                       </p>
                     </div>
@@ -3836,7 +3836,7 @@ export function AdminSettingsPanel({
                         }}
                         className="btn btn-sm btn-secondary gap-1.5"
                       >
-                        {copiedPublicUrl ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+                        {copiedPublicUrl ? <Check className="w-3.5 h-3.5 text-success" /> : <Copy className="w-3.5 h-3.5" />}
                         <span>{copiedPublicUrl ? 'Copied' : 'Copy URL'}</span>
                       </button>
 
@@ -3844,7 +3844,7 @@ export function AdminSettingsPanel({
                         href={`https://${cleanDomain(workspace.custom_domain)}`}
                         target="_blank"
                         rel="noreferrer"
-                        className="btn btn-sm btn-primary bg-emerald-600 hover:bg-emerald-700 text-white border-none gap-1.5"
+                        className="btn btn-sm btn-primary bg-success hover:bg-success text-white border-none gap-1.5"
                       >
                         <ExternalLink className="w-3.5 h-3.5" />
                         <span>Visit Site</span>
@@ -3856,21 +3856,21 @@ export function AdminSettingsPanel({
                 /* Connected / Pending DNS Verification State */
                 <div className="space-y-5">
                   {/* Automated Polling Notice */}
-                  <div className="p-3.5 rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-800 dark:text-amber-200 text-[12.5px] flex items-start gap-2.5">
-                    <RefreshCw className="w-4 h-4 shrink-0 text-amber-500 animate-spin mt-0.5" />
+                  <div className="p-3.5 rounded-xl border border-warn/30 bg-warn/10 text-warn text-xs flex items-start gap-2.5">
+                    <RefreshCw className="w-4 h-4 shrink-0 text-warn animate-spin mt-0.5" />
                     <div className="flex-1">
-                      <div className="font-semibold text-amber-900 dark:text-amber-100 flex items-center justify-between">
+                      <div className="font-semibold text-warn flex items-center justify-between">
                         <span>Waiting for DNS propagation for {cleanDomain(workspace.custom_domain)}</span>
                         <button
                           type="button"
                           onClick={handleVerifyDomain}
                           disabled={verifyingDomain}
-                          className="text-[11.5px] font-bold text-amber-900 dark:text-amber-200 underline hover:opacity-80"
+                          className="text-xs font-bold text-warn underline hover:opacity-80"
                         >
                           {verifyingDomain ? 'Checking now…' : 'Check Now'}
                         </button>
                       </div>
-                      <p className="mt-0.5 text-[11.5px] opacity-90">
+                      <p className="mt-0.5 text-xs opacity-90">
                         Our servers poll verification automatically every 30 seconds for the first 30 minutes, then hourly. Your Help Center will flip to <strong>Live</strong> and issue an SSL certificate automatically without you having to click verify.
                       </p>
                     </div>
@@ -3879,18 +3879,18 @@ export function AdminSettingsPanel({
                   {/* Exactly ONE Record to Add Card */}
                   <div className="space-y-2.5">
                     <div className="flex items-center justify-between">
-                      <h4 className="text-[13px] font-bold text-ink flex items-center gap-1.5">
+                      <h4 className="text-ui font-bold text-ink flex items-center gap-1.5">
                         <span>Step 1: Add exactly ONE record to your DNS</span>
                       </h4>
-                      <span className="text-[11px] font-medium text-ink-3">CNAME record only</span>
+                      <span className="text-2xs font-medium text-ink-3">CNAME record only</span>
                     </div>
 
                     {(() => {
                       const domain = cleanDomain(workspace.custom_domain);
                       const { hostRecord } = splitDomain(domain);
                       return (
-                        <div className="rounded-xl border-2 border-line-2 bg-surface overflow-hidden text-[12.5px] shadow-xs">
-                          <div className="grid grid-cols-12 px-4 py-2.5 bg-surface-2 border-b-2 border-line-2 font-bold text-ink text-[12px]">
+                        <div className="rounded-xl border-2 border-line-2 bg-surface overflow-hidden text-xs shadow-xs">
+                          <div className="grid grid-cols-12 px-4 py-2.5 bg-surface-2 border-b-2 border-line-2 font-bold text-ink text-xs">
                             <div className="col-span-2">Type</div>
                             <div className="col-span-4">Name / Host</div>
                             <div className="col-span-4">Target / Value</div>
@@ -3912,7 +3912,7 @@ export function AdminSettingsPanel({
                                 className="text-ink-3 hover:text-ink shrink-0"
                                 title="Copy Host"
                               >
-                                {copiedHost ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
+                                {copiedHost ? <Check className="w-3 h-3 text-success" /> : <Copy className="w-3 h-3" />}
                               </button>
                             </div>
                             <div className="col-span-4 font-mono text-ink font-semibold flex items-center gap-1.5">
@@ -3928,7 +3928,7 @@ export function AdminSettingsPanel({
                                 className="text-ink-3 hover:text-ink shrink-0"
                                 title="Copy Target"
                               >
-                                {copiedCname ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
+                                {copiedCname ? <Check className="w-3 h-3 text-success" /> : <Copy className="w-3 h-3" />}
                               </button>
                             </div>
                             <div className="col-span-2 text-right">
@@ -3951,8 +3951,8 @@ export function AdminSettingsPanel({
                           {expectedDnsData?.hasTxtChallenge && expectedDnsData.records
                             ?.filter((r: any) => r.type === 'TXT')
                             .map((txtRec: any, idx: number) => (
-                              <div key={idx} className="grid grid-cols-12 px-4 py-3 bg-amber-500/5 border-t border-amber-500/20 items-center">
-                                <div className="col-span-2 font-mono font-extrabold text-amber-500">{txtRec.type}</div>
+                              <div key={idx} className="grid grid-cols-12 px-4 py-3 bg-warn/5 border-t border-warn/20 items-center">
+                                <div className="col-span-2 font-mono font-extrabold text-warn">{txtRec.type}</div>
                                 <div className="col-span-4 font-mono text-ink font-semibold truncate">{txtRec.name}</div>
                                 <div className="col-span-4 font-mono text-ink font-semibold truncate">{txtRec.value}</div>
                                 <div className="col-span-2 text-right">
@@ -3979,10 +3979,10 @@ export function AdminSettingsPanel({
                   {/* Step 2: Detected DNS Provider Specific Instructions */}
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
-                      <h4 className="text-[13px] font-bold text-ink flex items-center gap-2">
+                      <h4 className="text-ui font-bold text-ink flex items-center gap-2">
                         <span>Step 2: Follow instructions for your DNS provider</span>
                         {dnsProviderGuide && (
-                          <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-surface-3 text-ink-2 border border-line">
+                          <span className="px-2 py-0.5 rounded text-2xs font-bold bg-surface-3 text-ink-2 border border-line">
                             Detected: {dnsProviderGuide.name}
                           </span>
                         )}
@@ -3991,12 +3991,12 @@ export function AdminSettingsPanel({
 
                     {/* Critical Cloudflare Warning Banner if Cloudflare is detected */}
                     {dnsProviderGuide?.isCloudflare && (
-                      <div className="p-3.5 rounded-xl border-2 border-amber-500/40 bg-amber-500/10 text-amber-900 dark:text-amber-100 text-[12.5px] space-y-1.5">
-                        <div className="font-bold flex items-center gap-1.5 text-amber-800 dark:text-amber-200">
-                          <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                      <div className="p-3.5 rounded-xl border-2 border-warn/40 bg-warn/10 text-warn text-xs space-y-1.5">
+                        <div className="font-bold flex items-center gap-1.5 text-warn">
+                          <AlertTriangle className="w-4 h-4 text-warn shrink-0" />
                           <span>CRITICAL FOR CLOUDFLARE: Set Proxy Status to &ldquo;DNS only&rdquo;</span>
                         </div>
-                        <p className="text-[12px] opacity-95 leading-relaxed">
+                        <p className="text-xs opacity-95 leading-relaxed">
                           Turn off the orange cloud proxy by toggling <strong>Proxy status</strong> to <strong>DNS only (gray cloud)</strong>. Cloudflare&apos;s proxy hides the CNAME target from Vercel, preventing SSL certificate generation.
                         </p>
                       </div>
@@ -4004,7 +4004,7 @@ export function AdminSettingsPanel({
 
                     {/* Step-by-step checklist */}
                     {dnsProviderGuide?.steps && (
-                      <div className="p-4 rounded-xl bg-surface-2 border border-line space-y-2 text-[12.5px]">
+                      <div className="p-4 rounded-xl bg-surface-2 border border-line space-y-2 text-xs">
                         <ol className="list-decimal list-inside space-y-1.5 text-ink-2 leading-relaxed">
                           {dnsProviderGuide.steps.map((step, idx) => (
                             <li key={idx} className="pl-1">
@@ -4024,7 +4024,7 @@ export function AdminSettingsPanel({
                   </label>
                   <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                     <div className="relative flex-1 flex items-center rounded-xl bg-surface border border-line focus-within:border-accent focus-within:ring-2 focus-within:ring-accent/20 overflow-hidden">
-                      <span className="px-3 py-2 text-[13px] font-mono text-ink-3 bg-surface-2 border-r border-line select-none">
+                      <span className="px-3 py-2 text-ui font-mono text-ink-3 bg-surface-2 border-r border-line select-none">
                         https://
                       </span>
                       <input
@@ -4036,7 +4036,7 @@ export function AdminSettingsPanel({
                           setDomainValidationError(null);
                         }}
                         placeholder={`help.${cleanDomain(workspace.website_url) || 'yourcompany.com'}`}
-                        className="flex-1 px-3 py-2 text-[13px] font-mono bg-transparent text-ink placeholder:text-ink-3 outline-none"
+                        className="flex-1 px-3 py-2 text-ui font-mono bg-transparent text-ink placeholder:text-ink-3 outline-none"
                       />
                     </div>
 
@@ -4059,12 +4059,12 @@ export function AdminSettingsPanel({
 
                   {/* Inline Error / Apex Explanation */}
                   {domainValidationError ? (
-                    <div className="p-3 rounded-lg border border-rose-500/30 bg-rose-500/10 text-rose-600 dark:text-rose-400 text-[12px] flex items-start gap-2">
+                    <div className="p-3 rounded-lg border border-danger/30 bg-danger/10 text-danger text-xs flex items-start gap-2">
                       <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
                       <span>{domainValidationError}</span>
                     </div>
                   ) : (
-                    <p className="text-[11.5px] text-ink-3">
+                    <p className="text-xs text-ink-3">
                       Enter a subdomain such as <code className="font-mono text-ink">help.{cleanDomain(workspace.website_url) || 'yourcompany.com'}</code>. Root apex domains (e.g. <code className="font-mono">{cleanDomain(workspace.website_url) || 'yourcompany.com'}</code>) cannot use CNAME records and require a subdomain prefix.
                     </p>
                   )}
@@ -4077,14 +4077,14 @@ export function AdminSettingsPanel({
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-line pb-4">
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
-                    <span className="px-2 py-0.5 rounded text-[10.5px] font-bold uppercase tracking-wider bg-accent/10 text-accent border border-accent/20">
+                    <span className="px-2 py-0.5 rounded text-2xs font-bold uppercase tracking-wider bg-accent/10 text-accent border border-accent/20">
                       Zero-Code Automation
                     </span>
-                    <h3 className="text-[16px] font-semibold text-ink flex items-center gap-1.5">
+                    <h3 className="text-base font-semibold text-ink flex items-center gap-1.5">
                       <span>Website Navbar Button Auto-Injector</span>
                     </h3>
                   </div>
-                  <p className="text-[12px] text-ink-3">
+                  <p className="text-xs text-ink-3">
                     Automatically connects to or injects a button into your website navbar (e.g. on <code className="font-mono text-ink">{cleanDomain(workspace.website_url) || 'yourbrand.com'}</code>) without touching your website code.
                   </p>
                 </div>
@@ -4097,7 +4097,7 @@ export function AdminSettingsPanel({
                     checked={navbarConfig.enabled}
                     onChange={(e) => setNavbarConfig({ ...navbarConfig, enabled: e.target.checked })}
                   />
-                  <div className="w-11 h-6 bg-surface-3 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-accent"></div>
+                  <div className="w-11 h-6 bg-surface-3 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-line-2 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-accent"></div>
                 </label>
               </div>
 
@@ -4108,16 +4108,16 @@ export function AdminSettingsPanel({
                     <div className="space-y-1.5">
                       <label className="field-label flex items-center justify-between">
                         <span>Button Text / Name in Navbar</span>
-                        <span className="text-[11px] text-ink-3">Default: Help</span>
+                        <span className="text-2xs text-ink-3">Default: Help</span>
                       </label>
                       <input
                         type="text"
                         value={navbarConfig.label}
                         onChange={(e) => setNavbarConfig({ ...navbarConfig, label: e.target.value })}
                         placeholder="Help"
-                        className="input font-semibold text-[14px]"
+                        className="input font-semibold text-sm"
                       />
-                      <p className="text-[11px] text-ink-3">
+                      <p className="text-2xs text-ink-3">
                         Always adds a new link with this text into your website menu. Never alters or hijacks existing website links.
                       </p>
                     </div>
@@ -4133,7 +4133,7 @@ export function AdminSettingsPanel({
                             action: e.target.value as 'help' | 'messages' | 'redirect',
                           })
                         }
-                        className="input text-[13px]"
+                        className="input text-ui"
                       >
                         <option value="redirect">
                           🌐 Open Help Center in new tab (Recommended)
@@ -4141,7 +4141,7 @@ export function AdminSettingsPanel({
                         <option value="help">📖 Open Help &amp; FAQs Slide-out Panel</option>
                         <option value="messages">💬 Open Live Chat Messenger</option>
                       </select>
-                      <p className="text-[11px] text-ink-3">
+                      <p className="text-2xs text-ink-3">
                         Opens your Help Center ({getWorkspaceHelpCenterUrl(workspace)}) or slides open the chat widget.
                       </p>
                     </div>
@@ -4150,13 +4150,13 @@ export function AdminSettingsPanel({
                   {/* Position & Styling Row */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-3 border-t border-line/60">
                     <div className="space-y-1.5 p-3.5 rounded-xl border border-line bg-surface-2">
-                      <label className="text-[12.5px] font-semibold text-ink block">Placement Position</label>
+                      <label className="text-xs font-semibold text-ink block">Placement Position</label>
                       <div className="grid grid-cols-2 gap-2 mt-1">
                         <button
                           type="button"
                           onClick={() => setNavbarConfig({ ...navbarConfig, position: 'end' })}
                           className={cn(
-                            'px-3 py-1.5 rounded-lg border text-center text-[12px] font-medium transition-all',
+                            'px-3 py-1.5 rounded-lg border text-center text-xs font-medium transition-all',
                             navbarConfig.position !== 'start'
                               ? 'border-accent bg-accent/10 text-accent font-semibold'
                               : 'border-line bg-surface text-ink-2 hover:bg-surface-3'
@@ -4168,7 +4168,7 @@ export function AdminSettingsPanel({
                           type="button"
                           onClick={() => setNavbarConfig({ ...navbarConfig, position: 'start' })}
                           className={cn(
-                            'px-3 py-1.5 rounded-lg border text-center text-[12px] font-medium transition-all',
+                            'px-3 py-1.5 rounded-lg border text-center text-xs font-medium transition-all',
                             navbarConfig.position === 'start'
                               ? 'border-accent bg-accent/10 text-accent font-semibold'
                               : 'border-line bg-surface text-ink-2 hover:bg-surface-3'
@@ -4177,19 +4177,19 @@ export function AdminSettingsPanel({
                           Start of Menu
                         </button>
                       </div>
-                      <p className="text-[11px] text-ink-3 mt-1">
+                      <p className="text-2xs text-ink-3 mt-1">
                         Appends the link at the end of your main navigation bar or prepends it as the first item.
                       </p>
                     </div>
 
                     <div className="space-y-1.5 p-3.5 rounded-xl border border-line bg-surface-2">
-                      <label className="text-[12.5px] font-semibold text-ink block">Button Styling Variant</label>
+                      <label className="text-xs font-semibold text-ink block">Button Styling Variant</label>
                       <div className="grid grid-cols-2 gap-2 mt-1">
                         <button
                           type="button"
                           onClick={() => setNavbarConfig({ ...navbarConfig, style: 'navbar_link' })}
                           className={cn(
-                            'px-3 py-1.5 rounded-lg border text-center text-[12px] font-medium transition-all',
+                            'px-3 py-1.5 rounded-lg border text-center text-xs font-medium transition-all',
                             navbarConfig.style === 'navbar_link'
                               ? 'border-accent bg-accent/10 text-accent font-semibold'
                               : 'border-line bg-surface text-ink-2 hover:bg-surface-3'
@@ -4201,7 +4201,7 @@ export function AdminSettingsPanel({
                           type="button"
                           onClick={() => setNavbarConfig({ ...navbarConfig, style: 'pill' })}
                           className={cn(
-                            'px-3 py-1.5 rounded-lg border text-center text-[12px] font-medium transition-all',
+                            'px-3 py-1.5 rounded-lg border text-center text-xs font-medium transition-all',
                             navbarConfig.style === 'pill'
                               ? 'border-accent bg-accent/10 text-accent font-semibold'
                               : 'border-line bg-surface text-ink-2 hover:bg-surface-3'
@@ -4210,7 +4210,7 @@ export function AdminSettingsPanel({
                           Modern Pill Button
                         </button>
                       </div>
-                      <p className="text-[11px] text-ink-3 mt-1">
+                      <p className="text-2xs text-ink-3 mt-1">
                         Copies fonts and spacing from existing menu links or styles as a prominent pill badge.
                       </p>
                     </div>
@@ -4219,11 +4219,11 @@ export function AdminSettingsPanel({
                   {/* Simulator Preview & Trigger */}
                   <div className="p-4 rounded-xl border border-line bg-surface-2/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div className="space-y-0.5">
-                      <span className="text-[13px] font-semibold text-ink flex items-center gap-1.5">
+                      <span className="text-ui font-semibold text-ink flex items-center gap-1.5">
                         <Sparkles className="w-3.5 h-3.5 text-accent" />
                         <span>Interactive Website Simulator</span>
                       </span>
-                      <p className="text-[11.5px] text-ink-3">
+                      <p className="text-xs text-ink-3">
                         Test and see how your menu link looks live on your site layout.
                       </p>
                     </div>
@@ -4241,18 +4241,18 @@ export function AdminSettingsPanel({
                   {/* HTML Snippet & Optional Selector Fallback */}
                   <div className="p-4 rounded-xl border border-line/80 bg-surface-2/20 space-y-3">
                     <div className="flex items-center justify-between">
-                      <span className="text-[12px] font-semibold text-ink flex items-center gap-1.5">
+                      <span className="text-xs font-semibold text-ink flex items-center gap-1.5">
                         <Code className="w-3.5 h-3.5 text-ink-3" />
                         <span>Manual HTML Snippet (If Automatic Detection is not preferred)</span>
                       </span>
                     </div>
 
-                    <div className="flex items-center gap-2 bg-slate-950 border border-slate-800 rounded-lg p-2 font-mono text-[12px] text-slate-300">
+                    <div className="flex items-center gap-2 bg-invert border border-line-3 rounded-lg p-2 font-mono text-xs text-ink-3">
                       <input
                         type="text"
                         readOnly
                         value={`<a href="${getWorkspaceHelpCenterUrl(workspace)}" target="_blank" rel="noopener noreferrer">${navbarConfig.label || 'Help'}</a>`}
-                        className="bg-transparent border-none outline-hidden flex-1 text-slate-300 font-mono text-xs"
+                        className="bg-transparent border-none outline-hidden flex-1 text-ink-3 font-mono text-xs"
                       />
                       <button
                         type="button"
@@ -4270,7 +4270,7 @@ export function AdminSettingsPanel({
                     </div>
 
                     <div className="space-y-1 pt-1">
-                      <label className="text-[11.5px] font-semibold text-ink block">
+                      <label className="text-xs font-semibold text-ink block">
                         Optional Custom CSS Selector
                       </label>
                       <input
@@ -4278,9 +4278,9 @@ export function AdminSettingsPanel({
                         value={navbarConfig.target_selector || ''}
                         onChange={(e) => setNavbarConfig({ ...navbarConfig, target_selector: e.target.value })}
                         placeholder="header nav ul, #primary-navigation"
-                        className="input h-8 text-[12px] font-mono"
+                        className="input h-8 text-xs font-mono"
                       />
-                      <p className="text-[11px] text-ink-3">
+                      <p className="text-2xs text-ink-3">
                         Leave blank to automatically detect the main navigation header list.
                       </p>
                     </div>
@@ -4288,7 +4288,7 @@ export function AdminSettingsPanel({
 
                   {/* Save Button */}
                   <div className="flex items-center justify-between pt-2">
-                    <span className="text-[11.5px] text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5 font-medium">
+                    <span className="text-xs text-success flex items-center gap-1.5 font-medium">
                       <CheckCircle2 className="w-3.5 h-3.5" />
                       <span>Zero-code: Updates live on your website instantly upon saving.</span>
                     </span>
@@ -4315,7 +4315,7 @@ export function AdminSettingsPanel({
         {activeTab === 'snippet' && (
           <div className="space-y-8 animate-rise max-w-5xl">
             {/* Header Banner */}
-            <div className="card p-6 border-accent/20 bg-gradient-to-r from-accent/5 via-surface to-surface">
+            <div className="card p-6 border-accent/20 bg-accent-soft">
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div className="space-y-1">
                   <div className="flex items-center gap-2.5">
@@ -4323,8 +4323,8 @@ export function AdminSettingsPanel({
                       <Code className="w-5 h-5" />
                     </div>
                     <div>
-                      <h3 className="text-[17px] font-bold text-ink">Install Zen-try &amp; Help Center Widget</h3>
-                      <p className="text-[12.5px] text-ink-3">
+                      <h3 className="text-lg font-bold text-ink">Install Zen-try &amp; Help Center Widget</h3>
+                      <p className="text-xs text-ink-3">
                         Embed live chat, knowledge base search, and custom Help buttons onto any website or app.
                       </p>
                     </div>
@@ -4349,12 +4349,12 @@ export function AdminSettingsPanel({
             <div className="card p-6 space-y-4">
               <div className="flex items-center justify-between border-b border-line pb-3">
                 <div className="flex items-center gap-2">
-                  <span className="w-6 h-6 rounded-full bg-accent text-white flex items-center justify-center text-[12px] font-bold">
+                  <span className="w-6 h-6 rounded-full bg-accent text-white flex items-center justify-center text-xs font-bold">
                     1
                   </span>
                   <div>
-                    <h4 className="text-[14px] font-semibold text-ink">Add the Widget Script Tag</h4>
-                    <p className="text-[12px] text-ink-3">
+                    <h4 className="text-sm font-semibold text-ink">Add the Widget Script Tag</h4>
+                    <p className="text-xs text-ink-3">
                       Paste this script right before the closing <code className="font-mono text-accent text-xs">&lt;/body&gt;</code> tag on your HTML pages.
                     </p>
                   </div>
@@ -4372,7 +4372,7 @@ export function AdminSettingsPanel({
                   }}
                   className="btn btn-sm btn-secondary gap-1.5 shadow-xs"
                 >
-                  {copiedSnippet ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+                  {copiedSnippet ? <Check className="w-3.5 h-3.5 text-success" /> : <Copy className="w-3.5 h-3.5" />}
                   <span>{copiedSnippet ? 'Copied!' : 'Copy Script Tag'}</span>
                 </button>
               </div>
@@ -4382,23 +4382,23 @@ export function AdminSettingsPanel({
                 const host = getWidgetOrigin();
                 const snippet = `<script\n  src="${host}/widget.js"\n  data-workspace-id="${workspace.id}"\n  data-color="${workspace.brand_color || '#2563eb'}"\n  data-title="${workspace.name} Support"\n  async>\n</script>`;
                 return (
-                  <div className="relative rounded-xl border border-line bg-surface-2 p-4 font-mono text-[12.5px] text-ink overflow-x-auto leading-relaxed">
+                  <div className="relative rounded-xl border border-line bg-surface-2 p-4 font-mono text-xs text-ink overflow-x-auto leading-relaxed">
                     <pre><code>{snippet}</code></pre>
                   </div>
                 );
               })()}
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-2 text-[12px] text-ink-3">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-2 text-xs text-ink-3">
                 <div className="p-3 rounded-xl border border-line/60 bg-surface">
-                  <div className="font-semibold text-ink text-[12.5px]">Workspace ID</div>
+                  <div className="font-semibold text-ink text-xs">Workspace ID</div>
                   <div className="font-mono text-xs text-accent mt-0.5 truncate">{workspace.id}</div>
                 </div>
                 <div className="p-3 rounded-xl border border-line/60 bg-surface">
-                  <div className="font-semibold text-ink text-[12.5px]">Brand Color</div>
+                  <div className="font-semibold text-ink text-xs">Brand Color</div>
                   <div className="font-mono text-xs text-ink mt-0.5">{workspace.brand_color || '#2563eb'}</div>
                 </div>
                 <div className="p-3 rounded-xl border border-line/60 bg-surface">
-                  <div className="font-semibold text-ink text-[12.5px]">Bundle Optimization</div>
+                  <div className="font-semibold text-ink text-xs">Bundle Optimization</div>
                   <div className="text-xs text-ink mt-0.5">Asynchronous zero-blocking loading</div>
                 </div>
               </div>
@@ -4408,12 +4408,12 @@ export function AdminSettingsPanel({
             <div className="card p-6 space-y-4">
               <div className="flex items-center justify-between border-b border-line pb-3">
                 <div className="flex items-center gap-2">
-                  <span className="w-6 h-6 rounded-full bg-accent text-white flex items-center justify-center text-[12px] font-bold">
+                  <span className="w-6 h-6 rounded-full bg-accent text-white flex items-center justify-center text-xs font-bold">
                     2
                   </span>
                   <div>
-                    <h4 className="text-[14px] font-semibold text-ink">Add a Help Button to Your Website Navbar</h4>
-                    <p className="text-[12px] text-ink-3">
+                    <h4 className="text-sm font-semibold text-ink">Add a Help Button to Your Website Navbar</h4>
+                    <p className="text-xs text-ink-3">
                       Use declarative HTML data attributes to trigger the widget tabs without writing any JavaScript.
                     </p>
                   </div>
@@ -4425,8 +4425,8 @@ export function AdminSettingsPanel({
                 <div className="p-4 rounded-xl border border-line bg-surface space-y-2">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <span className="text-[13px] font-semibold text-ink">1. Dedicated Help &amp; FAQs Button</span>
-                      <span className="text-[11px] px-2 py-0.5 rounded-full bg-accent/10 text-accent font-semibold">Recommended</span>
+                      <span className="text-ui font-semibold text-ink">1. Dedicated Help &amp; FAQs Button</span>
+                      <span className="text-2xs px-2 py-0.5 rounded-full bg-accent/10 text-accent font-semibold">Recommended</span>
                     </div>
                     <button
                       type="button"
@@ -4441,7 +4441,7 @@ export function AdminSettingsPanel({
                       <span>Copy</span>
                     </button>
                   </div>
-                  <p className="text-[12px] text-ink-3">
+                  <p className="text-xs text-ink-3">
                     Clicking this element opens the widget directly into the Help tab and focuses the article search bar.
                   </p>
                   <div className="rounded-lg bg-surface-2 p-3 font-mono text-xs text-ink overflow-x-auto">
@@ -4452,7 +4452,7 @@ export function AdminSettingsPanel({
                 {/* Specific Article Trigger */}
                 <div className="p-4 rounded-xl border border-line bg-surface space-y-2">
                   <div className="flex items-center justify-between">
-                    <span className="text-[13px] font-semibold text-ink">2. Deep Link to a Specific Article</span>
+                    <span className="text-ui font-semibold text-ink">2. Deep Link to a Specific Article</span>
                     <button
                       type="button"
                       onClick={() => {
@@ -4466,7 +4466,7 @@ export function AdminSettingsPanel({
                       <span>Copy</span>
                     </button>
                   </div>
-                  <p className="text-[12px] text-ink-3">
+                  <p className="text-xs text-ink-3">
                     Directly opens and expands an article accordion inside the widget using its slug or ID.
                   </p>
                   <div className="rounded-lg bg-surface-2 p-3 font-mono text-xs text-ink overflow-x-auto">
@@ -4477,7 +4477,7 @@ export function AdminSettingsPanel({
                 {/* Open Chat Trigger */}
                 <div className="p-4 rounded-xl border border-line bg-surface space-y-2">
                   <div className="flex items-center justify-between">
-                    <span className="text-[13px] font-semibold text-ink">3. Open Live Chat Directly</span>
+                    <span className="text-ui font-semibold text-ink">3. Open Live Chat Directly</span>
                     <button
                       type="button"
                       onClick={() => {
@@ -4491,7 +4491,7 @@ export function AdminSettingsPanel({
                       <span>Copy</span>
                     </button>
                   </div>
-                  <p className="text-[12px] text-ink-3">
+                  <p className="text-xs text-ink-3">
                     Opens the widget straight into the live chat messenger screen.
                   </p>
                   <div className="rounded-lg bg-surface-2 p-3 font-mono text-xs text-ink overflow-x-auto">
@@ -4505,12 +4505,12 @@ export function AdminSettingsPanel({
             <div className="card p-6 space-y-4">
               <div className="flex items-center justify-between border-b border-line pb-3">
                 <div className="flex items-center gap-2">
-                  <span className="w-6 h-6 rounded-full bg-accent text-white flex items-center justify-center text-[12px] font-bold">
+                  <span className="w-6 h-6 rounded-full bg-accent text-white flex items-center justify-center text-xs font-bold">
                     3
                   </span>
                   <div>
-                    <h4 className="text-[14px] font-semibold text-ink">JavaScript SDK API (`window.Zentry`)</h4>
-                    <p className="text-[12px] text-ink-3">
+                    <h4 className="text-sm font-semibold text-ink">JavaScript SDK API (`window.Zentry`)</h4>
+                    <p className="text-xs text-ink-3">
                       Control the widget programmatically in your frontend framework (React, Vue, Angular, Next.js).
                     </p>
                   </div>
@@ -4530,7 +4530,7 @@ export function AdminSettingsPanel({
                 </button>
               </div>
 
-              <div className="rounded-xl border border-line bg-surface-2 p-4 font-mono text-[12px] text-ink overflow-x-auto leading-relaxed">
+              <div className="rounded-xl border border-line bg-surface-2 p-4 font-mono text-xs text-ink overflow-x-auto leading-relaxed">
                 <pre><code>{`// 1. Open Help Center Tab directly
 window.Zentry.openHelp();
 
@@ -4553,12 +4553,12 @@ window.Zentry.close();`}</code></pre>
             <div className="card p-6 space-y-4">
               <div className="flex items-center justify-between border-b border-line pb-3">
                 <div className="flex items-center gap-2">
-                  <span className="w-6 h-6 rounded-full bg-accent text-white flex items-center justify-center text-[12px] font-bold">
+                  <span className="w-6 h-6 rounded-full bg-accent text-white flex items-center justify-center text-xs font-bold">
                     4
                   </span>
                   <div>
-                    <h4 className="text-[14px] font-semibold text-ink">Next.js &amp; React Integration</h4>
-                    <p className="text-[12px] text-ink-3">
+                    <h4 className="text-sm font-semibold text-ink">Next.js &amp; React Integration</h4>
+                    <p className="text-xs text-ink-3">
                       Using Next.js App Router or Pages Router? Use the <code className="font-mono text-accent text-xs">next/script</code> component.
                     </p>
                   </div>
@@ -4583,7 +4583,7 @@ window.Zentry.close();`}</code></pre>
                 const host = getWidgetOrigin();
                 const nextSnippet = `import Script from 'next/script';\n\nexport default function RootLayout({ children }) {\n  return (\n    <html lang="en">\n      <body>\n        {children}\n        <Script\n          src="${host}/widget.js"\n          data-workspace-id="${workspace.id}"\n          strategy="afterInteractive"\n        />\n      </body>\n    </html>\n  );\n}`;
                 return (
-                  <div className="rounded-xl border border-line bg-surface-2 p-4 font-mono text-[12px] text-ink overflow-x-auto leading-relaxed">
+                  <div className="rounded-xl border border-line bg-surface-2 p-4 font-mono text-xs text-ink overflow-x-auto leading-relaxed">
                     <pre><code>{nextSnippet}</code></pre>
                   </div>
                 );

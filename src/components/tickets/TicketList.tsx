@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { ArrowDownUp, ChevronLeft, ChevronRight, GitMerge, Tag, UserPlus, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { EmptyState } from '@/components/ui/EmptyState';
 import { Avatar } from '@/components/ui/Avatar';
 import { Menu } from '@/components/ui/Menu';
 import {
@@ -58,7 +59,7 @@ export function TicketList(props: Props) {
       {props.canEdit && selected.size > 0 ? (
         <BulkBar {...props} />
       ) : (
-        <div className="h-11 px-4 flex items-center justify-between border-b border-line text-[12px] text-ink-3 shrink-0">
+        <div className="h-11 px-4 flex items-center justify-between border-b border-line text-xs text-ink-3 shrink-0">
           <span>
             {props.loading ? 'Loading…' : `${props.total} ticket${props.total === 1 ? '' : 's'}`}
           </span>
@@ -87,8 +88,8 @@ export function TicketList(props: Props) {
       )}
 
       <div className="flex-1 overflow-auto">
-        <table className="w-full text-[13px] border-separate border-spacing-0">
-          <thead className="sticky top-0 z-[1] bg-surface-2 text-[11px] uppercase tracking-wide text-ink-3">
+        <table className="w-full text-ui border-separate border-spacing-0">
+          <thead className="sticky top-0 z-[1] bg-surface-2 text-2xs uppercase tracking-wide text-ink-3">
             <tr>
               <th className="w-10 px-4 py-2 border-b border-line text-left">
                 {props.canEdit && (<input
@@ -113,8 +114,21 @@ export function TicketList(props: Props) {
               return (
                 <tr
                   key={t.id}
+                  tabIndex={0}
+                  aria-label={`Ticket #${t.number}: ${t.subject || 'no subject'}`}
                   onClick={() => props.onOpen(t.id)}
-                  className={cn('cursor-pointer group', isSelected ? 'bg-accent-soft/60' : 'hover:bg-surface-2')}
+                  onKeyDown={(e) => {
+                    if (e.target !== e.currentTarget) return;
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      props.onOpen(t.id);
+                    } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+                      e.preventDefault();
+                      const row = e.key === 'ArrowDown' ? e.currentTarget.nextElementSibling : e.currentTarget.previousElementSibling;
+                      (row as HTMLElement | null)?.focus();
+                    }
+                  }}
+                  className={cn('cursor-pointer group outline-offset-[-2px]', isSelected ? 'bg-accent-soft/60' : 'hover:bg-surface-2')}
                 >
                   <td className="px-4 py-2.5 border-b border-line" onClick={(e) => e.stopPropagation()}>
                     {props.canEdit && (
@@ -136,10 +150,10 @@ export function TicketList(props: Props) {
                     {(t.tags.length > 0 || t.matched_on) && (
                       <div className="flex items-center gap-1 mt-1 pl-6 min-w-0 overflow-hidden">
                         {t.matched_on && (
-                          <span className="text-[10.5px] text-accent font-medium shrink-0">matched {MATCH_LABEL[t.matched_on] ?? t.matched_on}</span>
+                          <span className="text-2xs text-accent font-medium shrink-0">matched {MATCH_LABEL[t.matched_on] ?? t.matched_on}</span>
                         )}
                         {t.tags.slice(0, 4).map((tag) => (
-                          <span key={tag} className="px-1.5 rounded bg-surface-3 text-[10.5px] text-ink-2 shrink-0">
+                          <span key={tag} className="px-1.5 rounded bg-surface-3 text-2xs text-ink-2 shrink-0">
                             {tag}
                           </span>
                         ))}
@@ -171,15 +185,42 @@ export function TicketList(props: Props) {
                 </tr>
               );
             })}
+            {props.loading &&
+              tickets.length === 0 &&
+              Array.from({ length: 6 }).map((_, i) => (
+                <tr key={`sk-${i}`} aria-hidden="true">
+                  <td className="px-4 py-3 border-b border-line">
+                    <div className="skeleton w-4 h-4" />
+                  </td>
+                  <td className="px-2 py-3 border-b border-line">
+                    <div className="skeleton h-3.5 w-3/4" />
+                  </td>
+                  <td className="px-2 py-3 border-b border-line hidden md:table-cell">
+                    <div className="skeleton h-3 w-24" />
+                  </td>
+                  <td className="px-2 py-3 border-b border-line">
+                    <div className="skeleton h-5 w-14 rounded-full" />
+                  </td>
+                  <td className="px-2 py-3 border-b border-line hidden lg:table-cell">
+                    <div className="skeleton h-3 w-16" />
+                  </td>
+                  <td className="px-2 py-3 border-b border-line hidden lg:table-cell">
+                    <div className="skeleton h-3 w-24" />
+                  </td>
+                  <td className="px-4 py-3 border-b border-line">
+                    <div className="skeleton h-3 w-12 ml-auto" />
+                  </td>
+                </tr>
+              ))}
           </tbody>
         </table>
         {!props.loading && tickets.length === 0 && (
-          <div className="py-16 text-center text-[13px] text-ink-3">{props.emptyText}</div>
+          <EmptyState type="custom" title={props.emptyText} description="Tickets appear here as customers start conversations, or create one with New." className="py-14" />
         )}
       </div>
 
       {pages > 1 && (
-        <div className="h-11 px-4 flex items-center justify-end gap-2 border-t border-line text-[12px] text-ink-3 shrink-0">
+        <div className="h-11 px-4 flex items-center justify-end gap-2 border-t border-line text-xs text-ink-3 shrink-0">
           <span>
             Page {props.page + 1} of {pages}
           </span>
@@ -226,7 +267,7 @@ function BulkBar({ selected, tickets, agents, onBulk, onMerge, onToggleAll }: Pr
 
   return (
     <div className="h-11 px-4 flex items-center gap-2 border-b border-accent-line bg-accent-soft shrink-0">
-      <span className="text-[12.5px] font-semibold text-accent mr-1">{selected.size} selected</span>
+      <span className="text-xs font-semibold text-accent mr-1">{selected.size} selected</span>
 
       <Menu<string>
         value=""
@@ -267,7 +308,7 @@ function BulkBar({ selected, tickets, agents, onBulk, onMerge, onToggleAll }: Pr
             onChange={(e) => setTag(e.target.value)}
             placeholder="tag"
             aria-label="Tag to add"
-            className={cn(inputClass, 'h-7 w-32 text-[12px]')}
+            className={cn(inputClass, 'h-7 w-32 text-xs')}
           />
           <button type="submit" className="btn btn-accent btn-xs" disabled={busy}>
             Add
@@ -348,22 +389,22 @@ function MergeDialog({
         </>
       }
     >
-      <p className="text-[13px] text-ink-2">
+      <p className="text-ui text-ink-2">
         The other tickets&apos; conversations move into the one you keep, an internal note is added to each, and they are
         closed. This cannot be undone.
       </p>
       {closed.length > 0 && (
-        <p className="text-[12.5px] text-danger">
+        <p className="text-xs text-danger">
           Closed tickets cannot be merged: {closed.map((t) => `#${t.number}`).join(', ')}. Deselect them first.
         </p>
       )}
       <fieldset className="space-y-1.5">
-        <legend className="text-[11.5px] font-semibold text-ink-2 mb-1.5">Keep this ticket</legend>
+        <legend className="text-xs font-semibold text-ink-2 mb-1.5">Keep this ticket</legend>
         {open.map((t) => (
           <label
             key={t.id}
             className={cn(
-              'flex items-center gap-2 p-2.5 rounded-lg border cursor-pointer text-[13px]',
+              'flex items-center gap-2 p-2.5 rounded-lg border cursor-pointer text-ui',
               target === t.id ? 'border-accent-line bg-accent-soft' : 'border-line hover:bg-surface-2'
             )}
           >

@@ -7,24 +7,27 @@
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
 /* ==========================================================================
-   ZEN-TRY DESIGN SYSTEM
-   Deep Ink + Electric Blue. Light-first, dark by token swap.
-   Every colour in the app resolves through these variables — never hardcode.
+   ZENTRY DESIGN SYSTEM — tokens
+   Flat, high-contrast, one accent (electric blue). Light-first; dark is a
+   token swap. Every colour in the app resolves through these variables, and
+   docs/DESIGN.md explains when to use which. Text/background pairs are held to
+   WCAG AA by src/lib/design/tokens.test.ts, which reads this file, so a
+   change that drops a pair below 4.5:1 fails the test suite.
    ========================================================================== */
 
 :root {
-  /* --- Surfaces (light) --- */
-  --ds-canvas: #fbfbf9;          /* page background — warm ivory */
+  /* --- Surfaces --- */
+  --ds-canvas: #fbfbf9;          /* page background */
   --ds-canvas-alt: #f4f4f1;      /* alternating section band */
   --ds-surface: #ffffff;         /* cards, panels, popovers */
-  --ds-surface-2: #f7f7f5;       /* nested / inset panels */
-  --ds-surface-3: #eeeeeb;       /* hover fill, track */
+  --ds-surface-2: #f7f7f5;       /* nested / inset panels, table headers */
+  --ds-surface-3: #eeeeeb;       /* hover fill, tracks */
   --ds-overlay: rgba(11, 11, 15, 0.44);
 
-  /* --- Ink (light) --- */
+  /* --- Ink (text) --- */
   --ds-ink: #0b0b0f;             /* primary text */
-  --ds-ink-2: #56575e;           /* secondary text */
-  --ds-ink-3: #8b8c93;           /* muted / meta */
+  --ds-ink-2: #4f5057;           /* secondary text */
+  --ds-ink-3: #64656c;           /* muted / meta — still AA on every surface */
   --ds-ink-inv: #ffffff;         /* text on ink surfaces */
 
   /* --- Lines --- */
@@ -32,44 +35,51 @@
   --ds-line-2: #d6d6d1;
   --ds-line-3: #bcbcb6;
 
-  /* --- Brand --- */
-  --ds-primary: #0b0b0f;         /* primary action = deep ink */
-  --ds-primary-hover: #23232b;
-  --ds-primary-ink: #ffffff;
-
-  --ds-accent: #2e5bff;          /* electric blue */
-  --ds-accent-hover: #1f47e0;
+  /* --- The one accent. Primary actions, links, focus, selection. --- */
+  --ds-accent: #2850e8;
+  --ds-accent-hover: #1f43cc;
   --ds-accent-ink: #ffffff;
   --ds-accent-soft: #edf1ff;     /* tinted background */
   --ds-accent-line: #c9d5ff;
 
-  /* Surfaces that stay dark in BOTH themes — the editorial auth panel, the
-     closing CTA band, code blocks. Distinct from --ds-ink, which is a text
-     colour and therefore flips to near-white in dark mode. */
-  --ds-invert: #0b0b0f;
-  --ds-invert-2: #1a1a20;        /* hairlines and chips on that surface */
-  --ds-invert-ink: #ffffff;
-  --ds-invert-ink-2: rgba(255, 255, 255, 0.62);
+  /* Primary buttons are the accent. Kept as separate names so a future
+     brand can split them without touching components. */
+  --ds-primary: var(--ds-accent);
+  --ds-primary-hover: var(--ds-accent-hover);
+  --ds-primary-ink: var(--ds-accent-ink);
 
-  /* Outgoing chat bubble: brand electric blue */
-  --ds-bubble-out: #2e5bff;
+  /* Surfaces that stay dark in BOTH themes — the editorial auth panel, the
+     closing CTA band, code blocks, tooltips. Distinct from --ds-ink, which is
+     a text colour and therefore flips to near-white in dark mode. */
+  --ds-invert: #0b0b0f;
+  --ds-invert-2: #1a1a20;
+  --ds-invert-ink: #ffffff;
+  --ds-invert-ink-2: rgba(255, 255, 255, 0.72);
+
+  /* Outgoing chat bubble */
+  --ds-bubble-out: #2850e8;
   --ds-bubble-out-ink: #ffffff;
 
-  /* --- Semantics --- */
-  --ds-success: #0f9d76;
+  /* --- Status. Text colours are dark enough to read on their own -soft fill. --- */
+  --ds-success: #0b7a5c;
   --ds-success-soft: #e6f6f1;
   --ds-success-line: #b8e5d7;
 
-  --ds-warn: #b8730a;
+  --ds-warn: #8f5a06;
   --ds-warn-soft: #fdf3e2;
   --ds-warn-line: #f0d9ac;
 
-  --ds-danger: #d92d4f;
+  --ds-danger: #c0233f;
   --ds-danger-soft: #fdedf0;
   --ds-danger-line: #f7c6d0;
 
-  --ds-info: #2e5bff;
+  --ds-info: #2850e8;
   --ds-info-soft: #edf1ff;
+
+  /* --- Glass: only the app sidebar, modals/popovers and the chat widget --- */
+  --ds-glass-bg: rgba(255, 255, 255, 0.94);
+  --ds-glass-border: rgba(11, 11, 15, 0.08);
+  --ds-glass-blur: 24px;
 
   /* --- Elevation: soft, layered, never muddy --- */
   --ds-shadow-xs: 0 1px 2px rgba(11, 11, 15, 0.05);
@@ -77,20 +87,32 @@
   --ds-shadow-md: 0 4px 12px rgba(11, 11, 15, 0.07), 0 2px 4px rgba(11, 11, 15, 0.04);
   --ds-shadow-lg: 0 12px 32px rgba(11, 11, 15, 0.09), 0 4px 10px rgba(11, 11, 15, 0.04);
   --ds-shadow-xl: 0 24px 64px rgba(11, 11, 15, 0.13), 0 8px 20px rgba(11, 11, 15, 0.06);
-  --ds-ring: 0 0 0 3px rgba(46, 91, 255, 0.18);
+  --ds-ring: 0 0 0 3px rgba(40, 80, 232, 0.22);
+  --ds-focus: #2850e8;           /* focus outline colour */
 
   /* --- Radii --- */
   --ds-r-xs: 6px;
   --ds-r-sm: 8px;
-  --ds-r-md: 12px;
-  --ds-r-lg: 16px;
-  --ds-r-xl: 22px;
-  --ds-r-2xl: 28px;
+  --ds-r-md: 10px;
+  --ds-r-lg: 14px;
+  --ds-r-xl: 18px;
+  --ds-r-2xl: 24px;
 
   /* --- Motion --- */
+  --ds-dur-fast: 120ms;          /* hovers, presses */
+  --ds-dur: 180ms;               /* menus, tabs, toasts */
+  --ds-dur-slow: 280ms;          /* modals, drawers, theme swap */
   --ds-ease: cubic-bezier(0.22, 0.61, 0.36, 1);
   --ds-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --ds-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  /* --- Layers --- */
+  --ds-z-sticky: 20;
+  --ds-z-sidebar: 30;
+  --ds-z-popover: 60;
+  --ds-z-modal: 70;
+  --ds-z-toast: 80;
+  --ds-z-tooltip: 90;
 
   color-scheme: light;
 }
@@ -106,17 +128,13 @@
   --ds-overlay: rgba(0, 0, 0, 0.66);
 
   --ds-ink: #f5f5f3;
-  --ds-ink-2: #a2a2aa;
-  --ds-ink-3: #6e6e78;
+  --ds-ink-2: #b4b4bc;
+  --ds-ink-3: #8b8b95;
   --ds-ink-inv: #0b0b0f;
 
   --ds-line: #232329;
   --ds-line-2: #2f2f37;
   --ds-line-3: #43434d;
-
-  --ds-primary: #f5f5f3;
-  --ds-primary-hover: #ffffff;
-  --ds-primary-ink: #0b0b0f;
 
   --ds-accent: #6084ff;
   --ds-accent-hover: #7a99ff;
@@ -124,11 +142,10 @@
   --ds-accent-soft: #141a30;
   --ds-accent-line: #2b3766;
 
-  /* Lifted just enough to separate from the canvas behind it. */
   --ds-invert: #131317;
   --ds-invert-2: #26262e;
   --ds-invert-ink: #f5f5f3;
-  --ds-invert-ink-2: rgba(245, 245, 243, 0.6);
+  --ds-invert-ink-2: rgba(245, 245, 243, 0.7);
 
   --ds-bubble-out: #2f4bd8;
   --ds-bubble-out-ink: #ffffff;
@@ -148,17 +165,22 @@
   --ds-info: #6084ff;
   --ds-info-soft: #141a30;
 
+  --ds-glass-bg: rgba(16, 16, 19, 0.92);
+  --ds-glass-border: rgba(255, 255, 255, 0.08);
+
   --ds-shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.5);
   --ds-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.55), 0 1px 2px rgba(0, 0, 0, 0.4);
   --ds-shadow-md: 0 4px 14px rgba(0, 0, 0, 0.55), 0 2px 5px rgba(0, 0, 0, 0.4);
   --ds-shadow-lg: 0 14px 38px rgba(0, 0, 0, 0.6), 0 5px 12px rgba(0, 0, 0, 0.45);
   --ds-shadow-xl: 0 28px 72px rgba(0, 0, 0, 0.7), 0 10px 24px rgba(0, 0, 0, 0.5);
-  --ds-ring: 0 0 0 3px rgba(96, 132, 255, 0.26);
+  --ds-ring: 0 0 0 3px rgba(96, 132, 255, 0.3);
+  --ds-focus: #7a99ff;
 
   color-scheme: dark;
 }
 
-/* --- Dark: system default (no explicit choice stored) --- */
+/* --- Dark: system default (no explicit choice stored). Must stay identical
+   to the block above; tokens.test.ts checks that. --- */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     --ds-canvas: #08080a;
@@ -169,17 +191,13 @@
     --ds-overlay: rgba(0, 0, 0, 0.66);
 
     --ds-ink: #f5f5f3;
-    --ds-ink-2: #a2a2aa;
-    --ds-ink-3: #6e6e78;
+    --ds-ink-2: #b4b4bc;
+    --ds-ink-3: #8b8b95;
     --ds-ink-inv: #0b0b0f;
 
     --ds-line: #232329;
     --ds-line-2: #2f2f37;
     --ds-line-3: #43434d;
-
-    --ds-primary: #f5f5f3;
-    --ds-primary-hover: #ffffff;
-    --ds-primary-ink: #0b0b0f;
 
     --ds-accent: #6084ff;
     --ds-accent-hover: #7a99ff;
@@ -190,7 +208,7 @@
     --ds-invert: #131317;
     --ds-invert-2: #26262e;
     --ds-invert-ink: #f5f5f3;
-    --ds-invert-ink-2: rgba(245, 245, 243, 0.6);
+    --ds-invert-ink-2: rgba(245, 245, 243, 0.7);
 
     --ds-bubble-out: #2f4bd8;
     --ds-bubble-out-ink: #ffffff;
@@ -210,12 +228,16 @@
     --ds-info: #6084ff;
     --ds-info-soft: #141a30;
 
+    --ds-glass-bg: rgba(16, 16, 19, 0.92);
+    --ds-glass-border: rgba(255, 255, 255, 0.08);
+
     --ds-shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.5);
     --ds-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.55), 0 1px 2px rgba(0, 0, 0, 0.4);
     --ds-shadow-md: 0 4px 14px rgba(0, 0, 0, 0.55), 0 2px 5px rgba(0, 0, 0, 0.4);
     --ds-shadow-lg: 0 14px 38px rgba(0, 0, 0, 0.6), 0 5px 12px rgba(0, 0, 0, 0.45);
     --ds-shadow-xl: 0 28px 72px rgba(0, 0, 0, 0.7), 0 10px 24px rgba(0, 0, 0, 0.5);
-    --ds-ring: 0 0 0 3px rgba(96, 132, 255, 0.26);
+    --ds-ring: 0 0 0 3px rgba(96, 132, 255, 0.3);
+    --ds-focus: #7a99ff;
 
     color-scheme: dark;
   }
@@ -286,6 +308,18 @@
   --shadow-lg: var(--ds-shadow-lg);
   --shadow-xl: var(--ds-shadow-xl);
 
+  /* Type scale. Tailwind's xs/sm/base/lg/xl… stay; 2xs, ui and md fill the
+     gaps a dense support UI needs. Never use text-[Npx]. */
+  --text-2xs: 0.6875rem;
+  --text-2xs--line-height: 1rem;
+  --text-ui: 0.8125rem;
+  --text-ui--line-height: 1.25rem;
+  --text-md: 0.9375rem;
+  --text-md--line-height: 1.5rem;
+
+  --ease-ds: var(--ds-ease);
+  --ease-ds-out: var(--ds-ease-out);
+
   --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system,
     "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo,
@@ -341,10 +375,20 @@
     color: var(--ds-accent-ink);
   }
 
+  /* An outline, not a box-shadow: shadow utilities on the element would
+     silently replace a shadow ring, and outlines survive forced-colours mode. */
   :focus-visible {
+    outline: 2px solid var(--ds-focus);
+    outline-offset: 2px;
+  }
+
+  /* Inputs show focus with their border + ring instead (see .input). */
+  input:focus-visible,
+  textarea:focus-visible,
+  select:focus-visible,
+  [contenteditable]:focus-visible {
     outline: none;
     box-shadow: var(--ds-ring);
-    border-radius: var(--ds-r-sm);
   }
 
   input,
@@ -419,9 +463,9 @@
     cursor: pointer;
     user-select: none;
     border: 1px solid transparent;
-    transition: background-color 0.16s var(--ds-ease),
-      border-color 0.16s var(--ds-ease), color 0.16s var(--ds-ease),
-      box-shadow 0.16s var(--ds-ease), transform 0.12s var(--ds-ease);
+    transition: background-color var(--ds-dur-fast) var(--ds-ease),
+      border-color var(--ds-dur-fast) var(--ds-ease), color var(--ds-dur-fast) var(--ds-ease),
+      box-shadow var(--ds-dur-fast) var(--ds-ease), transform var(--ds-dur-fast) var(--ds-ease);
   }
 
   .btn:active:not(:disabled) {
@@ -462,24 +506,17 @@
     border-radius: var(--ds-r-sm);
   }
 
-  .btn-primary {
+  /* Primary and accent are the same button: there is one accent colour.
+     .btn-accent stays as an alias so older markup keeps working. */
+  .btn-primary,
+  .btn-accent {
     background: var(--ds-primary);
     color: var(--ds-primary-ink);
-    box-shadow: var(--ds-shadow-sm);
+    box-shadow: var(--ds-shadow-xs);
   }
-  .btn-primary:hover:not(:disabled) {
-    background: var(--ds-primary-hover);
-    box-shadow: var(--ds-shadow-md);
-  }
-
-  .btn-accent {
-    background: var(--ds-accent);
-    color: var(--ds-accent-ink);
-    box-shadow: var(--ds-shadow-sm);
-  }
+  .btn-primary:hover:not(:disabled),
   .btn-accent:hover:not(:disabled) {
-    background: var(--ds-accent-hover);
-    box-shadow: var(--ds-shadow-md);
+    background: var(--ds-primary-hover);
   }
 
   .btn-secondary {
@@ -509,7 +546,7 @@
   }
   .btn-danger:hover:not(:disabled) {
     background: var(--ds-danger);
-    color: #fff;
+    color: var(--ds-surface);
     border-color: var(--ds-danger);
   }
 
@@ -518,7 +555,7 @@
     background: var(--ds-surface);
     border: 1px solid var(--ds-line);
     border-radius: var(--ds-r-lg);
-    box-shadow: var(--ds-shadow-sm);
+    box-shadow: var(--ds-shadow-xs);
   }
 
   .card-hover {
@@ -527,8 +564,7 @@
   }
   .card-hover:hover {
     border-color: var(--ds-line-3);
-    box-shadow: var(--ds-shadow-lg);
-    transform: translateY(-2px);
+    box-shadow: var(--ds-shadow-md);
   }
 
   .panel {
@@ -668,6 +704,144 @@
     overflow-x: auto;
   }
 
+  .textarea {
+    height: auto;
+    min-height: 5.5rem;
+    padding: 0.625rem 0.875rem;
+    line-height: 1.5;
+    resize: vertical;
+  }
+
+  .input[aria-invalid="true"] {
+    border-color: var(--ds-danger);
+  }
+
+  .pill-info {
+    background: var(--ds-info-soft);
+    color: var(--ds-info);
+    border-color: var(--ds-accent-line);
+  }
+
+  /* ---- Tables ---- */
+  .table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: 0.8125rem;
+  }
+  .table th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: var(--ds-surface-2);
+    color: var(--ds-ink-3);
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    text-align: left;
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid var(--ds-line);
+    white-space: nowrap;
+  }
+  .table td {
+    padding: 0.625rem 0.75rem;
+    border-bottom: 1px solid var(--ds-line);
+    color: var(--ds-ink);
+    vertical-align: middle;
+  }
+  .table tbody tr {
+    transition: background-color var(--ds-dur-fast) var(--ds-ease);
+  }
+  .table tbody tr:hover {
+    background: var(--ds-surface-2);
+  }
+  .table tbody tr[aria-selected="true"] {
+    background: var(--ds-accent-soft);
+  }
+
+  /* ---- Tabs ---- */
+  .tabs {
+    display: flex;
+    gap: 0.25rem;
+    border-bottom: 1px solid var(--ds-line);
+  }
+  .tab {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    height: 2.5rem;
+    padding: 0 0.75rem;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: var(--ds-ink-2);
+    border-radius: var(--ds-r-sm) var(--ds-r-sm) 0 0;
+    transition: color var(--ds-dur-fast) var(--ds-ease);
+  }
+  .tab:hover {
+    color: var(--ds-ink);
+  }
+  .tab[aria-selected="true"] {
+    color: var(--ds-ink);
+    font-weight: 600;
+  }
+  .tab[aria-selected="true"]::after {
+    content: "";
+    position: absolute;
+    left: 0.5rem;
+    right: 0.5rem;
+    bottom: -1px;
+    height: 2px;
+    border-radius: 2px;
+    background: var(--ds-accent);
+  }
+  .tabs-pill {
+    display: inline-flex;
+    gap: 0.125rem;
+    padding: 0.1875rem;
+    border-radius: var(--ds-r-md);
+    background: var(--ds-surface-3);
+  }
+  .tabs-pill .tab {
+    height: 1.875rem;
+    border-radius: var(--ds-r-sm);
+  }
+  .tabs-pill .tab[aria-selected="true"] {
+    background: var(--ds-surface);
+    box-shadow: var(--ds-shadow-xs);
+  }
+  .tabs-pill .tab[aria-selected="true"]::after {
+    display: none;
+  }
+
+  /* ---- Tooltip ---- */
+  .tooltip {
+    pointer-events: none;
+    max-width: 16rem;
+    padding: 0.3125rem 0.5rem;
+    border-radius: var(--ds-r-xs);
+    background: var(--ds-invert);
+    color: var(--ds-invert-ink);
+    font-size: 0.6875rem;
+    font-weight: 500;
+    line-height: 1.35;
+    box-shadow: var(--ds-shadow-md);
+    animation: ds-fade var(--ds-dur) var(--ds-ease) both;
+  }
+
+  /* ---- Popover / modal surfaces (glass allowed) ---- */
+  .popover {
+    background: var(--ds-glass-bg);
+    border: 1px solid var(--ds-glass-border);
+    border-radius: var(--ds-r-lg);
+    box-shadow: var(--ds-shadow-lg);
+    /* Prefixed first: Lightning CSS keeps only the last of the pair, and
+       Chromium ignores the -webkit- form. */
+    -webkit-backdrop-filter: saturate(160%) blur(var(--ds-glass-blur));
+    backdrop-filter: saturate(160%) blur(var(--ds-glass-blur));
+  }
+
   /* Fine hairline separator that reads as engraved rather than drawn */
   .hairline {
     height: 1px;
@@ -702,10 +876,25 @@
     padding-inline: 1.5rem;
   }
 
+  /* Subtle glass. Allowed on three things only: the app sidebar, modals and
+     popovers, and the customer chat widget. Everything else is flat. */
   .glass {
-    background: color-mix(in srgb, var(--ds-surface) 72%, transparent);
-    backdrop-filter: saturate(180%) blur(20px);
-    -webkit-backdrop-filter: saturate(180%) blur(20px);
+    background: var(--ds-glass-bg);
+    border-color: var(--ds-glass-border);
+    /* Prefixed first: Lightning CSS keeps only the last of the pair, and
+       Chromium ignores the -webkit- form. */
+    -webkit-backdrop-filter: saturate(160%) blur(var(--ds-glass-blur));
+    backdrop-filter: saturate(160%) blur(var(--ds-glass-blur));
+  }
+
+  /* Text that exists only for screen readers. */
+  .sr-only-focusable:not(:focus) {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
   }
 
   .text-gradient {
@@ -867,6 +1056,33 @@
     opacity: 0.35;
     transform: scale(1.08);
   }
+}
+
+@keyframes ds-slide-in-right {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: none;
+  }
+}
+
+@keyframes ds-slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.animate-drawer {
+  animation: ds-slide-in-right var(--ds-dur-slow) var(--ds-ease-out) both;
+}
+.animate-toast {
+  animation: ds-slide-up var(--ds-dur) var(--ds-ease-out) both;
 }
 
 .animate-rise {

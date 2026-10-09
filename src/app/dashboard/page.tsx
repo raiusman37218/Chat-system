@@ -16,6 +16,7 @@ import { HelpDeskDashboard } from '@/components/dashboard/HelpDeskDashboard';
 import { TicketsView } from '@/components/tickets/TicketsView';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { KeyboardShortcutsModal } from '@/components/ui/KeyboardShortcutsModal';
+import { DashboardCommandPalette } from '@/components/dashboard/DashboardCommandPalette';
 import { MobileInstallModal } from '@/components/pwa/MobileInstallModal';
 import { MobileInstallBanner } from '@/components/pwa/MobileInstallBanner';
 import { sound } from '@/lib/sound';
@@ -53,6 +54,9 @@ export default function DashboardPage() {
   const [articlesCount, setArticlesCount] = useState(0);
   const [sectionsCount, setSectionsCount] = useState(0);
   const [settingsInitialSection, setSettingsInitialSection] = useState<SectionId | undefined>(undefined);
+  const [settingsNonce, setSettingsNonce] = useState(0);
+  // What the command palette asked the tickets screen to show.
+  const [ticketsRequest, setTicketsRequest] = useState<{ viewId?: string; ticketId?: string; nonce: number } | null>(null);
 
   // Five destinations: the inbox, the visitor radar, reports, help desk,
   // and the Settings hub.
@@ -104,6 +108,7 @@ export default function DashboardPage() {
   }, []);
   const [messages, setMessages] = useState<Message[]>([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [conversationsError, setConversationsError] = useState<string | null>(null);
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -390,7 +395,13 @@ export default function DashboardPage() {
 
   const handleOpenSettingsSection = useCallback((section: SectionId) => {
     setSettingsInitialSection(section);
+    setSettingsNonce((n) => n + 1);
     setActiveView('settings');
+  }, []);
+
+  const handleOpenTickets = useCallback((target: { viewId?: string; ticketId?: string }) => {
+    setTicketsRequest({ ...target, nonce: Date.now() });
+    setActiveView('tickets');
   }, []);
 
   // 2. Fetch Messages for Active Conversation with Instant In-Memory Cache
@@ -481,8 +492,10 @@ export default function DashboardPage() {
         const { data: convData, error } = await query;
         if (error) {
           console.error('Failed to fetch conversations:', error);
+          setConversationsError(error.message || 'Conversations could not be loaded.');
           return;
         }
+        setConversationsError(null);
 
         const fetchedConvs = (convData as any[]) || [];
         if (fetchedConvs.length < PAGE_SIZE) {
@@ -1515,7 +1528,7 @@ export default function DashboardPage() {
             className="w-full h-full object-contain filter drop-shadow-sm"
           />
         </div>
-        <p className="text-[13px] font-medium text-ink-3">Loading workspace…</p>
+        <p className="text-ui font-medium text-ink-3">Loading workspace…</p>
       </div>
     );
   }
@@ -1529,25 +1542,25 @@ export default function DashboardPage() {
     <div className="flex flex-col h-[var(--app-vvh,100dvh)] w-screen overflow-hidden bg-canvas relative">
       {/* Super Admin Switch Banner */}
       {isViewingAsSuperAdmin && (
-        <div className="bg-gradient-to-r from-purple-700 via-indigo-700 to-purple-800 text-white px-6 py-2.5 text-xs font-semibold flex items-center justify-between shadow-md z-50 shrink-0">
+        <div className="bg-accent text-white px-6 py-2.5 text-xs font-semibold flex items-center justify-between shadow-md z-50 shrink-0">
           <div className="flex items-center gap-2.5">
-            <span className="flex h-2 w-2 rounded-full bg-amber-400 animate-ping" />
-            <ShieldAlert className="w-4 h-4 text-amber-300" />
+            <span className="flex h-2 w-2 rounded-full bg-warn animate-ping" />
+            <ShieldAlert className="w-4 h-4 text-warn" />
             <span>
               Viewing as super admin: <strong className="underline underline-offset-2">{currentWorkspace?.name}</strong>{' '}
-              <span className="opacity-80 font-mono text-[11px]">({currentWorkspace?.id})</span>
+              <span className="opacity-80 font-mono text-2xs">({currentWorkspace?.id})</span>
             </span>
           </div>
           <div className="flex items-center gap-2.5">
             <Link
               href="/admin"
-              className="px-3 py-1 rounded-lg bg-white/20 hover:bg-white/30 text-white text-[11.5px] font-bold transition-colors"
+              className="px-3 py-1 rounded-lg bg-white/20 hover:bg-white/30 text-white text-xs font-bold transition-colors"
             >
               Super Admin Area
             </Link>
             <button
               onClick={handleExitSuperAdminView}
-              className="px-3 py-1 rounded-lg bg-red-500/80 hover:bg-red-600 text-white text-[11.5px] font-bold flex items-center gap-1.5 transition-colors"
+              className="px-3 py-1 rounded-lg bg-danger/80 hover:bg-danger text-white text-xs font-bold flex items-center gap-1.5 transition-colors"
             >
               <LogOut className="w-3 h-3" />
               <span>Exit Super Admin View</span>
@@ -1593,6 +1606,14 @@ export default function DashboardPage() {
             <div className="px-3 pt-2.5 pb-0">
               <MobileInstallBanner onOpenModal={() => setShowMobileInstallModal(true)} />
             </div>
+            {conversationsError && (
+              <div role="alert" className="mx-3 mt-2 flex items-center gap-2 px-3 py-2 rounded-lg border border-danger-line bg-danger-soft text-xs text-danger">
+                <span className="flex-1">Couldn&apos;t refresh conversations: {conversationsError}</span>
+                <button type="button" className="btn btn-xs btn-secondary" onClick={() => refreshConversations()}>
+                  Retry
+                </button>
+              </div>
+            )}
             <ConversationList
               conversations={conversations}
               selectedConversationId={selectedConversationId}
@@ -1709,7 +1730,7 @@ export default function DashboardPage() {
                     </div>
                     <div>
                       <h3 className="text-sm font-bold text-ink">Ready for conversations</h3>
-                      <p className="text-[12px] text-ink-3">Live updates stream instantly as visitors arrive.</p>
+                      <p className="text-xs text-ink-3">Live updates stream instantly as visitors arrive.</p>
                     </div>
                   </div>
 
@@ -1728,7 +1749,7 @@ export default function DashboardPage() {
                     onClick={() => setActiveView('visitors')}
                     className="flex-1 min-w-[130px] btn btn-sm btn-secondary shadow-xs hover:border-line-2 gap-1.5"
                   >
-                    <Radio className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                    <Radio className="w-3.5 h-3.5 text-success shrink-0" />
                     <span className="truncate">Live Radar ({counts.liveVisitors})</span>
                   </button>
                   <button
@@ -1741,22 +1762,22 @@ export default function DashboardPage() {
                 </div>
 
                 {/* Keyboard Quick Guide */}
-                <div className="w-full pt-3 border-t border-line/60 grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px] text-ink-3 text-left">
+                <div className="w-full pt-3 border-t border-line/60 grid grid-cols-2 sm:grid-cols-4 gap-2 text-2xs text-ink-3 text-left">
                   <div className="flex items-center justify-between px-2 py-1 rounded-lg bg-surface-2">
-                    <span>Search Inbox</span>
-                    <span className="kbd text-[9.5px]">Ctrl K</span>
+                    <span>Search inbox</span>
+                    <span className="kbd text-2xs">/</span>
                   </div>
                   <div className="flex items-center justify-between px-2 py-1 rounded-lg bg-surface-2">
                     <span>Shortcuts</span>
-                    <span className="kbd text-[9.5px]">?</span>
+                    <span className="kbd text-2xs">?</span>
                   </div>
                   <div className="flex items-center justify-between px-2 py-1 rounded-lg bg-surface-2">
                     <span>Saved Replies</span>
-                    <span className="kbd text-[9.5px]">/</span>
+                    <span className="kbd text-2xs">/</span>
                   </div>
                   <div className="flex items-center justify-between px-2 py-1 rounded-lg bg-surface-2">
                     <span>Send Message</span>
-                    <span className="kbd text-[9.5px]">Ctrl ↵</span>
+                    <span className="kbd text-2xs">Ctrl ↵</span>
                   </div>
                 </div>
               </div>
@@ -1789,7 +1810,7 @@ export default function DashboardPage() {
 
       {activeView === 'tickets' && currentWorkspace && (
         <div className="flex-1 flex overflow-hidden w-full pb-14 md:pb-0">
-          <TicketsView workspaceId={currentWorkspace.id} />
+          <TicketsView workspaceId={currentWorkspace.id} request={ticketsRequest} />
         </div>
       )}
 
@@ -1825,6 +1846,7 @@ export default function DashboardPage() {
             hasVisitors={visitors.length > 0}
             latestVisitorUrl={visitors[0]?.current_url}
             initialSection={settingsInitialSection}
+            sectionNonce={settingsNonce}
             onWorkspaceUpdated={(ws) => setCurrentWorkspace(ws)}
           />
         </div>
@@ -1833,14 +1855,14 @@ export default function DashboardPage() {
       {/* 3. Mobile bottom navigation — mirrors the desktop rail exactly, so
           the app has one navigation model rather than two. */}
       {!selectedConversationId && (
-        <nav className="md:hidden fixed bottom-0 left-0 right-0 h-14 bg-surface border-t border-line flex items-center justify-around px-2 z-40 shadow-lg">
+        <nav aria-label="Main" className="md:hidden fixed bottom-0 left-0 right-0 h-14 bg-surface border-t border-line flex items-stretch px-1 z-40 pb-[env(safe-area-inset-bottom)]">
           {(
             [
               ['inbox', 'Inbox', Inbox, true],
               ['tickets', 'Tickets', Ticket, true],
               ['visitors', 'Visitors', Radio, true],
               ['reports', 'Reports', BarChart2, isAdmin],
-              ['helpdesk', 'Help Desk', BookOpen, true],
+              ['helpdesk', 'Help', BookOpen, true],
               ['settings', 'Settings', Settings, true],
             ] as [View, string, typeof Inbox, boolean][]
           )
@@ -1851,24 +1873,39 @@ export default function DashboardPage() {
                 onClick={() => setActiveView(view)}
                 aria-current={activeView === view ? 'page' : undefined}
                 className={cn(
-                  'flex flex-col items-center justify-center gap-0.5 px-3 py-1 rounded-lg text-[10px] font-medium transition-colors',
-                  activeView === view ? 'text-accent font-bold' : 'text-ink-3'
+                  'flex-1 min-w-0 flex flex-col items-center justify-center gap-0.5 rounded-lg text-2xs font-medium transition-colors',
+                  activeView === view ? 'text-accent font-semibold' : 'text-ink-3'
                 )}
               >
-                <Icon className="w-4 h-4" />
-                <span>{label}</span>
+                <Icon className="w-4 h-4" aria-hidden="true" />
+                <span className="max-w-full truncate">{label}</span>
               </button>
             ))}
 
           <button
             onClick={() => setShowMobileInstallModal(true)}
-            className="flex flex-col items-center justify-center gap-0.5 px-3 py-1 rounded-lg text-[10px] font-medium text-ink-3 hover:text-accent transition-colors"
+            className="flex-1 min-w-0 flex flex-col items-center justify-center gap-0.5 rounded-lg text-2xs font-medium text-ink-3 hover:text-accent transition-colors"
             title="Mobile App Shortcut"
           >
-            <Smartphone className="w-4 h-4 text-accent" />
+            <Smartphone className="w-4 h-4 text-accent" aria-hidden="true" />
             <span>App</span>
           </button>
         </nav>
+      )}
+
+      {currentWorkspace && (
+        <DashboardCommandPalette
+          workspaceId={currentWorkspace.id}
+          isAdmin={isAdmin}
+          onNavigate={(view) => {
+            setSelectedConversationId(null);
+            setActiveView(view);
+          }}
+          onOpenTicketView={(viewId) => handleOpenTickets({ viewId })}
+          onOpenTicket={(ticketId) => handleOpenTickets({ ticketId })}
+          onOpenSettings={handleOpenSettingsSection}
+          onShowShortcuts={() => setShowShortcutsModal(true)}
+        />
       )}
 
       {/* 4. Global Keyboard Shortcuts Cheatsheet Modal */}

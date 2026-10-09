@@ -26,10 +26,10 @@ export function ChannelBadge({
           title="WhatsApp Message"
           className={`inline-flex items-center gap-1.5 rounded-md font-semibold text-white bg-[#25D366] ${
             size === 'xs'
-              ? 'px-1.5 py-0.5 text-[10px]'
+              ? 'px-1.5 py-0.5 text-2xs'
               : size === 'md'
-              ? 'px-2.5 py-1 text-[12px]'
-              : 'px-2 py-0.5 text-[11px]'
+              ? 'px-2.5 py-1 text-xs'
+              : 'px-2 py-0.5 text-2xs'
           } ${className}`}
         >
           <Phone className={size === 'xs' ? 'w-2.5 h-2.5' : 'w-3 h-3'} />
@@ -43,10 +43,10 @@ export function ChannelBadge({
           title="Instagram Direct"
           className={`inline-flex items-center gap-1.5 rounded-md font-semibold text-white bg-gradient-to-tr from-[#FD1D1D] via-[#E1306C] to-[#833AB4] ${
             size === 'xs'
-              ? 'px-1.5 py-0.5 text-[10px]'
+              ? 'px-1.5 py-0.5 text-2xs'
               : size === 'md'
-              ? 'px-2.5 py-1 text-[12px]'
-              : 'px-2 py-0.5 text-[11px]'
+              ? 'px-2.5 py-1 text-xs'
+              : 'px-2 py-0.5 text-2xs'
           } ${className}`}
         >
           <svg className={size === 'xs' ? 'w-2.5 h-2.5' : 'w-3 h-3'} viewBox="0 0 24 24" fill="currentColor">
@@ -63,10 +63,10 @@ export function ChannelBadge({
           title="Facebook Messenger"
           className={`inline-flex items-center gap-1.5 rounded-md font-semibold text-white bg-[#0084FF] ${
             size === 'xs'
-              ? 'px-1.5 py-0.5 text-[10px]'
+              ? 'px-1.5 py-0.5 text-2xs'
               : size === 'md'
-              ? 'px-2.5 py-1 text-[12px]'
-              : 'px-2 py-0.5 text-[11px]'
+              ? 'px-2.5 py-1 text-xs'
+              : 'px-2 py-0.5 text-2xs'
           } ${className}`}
         >
           <svg className={size === 'xs' ? 'w-2.5 h-2.5' : 'w-3 h-3'} viewBox="0 0 24 24" fill="currentColor">
@@ -82,13 +82,13 @@ export function ChannelBadge({
           title="Threads Message"
           className={`inline-flex items-center gap-1.5 rounded-md font-semibold text-white bg-[#101010] border border-white/20 ${
             size === 'xs'
-              ? 'px-1.5 py-0.5 text-[10px]'
+              ? 'px-1.5 py-0.5 text-2xs'
               : size === 'md'
-              ? 'px-2.5 py-1 text-[12px]'
-              : 'px-2 py-0.5 text-[11px]'
+              ? 'px-2.5 py-1 text-xs'
+              : 'px-2 py-0.5 text-2xs'
           } ${className}`}
         >
-          <span className="font-bold text-[11px]">@</span>
+          <span className="font-bold text-2xs">@</span>
           {showLabel && <span>Threads</span>}
         </span>
       );
@@ -99,13 +99,13 @@ export function ChannelBadge({
           title="LinkedIn Message"
           className={`inline-flex items-center gap-1.5 rounded-md font-semibold text-white bg-[#0A66C2] ${
             size === 'xs'
-              ? 'px-1.5 py-0.5 text-[10px]'
+              ? 'px-1.5 py-0.5 text-2xs'
               : size === 'md'
-              ? 'px-2.5 py-1 text-[12px]'
-              : 'px-2 py-0.5 text-[11px]'
+              ? 'px-2.5 py-1 text-xs'
+              : 'px-2 py-0.5 text-2xs'
           } ${className}`}
         >
-          <span className="font-bold text-[10px] uppercase">in</span>
+          <span className="font-bold text-2xs uppercase">in</span>
           {showLabel && <span>LinkedIn</span>}
         </span>
       );
@@ -117,10 +117,10 @@ export function ChannelBadge({
           title="Website Live Chat"
           className={`inline-flex items-center gap-1.5 rounded-md font-semibold text-ink bg-surface-3 border border-line-2 ${
             size === 'xs'
-              ? 'px-1.5 py-0.5 text-[10px]'
+              ? 'px-1.5 py-0.5 text-2xs'
               : size === 'md'
-              ? 'px-2.5 py-1 text-[12px]'
-              : 'px-2 py-0.5 text-[11px]'
+              ? 'px-2.5 py-1 text-xs'
+              : 'px-2 py-0.5 text-2xs'
           } ${className}`}
         >
           <Globe className={size === 'xs' ? 'w-2.5 h-2.5 text-accent' : 'w-3 h-3 text-accent'} />

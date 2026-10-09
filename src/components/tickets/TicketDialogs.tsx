@@ -165,12 +165,12 @@ export function ViewEditor({
           </select>
         </Field>
       </div>
-      <label className="flex items-center gap-2 text-[13px] text-ink-2">
+      <label className="flex items-center gap-2 text-ui text-ink-2">
         <input type="checkbox" checked={shared} disabled={!canShare} onChange={(e) => setShared(e.target.checked)} />
         Share with everyone in the workspace
         {!canShare && <span className="text-ink-3">(admins only)</span>}
       </label>
-      {error && <p className="text-[12.5px] text-danger">{error}</p>}
+      {error && <p className="text-xs text-danger">{error}</p>}
     </Modal>
   );
 }
@@ -242,7 +242,7 @@ export function NewTicketDialog({
         </>
       }
     >
-      <p className="text-[12.5px] text-ink-3">
+      <p className="text-xs text-ink-3">
         For requests that arrive outside the chat, such as an email or a form. Chats become tickets on their own.
       </p>
       <div className="grid grid-cols-2 gap-3">
@@ -310,7 +310,7 @@ export function NewTicketDialog({
           </select>
         </Field>
       </div>
-      {error && <p className="text-[12.5px] text-danger">{error}</p>}
+      {error && <p className="text-xs text-danger">{error}</p>}
     </Modal>
   );
 }
@@ -340,11 +340,11 @@ export function GroupsDialog({
   };
   return (
     <Modal title="Groups" onClose={onClose}>
-      <p className="text-[12.5px] text-ink-3">Groups route tickets to a team, such as Billing or Technical support.</p>
+      <p className="text-xs text-ink-3">Groups route tickets to a team, such as Billing or Technical support.</p>
       <ul className="divide-y divide-line border border-line rounded-lg">
-        {groups.length === 0 && <li className="px-3 py-2.5 text-[12.5px] text-ink-3">No groups yet.</li>}
+        {groups.length === 0 && <li className="px-3 py-2.5 text-xs text-ink-3">No groups yet.</li>}
         {groups.map((g) => (
-          <li key={g.id} className="flex items-center justify-between px-3 py-2 text-[13px]">
+          <li key={g.id} className="flex items-center justify-between px-3 py-2 text-ui">
             {g.name}
             <button
               type="button"
@@ -374,7 +374,7 @@ export function GroupsDialog({
           Add
         </button>
       </form>
-      {error && <p className="text-[12.5px] text-danger">{error}</p>}
+      {error && <p className="text-xs text-danger">{error}</p>}
     </Modal>
   );
 }

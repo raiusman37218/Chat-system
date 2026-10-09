@@ -94,11 +94,11 @@ export function MobileAppSettingsCard() {
                 <h2 className="text-xl font-bold text-ink tracking-tight">
                   Mobile App &amp; Home Screen Shortcuts
                 </h2>
-                <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-accent text-accent-ink uppercase tracking-wider">
+                <span className="text-2xs font-bold px-2.5 py-0.5 rounded-full bg-accent text-accent-ink uppercase tracking-wider">
                   No Play Store Needed
                 </span>
                 {isStandalone && (
-                  <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
+                  <span className="text-2xs font-bold px-2.5 py-0.5 rounded-full bg-success/10 text-success border border-success/20">
                     ✓ Installed
                   </span>
                 )}
@@ -144,7 +144,7 @@ export function MobileAppSettingsCard() {
               : 'text-ink-3 hover:text-ink'
           )}
         >
-          <Smartphone className="w-3.5 h-3.5 text-emerald-500" />
+          <Smartphone className="w-3.5 h-3.5 text-success" />
           <span>Android (Chrome / Samsung)</span>
         </button>
 
@@ -157,7 +157,7 @@ export function MobileAppSettingsCard() {
               : 'text-ink-3 hover:text-ink'
           )}
         >
-          <Smartphone className="w-3.5 h-3.5 text-blue-500" />
+          <Smartphone className="w-3.5 h-3.5 text-accent" />
           <span>iPhone / iPad (Safari)</span>
         </button>
 
@@ -188,7 +188,7 @@ export function MobileAppSettingsCard() {
               </p>
             </div>
             {canInstall && (
-              <span className="text-xs font-bold text-emerald-500 bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/20">
+              <span className="text-xs font-bold text-success bg-success/10 px-3 py-1 rounded-full border border-success/20">
                 1-Click Ready
               </span>
             )}
@@ -302,7 +302,7 @@ export function MobileAppSettingsCard() {
                   className="w-40 h-40 object-contain rounded-lg"
                 />
               ) : (
-                <div className="w-40 h-40 flex items-center justify-center text-xs text-neutral-400">
+                <div className="w-40 h-40 flex items-center justify-center text-xs text-ink-3">
                   Generating QR...
                 </div>
               )}
@@ -327,7 +327,7 @@ export function MobileAppSettingsCard() {
                 >
                   {copied ? (
                     <>
-                      <Check className="w-3.5 h-3.5 text-emerald-500" />
+                      <Check className="w-3.5 h-3.5 text-success" />
                       <span>Copied Dashboard Link!</span>
                     </>
                   ) : (
@@ -351,9 +351,9 @@ export function MobileAppSettingsCard() {
 
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="p-4 rounded-2xl bg-surface-2/60 border border-line/60 space-y-1.5">
-            <Zap className="w-5 h-5 text-amber-500" />
+            <Zap className="w-5 h-5 text-warn" />
             <h4 className="text-xs font-bold text-ink">0 MB Storage Overhead</h4>
-            <p className="text-[11.5px] text-ink-3 leading-relaxed">
+            <p className="text-xs text-ink-3 leading-relaxed">
               Unlike 100MB+ Play Store apps that fill your storage, Zen-try PWA uses almost zero space.
             </p>
           </div>
@@ -361,23 +361,23 @@ export function MobileAppSettingsCard() {
           <div className="p-4 rounded-2xl bg-surface-2/60 border border-line/60 space-y-1.5">
             <BellRing className="w-5 h-5 text-accent" />
             <h4 className="text-xs font-bold text-ink">Instant Realtime Alerts</h4>
-            <p className="text-[11.5px] text-ink-3 leading-relaxed">
+            <p className="text-xs text-ink-3 leading-relaxed">
               Get notified immediately when visitors send a message or start browsing your site.
             </p>
           </div>
 
           <div className="p-4 rounded-2xl bg-surface-2/60 border border-line/60 space-y-1.5">
-            <ShieldCheck className="w-5 h-5 text-emerald-500" />
+            <ShieldCheck className="w-5 h-5 text-success" />
             <h4 className="text-xs font-bold text-ink">Always Up-To-Date</h4>
-            <p className="text-[11.5px] text-ink-3 leading-relaxed">
+            <p className="text-xs text-ink-3 leading-relaxed">
               No manual Play Store updates needed. You always have the latest features automatically.
             </p>
           </div>
 
           <div className="p-4 rounded-2xl bg-surface-2/60 border border-line/60 space-y-1.5">
-            <WifiOff className="w-5 h-5 text-purple-500" />
+            <WifiOff className="w-5 h-5 text-accent" />
             <h4 className="text-xs font-bold text-ink">Spotty Network Resilient</h4>
-            <p className="text-[11.5px] text-ink-3 leading-relaxed">
+            <p className="text-xs text-ink-3 leading-relaxed">
               Cached app shell and service worker ensure the app opens instantly even on slow connections.
             </p>
           </div>

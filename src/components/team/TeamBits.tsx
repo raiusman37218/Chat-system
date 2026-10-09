@@ -56,7 +56,7 @@ export function TeamSkeleton({ rows = 4 }: { rows?: number }) {
 
 export function ErrorPanel({ message, onRetry }: { message: string; onRetry?: () => void }) {
   return (
-    <div role="alert" className="flex items-start gap-3 p-4 rounded-xl border border-danger-line bg-danger-soft text-[13px] text-danger">
+    <div role="alert" className="flex items-start gap-3 p-4 rounded-xl border border-danger-line bg-danger-soft text-ui text-danger">
       <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
       <span className="flex-1">{message}</span>
       {onRetry && (
@@ -77,7 +77,7 @@ const DOT: Record<AgentStatus, string> = { online: 'bg-success', away: 'bg-warn'
 
 export function StatusDot({ status }: { status: AgentStatus }) {
   return (
-    <span className="inline-flex items-center gap-1.5 text-[12px] text-ink-2">
+    <span className="inline-flex items-center gap-1.5 text-xs text-ink-2">
       <span className={cn('w-2 h-2 rounded-full', DOT[status])} aria-hidden />
       {STATUS_LABELS[status]}
     </span>

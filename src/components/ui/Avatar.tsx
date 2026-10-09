@@ -28,10 +28,10 @@ export function avatarColors(seed: string) {
 }
 
 const SIZES = {
-  xs: 'w-6 h-6 text-[10px]',
-  sm: 'w-8 h-8 text-[12px]',
-  md: 'w-10 h-10 text-[14px]',
-  lg: 'w-14 h-14 text-[19px]',
+  xs: 'w-6 h-6 text-2xs',
+  sm: 'w-8 h-8 text-xs',
+  md: 'w-10 h-10 text-sm',
+  lg: 'w-14 h-14 text-xl',
 } as const;
 
 const DOT = {
@@ -85,7 +85,7 @@ export function Avatar({
         <span
           title="Active now"
           className={cn(
-            'absolute -bottom-0.5 -right-0.5 rounded-full ring-2 ring-surface bg-emerald-500 shadow-xs',
+            'absolute -bottom-0.5 -right-0.5 rounded-full ring-2 ring-surface bg-success shadow-xs',
             DOT[size]
           )}
         />

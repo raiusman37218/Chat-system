@@ -371,8 +371,8 @@ function PublicHelpCenterContent() {
     return (
       <div className="min-h-screen bg-canvas flex flex-col items-center justify-center p-6 text-center gap-3">
         <BookOpen className="w-10 h-10 text-ink-3" />
-        <h1 className="text-[20px] font-semibold text-ink">Help Center not found</h1>
-        <p className="text-[14px] text-ink-3 max-w-sm">
+        <h1 className="text-xl font-semibold text-ink">Help Center not found</h1>
+        <p className="text-sm text-ink-3 max-w-sm">
           This address doesn&apos;t match a published help centre.
         </p>
       </div>
@@ -394,10 +394,10 @@ function PublicHelpCenterContent() {
       <section className="bg-[#0b0b0f] px-4 sm:px-6 pt-10 pb-12 sm:pt-12 sm:pb-14">
         <div className="mx-auto max-w-3xl space-y-5">
           <div className="space-y-1.5">
-            <h1 className="text-[26px] sm:text-[32px] font-semibold tracking-tight text-white">
+            <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-white">
               {workspace.help_center_title ? `Welcome to ${workspace.help_center_title}` : 'How can we help?'}
             </h1>
-            <p className="text-[14px] text-white/50">
+            <p className="text-sm text-white/50">
               {totalPublished > 0
                 ? `${totalPublished} ${totalPublished === 1 ? 'article' : 'articles'} from the ${title} team`
                 : `Answers and resources from the ${title} team are on their way.`}
@@ -414,7 +414,7 @@ function PublicHelpCenterContent() {
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search for articles..."
                 aria-label="Search help articles"
-                className="w-full h-13 pl-11 pr-24 rounded-xl bg-white/[0.06] border border-white/12 text-[15px] text-white placeholder:text-white/35 outline-none transition-all focus:bg-white/[0.09] focus:border-white/25 [&::-webkit-search-cancel-button]:hidden"
+                className="w-full h-13 pl-11 pr-24 rounded-xl bg-white/[0.06] border border-white/12 text-md text-white placeholder:text-white/35 outline-none transition-all focus:bg-white/[0.09] focus:border-white/25 [&::-webkit-search-cancel-button]:hidden"
               />
               {query ? (
                 <button
@@ -426,7 +426,7 @@ function PublicHelpCenterContent() {
                   <X className="w-4 h-4" />
                 </button>
               ) : (
-                <kbd className="absolute right-4 top-1/2 -translate-y-1/2 hidden sm:block px-1.5 py-0.5 rounded border border-white/15 text-[11px] font-medium text-white/40">
+                <kbd className="absolute right-4 top-1/2 -translate-y-1/2 hidden sm:block px-1.5 py-0.5 rounded border border-white/15 text-2xs font-medium text-white/40">
                   /
                 </kbd>
               )}
@@ -452,10 +452,10 @@ function PublicHelpCenterContent() {
               <Sparkles className="w-8 h-8 stroke-[1.75]" />
             </div>
             <div className="space-y-2">
-              <h2 className="text-[24px] sm:text-[28px] font-bold text-ink tracking-tight">
+              <h2 className="text-2xl sm:text-3xl font-bold text-ink tracking-tight">
                 Help Center Coming Soon
               </h2>
-              <p className="text-[14.5px] text-ink-3 max-w-md mx-auto leading-relaxed">
+              <p className="text-sm text-ink-3 max-w-md mx-auto leading-relaxed">
                 We&apos;re currently preparing helpful guides, FAQs, and step-by-step tutorials for {title}. Check back shortly!
               </p>
             </div>
@@ -464,7 +464,7 @@ function PublicHelpCenterContent() {
               <button
                 type="button"
                 onClick={openChat}
-                className="h-10 px-5 rounded-xl bg-accent text-white font-semibold text-[13px] inline-flex items-center gap-2 hover:opacity-95 shadow-xs transition-all cursor-pointer"
+                className="h-10 px-5 rounded-xl bg-accent text-white font-semibold text-ui inline-flex items-center gap-2 hover:opacity-95 shadow-xs transition-all cursor-pointer"
               >
                 <MessageCircle className="w-4 h-4" />
                 <span>Chat with our team</span>
@@ -475,7 +475,7 @@ function PublicHelpCenterContent() {
                   href={workspace.website_url.startsWith('http') ? workspace.website_url : `https://${workspace.website_url}`}
                   target="_blank"
                   rel="noreferrer"
-                  className="h-10 px-5 rounded-xl border border-line bg-surface hover:bg-surface-2 text-ink font-semibold text-[13px] inline-flex items-center gap-2 transition-all"
+                  className="h-10 px-5 rounded-xl border border-line bg-surface hover:bg-surface-2 text-ink font-semibold text-ui inline-flex items-center gap-2 transition-all"
                 >
                   <Globe className="w-4 h-4 text-ink-3" />
                   <span>Visit website</span>
@@ -484,7 +484,7 @@ function PublicHelpCenterContent() {
             </div>
 
             <div className="pt-4">
-              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-surface-2 border border-line text-[11.5px] text-ink-3">
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-surface-2 border border-line text-xs text-ink-3">
                 <Clock className="w-3.5 h-3.5 text-accent" />
                 <span>Articles are being prepared and will go live automatically once published.</span>
               </div>
@@ -513,10 +513,10 @@ function PublicHelpCenterContent() {
             {popularArticles.length > 0 && (
               <section className="rounded-2xl border border-line bg-surface p-4 sm:p-5 shadow-2xs">
                 <div className="flex items-center justify-between mb-3 px-1">
-                  <header className="text-[16px] font-bold text-ink">
+                  <header className="text-base font-bold text-ink">
                     Most Viewed Articles
                   </header>
-                  <span className="text-[12px] text-ink-3">Popular</span>
+                  <span className="text-xs text-ink-3">Popular</span>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   {popularArticles.map((art) => (
@@ -530,7 +530,7 @@ function PublicHelpCenterContent() {
                       className="group flex items-center justify-between gap-3 p-3.5 rounded-xl border border-line/70 bg-surface-2/40 hover:bg-accent-soft/30 hover:border-accent/40 transition-all no-underline"
                     >
                       <div className="min-w-0 flex-1">
-                        <h4 className="text-[13.5px] font-medium text-ink group-hover:text-accent transition-colors truncate">
+                        <h4 className="text-ui font-medium text-ink group-hover:text-accent transition-colors truncate">
                           {art.title}
                         </h4>
                       </div>
@@ -554,16 +554,16 @@ function PublicHelpCenterContent() {
 
         {!query.trim() && (
           <section className="mt-14 rounded-2xl border border-line bg-surface p-8 sm:p-10 text-center shadow-2xs">
-            <h2 className="text-[22px] sm:text-[25px] font-bold text-ink tracking-tight">
+            <h2 className="text-2xl sm:text-2xl font-bold text-ink tracking-tight">
               More Questions?
             </h2>
-            <p className="mt-2 text-[14px] text-ink-3 max-w-md mx-auto leading-relaxed">
+            <p className="mt-2 text-sm text-ink-3 max-w-md mx-auto leading-relaxed">
               If you have any unanswered questions simply get in touch with us and we&apos;ll aim to reply promptly.
             </p>
             <button
               type="button"
               onClick={openChat}
-              className="mt-5 h-11 px-6 rounded-xl text-white text-[14px] font-semibold inline-flex items-center gap-2 shadow-sm transition-all hover:opacity-90 active:scale-[0.98] cursor-pointer"
+              className="mt-5 h-11 px-6 rounded-xl text-white text-sm font-semibold inline-flex items-center gap-2 shadow-sm transition-all hover:opacity-90 active:scale-[0.98] cursor-pointer"
               style={{ backgroundColor: brand }}
             >
               <MessageCircle className="w-4 h-4" />
@@ -651,7 +651,7 @@ function CollectionIcon({
           className={`object-contain ${imgClassName}`}
         />
       ) : (
-        <span className="text-[20px] leading-none">
+        <span className="text-xl leading-none">
           {icon?.trim() || '📚'}
         </span>
       )}
@@ -678,8 +678,8 @@ function CollectionGrid({
     return (
       <div className="rounded-2xl border border-dashed border-line bg-surface-2/40 p-14 text-center space-y-2">
         <BookOpen className="w-9 h-9 text-ink-3 mx-auto stroke-[1.5]" />
-        <h2 className="text-[16px] font-semibold text-ink">Nothing published yet</h2>
-        <p className="text-[13px] text-ink-3">
+        <h2 className="text-base font-semibold text-ink">Nothing published yet</h2>
+        <p className="text-ui text-ink-3">
           Articles will appear here as soon as they go live.
         </p>
       </div>
@@ -691,10 +691,10 @@ function CollectionGrid({
       {/* Top Controls: Collections Header + Intercom-style Layout Variation Switcher */}
       <div className="flex items-center justify-between gap-3 pb-1">
         <div className="flex items-center gap-2">
-          <h2 className="text-[13px] font-bold text-ink uppercase tracking-wider">
+          <h2 className="text-ui font-bold text-ink uppercase tracking-wider">
             Collections
           </h2>
-          <span className="text-[11.5px] px-2 py-0.5 rounded-full bg-surface-2 border border-line text-ink-3 font-medium">
+          <span className="text-xs px-2 py-0.5 rounded-full bg-surface-2 border border-line text-ink-3 font-medium">
             {collections.length}
           </span>
         </div>
@@ -767,25 +767,25 @@ function CollectionGrid({
               >
                 <CollectionIcon
                   icon={c.icon}
-                  className="w-12 h-12 rounded-xl text-[22px]"
+                  className="w-12 h-12 rounded-xl text-2xl"
                   imgClassName="w-7 h-7"
                 />
 
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
-                    <span className="font-mono text-[11px] font-bold px-1.5 py-0.5 rounded-md bg-surface-2 border border-line text-ink-3 shrink-0">
+                    <span className="font-mono text-2xs font-bold px-1.5 py-0.5 rounded-md bg-surface-2 border border-line text-ink-3 shrink-0">
                       #{c.formattedNumber}
                     </span>
-                    <h3 className="text-[16.5px] font-semibold text-ink group-hover:text-accent transition-colors truncate">
+                    <h3 className="text-base font-semibold text-ink group-hover:text-accent transition-colors truncate">
                       {c.name}
                     </h3>
                   </div>
                   {c.description && (
-                    <p className="mt-1 text-[13.5px] text-ink-2 leading-relaxed line-clamp-1">
+                    <p className="mt-1 text-ui text-ink-2 leading-relaxed line-clamp-1">
                       {c.description}
                     </p>
                   )}
-                  <p className="mt-1 text-[12px] text-ink-3">
+                  <p className="mt-1 text-xs text-ink-3">
                     {c.articles.length} {c.articles.length === 1 ? 'article' : 'articles'}
                   </p>
                 </div>
@@ -803,7 +803,7 @@ function CollectionGrid({
                           e.preventDefault();
                           onSelect(a);
                         }}
-                        className="flex items-center gap-3 px-5 sm:px-6 py-2.5 text-[13.5px] text-ink-2 hover:text-ink hover:bg-surface-2/60 transition-colors"
+                        className="flex items-center gap-3 px-5 sm:px-6 py-2.5 text-ui text-ink-2 hover:text-ink hover:bg-surface-2/60 transition-colors"
                       >
                         <FileText className="w-3.5 h-3.5 text-ink-3 shrink-0" />
                         <span className="truncate">{a.title}</span>
@@ -815,7 +815,7 @@ function CollectionGrid({
                       <button
                         type="button"
                         onClick={() => onOpen(c.slug)}
-                        className="w-full text-left px-5 sm:px-6 py-2.5 text-[13px] font-medium text-accent hover:underline hover:bg-surface-2/60 transition-colors"
+                        className="w-full text-left px-5 sm:px-6 py-2.5 text-ui font-medium text-accent hover:underline hover:bg-surface-2/60 transition-colors"
                       >
                         Show all {c.articles.length} articles →
                       </button>
@@ -843,28 +843,28 @@ function CollectionGrid({
               >
                 <CollectionIcon
                   icon={c.icon}
-                  className="w-12 h-12 rounded-2xl text-[24px]"
+                  className="w-12 h-12 rounded-2xl text-2xl"
                   imgClassName="w-7 h-7"
                 />
 
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2 min-w-0">
-                      <span className="font-mono text-[11px] font-bold px-1.5 py-0.5 rounded-md bg-surface-2 border border-line text-ink-3 shrink-0">
+                      <span className="font-mono text-2xs font-bold px-1.5 py-0.5 rounded-md bg-surface-2 border border-line text-ink-3 shrink-0">
                         #{c.formattedNumber}
                       </span>
-                      <h3 className="text-[17px] font-bold text-ink group-hover:text-accent transition-colors truncate">
+                      <h3 className="text-lg font-bold text-ink group-hover:text-accent transition-colors truncate">
                         {c.name}
                       </h3>
                     </div>
                     <ChevronRight className="w-4 h-4 text-ink-3 shrink-0 transition-transform group-hover:translate-x-0.5" />
                   </div>
                   {c.description && (
-                    <p className="mt-1 text-[13.5px] text-ink-2 leading-relaxed line-clamp-2">
+                    <p className="mt-1 text-ui text-ink-2 leading-relaxed line-clamp-2">
                       {c.description}
                     </p>
                   )}
-                  <span className="inline-block mt-2 text-[11.5px] font-medium px-2 py-0.5 rounded-md bg-surface-2 border border-line text-ink-3">
+                  <span className="inline-block mt-2 text-xs font-medium px-2 py-0.5 rounded-md bg-surface-2 border border-line text-ink-3">
                     {c.articles.length} {c.articles.length === 1 ? 'article' : 'articles'}
                   </span>
                 </div>
@@ -880,7 +880,7 @@ function CollectionGrid({
                           e.preventDefault();
                           onSelect(a);
                         }}
-                        className="flex items-center gap-2.5 px-6 py-2.5 text-[13.5px] text-ink-2 hover:text-ink hover:bg-surface-2/60 transition-colors"
+                        className="flex items-center gap-2.5 px-6 py-2.5 text-ui text-ink-2 hover:text-ink hover:bg-surface-2/60 transition-colors"
                       >
                         <FileText className="w-3.5 h-3.5 text-ink-3 shrink-0" />
                         <span className="truncate">{a.title}</span>
@@ -892,7 +892,7 @@ function CollectionGrid({
                       <button
                         type="button"
                         onClick={() => onOpen(c.slug)}
-                        className="w-full text-left px-6 py-2 text-[12.5px] font-medium text-accent hover:underline transition-colors"
+                        className="w-full text-left px-6 py-2 text-xs font-medium text-accent hover:underline transition-colors"
                       >
                         Show all {c.articles.length} articles →
                       </button>
@@ -921,11 +921,11 @@ function CollectionGrid({
                 <div className="flex items-center justify-between w-full">
                   <CollectionIcon
                     icon={c.icon}
-                    className="w-11 h-11 rounded-xl text-[20px]"
+                    className="w-11 h-11 rounded-xl text-xl"
                     imgClassName="w-6 h-6"
                   />
                   <div className="flex items-center gap-1.5">
-                    <span className="font-mono text-[11px] font-bold px-1.5 py-0.5 rounded-md bg-surface-2 border border-line text-ink-3">
+                    <span className="font-mono text-2xs font-bold px-1.5 py-0.5 rounded-md bg-surface-2 border border-line text-ink-3">
                       #{c.formattedNumber}
                     </span>
                     <ChevronRight className="w-4 h-4 text-ink-3 transition-transform group-hover:translate-x-0.5" />
@@ -933,15 +933,15 @@ function CollectionGrid({
                 </div>
 
                 <div>
-                  <h3 className="text-[16px] font-bold text-ink group-hover:text-accent transition-colors truncate">
+                  <h3 className="text-base font-bold text-ink group-hover:text-accent transition-colors truncate">
                     {c.name}
                   </h3>
                   {c.description && (
-                    <p className="mt-1 text-[13px] text-ink-2 leading-relaxed line-clamp-2">
+                    <p className="mt-1 text-ui text-ink-2 leading-relaxed line-clamp-2">
                       {c.description}
                     </p>
                   )}
-                  <p className="mt-2 text-[11.5px] text-ink-3 font-medium">
+                  <p className="mt-2 text-xs text-ink-3 font-medium">
                     {c.articles.length} {c.articles.length === 1 ? 'article' : 'articles'}
                   </p>
                 </div>
@@ -957,7 +957,7 @@ function CollectionGrid({
                           e.preventDefault();
                           onSelect(a);
                         }}
-                        className="flex items-center gap-2 px-5 py-2 text-[12.5px] text-ink-2 hover:text-ink hover:bg-surface-2/60 transition-colors"
+                        className="flex items-center gap-2 px-5 py-2 text-xs text-ink-2 hover:text-ink hover:bg-surface-2/60 transition-colors"
                       >
                         <FileText className="w-3 h-3 text-ink-3 shrink-0" />
                         <span className="truncate">{a.title}</span>
@@ -969,7 +969,7 @@ function CollectionGrid({
                       <button
                         type="button"
                         onClick={() => onOpen(c.slug)}
-                        className="w-full text-left px-5 py-1.5 text-[12px] font-medium text-accent hover:underline transition-colors"
+                        className="w-full text-left px-5 py-1.5 text-xs font-medium text-accent hover:underline transition-colors"
                       >
                         +{c.articles.length - 2} more →
                       </button>
@@ -995,28 +995,28 @@ function CollectionGrid({
                 <div className="flex items-center justify-between mb-3">
                   <CollectionIcon
                     icon={c.icon}
-                    className="w-10 h-10 rounded-lg text-[18px]"
+                    className="w-10 h-10 rounded-lg text-lg"
                     imgClassName="w-5 h-5"
                   />
                   <div className="flex items-center gap-1.5">
-                    <span className="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-surface-2 border border-line text-ink-3">
+                    <span className="font-mono text-2xs font-bold px-1.5 py-0.5 rounded-md bg-surface-2 border border-line text-ink-3">
                       #{c.formattedNumber}
                     </span>
                     <ChevronRight className="w-4 h-4 text-ink-3 transition-transform group-hover:translate-x-0.5" />
                   </div>
                 </div>
 
-                <h3 className="text-[15px] font-bold text-ink group-hover:text-accent transition-colors line-clamp-1">
+                <h3 className="text-md font-bold text-ink group-hover:text-accent transition-colors line-clamp-1">
                   {c.name}
                 </h3>
                 {c.description && (
-                  <p className="mt-1 text-[12px] text-ink-3 leading-snug line-clamp-2">
+                  <p className="mt-1 text-xs text-ink-3 leading-snug line-clamp-2">
                     {c.description}
                   </p>
                 )}
               </div>
 
-              <div className="mt-3 pt-2.5 border-t border-line/60 flex items-center justify-between text-[11.5px] font-medium text-ink-3">
+              <div className="mt-3 pt-2.5 border-t border-line/60 flex items-center justify-between text-xs font-medium text-ink-3">
                 <span>{c.articles.length} {c.articles.length === 1 ? 'article' : 'articles'}</span>
                 <span className="text-accent opacity-0 group-hover:opacity-100 transition-opacity">View →</span>
               </div>
@@ -1042,7 +1042,7 @@ function CollectionView({
   return (
     <div className="space-y-6 animate-in fade-in">
       {/* Breadcrumbs Navigation */}
-      <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-[13px] text-ink-3">
+      <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-ui text-ink-3">
         <button
           type="button"
           onClick={onBack}
@@ -1059,23 +1059,23 @@ function CollectionView({
       <div className="rounded-2xl border border-line bg-surface p-6 sm:p-7 flex flex-col sm:flex-row items-start sm:items-center gap-5 shadow-2xs">
         <CollectionIcon
           icon={collection.icon}
-          className="w-16 h-16 rounded-2xl text-[32px] shrink-0"
+          className="w-16 h-16 rounded-2xl text-3xl shrink-0"
           imgClassName="w-9 h-9"
         />
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 mb-1">
-            <span className="font-mono text-[11px] font-bold px-1.5 py-0.5 rounded-md bg-surface-2 border border-line text-ink-3">
+            <span className="font-mono text-2xs font-bold px-1.5 py-0.5 rounded-md bg-surface-2 border border-line text-ink-3">
               #{collection.formattedNumber}
             </span>
-            <span className="text-[12px] font-medium text-ink-3">
+            <span className="text-xs font-medium text-ink-3">
               {collection.articles.length} {collection.articles.length === 1 ? 'article' : 'articles'}
             </span>
           </div>
-          <h1 className="text-[22px] sm:text-[26px] font-bold text-ink tracking-tight">
+          <h1 className="text-2xl sm:text-2xl font-bold text-ink tracking-tight">
             {collection.name}
           </h1>
           {collection.description && (
-            <p className="mt-1.5 text-[14px] text-ink-2 leading-relaxed max-w-2xl">
+            <p className="mt-1.5 text-sm text-ink-2 leading-relaxed max-w-2xl">
               {collection.description}
             </p>
           )}
@@ -1095,15 +1095,15 @@ function CollectionView({
               className="group flex items-center justify-between gap-4 p-4 sm:p-5 hover:bg-accent-soft/20 transition-all"
             >
               <div className="min-w-0 flex-1">
-                <h3 className="text-[15px] sm:text-[16px] font-semibold text-ink group-hover:text-accent transition-colors">
+                <h3 className="text-md sm:text-base font-semibold text-ink group-hover:text-accent transition-colors">
                   {a.title}
                 </h3>
                 {a.summary && (
-                  <p className="mt-1 text-[13px] text-ink-3 line-clamp-2 leading-relaxed">
+                  <p className="mt-1 text-ui text-ink-3 line-clamp-2 leading-relaxed">
                     {a.summary}
                   </p>
                 )}
-                <div className="mt-2 flex items-center gap-3 text-[11.5px] text-ink-3">
+                <div className="mt-2 flex items-center gap-3 text-xs text-ink-3">
                   <span className="inline-flex items-center gap-1">
                     <Calendar className="w-3 h-3 opacity-70" />
                     Updated {formatDate(a.updated_at || a.created_at)}
@@ -1116,7 +1116,7 @@ function CollectionView({
         ))}
 
         {collection.articles.length === 0 && (
-          <li className="p-12 text-center text-ink-3 text-[13.5px]">
+          <li className="p-12 text-center text-ink-3 text-ui">
             No published articles in this collection yet.
           </li>
         )}
@@ -1148,16 +1148,16 @@ function SearchResults({
     return (
       <div className="rounded-2xl border border-dashed border-line bg-surface-2/40 p-12 text-center space-y-2">
         <Search className="w-8 h-8 text-ink-3 mx-auto stroke-[1.5]" />
-        <h2 className="text-[15.5px] font-semibold text-ink">
+        <h2 className="text-md font-semibold text-ink">
           No results for “{query}”
         </h2>
-        <p className="text-[13px] text-ink-3 max-w-sm mx-auto">
+        <p className="text-ui text-ink-3 max-w-sm mx-auto">
           Try a shorter or different word — or ask us directly.
         </p>
         <button
           type="button"
           onClick={onAskSupport}
-          className="mt-2 h-9 px-4 rounded-xl border border-line bg-surface text-[13px] font-medium text-ink inline-flex items-center gap-2 hover:bg-surface-2 transition-colors"
+          className="mt-2 h-9 px-4 rounded-xl border border-line bg-surface text-ui font-medium text-ink inline-flex items-center gap-2 hover:bg-surface-2 transition-colors"
         >
           <MessageCircle className="w-4 h-4" />
           Ask support
@@ -1169,11 +1169,11 @@ function SearchResults({
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <p className="text-[13px] text-ink-3">
+        <p className="text-ui text-ink-3">
           {results.length} {results.length === 1 ? 'result' : 'results'} for{' '}
           <span className="font-medium text-ink-2">“{query}”</span>
         </p>
-        <p className="hidden sm:flex items-center gap-1.5 text-[11.5px] text-ink-3">
+        <p className="hidden sm:flex items-center gap-1.5 text-xs text-ink-3">
           <CornerDownLeft className="w-3 h-3" /> to open
         </p>
       </div>
@@ -1194,11 +1194,11 @@ function SearchResults({
             >
               <FileText className="w-4 h-4 text-ink-3 shrink-0 mt-0.5" />
               <div className="min-w-0 flex-1">
-                <h3 className="text-[14.5px] font-medium text-ink">
+                <h3 className="text-sm font-medium text-ink">
                   <Highlight text={a.title} query={query} />
                 </h3>
                 {a.summary && (
-                  <p className="mt-0.5 text-[13px] text-ink-3 line-clamp-2">
+                  <p className="mt-0.5 text-ui text-ink-3 line-clamp-2">
                     <Highlight text={a.summary} query={query} />
                   </p>
                 )}

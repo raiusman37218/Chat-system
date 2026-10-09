@@ -316,14 +316,14 @@ export default function ArticleDetailPage() {
     return (
       <div className="min-h-screen bg-canvas flex flex-col items-center justify-center p-6 text-center gap-3">
         <BookOpen className="w-10 h-10 text-ink-3" />
-        <h1 className="text-[20px] font-semibold text-ink">Article not found</h1>
-        <p className="text-[14px] text-ink-3 max-w-sm">
+        <h1 className="text-xl font-semibold text-ink">Article not found</h1>
+        <p className="text-sm text-ink-3 max-w-sm">
           It may have been moved, unpublished, or the link is out of date.
         </p>
         <button
           type="button"
           onClick={goHome}
-          className="mt-1 h-9 px-4 rounded-lg border border-line bg-surface text-[13px] font-medium text-ink hover:bg-surface-2 transition-colors"
+          className="mt-1 h-9 px-4 rounded-lg border border-line bg-surface text-ui font-medium text-ink hover:bg-surface-2 transition-colors"
         >
           Back to Help Center
         </button>
@@ -360,12 +360,12 @@ export default function ArticleDetailPage() {
             <button
               type="button"
               onClick={handleShare}
-              className="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-lg text-[13px] font-medium text-white/70 hover:text-white hover:bg-white/5 transition-colors cursor-pointer"
+              className="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-lg text-ui font-medium text-white/70 hover:text-white hover:bg-white/5 transition-colors cursor-pointer"
             >
               {copied ? (
                 <>
-                  <Check className="w-3.5 h-3.5 text-emerald-400" />
-                  <span className="hidden sm:inline text-emerald-400">Copied</span>
+                  <Check className="w-3.5 h-3.5 text-success" />
+                  <span className="hidden sm:inline text-success">Copied</span>
                 </>
               ) : (
                 <>
@@ -377,7 +377,7 @@ export default function ArticleDetailPage() {
             <button
               type="button"
               onClick={openChat}
-              className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg text-white text-[13px] font-semibold transition-opacity hover:opacity-90 cursor-pointer"
+              className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg text-white text-ui font-semibold transition-opacity hover:opacity-90 cursor-pointer"
               style={{ backgroundColor: brand }}
             >
               <MessageCircle className="w-3.5 h-3.5" />
@@ -407,7 +407,7 @@ export default function ArticleDetailPage() {
         >
           <nav
             aria-label="Breadcrumb"
-            className="flex items-center gap-1.5 text-[12.5px] text-ink-3 flex-wrap"
+            className="flex items-center gap-1.5 text-xs text-ink-3 flex-wrap"
           >
             <button
               type="button"
@@ -425,7 +425,7 @@ export default function ArticleDetailPage() {
                   className="hover:text-ink transition-colors cursor-pointer inline-flex items-center gap-1.5 font-medium"
                 >
                   {article.section.order_index ? (
-                    <span className="font-mono text-[10.5px] font-bold px-1.5 py-0.2 rounded bg-surface-2 border border-line text-ink-3">
+                    <span className="font-mono text-2xs font-bold px-1.5 py-0.2 rounded bg-surface-2 border border-line text-ink-3">
                       #{String(article.section.order_index).padStart(2, '0')}
                     </span>
                   ) : null}
@@ -438,17 +438,17 @@ export default function ArticleDetailPage() {
           </nav>
 
           <header className="mt-4 pb-6 border-b border-line space-y-3">
-            <h1 className="text-[27px] sm:text-[34px] font-semibold text-ink tracking-tight leading-[1.15]">
+            <h1 className="text-3xl sm:text-4xl font-semibold text-ink tracking-tight leading-[1.15]">
               {article.title}
             </h1>
 
             {article.summary && (
-              <p className="text-[15.5px] text-ink-2 leading-relaxed">
+              <p className="text-md text-ink-2 leading-relaxed">
                 {article.summary}
               </p>
             )}
 
-            <div className="flex items-center gap-x-4 gap-y-1.5 pt-1 text-[12.5px] text-ink-3 flex-wrap">
+            <div className="flex items-center gap-x-4 gap-y-1.5 pt-1 text-xs text-ink-3 flex-wrap">
               <span className="flex items-center gap-2 min-w-0">
                 {article.author ? (
                   <>
@@ -456,7 +456,7 @@ export default function ArticleDetailPage() {
                       name={article.author.name}
                       seed={article.author.id}
                       size="sm"
-                      className="w-5 h-5 shrink-0 text-[9px]"
+                      className="w-5 h-5 shrink-0 text-2xs"
                     />
                     <span className="text-ink-2">{article.author.name}</span>
                   </>
@@ -465,7 +465,7 @@ export default function ArticleDetailPage() {
                     {/* shrink-0: without it the flex row squeezes the badge
                         under the name and the two render on top of each other. */}
                     <span
-                      className="w-5 h-5 shrink-0 rounded-full grid place-items-center text-white text-[9px] font-bold"
+                      className="w-5 h-5 shrink-0 rounded-full grid place-items-center text-white text-2xs font-bold"
                       style={{ backgroundColor: brand }}
                     >
                       {workspace.name.slice(0, 1).toUpperCase()}
@@ -490,7 +490,7 @@ export default function ArticleDetailPage() {
           {/* Outline on narrow screens, where the sidebar is hidden. */}
           {headings.length > 2 && (
             <details className="lg:hidden mt-6 rounded-xl border border-line bg-surface-2/50 overflow-hidden">
-              <summary className="px-4 py-3 text-[13px] font-medium text-ink cursor-pointer flex items-center gap-2 select-none">
+              <summary className="px-4 py-3 text-ui font-medium text-ink cursor-pointer flex items-center gap-2 select-none">
                 <List className="w-3.5 h-3.5 text-ink-3" />
                 On this page
               </summary>
@@ -499,7 +499,7 @@ export default function ArticleDetailPage() {
                   <li key={h.id} className={h.level === 2 ? 'pl-3' : ''}>
                     <a
                       href={`#${h.id}`}
-                      className="text-[13px] text-ink-2 hover:text-ink transition-colors"
+                      className="text-ui text-ink-2 hover:text-ink transition-colors"
                     >
                       {h.text}
                     </a>
@@ -509,14 +509,14 @@ export default function ArticleDetailPage() {
             </details>
           )}
 
-          <div ref={bodyRef} className="mt-7 text-[15.5px] leading-[1.75]">
+          <div ref={bodyRef} className="mt-7 text-md leading-[1.75]">
             <MarkdownArticleContent content={article.content} />
           </div>
 
           {/* Feedback */}
           <section className="mt-12 rounded-2xl border border-line bg-surface-2/50 p-6 text-center">
             {voteState === 'done' ? (
-              <p className="flex items-center justify-center gap-2 text-[13.5px] font-medium text-emerald-600 dark:text-emerald-400">
+              <p className="flex items-center justify-center gap-2 text-ui font-medium text-success">
                 <CheckCircle2 className="w-4 h-4" />
                 {vote === 'helpful'
                   ? 'Thanks — glad this helped.'
@@ -524,21 +524,21 @@ export default function ArticleDetailPage() {
               </p>
             ) : voteState === 'error' ? (
               <div className="space-y-2">
-                <p className="flex items-center justify-center gap-2 text-[13.5px] font-medium text-amber-600 dark:text-amber-400">
+                <p className="flex items-center justify-center gap-2 text-ui font-medium text-warn">
                   <AlertCircle className="w-4 h-4" />
                   We couldn&apos;t record that just now.
                 </p>
                 <button
                   type="button"
                   onClick={() => submitVote(vote === 'helpful')}
-                  className="text-[13px] font-medium text-ink underline underline-offset-2 hover:no-underline cursor-pointer"
+                  className="text-ui font-medium text-ink underline underline-offset-2 hover:no-underline cursor-pointer"
                 >
                   Try again
                 </button>
               </div>
             ) : (
               <>
-                <p className="text-[14px] font-medium text-ink">
+                <p className="text-sm font-medium text-ink">
                   Did this answer your question?
                 </p>
                 <div className="mt-3.5 flex items-center justify-center gap-2.5">
@@ -546,18 +546,18 @@ export default function ArticleDetailPage() {
                     type="button"
                     disabled={voteState === 'sending'}
                     onClick={() => submitVote(true)}
-                    className="h-9 px-4 rounded-xl border border-line bg-surface text-[13px] font-medium text-ink inline-flex items-center gap-2 transition-colors hover:border-emerald-500/50 hover:bg-emerald-500/5 disabled:opacity-60 cursor-pointer"
+                    className="h-9 px-4 rounded-xl border border-line bg-surface text-ui font-medium text-ink inline-flex items-center gap-2 transition-colors hover:border-success/50 hover:bg-success/5 disabled:opacity-60 cursor-pointer"
                   >
-                    <ThumbsUp className="w-3.5 h-3.5 text-emerald-500" />
+                    <ThumbsUp className="w-3.5 h-3.5 text-success" />
                     Yes
                   </button>
                   <button
                     type="button"
                     disabled={voteState === 'sending'}
                     onClick={() => submitVote(false)}
-                    className="h-9 px-4 rounded-xl border border-line bg-surface text-[13px] font-medium text-ink inline-flex items-center gap-2 transition-colors hover:border-rose-500/50 hover:bg-rose-500/5 disabled:opacity-60 cursor-pointer"
+                    className="h-9 px-4 rounded-xl border border-line bg-surface text-ui font-medium text-ink inline-flex items-center gap-2 transition-colors hover:border-danger/50 hover:bg-danger/5 disabled:opacity-60 cursor-pointer"
                   >
-                    <ThumbsDown className="w-3.5 h-3.5 text-rose-500" />
+                    <ThumbsDown className="w-3.5 h-3.5 text-danger" />
                     No
                   </button>
                 </div>
@@ -577,11 +577,11 @@ export default function ArticleDetailPage() {
                   }}
                   className="group rounded-xl border border-line bg-surface p-4 hover:border-ink-3/35 transition-colors"
                 >
-                  <span className="flex items-center gap-1.5 text-[11.5px] text-ink-3">
+                  <span className="flex items-center gap-1.5 text-xs text-ink-3">
                     <ArrowLeft className="w-3 h-3 transition-transform group-hover:-translate-x-0.5" />
                     Previous
                   </span>
-                  <span className="mt-1 block text-[13.5px] font-medium text-ink line-clamp-2">
+                  <span className="mt-1 block text-ui font-medium text-ink line-clamp-2">
                     {prev.title}
                   </span>
                 </a>
@@ -598,11 +598,11 @@ export default function ArticleDetailPage() {
                   }}
                   className="group rounded-xl border border-line bg-surface p-4 hover:border-ink-3/35 transition-colors sm:text-right"
                 >
-                  <span className="flex items-center gap-1.5 text-[11.5px] text-ink-3 sm:justify-end">
+                  <span className="flex items-center gap-1.5 text-xs text-ink-3 sm:justify-end">
                     Next
                     <ArrowRight className="w-3 h-3 transition-transform group-hover:translate-x-0.5" />
                   </span>
-                  <span className="mt-1 block text-[13.5px] font-medium text-ink line-clamp-2">
+                  <span className="mt-1 block text-ui font-medium text-ink line-clamp-2">
                     {next.title}
                   </span>
                 </a>
@@ -612,7 +612,7 @@ export default function ArticleDetailPage() {
 
           {related.length > 0 && (
             <section className="mt-10 pt-8 border-t border-line">
-              <h2 className="text-[15px] font-semibold text-ink">
+              <h2 className="text-md font-semibold text-ink">
                 More in {article.section?.name || 'this collection'}
               </h2>
               <ul className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2.5">
@@ -626,11 +626,11 @@ export default function ArticleDetailPage() {
                       }}
                       className="block rounded-xl border border-line bg-surface p-3.5 hover:border-ink-3/35 transition-colors"
                     >
-                      <span className="block text-[13.5px] font-medium text-ink line-clamp-1">
+                      <span className="block text-ui font-medium text-ink line-clamp-1">
                         {r.title}
                       </span>
                       {r.summary && (
-                        <span className="mt-0.5 block text-[12.5px] text-ink-3 line-clamp-1">
+                        <span className="mt-0.5 block text-xs text-ink-3 line-clamp-1">
                           {r.summary}
                         </span>
                       )}
@@ -646,7 +646,7 @@ export default function ArticleDetailPage() {
         {headings.length > 2 && (
           <aside className="hidden lg:block w-56 shrink-0">
             <nav className="sticky top-28">
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-ink-3">
+              <p className="text-2xs font-semibold uppercase tracking-wider text-ink-3">
                 On this page
               </p>
               <ul className="mt-3 space-y-1.5 border-l border-line">
@@ -654,7 +654,7 @@ export default function ArticleDetailPage() {
                   <li key={h.id}>
                     <a
                       href={`#${h.id}`}
-                      className={`block border-l-2 -ml-px pl-3 py-0.5 text-[12.5px] leading-snug transition-colors ${
+                      className={`block border-l-2 -ml-px pl-3 py-0.5 text-xs leading-snug transition-colors ${
                         activeHeading === h.id
                           ? 'border-[var(--brand)] text-ink font-medium'
                           : 'border-transparent text-ink-3 hover:text-ink-2'

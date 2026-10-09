@@ -486,8 +486,8 @@ export function CompaniesAdminDashboard({
     <div className="flex-1 flex flex-col h-screen overflow-y-auto bg-canvas">
       {/* Toast Feedback */}
       {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-50 px-4 py-2.5 rounded-xl bg-ink text-canvas text-[13px] font-medium shadow-2xl flex items-center gap-2 animate-in fade-in slide-in-from-bottom-3">
-          <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+        <div className="fixed bottom-6 right-6 z-50 px-4 py-2.5 rounded-xl bg-ink text-canvas text-ui font-medium shadow-2xl flex items-center gap-2 animate-in fade-in slide-in-from-bottom-3">
+          <CheckCircle2 className="w-4 h-4 text-success" />
           <span>{toastMessage}</span>
         </div>
       )}
@@ -497,17 +497,17 @@ export function CompaniesAdminDashboard({
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-xl bg-blue-600/10 text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold">
+              <div className="w-8 h-8 rounded-xl bg-accent/10 text-accent flex items-center justify-center font-bold">
                 <Building2 className="w-4.5 h-4.5" />
               </div>
-              <h1 className="text-[20px] font-bold text-ink tracking-tight">
+              <h1 className="text-xl font-bold text-ink tracking-tight">
                 Companies &amp; Platform Administration
               </h1>
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-500/10 text-purple-600 dark:text-purple-400 uppercase tracking-wider">
+              <span className="px-2 py-0.5 rounded-full text-2xs font-bold bg-accent/10 text-accent uppercase tracking-wider">
                 Super Admin
               </span>
             </div>
-            <p className="text-[12.5px] text-ink-3 mt-1">
+            <p className="text-xs text-ink-3 mt-1">
               Complete multi-tenant visibility across all customer companies, traffic radar, and chat metrics.
             </p>
           </div>
@@ -517,18 +517,18 @@ export function CompaniesAdminDashboard({
             <button
               onClick={() => setIsDataIssuesOpen(true)}
               className={cn(
-                'h-9 px-3.5 rounded-xl border text-[12.5px] font-semibold flex items-center gap-2 transition-all shadow-xs',
+                'h-9 px-3.5 rounded-xl border text-xs font-semibold flex items-center gap-2 transition-all shadow-xs',
                 totalOrphanCount > 0
-                  ? 'border-amber-500/40 bg-amber-500/10 text-amber-600 dark:text-amber-400 hover:bg-amber-500/20'
+                  ? 'border-warn/40 bg-warn/10 text-warn hover:bg-warn/20'
                   : 'border-line bg-surface-2 hover:bg-surface text-ink-3 hover:text-ink'
               )}
               title="Inspect orphan data rows and database integrity issues"
             >
-              <ShieldAlert className={cn('w-4 h-4', totalOrphanCount > 0 ? 'text-amber-500 animate-pulse' : 'text-ink-3')} />
+              <ShieldAlert className={cn('w-4 h-4', totalOrphanCount > 0 ? 'text-warn animate-pulse' : 'text-ink-3')} />
               <span>Data Issues</span>
               <span className={cn(
-                'px-1.5 py-0.2 rounded-full text-[10.5px] font-bold',
-                totalOrphanCount > 0 ? 'bg-amber-500 text-white' : 'bg-surface-3 text-ink-3'
+                'px-1.5 py-0.2 rounded-full text-2xs font-bold',
+                totalOrphanCount > 0 ? 'bg-warn text-white' : 'bg-surface-3 text-ink-3'
               )}>
                 {formatNumber(totalOrphanCount)}
               </span>
@@ -537,7 +537,7 @@ export function CompaniesAdminDashboard({
             <button
               onClick={() => loadData(true)}
               disabled={refreshing}
-              className="h-9 px-3.5 rounded-xl border border-line bg-surface-2 hover:bg-surface text-ink text-[12.5px] font-medium flex items-center gap-2 transition-all disabled:opacity-50"
+              className="h-9 px-3.5 rounded-xl border border-line bg-surface-2 hover:bg-surface text-ink text-xs font-medium flex items-center gap-2 transition-all disabled:opacity-50"
               title="Refresh platform statistics"
             >
               <RefreshCw className={cn('w-3.5 h-3.5 text-ink-3', refreshing && 'animate-spin')} />
@@ -546,7 +546,7 @@ export function CompaniesAdminDashboard({
 
             <button
               onClick={handleExportCsv}
-              className="h-9 px-3.5 rounded-xl border border-line bg-surface-2 hover:bg-surface text-ink text-[12.5px] font-semibold flex items-center gap-1.5 transition-all shadow-xs"
+              className="h-9 px-3.5 rounded-xl border border-line bg-surface-2 hover:bg-surface text-ink text-xs font-semibold flex items-center gap-1.5 transition-all shadow-xs"
               title="Download platform companies CSV export"
             >
               <Download className="w-3.5 h-3.5 text-accent" />
@@ -556,16 +556,16 @@ export function CompaniesAdminDashboard({
             <button
               onClick={handleResyncDomains}
               disabled={resyncingDomains}
-              className="h-9 px-3.5 rounded-xl border border-line bg-surface-2 hover:bg-surface text-ink text-[12.5px] font-semibold flex items-center gap-1.5 transition-all shadow-xs disabled:opacity-50"
+              className="h-9 px-3.5 rounded-xl border border-line bg-surface-2 hover:bg-surface text-ink text-xs font-semibold flex items-center gap-1.5 transition-all shadow-xs disabled:opacity-50"
               title="Re-sync all workspace custom domains with Vercel project"
             >
-              <Globe className={cn('w-3.5 h-3.5 text-blue-500', resyncingDomains && 'animate-spin')} />
+              <Globe className={cn('w-3.5 h-3.5 text-accent', resyncingDomains && 'animate-spin')} />
               <span>{resyncingDomains ? 'Syncing...' : 'Re-sync domains with Vercel'}</span>
             </button>
 
             <button
               onClick={() => setIsCreateModalOpen(true)}
-              className="h-9 px-4 rounded-xl bg-accent text-accent-ink hover:opacity-90 text-[12.5px] font-semibold flex items-center gap-1.5 transition-all shadow-xs"
+              className="h-9 px-4 rounded-xl bg-accent text-accent-ink hover:opacity-90 text-xs font-semibold flex items-center gap-1.5 transition-all shadow-xs"
             >
               <Plus className="w-4 h-4" />
               <span>New Company</span>
@@ -577,12 +577,12 @@ export function CompaniesAdminDashboard({
       {/* Main Content Area */}
       <main className="p-8 space-y-7 max-w-7xl w-full mx-auto">
         {resyncNotice && (
-          <div className="p-4 rounded-2xl border border-blue-500/30 bg-blue-500/10 text-blue-700 dark:text-blue-300 text-sm flex items-center justify-between shadow-xs">
+          <div className="p-4 rounded-2xl border border-accent/30 bg-accent/10 text-accent text-sm flex items-center justify-between shadow-xs">
             <div className="flex items-center gap-2">
-              <CheckCircle2 className="w-5 h-5 text-blue-500" />
+              <CheckCircle2 className="w-5 h-5 text-accent" />
               <span>{resyncNotice}</span>
             </div>
-            <button onClick={() => setResyncNotice(null)} className="p-1 hover:bg-blue-500/20 rounded-lg text-blue-500">
+            <button onClick={() => setResyncNotice(null)} className="p-1 hover:bg-accent/20 rounded-lg text-accent">
               <X className="w-4 h-4" />
             </button>
           </div>
@@ -594,7 +594,7 @@ export function CompaniesAdminDashboard({
               type="button"
               onClick={() => setDashboardTab('overview')}
               className={cn(
-                'h-9 px-4 rounded-lg text-[13px] font-semibold flex items-center gap-2 transition-all',
+                'h-9 px-4 rounded-lg text-ui font-semibold flex items-center gap-2 transition-all',
                 dashboardTab === 'overview'
                   ? 'bg-surface text-ink shadow-xs'
                   : 'text-ink-3 hover:text-ink hover:bg-surface/50'
@@ -607,13 +607,13 @@ export function CompaniesAdminDashboard({
               type="button"
               onClick={() => setDashboardTab('companies')}
               className={cn(
-                'h-9 px-4 rounded-lg text-[13px] font-semibold flex items-center gap-2 transition-all',
+                'h-9 px-4 rounded-lg text-ui font-semibold flex items-center gap-2 transition-all',
                 dashboardTab === 'companies'
                   ? 'bg-surface text-ink shadow-xs'
                   : 'text-ink-3 hover:text-ink hover:bg-surface/50'
               )}
             >
-              <Building2 className="w-4 h-4 text-blue-500" />
+              <Building2 className="w-4 h-4 text-accent" />
               <span>Companies Directory ({formatNumber(data?.companies?.length || 0)})</span>
             </button>
           </div>
@@ -628,7 +628,7 @@ export function CompaniesAdminDashboard({
                   onClick={() => handlePlatformRangeChange(days)}
                   disabled={analyticsLoading}
                   className={cn(
-                    'h-7.5 px-3 rounded-md text-[11.5px] font-semibold transition-all disabled:opacity-50',
+                    'h-7.5 px-3 rounded-md text-xs font-semibold transition-all disabled:opacity-50',
                     platformDays === days
                       ? 'bg-accent text-accent-ink shadow-2xs'
                       : 'text-ink-3 hover:text-ink'
@@ -642,7 +642,7 @@ export function CompaniesAdminDashboard({
             <button
               type="button"
               onClick={handleExportCsv}
-              className="h-8.5 px-3.5 rounded-xl border border-line bg-surface hover:bg-surface-2 text-ink text-[12px] font-semibold flex items-center gap-1.5 transition-colors shadow-2xs"
+              className="h-8.5 px-3.5 rounded-xl border border-line bg-surface hover:bg-surface-2 text-ink text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-2xs"
               title="Download full companies CSV export"
             >
               <Download className="w-3.5 h-3.5 text-accent" />
@@ -668,57 +668,57 @@ export function CompaniesAdminDashboard({
             <section className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
               <div className="p-4.5 rounded-2xl border border-line bg-surface shadow-2xs space-y-2">
                 <div className="flex items-center justify-between text-ink-3">
-                  <span className="text-[11.5px] font-semibold uppercase tracking-wider">Companies</span>
-                  <Building2 className="w-4 h-4 text-blue-500" />
+                  <span className="text-xs font-semibold uppercase tracking-wider">Companies</span>
+                  <Building2 className="w-4 h-4 text-accent" />
                 </div>
-                <div className="text-[26px] font-extrabold text-ink tracking-tight">
+                <div className="text-2xl font-extrabold text-ink tracking-tight">
                   {loading ? '—' : formatNumber(data?.total_companies)}
                 </div>
-                <div className="text-[11.5px] text-ink-3">Registered tenants</div>
+                <div className="text-xs text-ink-3">Registered tenants</div>
               </div>
 
               <div className="p-4.5 rounded-2xl border border-line bg-surface shadow-2xs space-y-2">
                 <div className="flex items-center justify-between text-ink-3">
-                  <span className="text-[11.5px] font-semibold uppercase tracking-wider">Conversations</span>
-                  <MessageSquare className="w-4 h-4 text-emerald-500" />
+                  <span className="text-xs font-semibold uppercase tracking-wider">Conversations</span>
+                  <MessageSquare className="w-4 h-4 text-success" />
                 </div>
-                <div className="text-[26px] font-extrabold text-ink tracking-tight">
+                <div className="text-2xl font-extrabold text-ink tracking-tight">
                   {loading ? '—' : formatNumber(data?.total_conversations)}
                 </div>
-                <div className="text-[11.5px] text-ink-3">Sum of company chats</div>
+                <div className="text-xs text-ink-3">Sum of company chats</div>
               </div>
 
               <div className="p-4.5 rounded-2xl border border-line bg-surface shadow-2xs space-y-2">
                 <div className="flex items-center justify-between text-ink-3">
-                  <span className="text-[11.5px] font-semibold uppercase tracking-wider">Messages</span>
-                  <MessageSquare className="w-4 h-4 text-purple-500" />
+                  <span className="text-xs font-semibold uppercase tracking-wider">Messages</span>
+                  <MessageSquare className="w-4 h-4 text-accent" />
                 </div>
-                <div className="text-[26px] font-extrabold text-ink tracking-tight">
+                <div className="text-2xl font-extrabold text-ink tracking-tight">
                   {loading ? '—' : formatNumber(data?.total_messages)}
                 </div>
-                <div className="text-[11.5px] text-ink-3">Sum of company messages</div>
+                <div className="text-xs text-ink-3">Sum of company messages</div>
               </div>
 
               <div className="p-4.5 rounded-2xl border border-line bg-surface shadow-2xs space-y-2">
                 <div className="flex items-center justify-between text-ink-3">
-                  <span className="text-[11.5px] font-semibold uppercase tracking-wider">Visitors</span>
-                  <Radio className="w-4 h-4 text-amber-500" />
+                  <span className="text-xs font-semibold uppercase tracking-wider">Visitors</span>
+                  <Radio className="w-4 h-4 text-warn" />
                 </div>
-                <div className="text-[26px] font-extrabold text-ink tracking-tight">
+                <div className="text-2xl font-extrabold text-ink tracking-tight">
                   {loading ? '—' : formatNumber(data?.total_visitors)}
                 </div>
-                <div className="text-[11.5px] text-ink-3">Sum of company visitors</div>
+                <div className="text-xs text-ink-3">Sum of company visitors</div>
               </div>
 
               <div className="p-4.5 rounded-2xl border border-line bg-surface shadow-2xs space-y-2">
                 <div className="flex items-center justify-between text-ink-3">
-                  <span className="text-[11.5px] font-semibold uppercase tracking-wider">Support Agents</span>
-                  <Users className="w-4 h-4 text-indigo-500" />
+                  <span className="text-xs font-semibold uppercase tracking-wider">Support Agents</span>
+                  <Users className="w-4 h-4 text-accent" />
                 </div>
-                <div className="text-[26px] font-extrabold text-ink tracking-tight">
+                <div className="text-2xl font-extrabold text-ink tracking-tight">
                   {loading ? '—' : formatNumber(data?.total_agents)}
                 </div>
-                <div className="text-[11.5px] text-ink-3">Sum of company seats</div>
+                <div className="text-xs text-ink-3">Sum of company seats</div>
               </div>
             </section>
 
@@ -739,20 +739,20 @@ export function CompaniesAdminDashboard({
                     key={val}
                     onClick={() => setFilterType(val as any)}
                     className={cn(
-                      'h-8 px-3 rounded-lg text-[12px] font-medium transition-all whitespace-nowrap flex items-center gap-1.5',
+                      'h-8 px-3 rounded-lg text-xs font-medium transition-all whitespace-nowrap flex items-center gap-1.5',
                       filterType === val
                         ? 'bg-accent text-accent-ink shadow-xs font-semibold'
                         : 'bg-surface-2 text-ink-2 hover:bg-surface-3 hover:text-ink'
                     )}
                   >
                     {val === 'health_issues' && healthIssueCompanies.length > 0 && (
-                      <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
+                      <span className="w-2 h-2 rounded-full bg-danger animate-pulse" />
                     )}
                     {val === 'no_owner' && noOwnerCompanies.length > 0 && (
-                      <span className="w-2 h-2 rounded-full bg-rose-500" />
+                      <span className="w-2 h-2 rounded-full bg-danger" />
                     )}
                     {val === 'duplicates' && duplicateCompanies.length > 0 && (
-                      <span className="w-2 h-2 rounded-full bg-amber-500" />
+                      <span className="w-2 h-2 rounded-full bg-warn" />
                     )}
                     <span>{label}</span>
                   </button>
@@ -770,7 +770,7 @@ export function CompaniesAdminDashboard({
                   setHasUserSwitchedView(true);
                 }}
                 className={cn(
-                  'h-7.5 px-2.5 rounded-md text-[11.5px] font-medium flex items-center gap-1.5 transition-all',
+                  'h-7.5 px-2.5 rounded-md text-xs font-medium flex items-center gap-1.5 transition-all',
                   viewMode === 'cards'
                     ? 'bg-surface text-ink font-semibold shadow-2xs'
                     : 'text-ink-3 hover:text-ink'
@@ -787,7 +787,7 @@ export function CompaniesAdminDashboard({
                   setHasUserSwitchedView(true);
                 }}
                 className={cn(
-                  'h-7.5 px-2.5 rounded-md text-[11.5px] font-medium flex items-center gap-1.5 transition-all',
+                  'h-7.5 px-2.5 rounded-md text-xs font-medium flex items-center gap-1.5 transition-all',
                   viewMode === 'table'
                     ? 'bg-surface text-ink font-semibold shadow-2xs'
                     : 'text-ink-3 hover:text-ink'
@@ -806,7 +806,7 @@ export function CompaniesAdminDashboard({
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search name, domain, owner..."
-                className="w-full h-8.5 pl-8.5 pr-3 rounded-lg border border-line bg-surface text-[12.5px] text-ink placeholder:text-ink-3 focus:outline-none focus:border-accent"
+                className="w-full h-8.5 pl-8.5 pr-3 rounded-lg border border-line bg-surface text-xs text-ink placeholder:text-ink-3 focus:outline-none focus:border-accent"
               />
             </div>
 
@@ -814,7 +814,7 @@ export function CompaniesAdminDashboard({
               <select
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value as any)}
-                className="h-8.5 px-2.5 rounded-lg border border-line bg-surface text-[12px] text-ink focus:outline-none"
+                className="h-8.5 px-2.5 rounded-lg border border-line bg-surface text-xs text-ink focus:outline-none"
               >
                 <option value="newest">Sort: Newest</option>
                 <option value="conversations">Sort: Most Chats</option>
@@ -828,7 +828,7 @@ export function CompaniesAdminDashboard({
         {/* Companies Listing (Cards or Table View) */}
         <section className="space-y-4">
           {loading ? (
-            <div className="p-12 text-center text-ink-3 text-[13px] space-y-2 bg-surface border border-line rounded-2xl">
+            <div className="p-12 text-center text-ink-3 text-ui space-y-2 bg-surface border border-line rounded-2xl">
               <RefreshCw className="w-6 h-6 animate-spin mx-auto text-accent" />
               <p>Loading registered companies and data metrics...</p>
             </div>
@@ -836,7 +836,7 @@ export function CompaniesAdminDashboard({
             <div className="p-12 text-center rounded-2xl border border-dashed border-line bg-surface text-ink-3 space-y-2">
               <Building2 className="w-8 h-8 mx-auto text-ink-3/60" />
               <p className="font-semibold text-ink">No companies found</p>
-              <p className="text-[12px]">Try adjusting your search query or filter criteria.</p>
+              <p className="text-xs">Try adjusting your search query or filter criteria.</p>
             </div>
           ) : viewMode === 'table' ? (
             /* Table View with sorting and pagination (Requirement 7) */
@@ -889,13 +889,13 @@ export function CompaniesAdminDashboard({
                       isCurrent
                         ? 'border-accent ring-1 ring-accent/30 shadow-xs'
                         : isDeleted
-                        ? 'border-rose-500/40 bg-rose-500/5'
+                        ? 'border-danger/40 bg-danger/5'
                         : isSuspended
-                        ? 'border-amber-500/40 bg-amber-500/5'
+                        ? 'border-warn/40 bg-warn/5'
                         : hasNoOwner
-                        ? 'border-rose-500/30'
+                        ? 'border-danger/30'
                         : isDuplicate
-                        ? 'border-amber-500/30'
+                        ? 'border-warn/30'
                         : 'border-line'
                     )}
                   >
@@ -904,7 +904,7 @@ export function CompaniesAdminDashboard({
                       <div className="flex items-start gap-3.5 min-w-0 flex-1">
                         {/* Brand Color Avatar */}
                         <div
-                          className="w-11 h-11 rounded-2xl shrink-0 flex items-center justify-center font-bold text-white shadow-xs text-[15px]"
+                          className="w-11 h-11 rounded-2xl shrink-0 flex items-center justify-center font-bold text-white shadow-xs text-md"
                           style={{ backgroundColor: comp.brand_color || '#2563eb' }}
                         >
                           {comp.name.charAt(0).toUpperCase()}
@@ -912,36 +912,36 @@ export function CompaniesAdminDashboard({
 
                         <div className="min-w-0 flex-1 space-y-1">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <h3 className="text-[15.5px] font-bold text-ink truncate leading-tight">
+                            <h3 className="text-md font-bold text-ink truncate leading-tight">
                               {comp.name}
                             </h3>
 
                             {isCurrent && (
-                              <span className="px-2 py-0.5 rounded-full text-[10.5px] font-bold bg-accent text-accent-ink shadow-2xs">
+                              <span className="px-2 py-0.5 rounded-full text-2xs font-bold bg-accent text-accent-ink shadow-2xs">
                                 Active Workspace
                               </span>
                             )}
 
                             {/* Suspended Badge (Requirement 1) */}
                             {isSuspended && (
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10.5px] font-bold bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30">
-                                <PauseCircle className="w-3 h-3 text-amber-500" />
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-2xs font-bold bg-warn/15 text-warn border border-warn/30">
+                                <PauseCircle className="w-3 h-3 text-warn" />
                                 <span>Suspended</span>
                               </span>
                             )}
 
                             {/* Soft-Deleted Badge (Requirement 2) */}
                             {isDeleted && (
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10.5px] font-bold bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30">
-                                <Trash2 className="w-3 h-3 text-rose-500" />
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-2xs font-bold bg-danger/15 text-danger border border-danger/30">
+                                <Trash2 className="w-3 h-3 text-danger" />
                                 <span>Soft-Deleted ({daysUntilPurge}d left)</span>
                               </span>
                             )}
 
                             {/* Traffic Radar: Browsing Now */}
                             {comp.active_visitors_count > 0 && !isSuspended && !isDeleted && (
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10.5px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
-                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-2xs font-bold bg-success/10 text-success">
+                                <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
                                 {formatNumber(comp.active_visitors_count)} browsing now
                               </span>
                             )}
@@ -949,10 +949,10 @@ export function CompaniesAdminDashboard({
                             {/* Flag 1: Workspaces with no owner ("0 seats") */}
                             {hasNoOwner && (
                               <span
-                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10.5px] font-bold bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20"
+                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-2xs font-bold bg-danger/10 text-danger border border-danger/20"
                                 title="Workspace has no owner or active agents registered"
                               >
-                                <AlertTriangle className="w-3 h-3 text-rose-500" />
+                                <AlertTriangle className="w-3 h-3 text-danger" />
                                 <span>No Owner (0 seats)</span>
                               </span>
                             )}
@@ -960,16 +960,16 @@ export function CompaniesAdminDashboard({
                             {/* Flag 2: Duplicates by name plus domain */}
                             {isDuplicate && (
                               <span
-                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10.5px] font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20"
+                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-2xs font-bold bg-warn/10 text-warn border border-warn/20"
                                 title={`Duplicate workspace detected: ${dupList.length} companies share name "${comp.name}" and domain "${cleanDomain || '(none)'}"`}
                               >
-                                <Copy className="w-3 h-3 text-amber-500" />
+                                <Copy className="w-3 h-3 text-warn" />
                                 <span>Duplicate ({dupList.length}x)</span>
                               </span>
                             )}
                           </div>
 
-                          <div className="flex items-center gap-3 text-[12px] text-ink-3 flex-wrap">
+                          <div className="flex items-center gap-3 text-xs text-ink-3 flex-wrap">
                             {comp.website_url ? (
                               <a
                                 href={comp.website_url.startsWith('http') ? comp.website_url : `https://${comp.website_url}`}
@@ -989,22 +989,22 @@ export function CompaniesAdminDashboard({
                           {/* Health Flags per Company (Requirement 3) */}
                           {comp.health_flags && comp.health_flags.length > 0 && (
                             <div className="flex flex-wrap items-center gap-1.5 pt-1">
-                              <span className="text-[10px] font-bold text-ink-3 uppercase tracking-wider flex items-center gap-1 mr-0.5">
-                                <AlertTriangle className="w-3 h-3 text-amber-500" />
+                              <span className="text-2xs font-bold text-ink-3 uppercase tracking-wider flex items-center gap-1 mr-0.5">
+                                <AlertTriangle className="w-3 h-3 text-warn" />
                                 Health:
                               </span>
                               {comp.health_flags.map((flag, idx) => (
                                 <span
                                   key={idx}
                                   className={cn(
-                                    'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border',
+                                    'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-2xs font-semibold border',
                                     flag.includes('waiting over 24h')
-                                      ? 'bg-rose-500/15 text-rose-600 dark:text-rose-400 border-rose-500/30'
+                                      ? 'bg-danger/15 text-danger border-danger/30'
                                       : flag === 'widget not installed'
-                                      ? 'bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/25'
+                                      ? 'bg-danger/10 text-danger border-danger/25'
                                       : flag === 'no agent online for 7 days'
-                                      ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/25'
-                                      : 'bg-slate-500/10 text-slate-600 dark:text-slate-400 border-slate-500/25'
+                                      ? 'bg-warn/10 text-warn border-warn/25'
+                                      : 'bg-ink-3/10 text-ink-2 border-line-3/25'
                                   )}
                                 >
                                   <AlertCircle className="w-2.5 h-2.5 shrink-0" />
@@ -1020,7 +1020,7 @@ export function CompaniesAdminDashboard({
                       <div className="flex items-center gap-2 shrink-0">
                         <button
                           onClick={() => openDrilldown(comp.id)}
-                          className="h-8.5 px-3 rounded-xl border border-line bg-surface hover:bg-surface-2 text-ink text-[12px] font-medium flex items-center gap-1.5 transition-colors shadow-2xs"
+                          className="h-8.5 px-3 rounded-xl border border-line bg-surface hover:bg-surface-2 text-ink text-xs font-medium flex items-center gap-1.5 transition-colors shadow-2xs"
                           title="View deep company metrics, recent activity & team members"
                         >
                           <span>Insights</span>
@@ -1028,15 +1028,15 @@ export function CompaniesAdminDashboard({
                         </button>
 
                         {isCurrent ? (
-                          <div className="h-8.5 px-3 rounded-xl bg-surface-2 border border-line text-ink-3 text-[12px] font-medium flex items-center gap-1.5">
-                            <Check className="w-3.5 h-3.5 text-emerald-500" />
+                          <div className="h-8.5 px-3 rounded-xl bg-surface-2 border border-line text-ink-3 text-xs font-medium flex items-center gap-1.5">
+                            <Check className="w-3.5 h-3.5 text-success" />
                             <span>Current</span>
                           </div>
                         ) : (
                           <button
                             onClick={() => handleSwitch(comp)}
                             disabled={switchingId === comp.id || isSuspended || isDeleted}
-                            className="h-8.5 px-3.5 rounded-xl bg-accent text-accent-ink hover:opacity-90 text-[12px] font-semibold flex items-center gap-1.5 transition-all shadow-xs disabled:opacity-40"
+                            className="h-8.5 px-3.5 rounded-xl bg-accent text-accent-ink hover:opacity-90 text-xs font-semibold flex items-center gap-1.5 transition-all shadow-xs disabled:opacity-40"
                             title={isSuspended ? 'Workspace suspended' : isDeleted ? 'Workspace soft-deleted' : 'Switch into workspace'}
                           >
                             {switchingId === comp.id ? (
@@ -1052,30 +1052,30 @@ export function CompaniesAdminDashboard({
 
                     {/* Requirement 6: Detailed Metadata Row on Each Card */}
                     {/* Owner Email, Plan, Created Date, Last Activity, Widget Installed, AI ON/OFF, Published Articles */}
-                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-2.5 p-3 rounded-xl bg-surface-2/60 border border-line/60 text-[11.5px]">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-2.5 p-3 rounded-xl bg-surface-2/60 border border-line/60 text-xs">
                       {/* 1. Owner Email */}
                       <div className="min-w-0">
-                        <div className="text-ink-3 text-[10px] font-semibold uppercase flex items-center gap-1">
-                          <Mail className="w-3 h-3 text-blue-500" />
+                        <div className="text-ink-3 text-2xs font-semibold uppercase flex items-center gap-1">
+                          <Mail className="w-3 h-3 text-accent" />
                           <span>Owner</span>
                         </div>
                         <div className="truncate font-medium text-ink mt-0.5" title={comp.owner_email || 'No owner'}>
                           {comp.owner_email ? (
                             <span className="text-accent">{comp.owner_email}</span>
                           ) : (
-                            <span className="text-rose-500 italic">No owner</span>
+                            <span className="text-danger italic">No owner</span>
                           )}
                         </div>
                       </div>
 
                       {/* 2. Plan Badge */}
                       <div>
-                        <div className="text-ink-3 text-[10px] font-semibold uppercase flex items-center gap-1">
-                          <Sparkles className="w-3 h-3 text-purple-500" />
+                        <div className="text-ink-3 text-2xs font-semibold uppercase flex items-center gap-1">
+                          <Sparkles className="w-3 h-3 text-accent" />
                           <span>Plan</span>
                         </div>
                         <div className="mt-0.5">
-                          <span className="px-2 py-0.5 rounded text-[10.5px] font-bold bg-purple-500/10 text-purple-600 dark:text-purple-400 uppercase tracking-wider">
+                          <span className="px-2 py-0.5 rounded text-2xs font-bold bg-accent/10 text-accent uppercase tracking-wider">
                             {comp.plan || 'Free'}
                           </span>
                         </div>
@@ -1083,8 +1083,8 @@ export function CompaniesAdminDashboard({
 
                       {/* 3. Created Date */}
                       <div>
-                        <div className="text-ink-3 text-[10px] font-semibold uppercase flex items-center gap-1">
-                          <Clock className="w-3 h-3 text-slate-400" />
+                        <div className="text-ink-3 text-2xs font-semibold uppercase flex items-center gap-1">
+                          <Clock className="w-3 h-3 text-ink-3" />
                           <span>Created</span>
                         </div>
                         <div className="text-ink font-medium mt-0.5">
@@ -1094,8 +1094,8 @@ export function CompaniesAdminDashboard({
 
                       {/* 4. Last Activity */}
                       <div>
-                        <div className="text-ink-3 text-[10px] font-semibold uppercase flex items-center gap-1">
-                          <Clock className="w-3 h-3 text-amber-500" />
+                        <div className="text-ink-3 text-2xs font-semibold uppercase flex items-center gap-1">
+                          <Clock className="w-3 h-3 text-warn" />
                           <span>Last Activity</span>
                         </div>
                         <div className="text-ink font-medium mt-0.5" title={comp.last_activity_at || comp.created_at}>
@@ -1105,18 +1105,18 @@ export function CompaniesAdminDashboard({
 
                       {/* 5. Widget Installed (Yes/No) */}
                       <div>
-                        <div className="text-ink-3 text-[10px] font-semibold uppercase flex items-center gap-1">
-                          <Radio className="w-3 h-3 text-emerald-500" />
+                        <div className="text-ink-3 text-2xs font-semibold uppercase flex items-center gap-1">
+                          <Radio className="w-3 h-3 text-success" />
                           <span>Widget</span>
                         </div>
                         <div className="mt-0.5">
                           {comp.widget_installed ? (
-                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
-                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-2xs font-bold bg-success/10 text-success">
+                              <span className="w-1.5 h-1.5 rounded-full bg-success" />
                               Installed
                             </span>
                           ) : (
-                            <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-surface-3 text-ink-3">
+                            <span className="px-1.5 py-0.5 rounded text-2xs font-medium bg-surface-3 text-ink-3">
                               Not active
                             </span>
                           )}
@@ -1125,18 +1125,18 @@ export function CompaniesAdminDashboard({
 
                       {/* 6. AI On/Off */}
                       <div>
-                        <div className="text-ink-3 text-[10px] font-semibold uppercase flex items-center gap-1">
-                          <Zap className="w-3 h-3 text-amber-500" />
+                        <div className="text-ink-3 text-2xs font-semibold uppercase flex items-center gap-1">
+                          <Zap className="w-3 h-3 text-warn" />
                           <span>AI Engine</span>
                         </div>
                         <div className="mt-0.5">
                           {comp.ai_enabled ? (
-                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-500/10 text-indigo-600 dark:text-indigo-400">
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-2xs font-bold bg-accent/10 text-accent">
                               <Zap className="w-2.5 h-2.5" />
                               AI: ON
                             </span>
                           ) : (
-                            <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-surface-3 text-ink-3">
+                            <span className="px-1.5 py-0.5 rounded text-2xs font-medium bg-surface-3 text-ink-3">
                               AI: OFF
                             </span>
                           )}
@@ -1145,13 +1145,13 @@ export function CompaniesAdminDashboard({
 
                       {/* 7. Published Articles Count */}
                       <div>
-                        <div className="text-ink-3 text-[10px] font-semibold uppercase flex items-center gap-1">
-                          <BookOpen className="w-3 h-3 text-blue-500" />
+                        <div className="text-ink-3 text-2xs font-semibold uppercase flex items-center gap-1">
+                          <BookOpen className="w-3 h-3 text-accent" />
                           <span>Articles</span>
                         </div>
                         <div className="text-ink font-semibold mt-0.5">
                           {formatNumber(comp.published_articles_count ?? 0)}{' '}
-                          <span className="text-[10px] text-ink-3 font-normal">published</span>
+                          <span className="text-2xs text-ink-3 font-normal">published</span>
                         </div>
                       </div>
                     </div>
@@ -1159,7 +1159,7 @@ export function CompaniesAdminDashboard({
                     {/* Stats Summary & Management Action Buttons */}
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1 border-t border-line/40">
                       {/* Metric summary numbers */}
-                      <div className="flex items-center gap-4 text-[12px] text-ink-3 flex-wrap">
+                      <div className="flex items-center gap-4 text-xs text-ink-3 flex-wrap">
                         <span>
                           <strong className="text-ink font-bold">{formatNumber(comp.conversations_count)}</strong> chats (
                           {formatNumber(comp.open_conversations_count)} open)
@@ -1173,7 +1173,7 @@ export function CompaniesAdminDashboard({
                           <strong className="text-ink font-bold">{formatNumber(comp.visitors_count)}</strong> visitors
                         </span>
                         <span>•</span>
-                        <span className={cn(hasNoOwner && 'text-rose-500 font-bold')}>
+                        <span className={cn(hasNoOwner && 'text-danger font-bold')}>
                           {formatSeats(comp.agents_count)}
                         </span>
                       </div>
@@ -1183,7 +1183,7 @@ export function CompaniesAdminDashboard({
                         {/* 1. Edit Name, Domain, Plan & Limits */}
                         <button
                           onClick={() => setEditCompanyModalCompany(comp)}
-                          className="h-7 px-2.5 rounded-lg border border-line bg-surface hover:bg-surface-2 text-ink text-[11px] font-medium flex items-center gap-1 transition-colors"
+                          className="h-7 px-2.5 rounded-lg border border-line bg-surface hover:bg-surface-2 text-ink text-2xs font-medium flex items-center gap-1 transition-colors"
                           title="Edit company name, website domain, plan and limits"
                         >
                           <Settings2 className="w-3 h-3 text-ink-3" />
@@ -1193,7 +1193,7 @@ export function CompaniesAdminDashboard({
                         {/* 2. Assign / Change Owner */}
                         <button
                           onClick={() => setChangeOwnerModalCompany(comp)}
-                          className="h-7 px-2.5 rounded-lg border border-line bg-surface hover:bg-surface-2 text-ink text-[11px] font-medium flex items-center gap-1 transition-colors"
+                          className="h-7 px-2.5 rounded-lg border border-line bg-surface hover:bg-surface-2 text-ink text-2xs font-medium flex items-center gap-1 transition-colors"
                           title="Assign or change workspace owner by email"
                         >
                           <Mail className="w-3 h-3 text-ink-3" />
@@ -1204,19 +1204,19 @@ export function CompaniesAdminDashboard({
                         {comp.is_suspended ? (
                           <button
                             onClick={() => handleReactivate(comp)}
-                            className="h-7 px-2.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-[11px] font-medium flex items-center gap-1 transition-colors"
+                            className="h-7 px-2.5 rounded-lg border border-success/30 bg-success/10 hover:bg-success/20 text-success text-2xs font-medium flex items-center gap-1 transition-colors"
                             title="Reactivate company widget and agent logins"
                           >
-                            <PlayCircle className="w-3 h-3 text-emerald-500" />
+                            <PlayCircle className="w-3 h-3 text-success" />
                             <span>Reactivate</span>
                           </button>
                         ) : (
                           <button
                             onClick={() => setSuspendModalCompany(comp)}
-                            className="h-7 px-2.5 rounded-lg border border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 dark:text-amber-400 text-[11px] font-medium flex items-center gap-1 transition-colors"
+                            className="h-7 px-2.5 rounded-lg border border-warn/30 bg-warn/10 hover:bg-warn/20 text-warn text-2xs font-medium flex items-center gap-1 transition-colors"
                             title="Suspend company (stops widget and logins, keeps data)"
                           >
-                            <PauseCircle className="w-3 h-3 text-amber-500" />
+                            <PauseCircle className="w-3 h-3 text-warn" />
                             <span>Suspend</span>
                           </button>
                         )}
@@ -1225,10 +1225,10 @@ export function CompaniesAdminDashboard({
                         {isDuplicate && (
                           <button
                             onClick={() => setMergeModalCompany(comp)}
-                            className="h-7 px-2.5 rounded-lg border border-purple-500/30 bg-purple-500/10 hover:bg-purple-500/20 text-purple-600 dark:text-purple-400 text-[11px] font-medium flex items-center gap-1 transition-colors"
+                            className="h-7 px-2.5 rounded-lg border border-accent/30 bg-accent/10 hover:bg-accent/20 text-accent text-2xs font-medium flex items-center gap-1 transition-colors"
                             title="Merge this duplicate workspace into another company"
                           >
-                            <GitMerge className="w-3 h-3 text-purple-500" />
+                            <GitMerge className="w-3 h-3 text-accent" />
                             <span>Merge</span>
                           </button>
                         )}
@@ -1237,19 +1237,19 @@ export function CompaniesAdminDashboard({
                         {isDeleted ? (
                           <button
                             onClick={() => handleRestore(comp)}
-                            className="h-7 px-2.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-[11px] font-medium flex items-center gap-1 transition-colors"
+                            className="h-7 px-2.5 rounded-lg border border-success/30 bg-success/10 hover:bg-success/20 text-success text-2xs font-medium flex items-center gap-1 transition-colors"
                             title="Restore workspace from 30-day trash"
                           >
-                            <RotateCcw className="w-3 h-3 text-emerald-500" />
+                            <RotateCcw className="w-3 h-3 text-success" />
                             <span>Restore</span>
                           </button>
                         ) : (
                           <button
                             onClick={() => setDeleteModalCompany(comp)}
-                            className="h-7 px-2.5 rounded-lg border border-rose-500/30 bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 text-[11px] font-medium flex items-center gap-1 transition-colors"
+                            className="h-7 px-2.5 rounded-lg border border-danger/30 bg-danger/10 hover:bg-danger/20 text-danger text-2xs font-medium flex items-center gap-1 transition-colors"
                             title="Soft delete with 30-day recovery window"
                           >
-                            <Trash2 className="w-3 h-3 text-rose-500" />
+                            <Trash2 className="w-3 h-3 text-danger" />
                             <span>Delete</span>
                           </button>
                         )}
@@ -1442,12 +1442,12 @@ function CreateCompanyModal({ allCompanies, onClose, onCreated }: CreateCompanyM
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in">
-      <div className="bg-surface border border-line rounded-2xl shadow-2xl max-w-md w-full overflow-hidden flex flex-col max-h-[90vh]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-overlay animate-in fade-in">
+      <div className="popover border border-line rounded-2xl shadow-2xl max-w-md w-full overflow-hidden flex flex-col max-h-[90vh]">
         <div className="px-6 py-4 border-b border-line flex items-center justify-between bg-surface-2/60">
           <div>
-            <h2 className="text-[16px] font-bold text-ink">Register New Company</h2>
-            <p className="text-[11.5px] text-ink-3">Create an isolated multi-tenant workspace</p>
+            <h2 className="text-base font-bold text-ink">Register New Company</h2>
+            <p className="text-xs text-ink-3">Create an isolated multi-tenant workspace</p>
           </div>
           <button
             onClick={onClose}
@@ -1459,18 +1459,18 @@ function CreateCompanyModal({ allCompanies, onClose, onCreated }: CreateCompanyM
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto">
           {errorMsg && (
-            <div className="p-3 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-600 text-xs">
+            <div className="p-3 rounded-lg bg-danger/10 border border-danger/20 text-danger text-xs">
               {errorMsg}
             </div>
           )}
 
           {/* Dynamic Duplicate Warnings (Requirement 3) */}
           {duplicateNameWarning && (
-            <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-400 text-xs flex items-start gap-2">
-              <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5 text-amber-500" />
+            <div className="p-3 rounded-xl bg-warn/10 border border-warn/20 text-warn text-xs flex items-start gap-2">
+              <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5 text-warn" />
               <div>
                 <strong>Warning: Duplicate Company Name</strong>
-                <p className="text-[11.5px] mt-0.5">
+                <p className="text-xs mt-0.5">
                   A company named &quot;{duplicateNameWarning}&quot; already exists.
                 </p>
               </div>
@@ -1478,11 +1478,11 @@ function CreateCompanyModal({ allCompanies, onClose, onCreated }: CreateCompanyM
           )}
 
           {duplicateDomainWarning && (
-            <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-400 text-xs flex items-start gap-2">
-              <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5 text-amber-500" />
+            <div className="p-3 rounded-xl bg-warn/10 border border-warn/20 text-warn text-xs flex items-start gap-2">
+              <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5 text-warn" />
               <div>
                 <strong>Warning: Duplicate Website Domain</strong>
-                <p className="text-[11.5px] mt-0.5">
+                <p className="text-xs mt-0.5">
                   Domain &quot;{duplicateDomainWarning.domain}&quot; is already in use by company &quot;{duplicateDomainWarning.name}&quot;.
                 </p>
               </div>
@@ -1490,47 +1490,47 @@ function CreateCompanyModal({ allCompanies, onClose, onCreated }: CreateCompanyM
           )}
 
           <div className="space-y-1.5">
-            <label className="text-[12px] font-semibold text-ink-2">Company / Business Name *</label>
+            <label className="text-xs font-semibold text-ink-2">Company / Business Name *</label>
             <input
               type="text"
               required
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g. Acme Corp, TechWave Labs"
-              className="w-full h-9.5 px-3 rounded-xl border border-line bg-surface text-[13px] text-ink focus:outline-none focus:border-accent"
+              className="w-full h-9.5 px-3 rounded-xl border border-line bg-surface text-ui text-ink focus:outline-none focus:border-accent"
             />
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-[12px] font-semibold text-ink-2">Owner Email *</label>
+            <label className="text-xs font-semibold text-ink-2">Owner Email *</label>
             <input
               type="email"
               required
               value={ownerEmail}
               onChange={(e) => setOwnerEmail(e.target.value)}
               placeholder="owner@acmecorp.com"
-              className="w-full h-9.5 px-3 rounded-xl border border-line bg-surface text-[13px] text-ink focus:outline-none focus:border-accent"
+              className="w-full h-9.5 px-3 rounded-xl border border-line bg-surface text-ui text-ink focus:outline-none focus:border-accent"
             />
-            <p className="text-[11px] text-ink-3">An invite will be automatically sent to this email.</p>
+            <p className="text-2xs text-ink-3">An invite will be automatically sent to this email.</p>
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-[12px] font-semibold text-ink-2">Website Domain / URL</label>
+            <label className="text-xs font-semibold text-ink-2">Website Domain / URL</label>
             <input
               type="text"
               value={websiteUrl}
               onChange={(e) => setWebsiteUrl(e.target.value)}
               placeholder="e.g. https://acmecorp.com"
-              className="w-full h-9.5 px-3 rounded-xl border border-line bg-surface text-[13px] text-ink focus:outline-none focus:border-accent"
+              className="w-full h-9.5 px-3 rounded-xl border border-line bg-surface text-ui text-ink focus:outline-none focus:border-accent"
             />
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-[12px] font-semibold text-ink-2">Subscription Plan</label>
+            <label className="text-xs font-semibold text-ink-2">Subscription Plan</label>
             <select
               value={plan}
               onChange={(e) => setPlan(e.target.value)}
-              className="w-full h-9.5 px-3 rounded-xl border border-line bg-surface text-[13px] text-ink focus:outline-none focus:border-accent capitalize"
+              className="w-full h-9.5 px-3 rounded-xl border border-line bg-surface text-ui text-ink focus:outline-none focus:border-accent capitalize"
             >
               <option value="free">Free (5 seats, 1,000 chats, 500 AI replies)</option>
               <option value="starter">Starter (10 seats, 5,000 chats, 2,000 AI replies)</option>
@@ -1540,7 +1540,7 @@ function CreateCompanyModal({ allCompanies, onClose, onCreated }: CreateCompanyM
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-[12px] font-semibold text-ink-2">Brand Color Theme</label>
+            <label className="text-xs font-semibold text-ink-2">Brand Color Theme</label>
             <div className="flex items-center gap-2">
               {COLOR_PRESETS.map((col) => (
                 <button
@@ -1563,12 +1563,12 @@ function CreateCompanyModal({ allCompanies, onClose, onCreated }: CreateCompanyM
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-[12px] font-semibold text-ink-2">Initial Greeting Title</label>
+            <label className="text-xs font-semibold text-ink-2">Initial Greeting Title</label>
             <input
               type="text"
               value={greetingTitle}
               onChange={(e) => setGreetingTitle(e.target.value)}
-              className="w-full h-9.5 px-3 rounded-xl border border-line bg-surface text-[13px] text-ink focus:outline-none focus:border-accent"
+              className="w-full h-9.5 px-3 rounded-xl border border-line bg-surface text-ui text-ink focus:outline-none focus:border-accent"
             />
           </div>
 
@@ -1576,14 +1576,14 @@ function CreateCompanyModal({ allCompanies, onClose, onCreated }: CreateCompanyM
             <button
               type="button"
               onClick={onClose}
-              className="h-9 px-4 rounded-xl border border-line bg-surface hover:bg-surface-2 text-ink text-[12px] font-medium"
+              className="h-9 px-4 rounded-xl border border-line bg-surface hover:bg-surface-2 text-ink text-xs font-medium"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={saving}
-              className="h-9 px-5 rounded-xl bg-accent text-accent-ink hover:opacity-90 text-[12px] font-semibold disabled:opacity-50"
+              className="h-9 px-5 rounded-xl bg-accent text-accent-ink hover:opacity-90 text-xs font-semibold disabled:opacity-50"
             >
               {saving ? 'Creating & Sending Invite...' : 'Register Company'}
             </button>
@@ -1622,16 +1622,16 @@ function SuspendCompanyModal({ company, onClose, onConfirm }: SuspendCompanyModa
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in">
-      <div className="bg-surface border border-line rounded-2xl shadow-2xl max-w-md w-full overflow-hidden flex flex-col">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-overlay animate-in fade-in">
+      <div className="popover border border-line rounded-2xl shadow-2xl max-w-md w-full overflow-hidden flex flex-col">
         <div className="px-6 py-4 border-b border-line flex items-center justify-between bg-surface-2/60">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-amber-500/10 text-amber-500 flex items-center justify-center font-bold">
+            <div className="w-8 h-8 rounded-xl bg-warn/10 text-warn flex items-center justify-center font-bold">
               <PauseCircle className="w-4.5 h-4.5" />
             </div>
             <div>
-              <h2 className="text-[16px] font-bold text-ink">Suspend Workspace</h2>
-              <p className="text-[11.5px] text-ink-3">{company.name}</p>
+              <h2 className="text-base font-bold text-ink">Suspend Workspace</h2>
+              <p className="text-xs text-ink-3">{company.name}</p>
             </div>
           </div>
           <button
@@ -1644,17 +1644,17 @@ function SuspendCompanyModal({ company, onClose, onConfirm }: SuspendCompanyModa
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           {errorMsg && (
-            <div className="p-3 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-600 text-xs">
+            <div className="p-3 rounded-lg bg-danger/10 border border-danger/20 text-danger text-xs">
               {errorMsg}
             </div>
           )}
 
-          <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-400 text-xs space-y-1.5">
+          <div className="p-3 rounded-xl bg-warn/10 border border-warn/20 text-warn text-xs space-y-1.5">
             <div className="font-semibold flex items-center gap-1.5">
               <AlertTriangle className="w-3.5 h-3.5" />
               <span>Suspension Impact</span>
             </div>
-            <ul className="list-disc pl-4 space-y-1 text-[11.5px]">
+            <ul className="list-disc pl-4 space-y-1 text-xs">
               <li>The chat widget will NOT load on the customer&apos;s website</li>
               <li>Support agents cannot log into the dashboard</li>
               <li>All historical conversations, visitors, and articles are kept safely</li>
@@ -1663,13 +1663,13 @@ function SuspendCompanyModal({ company, onClose, onConfirm }: SuspendCompanyModa
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-[12px] font-semibold text-ink-2">Suspension Reason</label>
+            <label className="text-xs font-semibold text-ink-2">Suspension Reason</label>
             <textarea
               rows={3}
               value={reason}
               onChange={(e) => setReason(e.target.value)}
               placeholder="Provide a reason for suspension..."
-              className="w-full p-2.5 rounded-xl border border-line bg-surface text-[12.5px] text-ink focus:outline-none focus:border-accent"
+              className="w-full p-2.5 rounded-xl border border-line bg-surface text-xs text-ink focus:outline-none focus:border-accent"
             />
           </div>
 
@@ -1677,14 +1677,14 @@ function SuspendCompanyModal({ company, onClose, onConfirm }: SuspendCompanyModa
             <button
               type="button"
               onClick={onClose}
-              className="h-9 px-4 rounded-xl border border-line bg-surface hover:bg-surface-2 text-ink text-[12px] font-medium"
+              className="h-9 px-4 rounded-xl border border-line bg-surface hover:bg-surface-2 text-ink text-xs font-medium"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="h-9 px-5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-[12px] font-semibold disabled:opacity-50 flex items-center gap-1.5"
+              className="h-9 px-5 rounded-xl bg-warn hover:bg-warn text-white text-xs font-semibold disabled:opacity-50 flex items-center gap-1.5"
             >
               {loading ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <PauseCircle className="w-3.5 h-3.5" />}
               <span>{loading ? 'Suspending...' : 'Suspend Workspace'}</span>
@@ -1726,16 +1726,16 @@ function DeleteCompanyModal({ company, onClose, onConfirm }: DeleteCompanyModalP
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in">
-      <div className="bg-surface border border-line rounded-2xl shadow-2xl max-w-md w-full overflow-hidden flex flex-col">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-overlay animate-in fade-in">
+      <div className="popover border border-line rounded-2xl shadow-2xl max-w-md w-full overflow-hidden flex flex-col">
         <div className="px-6 py-4 border-b border-line flex items-center justify-between bg-surface-2/60">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-rose-500/10 text-rose-500 flex items-center justify-center font-bold">
+            <div className="w-8 h-8 rounded-xl bg-danger/10 text-danger flex items-center justify-center font-bold">
               <Trash2 className="w-4.5 h-4.5" />
             </div>
             <div>
-              <h2 className="text-[16px] font-bold text-ink">Delete Company Workspace</h2>
-              <p className="text-[11.5px] text-ink-3">{company.name}</p>
+              <h2 className="text-base font-bold text-ink">Delete Company Workspace</h2>
+              <p className="text-xs text-ink-3">{company.name}</p>
             </div>
           </div>
           <button
@@ -1748,24 +1748,24 @@ function DeleteCompanyModal({ company, onClose, onConfirm }: DeleteCompanyModalP
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           {errorMsg && (
-            <div className="p-3 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-600 text-xs">
+            <div className="p-3 rounded-lg bg-danger/10 border border-danger/20 text-danger text-xs">
               {errorMsg}
             </div>
           )}
 
-          <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-700 dark:text-rose-400 text-xs space-y-1.5">
+          <div className="p-3 rounded-xl bg-danger/10 border border-danger/20 text-danger text-xs space-y-1.5">
             <div className="font-semibold flex items-center gap-1.5">
               <AlertTriangle className="w-3.5 h-3.5" />
               <span>30-Day Soft Delete Retention</span>
             </div>
-            <p className="text-[11.5px] leading-relaxed">
+            <p className="text-xs leading-relaxed">
               This workspace will be soft-deleted. The chat widget and agent logins will immediately stop working. All historical data is kept for <strong>30 days</strong> and can be restored at any time during this period.
             </p>
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-[12px] font-semibold text-ink-2">
-              Type <span className="font-mono text-rose-500 font-bold">DELETE</span> to confirm:
+            <label className="text-xs font-semibold text-ink-2">
+              Type <span className="font-mono text-danger font-bold">DELETE</span> to confirm:
             </label>
             <input
               type="text"
@@ -1773,7 +1773,7 @@ function DeleteCompanyModal({ company, onClose, onConfirm }: DeleteCompanyModalP
               value={typedConfirm}
               onChange={(e) => setTypedConfirm(e.target.value)}
               placeholder="DELETE"
-              className="w-full h-9.5 px-3 rounded-xl border border-line bg-surface text-[13px] font-mono text-ink focus:outline-none focus:border-rose-500"
+              className="w-full h-9.5 px-3 rounded-xl border border-line bg-surface text-ui font-mono text-ink focus:outline-none focus:border-danger"
             />
           </div>
 
@@ -1781,14 +1781,14 @@ function DeleteCompanyModal({ company, onClose, onConfirm }: DeleteCompanyModalP
             <button
               type="button"
               onClick={onClose}
-              className="h-9 px-4 rounded-xl border border-line bg-surface hover:bg-surface-2 text-ink text-[12px] font-medium"
+              className="h-9 px-4 rounded-xl border border-line bg-surface hover:bg-surface-2 text-ink text-xs font-medium"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={typedConfirm !== 'DELETE' || loading}
-              className="h-9 px-5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-[12px] font-semibold disabled:opacity-40 flex items-center gap-1.5"
+              className="h-9 px-5 rounded-xl bg-danger hover:bg-danger text-white text-xs font-semibold disabled:opacity-40 flex items-center gap-1.5"
             >
               {loading ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
               <span>{loading ? 'Deleting...' : 'Confirm Soft Delete (30 Days)'}</span>
@@ -1832,16 +1832,16 @@ function ChangeOwnerModal({ company, onClose, onConfirm }: ChangeOwnerModalProps
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in">
-      <div className="bg-surface border border-line rounded-2xl shadow-2xl max-w-md w-full overflow-hidden flex flex-col">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-overlay animate-in fade-in">
+      <div className="popover border border-line rounded-2xl shadow-2xl max-w-md w-full overflow-hidden flex flex-col">
         <div className="px-6 py-4 border-b border-line flex items-center justify-between bg-surface-2/60">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-blue-500/10 text-blue-500 flex items-center justify-center font-bold">
+            <div className="w-8 h-8 rounded-xl bg-accent/10 text-accent flex items-center justify-center font-bold">
               <Mail className="w-4.5 h-4.5" />
             </div>
             <div>
-              <h2 className="text-[16px] font-bold text-ink">Assign / Change Owner</h2>
-              <p className="text-[11.5px] text-ink-3">{company.name}</p>
+              <h2 className="text-base font-bold text-ink">Assign / Change Owner</h2>
+              <p className="text-xs text-ink-3">{company.name}</p>
             </div>
           </div>
           <button
@@ -1854,33 +1854,33 @@ function ChangeOwnerModal({ company, onClose, onConfirm }: ChangeOwnerModalProps
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           {errorMsg && (
-            <div className="p-3 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-600 text-xs">
+            <div className="p-3 rounded-lg bg-danger/10 border border-danger/20 text-danger text-xs">
               {errorMsg}
             </div>
           )}
 
           <div className="space-y-1">
-            <span className="text-[11px] text-ink-3 uppercase font-semibold">Current Owner</span>
+            <span className="text-2xs text-ink-3 uppercase font-semibold">Current Owner</span>
             <div className="font-semibold text-ink text-sm">
               {company.owner_email ? (
                 <span className="text-accent">{company.owner_email}</span>
               ) : (
-                <span className="text-rose-500 italic">No owner assigned (0 seats)</span>
+                <span className="text-danger italic">No owner assigned (0 seats)</span>
               )}
             </div>
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-[12px] font-semibold text-ink-2">New Owner Email Address *</label>
+            <label className="text-xs font-semibold text-ink-2">New Owner Email Address *</label>
             <input
               type="email"
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="owner@company.com"
-              className="w-full h-9.5 px-3 rounded-xl border border-line bg-surface text-[13px] text-ink focus:outline-none focus:border-accent"
+              className="w-full h-9.5 px-3 rounded-xl border border-line bg-surface text-ui text-ink focus:outline-none focus:border-accent"
             />
-            <p className="text-[11px] text-ink-3">
+            <p className="text-2xs text-ink-3">
               This email will be assigned the workspace owner role and linked to this workspace.
             </p>
           </div>
@@ -1889,14 +1889,14 @@ function ChangeOwnerModal({ company, onClose, onConfirm }: ChangeOwnerModalProps
             <button
               type="button"
               onClick={onClose}
-              className="h-9 px-4 rounded-xl border border-line bg-surface hover:bg-surface-2 text-ink text-[12px] font-medium"
+              className="h-9 px-4 rounded-xl border border-line bg-surface hover:bg-surface-2 text-ink text-xs font-medium"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="h-9 px-5 rounded-xl bg-accent text-accent-ink hover:opacity-90 text-[12px] font-semibold disabled:opacity-50 flex items-center gap-1.5"
+              className="h-9 px-5 rounded-xl bg-accent text-accent-ink hover:opacity-90 text-xs font-semibold disabled:opacity-50 flex items-center gap-1.5"
             >
               {loading ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Mail className="w-3.5 h-3.5" />}
               <span>{loading ? 'Saving...' : 'Assign Owner'}</span>
@@ -1963,16 +1963,16 @@ function EditCompanyModal({ company, onClose, onConfirm }: EditCompanyModalProps
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in">
-      <div className="bg-surface border border-line rounded-2xl shadow-2xl max-w-md w-full overflow-hidden flex flex-col max-h-[90vh]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-overlay animate-in fade-in">
+      <div className="popover border border-line rounded-2xl shadow-2xl max-w-md w-full overflow-hidden flex flex-col max-h-[90vh]">
         <div className="px-6 py-4 border-b border-line flex items-center justify-between bg-surface-2/60">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-purple-500/10 text-purple-500 flex items-center justify-center font-bold">
+            <div className="w-8 h-8 rounded-xl bg-accent/10 text-accent flex items-center justify-center font-bold">
               <Settings2 className="w-4.5 h-4.5" />
             </div>
             <div>
-              <h2 className="text-[16px] font-bold text-ink">Edit Company Details</h2>
-              <p className="text-[11.5px] text-ink-3">Manage name, domain, plan and usage limits</p>
+              <h2 className="text-base font-bold text-ink">Edit Company Details</h2>
+              <p className="text-xs text-ink-3">Manage name, domain, plan and usage limits</p>
             </div>
           </div>
           <button
@@ -1985,35 +1985,35 @@ function EditCompanyModal({ company, onClose, onConfirm }: EditCompanyModalProps
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto">
           {errorMsg && (
-            <div className="p-3 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-600 text-xs">
+            <div className="p-3 rounded-lg bg-danger/10 border border-danger/20 text-danger text-xs">
               {errorMsg}
             </div>
           )}
 
           <div className="space-y-1.5">
-            <label className="text-[12px] font-semibold text-ink-2">Company Name *</label>
+            <label className="text-xs font-semibold text-ink-2">Company Name *</label>
             <input
               type="text"
               required
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full h-9.5 px-3 rounded-xl border border-line bg-surface text-[13px] text-ink focus:outline-none focus:border-accent"
+              className="w-full h-9.5 px-3 rounded-xl border border-line bg-surface text-ui text-ink focus:outline-none focus:border-accent"
             />
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-[12px] font-semibold text-ink-2">Website Domain / URL</label>
+            <label className="text-xs font-semibold text-ink-2">Website Domain / URL</label>
             <input
               type="text"
               value={websiteUrl}
               onChange={(e) => setWebsiteUrl(e.target.value)}
               placeholder="e.g. acme.com"
-              className="w-full h-9.5 px-3 rounded-xl border border-line bg-surface text-[13px] text-ink focus:outline-none focus:border-accent"
+              className="w-full h-9.5 px-3 rounded-xl border border-line bg-surface text-ui text-ink focus:outline-none focus:border-accent"
             />
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-[12px] font-semibold text-ink-2">Subscription Plan</label>
+            <label className="text-xs font-semibold text-ink-2">Subscription Plan</label>
             <select
               value={plan}
               onChange={(e) => {
@@ -2037,7 +2037,7 @@ function EditCompanyModal({ company, onClose, onConfirm }: EditCompanyModalProps
                   setMaxAiReplies(50000);
                 }
               }}
-              className="w-full h-9.5 px-3 rounded-xl border border-line bg-surface text-[13px] text-ink focus:outline-none focus:border-accent capitalize"
+              className="w-full h-9.5 px-3 rounded-xl border border-line bg-surface text-ui text-ink focus:outline-none focus:border-accent capitalize"
             >
               <option value="free">Free</option>
               <option value="starter">Starter</option>
@@ -2047,39 +2047,39 @@ function EditCompanyModal({ company, onClose, onConfirm }: EditCompanyModalProps
           </div>
 
           <div className="space-y-3 pt-2 border-t border-line">
-            <h4 className="text-[11.5px] font-bold text-ink uppercase tracking-wider">Plan Limits</h4>
+            <h4 className="text-xs font-bold text-ink uppercase tracking-wider">Plan Limits</h4>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div className="space-y-1">
-                <label className="text-[11.5px] text-ink-3">Max Seats</label>
+                <label className="text-xs text-ink-3">Max Seats</label>
                 <input
                   type="number"
                   min={1}
                   value={maxSeats}
                   onChange={(e) => setMaxSeats(Number(e.target.value))}
-                  className="w-full h-9 px-2.5 rounded-lg border border-line bg-surface text-[12.5px] text-ink focus:outline-none focus:border-accent"
+                  className="w-full h-9 px-2.5 rounded-lg border border-line bg-surface text-xs text-ink focus:outline-none focus:border-accent"
                 />
               </div>
 
               <div className="space-y-1">
-                <label className="text-[11.5px] text-ink-3">Monthly Chats</label>
+                <label className="text-xs text-ink-3">Monthly Chats</label>
                 <input
                   type="number"
                   min={0}
                   value={maxMonthlyConvs}
                   onChange={(e) => setMaxMonthlyConvs(Number(e.target.value))}
-                  className="w-full h-9 px-2.5 rounded-lg border border-line bg-surface text-[12.5px] text-ink focus:outline-none focus:border-accent"
+                  className="w-full h-9 px-2.5 rounded-lg border border-line bg-surface text-xs text-ink focus:outline-none focus:border-accent"
                 />
               </div>
 
               <div className="space-y-1">
-                <label className="text-[11.5px] text-ink-3">AI Replies</label>
+                <label className="text-xs text-ink-3">AI Replies</label>
                 <input
                   type="number"
                   min={0}
                   value={maxAiReplies}
                   onChange={(e) => setMaxAiReplies(Number(e.target.value))}
-                  className="w-full h-9 px-2.5 rounded-lg border border-line bg-surface text-[12.5px] text-ink focus:outline-none focus:border-accent"
+                  className="w-full h-9 px-2.5 rounded-lg border border-line bg-surface text-xs text-ink focus:outline-none focus:border-accent"
                 />
               </div>
             </div>
@@ -2089,14 +2089,14 @@ function EditCompanyModal({ company, onClose, onConfirm }: EditCompanyModalProps
             <button
               type="button"
               onClick={onClose}
-              className="h-9 px-4 rounded-xl border border-line bg-surface hover:bg-surface-2 text-ink text-[12px] font-medium"
+              className="h-9 px-4 rounded-xl border border-line bg-surface hover:bg-surface-2 text-ink text-xs font-medium"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="h-9 px-5 rounded-xl bg-accent text-accent-ink hover:opacity-90 text-[12px] font-semibold disabled:opacity-50 flex items-center gap-1.5"
+              className="h-9 px-5 rounded-xl bg-accent text-accent-ink hover:opacity-90 text-xs font-semibold disabled:opacity-50 flex items-center gap-1.5"
             >
               {loading ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
               <span>{loading ? 'Saving...' : 'Save Changes'}</span>
@@ -2167,16 +2167,16 @@ function MergeWorkspacesModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in">
-      <div className="bg-surface border border-line rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden flex flex-col max-h-[90vh]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-overlay animate-in fade-in">
+      <div className="popover border border-line rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden flex flex-col max-h-[90vh]">
         <div className="px-6 py-4 border-b border-line flex items-center justify-between bg-surface-2/60">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-purple-500/10 text-purple-600 dark:text-purple-400 flex items-center justify-center font-bold">
+            <div className="w-8 h-8 rounded-xl bg-accent/10 text-accent flex items-center justify-center font-bold">
               <GitMerge className="w-4.5 h-4.5" />
             </div>
             <div>
-              <h2 className="text-[16px] font-bold text-ink">Merge Duplicate Workspaces</h2>
-              <p className="text-[11.5px] text-ink-3">Consolidate data into a single destination workspace</p>
+              <h2 className="text-base font-bold text-ink">Merge Duplicate Workspaces</h2>
+              <p className="text-xs text-ink-3">Consolidate data into a single destination workspace</p>
             </div>
           </div>
           <button
@@ -2189,7 +2189,7 @@ function MergeWorkspacesModal({
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto">
           {errorMsg && (
-            <div className="p-3 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-600 text-xs">
+            <div className="p-3 rounded-lg bg-danger/10 border border-danger/20 text-danger text-xs">
               {errorMsg}
             </div>
           )}
@@ -2197,10 +2197,10 @@ function MergeWorkspacesModal({
           {/* Source Workspace Card */}
           <div className="p-3.5 rounded-xl border border-line bg-surface-2/60 space-y-2">
             <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold text-ink-3 uppercase tracking-wider">
+              <span className="text-2xs font-bold text-ink-3 uppercase tracking-wider">
                 Source Workspace (Will be deactivated)
               </span>
-              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-surface-3 text-ink-2">Source</span>
+              <span className="px-2 py-0.5 rounded text-2xs font-bold bg-surface-3 text-ink-2">Source</span>
             </div>
             <div className="flex items-center gap-2.5">
               <div
@@ -2210,13 +2210,13 @@ function MergeWorkspacesModal({
                 {sourceCompany.name.charAt(0)}
               </div>
               <div className="min-w-0 flex-1">
-                <div className="font-bold text-ink text-[13.5px] truncate">{sourceCompany.name}</div>
-                <div className="text-[11.5px] text-ink-3">
+                <div className="font-bold text-ink text-ui truncate">{sourceCompany.name}</div>
+                <div className="text-xs text-ink-3">
                   {sourceCompany.website_url || 'No domain'} • {formatSeats(sourceCompany.agents_count)}
                 </div>
               </div>
             </div>
-            <div className="grid grid-cols-4 gap-2 pt-1 text-center text-[11px] text-ink-3">
+            <div className="grid grid-cols-4 gap-2 pt-1 text-center text-2xs text-ink-3">
               <div className="bg-surface p-1.5 rounded-lg border border-line">
                 <div className="font-bold text-ink">{sourceCompany.conversations_count}</div>
                 <div>Chats</div>
@@ -2238,11 +2238,11 @@ function MergeWorkspacesModal({
 
           {/* Target Workspace Selector */}
           <div className="space-y-1.5">
-            <label className="text-[12px] font-semibold text-ink-2">Select Target Destination Workspace *</label>
+            <label className="text-xs font-semibold text-ink-2">Select Target Destination Workspace *</label>
             <select
               value={selectedTargetId}
               onChange={(e) => setSelectedTargetId(e.target.value)}
-              className="w-full h-10 px-3 rounded-xl border border-line bg-surface text-[13px] text-ink focus:outline-none focus:border-accent font-medium"
+              className="w-full h-10 px-3 rounded-xl border border-line bg-surface text-ui text-ink focus:outline-none focus:border-accent font-medium"
             >
               {sortedTargetOptions.map((c) => {
                 const isDup = dupIds.includes(c.id);
@@ -2256,12 +2256,12 @@ function MergeWorkspacesModal({
           </div>
 
           {targetCompany && (
-            <div className="p-3.5 rounded-xl border border-emerald-500/30 bg-emerald-500/5 space-y-1.5 text-xs">
-              <div className="font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
+            <div className="p-3.5 rounded-xl border border-success/30 bg-success/5 space-y-1.5 text-xs">
+              <div className="font-semibold text-success flex items-center gap-1.5">
                 <CheckCircle2 className="w-3.5 h-3.5" />
                 <span>Destination: {targetCompany.name}</span>
               </div>
-              <p className="text-ink-3 text-[11.5px]">
+              <p className="text-ink-3 text-xs">
                 All {sourceCompany.conversations_count} conversations, {sourceCompany.visitors_count} visitors, {sourceCompany.articles_count} help articles, and non-conflicting agents will be transferred into <strong>{targetCompany.name}</strong>.
               </p>
             </div>
@@ -2275,7 +2275,7 @@ function MergeWorkspacesModal({
                 onChange={(e) => setConfirmed(e.target.checked)}
                 className="mt-0.5 rounded border-line text-accent focus:ring-accent"
               />
-              <span className="text-[11.5px] text-ink-2">
+              <span className="text-xs text-ink-2">
                 I understand this operation moves all records permanently from <strong>{sourceCompany.name}</strong> into the target workspace and soft-deletes the source.
               </span>
             </label>
@@ -2285,14 +2285,14 @@ function MergeWorkspacesModal({
             <button
               type="button"
               onClick={onClose}
-              className="h-9 px-4 rounded-xl border border-line bg-surface hover:bg-surface-2 text-ink text-[12px] font-medium"
+              className="h-9 px-4 rounded-xl border border-line bg-surface hover:bg-surface-2 text-ink text-xs font-medium"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={!confirmed || !selectedTargetId || loading}
-              className="h-9 px-5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-[12px] font-semibold disabled:opacity-40 flex items-center gap-1.5"
+              className="h-9 px-5 rounded-xl bg-accent hover:bg-accent text-white text-xs font-semibold disabled:opacity-40 flex items-center gap-1.5"
             >
               {loading ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <GitMerge className="w-3.5 h-3.5" />}
               <span>{loading ? 'Merging...' : 'Merge Workspaces'}</span>
@@ -2356,9 +2356,9 @@ function CompaniesTableView({
   return (
     <div className="border border-line rounded-2xl overflow-hidden bg-surface shadow-2xs">
       <div className="overflow-x-auto">
-        <table className="w-full text-left border-collapse text-[12px]">
+        <table className="w-full text-left border-collapse text-xs">
           <thead>
-            <tr className="border-b border-line bg-surface-2/60 text-ink-3 font-semibold uppercase text-[10.5px] tracking-wider select-none">
+            <tr className="border-b border-line bg-surface-2/60 text-ink-3 font-semibold uppercase text-2xs tracking-wider select-none">
               <th className="py-3 px-4 cursor-pointer hover:text-ink" onClick={() => onSort('name')}>
                 Company {renderSortIndicator('name')}
               </th>
@@ -2417,8 +2417,8 @@ function CompaniesTableView({
                   className={cn(
                     'hover:bg-surface-2/40 transition-colors',
                     isCurrent && 'bg-accent/5',
-                    isDeleted && 'bg-rose-500/5',
-                    isSuspended && 'bg-amber-500/5'
+                    isDeleted && 'bg-danger/5',
+                    isSuspended && 'bg-warn/5'
                   )}
                 >
                   {/* 1. Company */}
@@ -2434,12 +2434,12 @@ function CompaniesTableView({
                         <div className="font-semibold text-ink truncate flex items-center gap-1.5">
                           <span>{comp.name}</span>
                           {isCurrent && (
-                            <span className="px-1.5 py-0.2 rounded text-[9.5px] font-bold bg-accent text-accent-ink">
+                            <span className="px-1.5 py-0.2 rounded text-2xs font-bold bg-accent text-accent-ink">
                               Active
                             </span>
                           )}
                         </div>
-                        <div className="text-[11px] text-ink-3 truncate max-w-[150px]">
+                        <div className="text-2xs text-ink-3 truncate max-w-[150px]">
                           {comp.website_url ? (
                             <a
                               href={comp.website_url.startsWith('http') ? comp.website_url : `https://${comp.website_url}`}
@@ -2465,7 +2465,7 @@ function CompaniesTableView({
                           {comp.owner_email}
                         </span>
                       ) : (
-                        <span className="text-rose-500 italic">No owner</span>
+                        <span className="text-danger italic">No owner</span>
                       )}
                     </div>
                   </td>
@@ -2473,15 +2473,15 @@ function CompaniesTableView({
                   {/* 3. Status */}
                   <td className="py-3 px-3 whitespace-nowrap">
                     {isDeleted ? (
-                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-500/15 text-rose-600 border border-rose-500/30">
+                      <span className="px-2 py-0.5 rounded text-2xs font-bold bg-danger/15 text-danger border border-danger/30">
                         Soft-Deleted ({daysLeft}d)
                       </span>
                     ) : isSuspended ? (
-                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/15 text-amber-600 border border-amber-500/30">
+                      <span className="px-2 py-0.5 rounded text-2xs font-bold bg-warn/15 text-warn border border-warn/30">
                         Suspended
                       </span>
                     ) : (
-                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/15 text-emerald-600 border border-emerald-500/30">
+                      <span className="px-2 py-0.5 rounded text-2xs font-bold bg-success/15 text-success border border-success/30">
                         Active
                       </span>
                     )}
@@ -2489,7 +2489,7 @@ function CompaniesTableView({
 
                   {/* 4. Plan */}
                   <td className="py-3 px-3 whitespace-nowrap">
-                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-500/10 text-purple-600 dark:text-purple-400 uppercase tracking-wider">
+                    <span className="px-2 py-0.5 rounded text-2xs font-bold bg-accent/10 text-accent uppercase tracking-wider">
                       {comp.plan || 'Free'}
                     </span>
                   </td>
@@ -2497,7 +2497,7 @@ function CompaniesTableView({
                   {/* 5. Chats */}
                   <td className="py-3 px-3 whitespace-nowrap font-medium text-ink">
                     {formatNumber(comp.conversations_count)}{' '}
-                    <span className="text-[10.5px] text-ink-3">({formatNumber(comp.open_conversations_count)})</span>
+                    <span className="text-2xs text-ink-3">({formatNumber(comp.open_conversations_count)})</span>
                   </td>
 
                   {/* 6. Messages */}
@@ -2509,7 +2509,7 @@ function CompaniesTableView({
                   <td className="py-3 px-3 whitespace-nowrap font-medium text-ink">
                     {formatNumber(comp.visitors_count)}
                     {comp.active_visitors_count > 0 && !isSuspended && !isDeleted && (
-                      <span className="ml-1 inline-flex items-center px-1.5 py-0.2 rounded text-[9.5px] font-bold bg-emerald-500/15 text-emerald-600">
+                      <span className="ml-1 inline-flex items-center px-1.5 py-0.2 rounded text-2xs font-bold bg-success/15 text-success">
                         🟢 {comp.active_visitors_count}
                       </span>
                     )}
@@ -2517,7 +2517,7 @@ function CompaniesTableView({
 
                   {/* 8. Seats */}
                   <td className="py-3 px-3 whitespace-nowrap">
-                    <span className={cn(comp.agents_count === 0 ? 'text-rose-500 font-bold' : 'text-ink font-medium')}>
+                    <span className={cn(comp.agents_count === 0 ? 'text-danger font-bold' : 'text-ink font-medium')}>
                       {formatSeats(comp.agents_count)}
                     </span>
                   </td>
@@ -2525,7 +2525,7 @@ function CompaniesTableView({
                   {/* 9. Widget */}
                   <td className="py-3 px-3 whitespace-nowrap">
                     {comp.widget_installed ? (
-                      <span className="text-emerald-500 font-semibold">Yes 🟢</span>
+                      <span className="text-success font-semibold">Yes 🟢</span>
                     ) : (
                       <span className="text-ink-3">No ⚪</span>
                     )}
@@ -2534,7 +2534,7 @@ function CompaniesTableView({
                   {/* 10. AI */}
                   <td className="py-3 px-3 whitespace-nowrap">
                     {comp.ai_enabled ? (
-                      <span className="text-indigo-500 font-bold">ON ⚡</span>
+                      <span className="text-accent font-bold">ON ⚡</span>
                     ) : (
                       <span className="text-ink-3">OFF</span>
                     )}
@@ -2553,14 +2553,14 @@ function CompaniesTableView({
                           <span
                             key={idx}
                             className={cn(
-                              'inline-flex items-center px-1.5 py-0.5 rounded text-[9.5px] font-semibold border',
+                              'inline-flex items-center px-1.5 py-0.5 rounded text-2xs font-semibold border',
                               flag.includes('waiting over 24h')
-                                ? 'bg-rose-500/15 text-rose-600 dark:text-rose-400 border-rose-500/30'
+                                ? 'bg-danger/15 text-danger border-danger/30'
                                 : flag === 'widget not installed'
-                                ? 'bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/25'
+                                ? 'bg-danger/10 text-danger border-danger/25'
                                 : flag === 'no agent online for 7 days'
-                                ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/25'
-                                : 'bg-slate-500/10 text-slate-600 dark:text-slate-400 border-slate-500/25'
+                                ? 'bg-warn/10 text-warn border-warn/25'
+                                : 'bg-ink-3/10 text-ink-2 border-line-3/25'
                             )}
                             title={flag}
                           >
@@ -2569,7 +2569,7 @@ function CompaniesTableView({
                         ))}
                       </div>
                     ) : (
-                      <span className="inline-flex items-center gap-1 text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">
+                      <span className="inline-flex items-center gap-1 text-2xs text-success font-medium">
                         <CheckCircle2 className="w-3 h-3" />
                         Healthy
                       </span>
@@ -2591,7 +2591,7 @@ function CompaniesTableView({
                     <div className="flex items-center justify-end gap-1.5">
                       <button
                         onClick={() => onOpenDrilldown(comp.id)}
-                        className="h-7 px-2 rounded-lg border border-line bg-surface hover:bg-surface-2 text-ink text-[11px] font-medium"
+                        className="h-7 px-2 rounded-lg border border-line bg-surface hover:bg-surface-2 text-ink text-2xs font-medium"
                         title="View Insights"
                       >
                         Insights
@@ -2601,7 +2601,7 @@ function CompaniesTableView({
                         <button
                           onClick={() => onSwitchWorkspace(comp)}
                           disabled={switchingId === comp.id || isSuspended || isDeleted}
-                          className="h-7 px-2 rounded-lg bg-accent text-accent-ink hover:opacity-90 text-[11px] font-semibold disabled:opacity-40"
+                          className="h-7 px-2 rounded-lg bg-accent text-accent-ink hover:opacity-90 text-2xs font-semibold disabled:opacity-40"
                           title="Switch into workspace"
                         >
                           Switch
@@ -2610,7 +2610,7 @@ function CompaniesTableView({
 
                       <button
                         onClick={() => onOpenEdit(comp)}
-                        className="h-7 px-2 rounded-lg border border-line bg-surface hover:bg-surface-2 text-ink text-[11px]"
+                        className="h-7 px-2 rounded-lg border border-line bg-surface hover:bg-surface-2 text-ink text-2xs"
                         title="Edit name, domain, plan and limits"
                       >
                         Edit
@@ -2618,7 +2618,7 @@ function CompaniesTableView({
 
                       <button
                         onClick={() => onOpenChangeOwner(comp)}
-                        className="h-7 px-2 rounded-lg border border-line bg-surface hover:bg-surface-2 text-ink text-[11px]"
+                        className="h-7 px-2 rounded-lg border border-line bg-surface hover:bg-surface-2 text-ink text-2xs"
                         title="Change Owner"
                       >
                         Owner
@@ -2627,7 +2627,7 @@ function CompaniesTableView({
                       {isSuspended ? (
                         <button
                           onClick={() => onReactivate(comp)}
-                          className="h-7 px-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 text-emerald-600 text-[11px]"
+                          className="h-7 px-2 rounded-lg border border-success/30 bg-success/10 text-success text-2xs"
                           title="Reactivate Workspace"
                         >
                           Reactivate
@@ -2635,7 +2635,7 @@ function CompaniesTableView({
                       ) : (
                         <button
                           onClick={() => onOpenSuspend(comp)}
-                          className="h-7 px-2 rounded-lg border border-amber-500/30 bg-amber-500/10 text-amber-600 text-[11px]"
+                          className="h-7 px-2 rounded-lg border border-warn/30 bg-warn/10 text-warn text-2xs"
                           title="Suspend Workspace"
                         >
                           Suspend
@@ -2644,7 +2644,7 @@ function CompaniesTableView({
 
                       <button
                         onClick={() => onOpenMerge(comp)}
-                        className="h-7 px-2 rounded-lg border border-purple-500/30 bg-purple-500/10 text-purple-600 text-[11px]"
+                        className="h-7 px-2 rounded-lg border border-accent/30 bg-accent/10 text-accent text-2xs"
                         title="Merge Workspace"
                       >
                         Merge
@@ -2653,7 +2653,7 @@ function CompaniesTableView({
                       {isDeleted ? (
                         <button
                           onClick={() => onRestore(comp)}
-                          className="h-7 px-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 text-emerald-600 text-[11px]"
+                          className="h-7 px-2 rounded-lg border border-success/30 bg-success/10 text-success text-2xs"
                           title="Restore from Trash"
                         >
                           Restore
@@ -2661,7 +2661,7 @@ function CompaniesTableView({
                       ) : (
                         <button
                           onClick={() => onOpenDelete(comp)}
-                          className="h-7 px-2 rounded-lg border border-rose-500/30 bg-rose-500/10 text-rose-600 text-[11px]"
+                          className="h-7 px-2 rounded-lg border border-danger/30 bg-danger/10 text-danger text-2xs"
                           title="Soft Delete Workspace"
                         >
                           Delete
@@ -2703,7 +2703,7 @@ function PaginationControls({
   const end = Math.min(currentPage * pageSize, totalItems);
 
   return (
-    <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-3 text-[12px] text-ink-3 border-t border-line">
+    <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-3 text-xs text-ink-3 border-t border-line">
       <div className="flex items-center gap-2">
         <span>
           Showing <strong className="text-ink">{start}</strong> to <strong className="text-ink">{end}</strong> of{' '}
@@ -2854,22 +2854,22 @@ function DataIssuesModal({
   );
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in">
-      <div className="bg-surface border border-line rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-overlay animate-in fade-in">
+      <div className="popover border border-line rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
         {/* Header */}
         <div className="px-6 py-4.5 border-b border-line flex items-center justify-between bg-surface-2/60">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center font-bold">
+            <div className="w-10 h-10 rounded-xl bg-warn/10 text-warn flex items-center justify-center font-bold">
               <ShieldAlert className="w-5 h-5" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-[17px] font-bold text-ink">Data Integrity &amp; Orphan Issues Panel</h2>
-                <span className="px-2 py-0.5 rounded-full text-[10.5px] font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+                <h2 className="text-lg font-bold text-ink">Data Integrity &amp; Orphan Issues Panel</h2>
+                <span className="px-2 py-0.5 rounded-full text-2xs font-bold bg-warn/10 text-warn border border-warn/20">
                   {formatNumber(totalOrphans + workspaceAnomaliesCount)} issues detected
                 </span>
               </div>
-              <p className="text-[11.5px] text-ink-3">
+              <p className="text-xs text-ink-3">
                 Orphan database records unassociated with active companies and workspace anomalies.
               </p>
             </div>
@@ -2884,8 +2884,8 @@ function DataIssuesModal({
         </div>
 
         {/* Informative Explanation Banner */}
-        <div className="px-6 py-3 bg-blue-500/5 border-b border-blue-500/10 flex items-start gap-2.5 text-[12px] text-ink-2">
-          <Database className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" />
+        <div className="px-6 py-3 bg-accent/5 border-b border-accent/10 flex items-start gap-2.5 text-xs text-ink-2">
+          <Database className="w-4 h-4 text-accent shrink-0 mt-0.5" />
           <p>
             <strong>Platform Accounting Rule:</strong> Platform totals strictly equal the sum of registered per-company cards. Orphan records lacking a valid workspace association are listed below for audit and maintenance.
           </p>
@@ -2894,28 +2894,28 @@ function DataIssuesModal({
         {/* Quick KPI Overview */}
         <div className="px-6 py-3.5 border-b border-line bg-surface grid grid-cols-2 sm:grid-cols-6 gap-2">
           <div className="p-2.5 rounded-xl border border-line bg-surface-2/40 text-center">
-            <div className="text-[10px] uppercase font-bold text-ink-3">Orphan Agents</div>
-            <div className="text-[16px] font-extrabold text-ink mt-0.5">{formatNumber(orphanAgents.length)}</div>
+            <div className="text-2xs uppercase font-bold text-ink-3">Orphan Agents</div>
+            <div className="text-base font-extrabold text-ink mt-0.5">{formatNumber(orphanAgents.length)}</div>
           </div>
           <div className="p-2.5 rounded-xl border border-line bg-surface-2/40 text-center">
-            <div className="text-[10px] uppercase font-bold text-ink-3">Orphan Chats</div>
-            <div className="text-[16px] font-extrabold text-ink mt-0.5">{formatNumber(orphanConversations.length)}</div>
+            <div className="text-2xs uppercase font-bold text-ink-3">Orphan Chats</div>
+            <div className="text-base font-extrabold text-ink mt-0.5">{formatNumber(orphanConversations.length)}</div>
           </div>
           <div className="p-2.5 rounded-xl border border-line bg-surface-2/40 text-center">
-            <div className="text-[10px] uppercase font-bold text-ink-3">Orphan Msgs</div>
-            <div className="text-[16px] font-extrabold text-ink mt-0.5">{formatNumber(orphanMessages.length)}</div>
+            <div className="text-2xs uppercase font-bold text-ink-3">Orphan Msgs</div>
+            <div className="text-base font-extrabold text-ink mt-0.5">{formatNumber(orphanMessages.length)}</div>
           </div>
           <div className="p-2.5 rounded-xl border border-line bg-surface-2/40 text-center">
-            <div className="text-[10px] uppercase font-bold text-ink-3">Orphan Visitors</div>
-            <div className="text-[16px] font-extrabold text-ink mt-0.5">{formatNumber(orphanVisitors.length)}</div>
+            <div className="text-2xs uppercase font-bold text-ink-3">Orphan Visitors</div>
+            <div className="text-base font-extrabold text-ink mt-0.5">{formatNumber(orphanVisitors.length)}</div>
           </div>
           <div className="p-2.5 rounded-xl border border-line bg-surface-2/40 text-center">
-            <div className="text-[10px] uppercase font-bold text-rose-500">0 Seats (No Owner)</div>
-            <div className="text-[16px] font-extrabold text-rose-600 dark:text-rose-400 mt-0.5">{formatNumber(noOwnerCompanies.length)}</div>
+            <div className="text-2xs uppercase font-bold text-danger">0 Seats (No Owner)</div>
+            <div className="text-base font-extrabold text-danger mt-0.5">{formatNumber(noOwnerCompanies.length)}</div>
           </div>
           <div className="p-2.5 rounded-xl border border-line bg-surface-2/40 text-center">
-            <div className="text-[10px] uppercase font-bold text-amber-500">Duplicates</div>
-            <div className="text-[16px] font-extrabold text-amber-600 dark:text-amber-400 mt-0.5">{formatNumber(duplicateCompanies.length)}</div>
+            <div className="text-2xs uppercase font-bold text-warn">Duplicates</div>
+            <div className="text-base font-extrabold text-warn mt-0.5">{formatNumber(duplicateCompanies.length)}</div>
           </div>
         </div>
 
@@ -2934,7 +2934,7 @@ function DataIssuesModal({
                 key={tab}
                 onClick={() => setActiveTab(tab as any)}
                 className={cn(
-                  'h-8 px-3 rounded-lg text-[12px] font-medium transition-all whitespace-nowrap',
+                  'h-8 px-3 rounded-lg text-xs font-medium transition-all whitespace-nowrap',
                   activeTab === tab
                     ? 'bg-accent text-accent-ink shadow-xs font-semibold'
                     : 'bg-surface-2 text-ink-2 hover:bg-surface-3 hover:text-ink'
@@ -2952,22 +2952,22 @@ function DataIssuesModal({
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="Search orphan records..."
-              className="w-full h-8 pl-8.5 pr-3 rounded-lg border border-line bg-surface text-[12px] text-ink placeholder:text-ink-3 focus:outline-none focus:border-accent"
+              className="w-full h-8 pl-8.5 pr-3 rounded-lg border border-line bg-surface text-xs text-ink placeholder:text-ink-3 focus:outline-none focus:border-accent"
             />
           </div>
         </div>
 
         {/* Tab Content Body */}
-        <div className="p-6 overflow-y-auto space-y-6 flex-1 text-[12.5px]">
+        <div className="p-6 overflow-y-auto space-y-6 flex-1 text-xs">
           {/* 1. AGENTS TAB / ALL */}
           {(activeTab === 'all' || activeTab === 'agents') && (
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <h3 className="font-bold text-ink uppercase tracking-wider text-[11.5px] flex items-center gap-1.5">
-                  <Users className="w-3.5 h-3.5 text-indigo-500" />
+                <h3 className="font-bold text-ink uppercase tracking-wider text-xs flex items-center gap-1.5">
+                  <Users className="w-3.5 h-3.5 text-accent" />
                   <span>Orphan Agents ({formatNumber(filteredAgents.length)})</span>
                 </h3>
-                <span className="text-[11px] text-ink-3">Agents registered without an active workspace</span>
+                <span className="text-2xs text-ink-3">Agents registered without an active workspace</span>
               </div>
 
               {filteredAgents.length === 0 ? (
@@ -2981,20 +2981,20 @@ function DataIssuesModal({
                       <div className="min-w-0 flex-1 space-y-1">
                         <div className="flex items-center gap-2">
                           <span className="font-semibold text-ink">{ag.name}</span>
-                          <span className="text-[11px] text-ink-3">({ag.email})</span>
-                          <span className="px-2 py-0.2 rounded text-[10px] font-bold bg-indigo-500/10 text-indigo-600 uppercase">
+                          <span className="text-2xs text-ink-3">({ag.email})</span>
+                          <span className="px-2 py-0.2 rounded text-2xs font-bold bg-accent/10 text-accent uppercase">
                             {ag.role}
                           </span>
                         </div>
-                        <div className="flex items-center gap-3 text-[11px] text-ink-3">
-                          <span className="text-rose-500 font-medium">{ag.issue_reason}</span>
+                        <div className="flex items-center gap-3 text-2xs text-ink-3">
+                          <span className="text-danger font-medium">{ag.issue_reason}</span>
                           <span>•</span>
                           <span>Joined {new Date(ag.created_at).toLocaleDateString()}</span>
                         </div>
                       </div>
 
                       <div className="flex items-center gap-2 shrink-0">
-                        <code className="text-[11px] text-ink-3 font-mono bg-surface-2 px-2 py-1 rounded">
+                        <code className="text-2xs text-ink-3 font-mono bg-surface-2 px-2 py-1 rounded">
                           {ag.id}
                         </code>
                         <button
@@ -3003,7 +3003,7 @@ function DataIssuesModal({
                           title="Copy Agent ID"
                         >
                           {copiedId === ag.id ? (
-                            <Check className="w-3.5 h-3.5 text-emerald-500" />
+                            <Check className="w-3.5 h-3.5 text-success" />
                           ) : (
                             <Copy className="w-3.5 h-3.5" />
                           )}
@@ -3020,11 +3020,11 @@ function DataIssuesModal({
           {(activeTab === 'all' || activeTab === 'conversations') && (
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <h3 className="font-bold text-ink uppercase tracking-wider text-[11.5px] flex items-center gap-1.5">
-                  <MessageSquare className="w-3.5 h-3.5 text-emerald-500" />
+                <h3 className="font-bold text-ink uppercase tracking-wider text-xs flex items-center gap-1.5">
+                  <MessageSquare className="w-3.5 h-3.5 text-success" />
                   <span>Orphan Conversations ({formatNumber(filteredConversations.length)})</span>
                 </h3>
-                <span className="text-[11px] text-ink-3">Customer chats missing workspace ID</span>
+                <span className="text-2xs text-ink-3">Customer chats missing workspace ID</span>
               </div>
 
               {filteredConversations.length === 0 ? (
@@ -3038,15 +3038,15 @@ function DataIssuesModal({
                       <div className="min-w-0 flex-1 space-y-1">
                         <div className="flex items-center gap-2">
                           <span className="font-semibold text-ink">Conversation</span>
-                          <span className="px-2 py-0.2 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-600 uppercase">
+                          <span className="px-2 py-0.2 rounded text-2xs font-bold bg-success/10 text-success uppercase">
                             {c.status}
                           </span>
-                          <span className="px-1.5 py-0.2 rounded text-[10px] bg-surface-2 text-ink-3 uppercase">
+                          <span className="px-1.5 py-0.2 rounded text-2xs bg-surface-2 text-ink-3 uppercase">
                             {c.channel}
                           </span>
                         </div>
-                        <div className="flex items-center gap-3 text-[11px] text-ink-3">
-                          <span className="text-rose-500 font-medium">{c.issue_reason}</span>
+                        <div className="flex items-center gap-3 text-2xs text-ink-3">
+                          <span className="text-danger font-medium">{c.issue_reason}</span>
                           <span>•</span>
                           <span>Visitor: {c.visitor_id.slice(0, 8)}...</span>
                           <span>•</span>
@@ -3055,7 +3055,7 @@ function DataIssuesModal({
                       </div>
 
                       <div className="flex items-center gap-2 shrink-0">
-                        <code className="text-[11px] text-ink-3 font-mono bg-surface-2 px-2 py-1 rounded">
+                        <code className="text-2xs text-ink-3 font-mono bg-surface-2 px-2 py-1 rounded">
                           {c.id}
                         </code>
                         <button
@@ -3064,7 +3064,7 @@ function DataIssuesModal({
                           title="Copy Conversation ID"
                         >
                           {copiedId === c.id ? (
-                            <Check className="w-3.5 h-3.5 text-emerald-500" />
+                            <Check className="w-3.5 h-3.5 text-success" />
                           ) : (
                             <Copy className="w-3.5 h-3.5" />
                           )}
@@ -3081,11 +3081,11 @@ function DataIssuesModal({
           {(activeTab === 'all' || activeTab === 'messages') && (
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <h3 className="font-bold text-ink uppercase tracking-wider text-[11.5px] flex items-center gap-1.5">
-                  <MessageSquare className="w-3.5 h-3.5 text-purple-500" />
+                <h3 className="font-bold text-ink uppercase tracking-wider text-xs flex items-center gap-1.5">
+                  <MessageSquare className="w-3.5 h-3.5 text-accent" />
                   <span>Orphan Messages ({formatNumber(filteredMessages.length)})</span>
                 </h3>
-                <span className="text-[11px] text-ink-3">Messages linked to orphan conversations</span>
+                <span className="text-2xs text-ink-3">Messages linked to orphan conversations</span>
               </div>
 
               {filteredMessages.length === 0 ? (
@@ -3099,12 +3099,12 @@ function DataIssuesModal({
                       <div className="min-w-0 flex-1 space-y-1">
                         <div className="flex items-center gap-2">
                           <span className="font-semibold text-ink">"{m.content_preview}..."</span>
-                          <span className="px-1.5 py-0.2 rounded text-[10px] bg-purple-500/10 text-purple-600 font-bold uppercase">
+                          <span className="px-1.5 py-0.2 rounded text-2xs bg-accent/10 text-accent font-bold uppercase">
                             {m.sender_type}
                           </span>
                         </div>
-                        <div className="flex items-center gap-3 text-[11px] text-ink-3">
-                          <span className="text-rose-500 font-medium">{m.issue_reason}</span>
+                        <div className="flex items-center gap-3 text-2xs text-ink-3">
+                          <span className="text-danger font-medium">{m.issue_reason}</span>
                           <span>•</span>
                           <span>Parent Conv: {m.conversation_id ? `${m.conversation_id.slice(0, 8)}...` : 'None'}</span>
                           <span>•</span>
@@ -3113,7 +3113,7 @@ function DataIssuesModal({
                       </div>
 
                       <div className="flex items-center gap-2 shrink-0">
-                        <code className="text-[11px] text-ink-3 font-mono bg-surface-2 px-2 py-1 rounded">
+                        <code className="text-2xs text-ink-3 font-mono bg-surface-2 px-2 py-1 rounded">
                           {m.id}
                         </code>
                         <button
@@ -3122,7 +3122,7 @@ function DataIssuesModal({
                           title="Copy Message ID"
                         >
                           {copiedId === m.id ? (
-                            <Check className="w-3.5 h-3.5 text-emerald-500" />
+                            <Check className="w-3.5 h-3.5 text-success" />
                           ) : (
                             <Copy className="w-3.5 h-3.5" />
                           )}
@@ -3139,11 +3139,11 @@ function DataIssuesModal({
           {(activeTab === 'all' || activeTab === 'visitors') && (
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <h3 className="font-bold text-ink uppercase tracking-wider text-[11.5px] flex items-center gap-1.5">
-                  <Radio className="w-3.5 h-3.5 text-amber-500" />
+                <h3 className="font-bold text-ink uppercase tracking-wider text-xs flex items-center gap-1.5">
+                  <Radio className="w-3.5 h-3.5 text-warn" />
                   <span>Orphan Visitors ({formatNumber(filteredVisitors.length)})</span>
                 </h3>
-                <span className="text-[11px] text-ink-3">Visitors without an assigned workspace ID</span>
+                <span className="text-2xs text-ink-3">Visitors without an assigned workspace ID</span>
               </div>
 
               {filteredVisitors.length === 0 ? (
@@ -3157,16 +3157,16 @@ function DataIssuesModal({
                       <div className="min-w-0 flex-1 space-y-1">
                         <div className="flex items-center gap-2">
                           <span className="font-semibold text-ink">{v.name || 'Anonymous Visitor'}</span>
-                          {v.email && <span className="text-[11px] text-ink-3">({v.email})</span>}
+                          {v.email && <span className="text-2xs text-ink-3">({v.email})</span>}
                           {v.location && (
-                            <span className="text-[11px] text-ink-3 flex items-center gap-0.5">
+                            <span className="text-2xs text-ink-3 flex items-center gap-0.5">
                               <MapPin className="w-2.5 h-2.5" />
                               {v.location}
                             </span>
                           )}
                         </div>
-                        <div className="flex items-center gap-3 text-[11px] text-ink-3 truncate">
-                          <span className="text-rose-500 font-medium">{v.issue_reason}</span>
+                        <div className="flex items-center gap-3 text-2xs text-ink-3 truncate">
+                          <span className="text-danger font-medium">{v.issue_reason}</span>
                           <span>•</span>
                           <span className="truncate max-w-xs">{v.current_url || 'Unknown page'}</span>
                           <span>•</span>
@@ -3175,7 +3175,7 @@ function DataIssuesModal({
                       </div>
 
                       <div className="flex items-center gap-2 shrink-0">
-                        <code className="text-[11px] text-ink-3 font-mono bg-surface-2 px-2 py-1 rounded">
+                        <code className="text-2xs text-ink-3 font-mono bg-surface-2 px-2 py-1 rounded">
                           {v.id}
                         </code>
                         <button
@@ -3184,7 +3184,7 @@ function DataIssuesModal({
                           title="Copy Visitor ID"
                         >
                           {copiedId === v.id ? (
-                            <Check className="w-3.5 h-3.5 text-emerald-500" />
+                            <Check className="w-3.5 h-3.5 text-success" />
                           ) : (
                             <Copy className="w-3.5 h-3.5" />
                           )}
@@ -3203,11 +3203,11 @@ function DataIssuesModal({
               {/* No Owner Workspaces */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <h3 className="font-bold text-rose-600 dark:text-rose-400 uppercase tracking-wider text-[11.5px] flex items-center gap-1.5">
-                    <AlertTriangle className="w-3.5 h-3.5 text-rose-500" />
+                  <h3 className="font-bold text-danger uppercase tracking-wider text-xs flex items-center gap-1.5">
+                    <AlertTriangle className="w-3.5 h-3.5 text-danger" />
                     <span>Workspaces with No Owner ("0 seats") ({formatNumber(filteredNoOwner.length)})</span>
                   </h3>
-                  <span className="text-[11px] text-ink-3">Workspaces having 0 registered agents</span>
+                  <span className="text-2xs text-ink-3">Workspaces having 0 registered agents</span>
                 </div>
 
                 {filteredNoOwner.length === 0 ? (
@@ -3221,11 +3221,11 @@ function DataIssuesModal({
                         <div className="min-w-0 flex-1 space-y-1">
                           <div className="flex items-center gap-2">
                             <span className="font-bold text-ink">{c.name}</span>
-                            <span className="px-2 py-0.2 rounded text-[10px] font-bold bg-rose-500/10 text-rose-600 border border-rose-500/20">
+                            <span className="px-2 py-0.2 rounded text-2xs font-bold bg-danger/10 text-danger border border-danger/20">
                               0 Seats
                             </span>
                           </div>
-                          <div className="text-[11px] text-ink-3">
+                          <div className="text-2xs text-ink-3">
                             Domain: {c.website_url || 'None'} • Created {new Date(c.created_at).toLocaleDateString()}
                           </div>
                         </div>
@@ -3247,11 +3247,11 @@ function DataIssuesModal({
               {/* Duplicates by Name + Domain */}
               <div className="space-y-3 pt-2">
                 <div className="flex items-center justify-between">
-                  <h3 className="font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider text-[11.5px] flex items-center gap-1.5">
-                    <Copy className="w-3.5 h-3.5 text-amber-500" />
+                  <h3 className="font-bold text-warn uppercase tracking-wider text-xs flex items-center gap-1.5">
+                    <Copy className="w-3.5 h-3.5 text-warn" />
                     <span>Duplicate Workspaces by Name &amp; Domain ({formatNumber(filteredDuplicates.length)})</span>
                   </h3>
-                  <span className="text-[11px] text-ink-3">Workspaces sharing identical normalized name and domain</span>
+                  <span className="text-2xs text-ink-3">Workspaces sharing identical normalized name and domain</span>
                 </div>
 
                 {filteredDuplicates.length === 0 ? (
@@ -3271,11 +3271,11 @@ function DataIssuesModal({
                           <div className="min-w-0 flex-1 space-y-1">
                             <div className="flex items-center gap-2">
                               <span className="font-bold text-ink">{c.name}</span>
-                              <span className="px-2 py-0.2 rounded text-[10px] font-bold bg-amber-500/10 text-amber-600 border border-amber-500/20">
+                              <span className="px-2 py-0.2 rounded text-2xs font-bold bg-warn/10 text-warn border border-warn/20">
                                 Duplicate ({count} workspaces)
                               </span>
                             </div>
-                            <div className="text-[11px] text-ink-3">
+                            <div className="text-2xs text-ink-3">
                               Normalized Key: <code className="text-accent">{cleanName} @ {cleanDomain || '(empty)'}</code> • ID: {c.id}
                             </div>
                           </div>
@@ -3300,10 +3300,10 @@ function DataIssuesModal({
 
         {/* Footer */}
         <div className="px-6 py-3.5 border-t border-line flex items-center justify-between bg-surface-2/40">
-          <span className="text-[11.5px] text-ink-3">Super Admin Data Correctness &amp; Auditing Suite</span>
+          <span className="text-xs text-ink-3">Super Admin Data Correctness &amp; Auditing Suite</span>
           <button
             onClick={onClose}
-            className="h-8.5 px-4 rounded-xl border border-line bg-surface hover:bg-surface-2 text-ink text-[12px] font-medium"
+            className="h-8.5 px-4 rounded-xl border border-line bg-surface hover:bg-surface-2 text-ink text-xs font-medium"
           >
             Close Panel
           </button>

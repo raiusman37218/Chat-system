@@ -36,7 +36,7 @@ export function AuthShell({
 
         <Link
           href="/"
-          className="inline-flex items-center gap-1.5 min-h-11 text-[12.5px] text-ink-3 hover:text-ink transition-colors"
+          className="inline-flex items-center gap-1.5 min-h-11 text-xs text-ink-3 hover:text-ink transition-colors"
         >
           <ArrowLeft className="w-3.5 h-3.5" />
           Back to home
@@ -72,10 +72,10 @@ export function AuthAside({
 }) {
   return (
     <div className="max-w-md">
-      <span className="text-[11px] font-bold uppercase tracking-[0.1em] opacity-50">
+      <span className="text-2xs font-bold uppercase tracking-[0.1em] opacity-50">
         {eyebrow}
       </span>
-      <h2 className="mt-4 text-[2.1rem] leading-[1.12] font-semibold text-invert-ink">
+      <h2 className="mt-4 text-4xl leading-[1.12] font-semibold text-invert-ink">
         {headline}
       </h2>
 
@@ -84,8 +84,8 @@ export function AuthAside({
           <li key={p.title} className="flex gap-4">
             <span className="mt-1.5 w-1 h-1 rounded-full bg-white/40 shrink-0" />
             <div>
-              <div className="text-[14px] font-semibold">{p.title}</div>
-              <p className="mt-1 text-[13px] leading-relaxed opacity-60">
+              <div className="text-sm font-semibold">{p.title}</div>
+              <p className="mt-1 text-ui leading-relaxed opacity-60">
                 {p.body}
               </p>
             </div>

@@ -38,10 +38,10 @@ export function FaqSection() {
     <section id="faq" className="u-container py-20 sm:py-28 border-t border-line">
       <div className="max-w-2xl mx-auto text-center">
         <span className="eyebrow">Got Questions?</span>
-        <h2 className="mt-3 text-3xl sm:text-[2.6rem] leading-[1.1] font-semibold text-ink">
+        <h2 className="mt-3 text-3xl sm:text-5xl leading-[1.1] font-semibold text-ink">
           Frequently asked questions
         </h2>
-        <p className="mt-4 text-[15px] text-ink-2">
+        <p className="mt-4 text-md text-ink-2">
           Everything you need to know about setting up and running Zen-try.
         </p>
       </div>
@@ -62,7 +62,7 @@ export function FaqSection() {
               <button
                 type="button"
                 onClick={() => setOpenIndex(isOpen ? null : i)}
-                className="w-full p-5 text-left flex items-center justify-between gap-4 font-semibold text-[15px] text-ink cursor-pointer"
+                className="w-full p-5 text-left flex items-center justify-between gap-4 font-semibold text-md text-ink cursor-pointer"
               >
                 <span className="flex items-center gap-2.5">
                   <HelpCircle className="w-4 h-4 text-accent shrink-0" />
@@ -77,7 +77,7 @@ export function FaqSection() {
               </button>
 
               {isOpen && (
-                <div className="px-5 pb-5 pt-1 text-[13.5px] leading-relaxed text-ink-2 border-t border-line/40 animate-in fade-in duration-150">
+                <div className="px-5 pb-5 pt-1 text-ui leading-relaxed text-ink-2 border-t border-line/40 animate-in fade-in duration-150">
                   {faq.a}
                 </div>
               )}

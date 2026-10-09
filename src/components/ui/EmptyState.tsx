@@ -55,7 +55,7 @@ export function EmptyState({
         <div className="w-14 h-14 rounded-2xl bg-accent/10 border border-accent/20 flex items-center justify-center text-accent">
           <MessageSquare className="w-7 h-7" />
         </div>
-        <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-emerald-500 text-white flex items-center justify-center text-[10px] font-bold border-2 border-surface">
+        <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-success text-white flex items-center justify-center text-2xs font-bold border-2 border-surface">
           ✓
         </div>
       </div>
@@ -77,7 +77,7 @@ export function EmptyState({
       'No active visitors on your site at this moment. As soon as someone browses your pages, their live URL, location, and device will appear right here.';
   } else if (type === 'no-tags') {
     defaultIcon = (
-      <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-600 flex items-center justify-center">
+      <div className="w-10 h-10 rounded-xl bg-warn/10 border border-warn/20 text-warn flex items-center justify-center">
         <Tag className="w-5 h-5" />
       </div>
     );
@@ -103,18 +103,18 @@ export function EmptyState({
     >
       <div className="mb-4 flex items-center justify-center">{defaultIcon}</div>
 
-      <h3 className="text-[15px] font-semibold text-ink tracking-tight mb-1.5">
+      <h3 className="text-md font-semibold text-ink tracking-tight mb-1.5">
         {finalTitle}
       </h3>
 
-      <p className="text-[12.5px] text-ink-3 leading-relaxed mb-5">
+      <p className="text-xs text-ink-3 leading-relaxed mb-5">
         {finalDesc}
       </p>
 
       {/* Preset Tag Chips (For No Tags state) */}
       {type === 'no-tags' && (quickTags || ['Billing', 'Bug', 'VIP', 'Sales', 'Feature']).length > 0 && onSelectTag && (
         <div className="space-y-2 w-full mb-4">
-          <div className="text-[11px] font-semibold text-ink-3 uppercase tracking-wider">
+          <div className="text-2xs font-semibold text-ink-3 uppercase tracking-wider">
             Quick Add Preset:
           </div>
           <div className="flex flex-wrap items-center justify-center gap-1.5">

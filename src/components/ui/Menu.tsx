@@ -238,7 +238,7 @@ export function Menu<T extends string>({
               zIndex: 9999,
             }}
             className={cn(
-              'w-64 max-w-[calc(100vw-16px)] p-1 rounded-xl border border-line bg-surface shadow-2xl animate-pop',
+              'popover w-64 max-w-[calc(100vw-16px)] p-1 rounded-xl animate-pop',
               menuClassName
             )}
           >
@@ -268,11 +268,11 @@ export function Menu<T extends string>({
                     />
                   )}
                   <span className="flex-1 min-w-0">
-                    <span className="block text-[13px] font-medium truncate">
+                    <span className="block text-ui font-medium truncate">
                       {opt.label}
                     </span>
                     {opt.description && (
-                      <span className="block text-[11.5px] text-ink-3 truncate">
+                      <span className="block text-xs text-ink-3 truncate">
                         {opt.description}
                       </span>
                     )}

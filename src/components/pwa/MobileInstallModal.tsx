@@ -100,13 +100,13 @@ export function MobileInstallModal({ isOpen, onClose }: MobileInstallModalProps)
       : activeTab;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fade-in select-none">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-overlay animate-fade-in select-none">
       <div
-        className="relative w-full max-w-lg bg-surface border border-line rounded-3xl shadow-2xl overflow-hidden animate-rise flex flex-col max-h-[92vh]"
+        className="relative w-full max-w-lg popover border border-line rounded-3xl shadow-2xl overflow-hidden animate-rise flex flex-col max-h-[92vh]"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header with App Icon and Badge */}
-        <div className="p-5 sm:p-6 border-b border-line bg-gradient-to-b from-accent/5 to-transparent flex items-start justify-between gap-4">
+        <div className="p-5 sm:p-6 border-b border-line bg-accent-soft flex items-start justify-between gap-4">
           <div className="flex items-center gap-3.5">
             <div className="w-12 h-12 rounded-2xl bg-surface-2 border border-line shadow-sm overflow-hidden flex items-center justify-center p-1.5 shrink-0 ring-2 ring-accent/20">
               <img
@@ -120,11 +120,11 @@ export function MobileInstallModal({ isOpen, onClose }: MobileInstallModalProps)
                 <h3 className="text-base sm:text-lg font-bold text-ink tracking-tight">
                   Zen-try Mobile App
                 </h3>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-accent text-accent-ink uppercase tracking-wide">
+                <span className="text-2xs font-bold px-2 py-0.5 rounded-full bg-accent text-accent-ink uppercase tracking-wide">
                   PWA Shortcut
                 </span>
               </div>
-              <p className="text-[12px] sm:text-[13px] text-ink-3 mt-0.5">
+              <p className="text-xs sm:text-ui text-ink-3 mt-0.5">
                 Install as a mobile shortcut without Play Store or App Store
               </p>
             </div>
@@ -185,10 +185,10 @@ export function MobileInstallModal({ isOpen, onClose }: MobileInstallModalProps)
         <div className="p-5 sm:p-6 overflow-y-auto flex-1 space-y-5">
           {/* Status banner if already standalone */}
           {isStandalone && (
-            <div className="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center gap-3 text-emerald-600 dark:text-emerald-400">
+            <div className="p-3.5 rounded-2xl bg-success/10 border border-success/20 flex items-center gap-3 text-success">
               <CheckCircle className="w-5 h-5 shrink-0" />
               <div className="text-xs">
-                <span className="font-bold block text-[13px]">App Already Installed!</span>
+                <span className="font-bold block text-ui">App Already Installed!</span>
                 You are currently running Zen-try directly from your mobile home screen.
               </div>
             </div>
@@ -203,7 +203,7 @@ export function MobileInstallModal({ isOpen, onClose }: MobileInstallModalProps)
                     Android 1-Click Install
                   </div>
                   {canInstall && (
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
+                    <span className="text-2xs font-bold px-2 py-0.5 rounded-full bg-success/10 text-success border border-success/20">
                       Ready to install
                     </span>
                   )}
@@ -255,7 +255,7 @@ export function MobileInstallModal({ isOpen, onClose }: MobileInstallModalProps)
                       <span className="font-semibold text-ink block">
                         Tap the 3 dots menu (⋮)
                       </span>
-                      <span className="text-ink-3 text-[11.5px]">
+                      <span className="text-ink-3 text-xs">
                         Located in the top right corner of your Chrome mobile browser.
                       </span>
                     </div>
@@ -269,7 +269,7 @@ export function MobileInstallModal({ isOpen, onClose }: MobileInstallModalProps)
                       <span className="font-semibold text-ink block">
                         Tap &ldquo;Install app&rdquo; or &ldquo;Add to Home screen&rdquo;
                       </span>
-                      <span className="text-ink-3 text-[11.5px]">
+                      <span className="text-ink-3 text-xs">
                         Confirm the dialog. The Zen-try logo shortcut will appear on your phone's home screen!
                       </span>
                     </div>
@@ -303,7 +303,7 @@ export function MobileInstallModal({ isOpen, onClose }: MobileInstallModalProps)
                         <Share className="w-3.5 h-3.5" />
                       </span>
                     </div>
-                    <span className="text-ink-3 text-[11.5px]">
+                    <span className="text-ink-3 text-xs">
                       At the bottom toolbar of Safari on your iPhone.
                     </span>
                   </div>
@@ -320,7 +320,7 @@ export function MobileInstallModal({ isOpen, onClose }: MobileInstallModalProps)
                         <PlusSquare className="w-3.5 h-3.5" />
                       </span>
                     </div>
-                    <span className="text-ink-3 text-[11.5px]">
+                    <span className="text-ink-3 text-xs">
                       Located in the Safari share sheet options list.
                     </span>
                   </div>
@@ -334,7 +334,7 @@ export function MobileInstallModal({ isOpen, onClose }: MobileInstallModalProps)
                     <span className="font-semibold text-ink block">
                       Tap &ldquo;Add&rdquo; in the top-right corner
                     </span>
-                    <span className="text-ink-3 text-[11.5px]">
+                    <span className="text-ink-3 text-xs">
                       Zen-try is now installed on your home screen without needing Apple App Store!
                     </span>
                   </div>
@@ -356,7 +356,7 @@ export function MobileInstallModal({ isOpen, onClose }: MobileInstallModalProps)
                       className="w-36 h-36 object-contain rounded-lg"
                     />
                   ) : (
-                    <div className="w-36 h-36 flex items-center justify-center text-xs text-neutral-400">
+                    <div className="w-36 h-36 flex items-center justify-center text-xs text-ink-3">
                       Generating QR...
                     </div>
                   )}
@@ -364,7 +364,7 @@ export function MobileInstallModal({ isOpen, onClose }: MobileInstallModalProps)
 
                 {/* Instructions */}
                 <div className="space-y-2.5 text-center sm:text-left">
-                  <span className="inline-flex items-center gap-1.5 text-[11px] font-bold px-2 py-0.5 rounded-full bg-accent-soft text-accent">
+                  <span className="inline-flex items-center gap-1.5 text-2xs font-bold px-2 py-0.5 rounded-full bg-accent-soft text-accent">
                     <Sparkles className="w-3 h-3" />
                     Instant Mobile Handshake
                   </span>
@@ -379,7 +379,7 @@ export function MobileInstallModal({ isOpen, onClose }: MobileInstallModalProps)
 
               {/* Copy URL Box */}
               <div className="space-y-1.5">
-                <span className="text-[11px] font-bold text-ink-3 uppercase tracking-wider">
+                <span className="text-2xs font-bold text-ink-3 uppercase tracking-wider">
                   Direct Mobile Link
                 </span>
                 <div className="flex items-center gap-2 p-1.5 rounded-xl bg-surface-2 border border-line">
@@ -394,7 +394,7 @@ export function MobileInstallModal({ isOpen, onClose }: MobileInstallModalProps)
                   >
                     {copied ? (
                       <>
-                        <Check className="w-3.5 h-3.5 text-emerald-500" />
+                        <Check className="w-3.5 h-3.5 text-success" />
                         <span>Copied!</span>
                       </>
                     ) : (
@@ -410,21 +410,21 @@ export function MobileInstallModal({ isOpen, onClose }: MobileInstallModalProps)
           )}
 
           {/* App Advantages Feature List */}
-          <div className="pt-2 border-t border-line/60 grid grid-cols-2 gap-2 text-[11.5px] text-ink-2">
+          <div className="pt-2 border-t border-line/60 grid grid-cols-2 gap-2 text-xs text-ink-2">
             <div className="flex items-center gap-2 p-2 rounded-xl bg-surface-2/40 border border-line/40">
               <ShieldCheck className="w-4 h-4 text-accent shrink-0" />
               <span>No Play Store account needed</span>
             </div>
             <div className="flex items-center gap-2 p-2 rounded-xl bg-surface-2/40 border border-line/40">
-              <Radio className="w-4 h-4 text-emerald-500 shrink-0" />
+              <Radio className="w-4 h-4 text-success shrink-0" />
               <span>Real-time push &amp; sound alerts</span>
             </div>
             <div className="flex items-center gap-2 p-2 rounded-xl bg-surface-2/40 border border-line/40">
-              <Smartphone className="w-4 h-4 text-blue-500 shrink-0" />
+              <Smartphone className="w-4 h-4 text-accent shrink-0" />
               <span>Fullscreen native app feel</span>
             </div>
             <div className="flex items-center gap-2 p-2 rounded-xl bg-surface-2/40 border border-line/40">
-              <Download className="w-4 h-4 text-purple-500 shrink-0" />
+              <Download className="w-4 h-4 text-accent shrink-0" />
               <span>Ultra-fast 0-second loading</span>
             </div>
           </div>
@@ -432,7 +432,7 @@ export function MobileInstallModal({ isOpen, onClose }: MobileInstallModalProps)
 
         {/* Footer */}
         <div className="p-4 border-t border-line bg-surface-2/40 flex items-center justify-between gap-3">
-          <div className="text-[11px] text-ink-3">
+          <div className="text-2xs text-ink-3">
             Powered by Progressive Web App (PWA) standard
           </div>
           <button

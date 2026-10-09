@@ -17,6 +17,7 @@ import {
   X,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { ErrorState, LoadingState } from '@/components/ui/States';
 import { createClient } from '@/lib/supabase/client';
 import { Avatar } from '@/components/ui/Avatar';
 import { ChatMarkdown } from '@/components/ui/ChatMarkdown';
@@ -140,8 +141,8 @@ export function TicketDetail({ workspaceId, ticketId, agents, groups, me, onBack
 
   if (error) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center gap-3 text-[13px] text-ink-2">
-        <p>{error}</p>
+      <div className="flex-1 flex flex-col items-center justify-center">
+        <ErrorState title="Couldn't open this ticket" message={error} />
         <button type="button" className="btn btn-secondary btn-sm" onClick={onBack}>
           Back to tickets
         </button>
@@ -149,7 +150,7 @@ export function TicketDetail({ workspaceId, ticketId, agents, groups, me, onBack
     );
   }
   if (!detail) {
-    return <div className="flex-1 flex items-center justify-center text-[13px] text-ink-3">Loading ticket…</div>;
+    return <LoadingState label="Loading ticket…" className="flex-1" />;
   }
 
   const { ticket } = detail;
@@ -167,7 +168,7 @@ export function TicketDetail({ workspaceId, ticketId, agents, groups, me, onBack
             <ArrowLeft className="w-4 h-4" />
           </button>
           <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2 text-[12px] text-ink-3">
+            <div className="flex items-center gap-2 text-xs text-ink-3">
               <ChannelIcon channel={ticket.channel} />
               <span className="tabular-nums">#{ticket.number}</span>
               <StatusBadge status={ticket.status} />
@@ -183,7 +184,7 @@ export function TicketDetail({ workspaceId, ticketId, agents, groups, me, onBack
         </header>
 
         {closed && (
-          <div className="px-4 py-2.5 bg-surface-2 border-b border-line text-[12.5px] text-ink-2 flex items-center gap-2 shrink-0">
+          <div className="px-4 py-2.5 bg-surface-2 border-b border-line text-xs text-ink-2 flex items-center gap-2 shrink-0">
             <Lock className="w-3.5 h-3.5 shrink-0" />
             <span>
               This ticket is closed and read-only.
@@ -204,14 +205,14 @@ export function TicketDetail({ workspaceId, ticketId, agents, groups, me, onBack
           </div>
         )}
         {followUpOf && (
-          <div className="px-4 py-2 border-b border-line text-[12.5px] text-ink-2 flex items-center gap-2 shrink-0">
+          <div className="px-4 py-2 border-b border-line text-xs text-ink-2 flex items-center gap-2 shrink-0">
             <CornerDownRight className="w-3.5 h-3.5 shrink-0" />
             Follow-up to <LinkButton onClick={() => onOpenTicket(followUpOf.id)}>#{followUpOf.number}</LinkButton>
             <span className="truncate text-ink-3">{followUpOf.subject}</span>
           </div>
         )}
         {mergedFrom.length > 0 && (
-          <div className="px-4 py-2 border-b border-line text-[12.5px] text-ink-2 flex flex-wrap items-center gap-x-2 shrink-0">
+          <div className="px-4 py-2 border-b border-line text-xs text-ink-2 flex flex-wrap items-center gap-x-2 shrink-0">
             Merged into this ticket:
             {mergedFrom.map((m) => (
               <LinkButton key={m.id} onClick={() => onOpenTicket(m.id)}>
@@ -221,7 +222,7 @@ export function TicketDetail({ workspaceId, ticketId, agents, groups, me, onBack
           </div>
         )}
         {notice && (
-          <div className="px-4 py-2 bg-warn-soft border-b border-warn-line text-[12.5px] text-ink flex items-center gap-2 shrink-0" role="status">
+          <div className="px-4 py-2 bg-warn-soft border-b border-warn-line text-xs text-ink flex items-center gap-2 shrink-0" role="status">
             <span className="flex-1">{notice}</span>
             <button type="button" className="btn btn-ghost btn-xs" onClick={() => setNotice(null)} aria-label="Dismiss">
               <X className="w-3.5 h-3.5" />
@@ -245,7 +246,7 @@ export function TicketDetail({ workspaceId, ticketId, agents, groups, me, onBack
               aria-selected={tab === key}
               onClick={() => setTab(key)}
               className={cn(
-                'inline-flex items-center gap-1.5 px-3 h-9 text-[12.5px] font-semibold border-b-2 -mb-px',
+                'inline-flex items-center gap-1.5 px-3 h-9 text-xs font-semibold border-b-2 -mb-px',
                 tab === key ? 'border-accent text-ink' : 'border-transparent text-ink-3 hover:text-ink-2'
               )}
             >
@@ -309,7 +310,7 @@ function SubjectEditor({ value, disabled, onSave }: { value: string; disabled: b
       onChange={(e) => setDraft(e.target.value)}
       onBlur={() => draft.trim() !== value && onSave(draft)}
       onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
-      className="w-full mt-1 bg-transparent text-[17px] font-bold text-ink placeholder:text-ink-3 rounded-md px-1 -mx-1 hover:bg-surface-2 focus:bg-surface-2 focus:outline-none disabled:hover:bg-transparent"
+      className="w-full mt-1 bg-transparent text-lg font-bold text-ink placeholder:text-ink-3 rounded-md px-1 -mx-1 hover:bg-surface-2 focus:bg-surface-2 focus:outline-none disabled:hover:bg-transparent"
     />
   );
 }
@@ -326,12 +327,12 @@ function Thread({ detail, people }: { detail: Detail; people: Record<string, str
 
   return (
     <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3 bg-canvas">
-      {detail.messages.length === 0 && <p className="text-center text-[13px] text-ink-3 py-10">No messages yet.</p>}
+      {detail.messages.length === 0 && <p className="text-center text-ui text-ink-3 py-10">No messages yet.</p>}
       {detail.messages.map((m) => {
         const time = <span title={fullTime(m.created_at)}>{timeAgo(m.created_at)}</span>;
         if (m.sender_type === 'system' && !m.is_internal) {
           return (
-            <p key={m.id} className="text-center text-[11.5px] text-ink-3">
+            <p key={m.id} className="text-center text-xs text-ink-3">
               {m.content} · {time}
             </p>
           );
@@ -341,11 +342,11 @@ function Thread({ detail, people }: { detail: Detail; people: Record<string, str
             m.sender_type === 'agent' ? people[m.sender_id || ''] || 'Agent' : m.sender_type === 'ai' ? 'Bot' : 'System';
           return (
             <article key={m.id} className="rounded-xl border border-warn-line bg-warn-soft px-3.5 py-2.5" aria-label="Internal note">
-              <header className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-warn mb-1">
+              <header className="flex items-center gap-1.5 text-2xs font-bold uppercase tracking-wide text-warn mb-1">
                 <Lock className="w-3 h-3" /> Internal note · <span className="normal-case tracking-normal">{author}</span>
                 <span className="ml-auto font-medium normal-case tracking-normal text-ink-3">{time}</span>
               </header>
-              <div className="text-[13px] text-ink whitespace-pre-wrap break-words">{m.content}</div>
+              <div className="text-ui text-ink whitespace-pre-wrap break-words">{m.content}</div>
             </article>
           );
         }
@@ -361,12 +362,12 @@ function Thread({ detail, people }: { detail: Detail; people: Record<string, str
               <Avatar name={author} seed={fromCustomer ? detail.requester?.id : m.sender_id || undefined} size="sm" />
             )}
             <div className={cn('max-w-[75%] min-w-0', fromCustomer ? '' : 'text-right')}>
-              <div className="text-[11.5px] text-ink-3 mb-0.5">
+              <div className="text-xs text-ink-3 mb-0.5">
                 <span className="font-semibold text-ink-2">{author}</span> · {time}
               </div>
               <div
                 className={cn(
-                  'inline-block text-left rounded-2xl px-3.5 py-2 text-[13px] break-words',
+                  'inline-block text-left rounded-2xl px-3.5 py-2 text-ui break-words',
                   fromCustomer ? 'bg-surface border border-line text-ink' : 'bg-bubble-out text-bubble-out-ink'
                 )}
               >
@@ -442,7 +443,7 @@ function Composer({
               if (body.trim()) onActivity(isNote ? 'noting' : 'replying');
             }}
             className={cn(
-              'inline-flex items-center gap-1.5 px-2.5 h-7 rounded-lg text-[12px] font-semibold',
+              'inline-flex items-center gap-1.5 px-2.5 h-7 rounded-lg text-xs font-semibold',
               internal === isNote
                 ? isNote
                   ? 'bg-warn-soft text-warn border border-warn-line'
@@ -469,9 +470,9 @@ function Composer({
         placeholder={internal ? 'Only your team can see this note' : 'Write a reply to the customer'}
         className={cn(inputClass, 'h-auto py-2 resize-y min-h-[76px]', internal && 'bg-surface border-warn-line')}
       />
-      {error && <p className="text-[12px] text-danger mt-1.5">{error}</p>}
+      {error && <p className="text-xs text-danger mt-1.5">{error}</p>}
       <div className="flex items-center justify-end gap-2 mt-2">
-        {!canReply && <span className="mr-auto text-[12px] text-ink-3">Light agents can add internal notes only.</span>}
+        {!canReply && <span className="mr-auto text-xs text-ink-3">Light agents can add internal notes only.</span>}
         {!internal && canEditStatus && (
           <Menu<TicketStatus>
             value={submitAs}
@@ -494,7 +495,7 @@ function AuditLog({ detail, people, groups }: { detail: Detail; people: Record<s
   return (
     <ol className="flex-1 overflow-y-auto px-4 py-3 space-y-0.5 bg-canvas" aria-label="Audit log">
       {[...detail.events].reverse().map((e) => (
-        <li key={e.id} className="flex items-start gap-3 py-2 border-b border-line/70 text-[12.5px]">
+        <li key={e.id} className="flex items-start gap-3 py-2 border-b border-line/70 text-xs">
           <span className="w-36 shrink-0 text-ink-3 tabular-nums" title={e.created_at}>
             {fullTime(e.created_at)}
           </span>
@@ -528,7 +529,7 @@ function Properties({
   const assignees = assigneeOptions(agents, groups, ticket.group_id, ticket.assignee_id);
   const row = (label: string, control: React.ReactNode) => (
     <div className="flex items-center justify-between gap-3 py-1.5">
-      <span className="text-[12px] text-ink-3 shrink-0">{label}</span>
+      <span className="text-xs text-ink-3 shrink-0">{label}</span>
       <div className={cn('min-w-0', disabled && 'pointer-events-none opacity-60')}>{control}</div>
     </div>
   );
@@ -539,8 +540,8 @@ function Properties({
 
   return (
     <section className="p-4 border-b border-line">
-      <h3 className="text-[11px] font-bold uppercase tracking-wide text-ink-3 mb-2">Properties</h3>
-      {readOnlyReason && <p className="text-[12px] text-ink-3 mb-2">{readOnlyReason}</p>}
+      <h3 className="text-2xs font-bold uppercase tracking-wide text-ink-3 mb-2">Properties</h3>
+      {readOnlyReason && <p className="text-xs text-ink-3 mb-2">{readOnlyReason}</p>}
       {row(
         'Status',
         <Menu<TicketStatus> value={ticket.status} label="Status" onChange={(status) => status !== 'new' && onUpdate({ status })} options={statusOptions} />
@@ -582,10 +583,10 @@ function Properties({
         />
       )}
       <div className="py-1.5">
-        <span className="text-[12px] text-ink-3">Tags</span>
+        <span className="text-xs text-ink-3">Tags</span>
         <div className="flex flex-wrap gap-1 mt-1.5">
           {ticket.tags.map((t) => (
-            <span key={t} className="inline-flex items-center gap-1 pl-2 pr-1 h-6 rounded-md bg-surface-3 text-[11.5px] text-ink-2">
+            <span key={t} className="inline-flex items-center gap-1 pl-2 pr-1 h-6 rounded-md bg-surface-3 text-xs text-ink-2">
               {t}
               {!disabled && (
                 <button
@@ -614,7 +615,7 @@ function Properties({
                 onChange={(e) => setTag(e.target.value)}
                 placeholder="Add tag"
                 aria-label="Add tag"
-                className="h-6 w-24 px-2 rounded-md border border-dashed border-line-2 bg-transparent text-[11.5px] focus:outline-none focus:border-accent"
+                className="h-6 w-24 px-2 rounded-md border border-dashed border-line-2 bg-transparent text-xs focus:outline-none focus:border-accent"
               />
               <button type="submit" className="sr-only">
                 <Plus /> Add
@@ -623,7 +624,7 @@ function Properties({
           )}
         </div>
       </div>
-      <dl className="mt-3 pt-3 border-t border-line grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-[11.5px]">
+      <dl className="mt-3 pt-3 border-t border-line grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
         {(
           [
             ['Created', ticket.created_at],
@@ -652,21 +653,21 @@ function Requester({ detail, onOpenTicket }: { detail: Detail; onOpenTicket: (id
   return (
     <>
       <section className="p-4 border-b border-line">
-        <h3 className="text-[11px] font-bold uppercase tracking-wide text-ink-3 mb-2">Requester</h3>
+        <h3 className="text-2xs font-bold uppercase tracking-wide text-ink-3 mb-2">Requester</h3>
         {r ? (
           <div className="space-y-2">
             <div className="flex items-center gap-2.5">
               <Avatar name={r.name || r.email || '?'} seed={r.id} size="md" />
               <div className="min-w-0">
-                <div className="font-semibold text-[13.5px] text-ink truncate">{r.name || 'Unnamed visitor'}</div>
+                <div className="font-semibold text-ui text-ink truncate">{r.name || 'Unnamed visitor'}</div>
                 {r.email && (
-                  <a href={`mailto:${r.email}`} className="text-[12px] text-accent truncate block">
+                  <a href={`mailto:${r.email}`} className="text-xs text-accent truncate block">
                     {r.email}
                   </a>
                 )}
               </div>
             </div>
-            <ul className="text-[12px] text-ink-2 space-y-1">
+            <ul className="text-xs text-ink-2 space-y-1">
               {location && (
                 <li className="flex items-center gap-1.5">
                   <MapPin className="w-3.5 h-3.5 text-ink-3" /> {location}
@@ -683,15 +684,15 @@ function Requester({ detail, onOpenTicket }: { detail: Detail; onOpenTicket: (id
             </ul>
           </div>
         ) : (
-          <p className="text-[12.5px] text-ink-3">No requester on this ticket.</p>
+          <p className="text-xs text-ink-3">No requester on this ticket.</p>
         )}
       </section>
       <section className="p-4">
-        <h3 className="text-[11px] font-bold uppercase tracking-wide text-ink-3 mb-2">
+        <h3 className="text-2xs font-bold uppercase tracking-wide text-ink-3 mb-2">
           Previous tickets ({detail.previousTickets.length})
         </h3>
         {detail.previousTickets.length === 0 ? (
-          <p className="text-[12.5px] text-ink-3">This is their first ticket.</p>
+          <p className="text-xs text-ink-3">This is their first ticket.</p>
         ) : (
           <ul className="space-y-1">
             {detail.previousTickets.map((t) => (
@@ -701,8 +702,8 @@ function Requester({ detail, onOpenTicket }: { detail: Detail; onOpenTicket: (id
                   onClick={() => onOpenTicket(t.id)}
                   className="w-full text-left flex items-center gap-2 px-2 py-1.5 -mx-2 rounded-lg hover:bg-surface-2"
                 >
-                  <span className="text-[11.5px] text-ink-3 tabular-nums">#{t.number}</span>
-                  <span className="text-[12.5px] text-ink truncate flex-1">{t.subject || '(no subject)'}</span>
+                  <span className="text-xs text-ink-3 tabular-nums">#{t.number}</span>
+                  <span className="text-xs text-ink truncate flex-1">{t.subject || '(no subject)'}</span>
                   <StatusBadge status={t.status} className="scale-90 origin-right" />
                 </button>
               </li>

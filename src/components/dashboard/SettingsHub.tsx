@@ -449,7 +449,7 @@ function AutoCloseSettingsCard({
   return (
     <div className="p-4 rounded-2xl border border-line bg-surface-2 space-y-3.5">
       <form onSubmit={handleSave} className="flex flex-wrap items-center gap-3">
-        <label className="text-[12.5px] font-medium text-ink flex items-center gap-2">
+        <label className="text-xs font-medium text-ink flex items-center gap-2">
           <span>Resolve conversations inactive for</span>
           <input
             type="number"
@@ -457,7 +457,7 @@ function AutoCloseSettingsCard({
             max={365}
             value={days}
             onChange={(e) => setDays(Math.max(1, parseInt(e.target.value) || 1))}
-            className="input input-sm w-20 text-center font-bold text-[13px] bg-surface border-line"
+            className="input input-sm w-20 text-center font-bold text-ui bg-surface border-line"
           />
           <span>days (default: 7)</span>
         </label>
@@ -486,9 +486,9 @@ function AutoCloseSettingsCard({
       {statusMsg && (
         <div
           className={cn(
-            'p-2.5 rounded-xl text-[12px] font-medium flex items-center gap-2 animate-in fade-in duration-150',
+            'p-2.5 rounded-xl text-xs font-medium flex items-center gap-2 animate-in fade-in duration-150',
             statusMsg.type === 'success'
-              ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
+              ? 'bg-success/10 text-success border border-success/20'
               : 'bg-danger/10 text-danger border border-danger/20'
           )}
         >
@@ -512,7 +512,18 @@ interface SettingsHubProps {
   hasVisitors?: boolean;
   latestVisitorUrl?: string;
   initialSection?: SectionId;
+  /** Bumped by the command palette so picking the same section again still jumps there. */
+  sectionNonce?: number;
   onWorkspaceUpdated?: (ws: Workspace) => void;
+}
+
+/** Settings sections the caller may open, for the command palette. */
+export function settingsSections(isAdmin: boolean): { id: SectionId; label: string; description: string; keywords: string[]; group: string }[] {
+  return SETTING_GROUPS.flatMap((g) =>
+    g.items
+      .filter((item) => !item.adminOnly || isAdmin)
+      .map((item) => ({ id: item.id, label: item.label, description: item.description, keywords: item.keywords, group: g.title }))
+  );
 }
 
 export function SettingsHub({
@@ -523,6 +534,7 @@ export function SettingsHub({
   hasVisitors = false,
   latestVisitorUrl,
   initialSection,
+  sectionNonce,
   onWorkspaceUpdated,
 }: SettingsHubProps) {
   const isAdmin =
@@ -541,7 +553,7 @@ export function SettingsHub({
     if (initialSection) {
       setActive(initialSection);
     }
-  }, [initialSection]);
+  }, [initialSection, sectionNonce]);
 
   useEffect(() => {
     if (!workspace?.id) return;
@@ -702,10 +714,10 @@ export function SettingsHub({
 
             <div className="min-w-0">
               <div className="flex items-center gap-2">
-                <span className="font-semibold text-[14.5px] tracking-tight truncate text-ink">
+                <span className="font-semibold text-sm tracking-tight truncate text-ink">
                   {workspace?.name || 'Workspace Settings'}
                 </span>
-                <span className="hidden sm:inline-flex items-center px-1.5 py-0.5 rounded text-[10.5px] font-medium bg-surface-3 text-ink-3">
+                <span className="hidden sm:inline-flex items-center px-1.5 py-0.5 rounded text-2xs font-medium bg-surface-3 text-ink-3">
                   Settings Hub
                 </span>
               </div>
@@ -719,20 +731,20 @@ export function SettingsHub({
           {workspace?.id && (
             <button
               onClick={copyWorkspaceId}
-              className="hidden lg:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-line bg-surface-2/60 hover:bg-surface-3 text-[12px] text-ink-2 font-mono transition-colors shadow-xs"
+              className="hidden lg:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-line bg-surface-2/60 hover:bg-surface-3 text-xs text-ink-2 font-mono transition-colors shadow-xs"
               title="Click to copy your unique Workspace ID"
             >
               {copiedWsId ? (
                 <>
-                  <Check className="w-3.5 h-3.5 text-emerald-500" />
-                  <span className="text-emerald-600 dark:text-emerald-400 font-sans font-medium text-[11px]">
+                  <Check className="w-3.5 h-3.5 text-success" />
+                  <span className="text-success font-sans font-medium text-2xs">
                     Copied!
                   </span>
                 </>
               ) : (
                 <>
                   <Copy className="w-3.5 h-3.5 text-ink-3" />
-                  <span className="text-[11px] truncate max-w-[120px]">
+                  <span className="text-2xs truncate max-w-[120px]">
                     {workspace.id}
                   </span>
                 </>
@@ -748,7 +760,7 @@ export function SettingsHub({
                 : '/demo.html';
               window.open(url, '_blank');
             }}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent text-white hover:opacity-95 text-[12px] font-medium transition-all shadow-xs"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent text-white hover:opacity-95 text-xs font-medium transition-all shadow-xs"
             title="Open test website simulator in a new tab"
           >
             <ExternalLink className="w-3.5 h-3.5" />
@@ -783,7 +795,7 @@ export function SettingsHub({
                 placeholder="Search settings (logo, smtp, team)..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full h-9.5 pl-9 pr-8 text-[13px] bg-transparent text-ink placeholder:text-ink-2/70 font-medium focus:outline-none"
+                className="w-full h-9.5 pl-9 pr-8 text-ui bg-transparent text-ink placeholder:text-ink-2/70 font-medium focus:outline-none"
               />
               {searchQuery && (
                 <button
@@ -802,10 +814,10 @@ export function SettingsHub({
             {filteredGroups.length === 0 ? (
               <div className="p-6 text-center space-y-2.5 bg-surface-2/60 rounded-xl border border-line-2">
                 <AlertCircle className="w-6 h-6 text-accent mx-auto" />
-                <p className="text-[13px] font-semibold text-ink">
+                <p className="text-ui font-semibold text-ink">
                   No settings match &ldquo;{searchQuery}&rdquo;
                 </p>
-                <p className="text-[12px] text-ink-2">
+                <p className="text-xs text-ink-2">
                   Try searching for keywords like <code className="font-mono bg-surface-3 px-1 py-0.5 rounded text-ink">logo</code>, <code className="font-mono bg-surface-3 px-1 py-0.5 rounded text-ink">smtp</code>, or <code className="font-mono bg-surface-3 px-1 py-0.5 rounded text-ink">team</code>.
                 </p>
                 <button
@@ -819,11 +831,11 @@ export function SettingsHub({
               filteredGroups.map((group) => (
                 <div key={group.id} className="space-y-1.5">
                   <div className="px-2 py-1 flex items-center justify-between">
-                    <span className="text-[11.5px] font-extrabold uppercase tracking-wider text-ink-2 flex items-center gap-1.5">
+                    <span className="text-xs font-extrabold uppercase tracking-wider text-ink-2 flex items-center gap-1.5">
                       <span className="w-1.5 h-1.5 rounded-full bg-accent inline-block" />
                       <span>{group.title}</span>
                     </span>
-                    <span className="text-[10.5px] px-1.5 py-0.5 rounded-md bg-surface-3 text-ink-2 font-bold font-mono">
+                    <span className="text-2xs px-1.5 py-0.5 rounded-md bg-surface-3 text-ink-2 font-bold font-mono">
                       {group.items.length}
                     </span>
                   </div>
@@ -846,7 +858,7 @@ export function SettingsHub({
                           onClick={() => handleSelectTab(item.id)}
                           aria-current={isActive ? 'page' : undefined}
                           className={cn(
-                            'w-full min-h-[42px] px-3 py-2 rounded-xl flex items-center gap-2.5 text-left text-[13px] transition-all group',
+                            'w-full min-h-[42px] px-3 py-2 rounded-xl flex items-center gap-2.5 text-left text-ui transition-all group',
                             isActive
                               ? 'bg-accent/10 border border-accent/40 text-accent font-bold shadow-xs ring-1 ring-accent/30 dark:bg-accent/20'
                               : 'text-ink/90 hover:bg-surface-2 hover:text-ink font-medium border border-transparent hover:border-line'
@@ -863,18 +875,18 @@ export function SettingsHub({
                             <Icon className="w-4 h-4" />
                           </div>
 
-                          <span className="flex-1 font-semibold text-[13px] leading-snug text-left line-clamp-2 break-words">{item.label}</span>
+                          <span className="flex-1 font-semibold text-ui leading-snug text-left line-clamp-2 break-words">{item.label}</span>
 
                           {badge && (
                             <span
                               className={cn(
-                                'text-[10.5px] px-2 py-0.5 rounded-full font-bold shrink-0 tracking-tight',
+                                'text-2xs px-2 py-0.5 rounded-full font-bold shrink-0 tracking-tight',
                                 badge.variant === 'emerald' &&
-                                  'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30',
+                                  'bg-success/15 text-success border border-success/30',
                                 badge.variant === 'amber' &&
-                                  'bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30',
+                                  'bg-warn/15 text-warn border border-warn/30',
                                 badge.variant === 'blue' &&
-                                  'bg-blue-500/15 text-blue-700 dark:text-blue-300 border border-blue-500/30',
+                                  'bg-accent/15 text-accent border border-accent/30',
                                 badge.variant === 'neutral' &&
                                   'bg-surface-3 text-ink font-semibold border border-line-2'
                               )}
@@ -892,12 +904,12 @@ export function SettingsHub({
           </div>
 
           {/* Quick status bar at bottom of nav */}
-          <div className="p-3 border-t border-line-2 bg-surface-2/60 text-[12px] text-ink-2 flex items-center justify-between font-medium">
+          <div className="p-3 border-t border-line-2 bg-surface-2/60 text-xs text-ink-2 flex items-center justify-between font-medium">
             <span className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block shadow-xs animate-pulse" />
+              <span className="w-2.5 h-2.5 rounded-full bg-success inline-block shadow-xs animate-pulse" />
               <span className="font-semibold text-ink">System Online</span>
             </span>
-            <span className="text-[11px] font-mono font-bold px-1.5 py-0.5 rounded bg-surface-3 border border-line-2">v2.4 Pro</span>
+            <span className="text-2xs font-mono font-bold px-1.5 py-0.5 rounded bg-surface-3 border border-line-2">v2.4 Pro</span>
           </div>
         </nav>
 
@@ -905,7 +917,7 @@ export function SettingsHub({
         {mobileMenuOpen && (
           <div
             onClick={() => setMobileMenuOpen(false)}
-            className="min-[1100px]:hidden fixed inset-0 bg-black/40 z-40"
+            className="min-[1100px]:hidden fixed inset-0 bg-overlay z-40"
           />
         )}
 
@@ -914,7 +926,7 @@ export function SettingsHub({
         {/* ───────────────────────────────────────────────────────────────── */}
         <main ref={contentRef} className="flex-1 min-w-0 overflow-y-auto flex flex-col bg-canvas">
           {/* Below 1100px Sub-navigation Bar: Collapsible Dropdown & Fast Horizontal Chips */}
-          <div className="min-[1100px]:hidden shrink-0 border-b border-line-2 bg-surface px-4 py-2.5 space-y-2 sticky top-0 z-30 shadow-2xs backdrop-blur-md bg-surface/95">
+          <div className="min-[1100px]:hidden shrink-0 border-b border-line-2 bg-surface px-4 py-2.5 space-y-2 sticky top-0 z-30 shadow-2xs bg-surface">
             <div className="flex items-center gap-2">
               <div className="relative flex-1">
                 <button
@@ -926,11 +938,11 @@ export function SettingsHub({
                     <div className="w-6 h-6 rounded-lg bg-accent text-white flex items-center justify-center shrink-0">
                       <currentItem.Icon className="w-3.5 h-3.5" />
                     </div>
-                    <span className="text-[13px] font-bold text-ink truncate">
+                    <span className="text-ui font-bold text-ink truncate">
                       {currentItem.label}
                     </span>
                     {currentGroup && (
-                      <span className="text-[11px] text-ink-3 hidden sm:inline">
+                      <span className="text-2xs text-ink-3 hidden sm:inline">
                         ({currentGroup.title})
                       </span>
                     )}
@@ -945,7 +957,7 @@ export function SettingsHub({
                       if (groupItems.length === 0) return null;
                       return (
                         <div key={group.id} className="space-y-1">
-                          <div className="px-2 py-1 text-[11px] font-bold uppercase tracking-wider text-ink-3">
+                          <div className="px-2 py-1 text-2xs font-bold uppercase tracking-wider text-ink-3">
                             {group.title}
                           </div>
                           {groupItems.map((item) => {
@@ -957,7 +969,7 @@ export function SettingsHub({
                                 type="button"
                                 onClick={() => handleSelectTab(item.id)}
                                 className={cn(
-                                  'w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-left text-[13px] transition-colors',
+                                  'w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-left text-ui transition-colors',
                                   isSelected
                                     ? 'bg-accent/10 text-accent font-bold'
                                     : 'text-ink hover:bg-surface-2 font-medium'
@@ -987,7 +999,7 @@ export function SettingsHub({
                     type="button"
                     onClick={() => handleSelectTab(item.id)}
                     className={cn(
-                      'shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-medium transition-all whitespace-nowrap',
+                      'shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all whitespace-nowrap',
                       isSelected
                         ? 'bg-accent text-white font-bold shadow-xs'
                         : 'bg-surface-2 hover:bg-surface-3 text-ink-2 border border-line-2 hover:text-ink'
@@ -1005,7 +1017,7 @@ export function SettingsHub({
             <div className="px-6 md:px-8 pt-6 pb-5 border-b border-line-2 bg-surface shadow-2xs">
               <div className="max-w-5xl">
                 {/* Breadcrumb */}
-                <div className="flex items-center gap-2 text-[12.5px] font-medium text-ink-2 mb-2.5">
+                <div className="flex items-center gap-2 text-xs font-medium text-ink-2 mb-2.5">
                   <span className="hover:text-ink cursor-pointer">Settings</span>
                   <span className="text-ink-3">/</span>
                   <span>{currentGroup?.title || 'Configuration'}</span>
@@ -1020,10 +1032,10 @@ export function SettingsHub({
                       <currentItem.Icon className="w-5 h-5" />
                     </div>
                     <div>
-                      <h2 className="text-[21px] font-extrabold tracking-tight text-ink">
+                      <h2 className="text-xl font-extrabold tracking-tight text-ink">
                         {currentItem.label}
                       </h2>
-                      <p className="text-[13px] text-ink-2 mt-0.5 leading-relaxed font-normal">
+                      <p className="text-ui text-ink-2 mt-0.5 leading-relaxed font-normal">
                         {currentItem.description}
                       </p>
                     </div>
@@ -1044,7 +1056,7 @@ export function SettingsHub({
                           key={id}
                           onClick={() => setChannelTab(id)}
                           className={cn(
-                            'h-8 px-3.5 rounded-lg text-[12.5px] font-semibold transition-all',
+                            'h-8 px-3.5 rounded-lg text-xs font-semibold transition-all',
                             channelTab === id
                               ? 'bg-accent text-white shadow-xs'
                               : 'text-ink-2 hover:text-ink hover:bg-surface-3'
@@ -1108,20 +1120,20 @@ export function SettingsHub({
                 <div className="space-y-8">
                   {renderAdmin('hours')}
                   <div className="pt-2 border-t border-line">
-                    <h3 className="text-[14px] font-semibold text-ink mb-1">
+                    <h3 className="text-sm font-semibold text-ink mb-1">
                       Conversation Assignment
                     </h3>
-                    <p className="text-[12px] text-ink-3 mb-4">
+                    <p className="text-xs text-ink-3 mb-4">
                       Configure round-robin and agent routing for incoming chats
                     </p>
                     {renderAdmin('assignment')}
                   </div>
                   <div className="pt-2 border-t border-line">
-                    <h3 className="text-[14px] font-semibold text-ink mb-1 flex items-center gap-2">
+                    <h3 className="text-sm font-semibold text-ink mb-1 flex items-center gap-2">
                       <Clock className="w-4 h-4 text-accent" />
                       Auto-Close Inactivity Rule
                     </h3>
-                    <p className="text-[12px] text-ink-3 mb-4">
+                    <p className="text-xs text-ink-3 mb-4">
                       Automatically resolve open conversations that have had no customer or agent activity for a specified period.
                     </p>
                     <AutoCloseSettingsCard
@@ -1141,10 +1153,10 @@ export function SettingsHub({
                   {renderAdmin('ai')}
                   <div className="pt-4 border-t border-line">
                     <div className="mb-4">
-                      <h3 className="text-[15px] font-semibold text-ink">
+                      <h3 className="text-md font-semibold text-ink">
                         LangGraph &amp; Custom LLM Pipelines
                       </h3>
-                      <p className="text-[12px] text-ink-3">
+                      <p className="text-xs text-ink-3">
                         Optionally connect specialized multi-agent workflows or LangGraph endpoints
                       </p>
                     </div>

@@ -43,7 +43,7 @@ export function GroupsSettings({ workspaceId }: { workspaceId: string }) {
         <h2 id="groups-heading" className="sr-only">
           Groups
         </h2>
-        <p className="text-[12.5px] text-ink-3 min-w-0 flex-1 basis-72 max-w-xl">
+        <p className="text-xs text-ink-3 min-w-0 flex-1 basis-72 max-w-xl">
           Groups such as Billing or Technical collect tickets for the people who handle them. A ticket in a group can only be assigned to one of its members.
         </p>
         {team && (
@@ -57,7 +57,7 @@ export function GroupsSettings({ workspaceId }: { workspaceId: string }) {
         <div
           role={notice.tone === 'error' ? 'alert' : 'status'}
           className={cn(
-            'px-3 py-2 rounded-lg border text-[12.5px]',
+            'px-3 py-2 rounded-lg border text-xs',
             notice.tone === 'error' ? 'bg-danger-soft border-danger-line text-danger' : 'bg-success-soft border-success-line text-ink'
           )}
         >
@@ -87,10 +87,10 @@ export function GroupsSettings({ workspaceId }: { workspaceId: string }) {
                 <div className="flex flex-wrap items-center gap-3">
                   <div className="flex items-center gap-2 min-w-0 flex-1 basis-40">
                     <Users className="w-4 h-4 text-ink-3 shrink-0" />
-                    <span className="text-[14px] font-semibold text-ink truncate">{g.name}</span>
+                    <span className="text-sm font-semibold text-ink truncate">{g.name}</span>
                     <span className="pill pill-neutral">{g.member_ids.length} member{g.member_ids.length === 1 ? '' : 's'}</span>
                   </div>
-                  <label className="flex items-center gap-2 text-[12.5px] text-ink-2 cursor-pointer">
+                  <label className="flex items-center gap-2 text-xs text-ink-2 cursor-pointer">
                     <input
                       type="checkbox"
                       className="w-4 h-4 accent-[var(--ds-accent)]"
@@ -107,14 +107,14 @@ export function GroupsSettings({ workspaceId }: { workspaceId: string }) {
                   </button>
                 </div>
 
-                <p className="text-[12px] text-ink-3">
+                <p className="text-xs text-ink-3">
                   {g.round_robin
                     ? 'New tickets in this group go to the next member who is online and under their capacity. Away and offline members are skipped; if nobody qualifies the ticket waits unassigned.'
                     : 'Tickets in this group are assigned by hand.'}
                 </p>
 
                 {assignable.length === 0 ? (
-                  <p className="text-[12.5px] text-ink-3">No one can be added yet. Invite an agent first.</p>
+                  <p className="text-xs text-ink-3">No one can be added yet. Invite an agent first.</p>
                 ) : (
                   <div className="space-y-2">
                     <ChipGroup
@@ -172,7 +172,7 @@ export function GroupsSettings({ workspaceId }: { workspaceId: string }) {
             </>
           }
         >
-          <p className="text-[13px] text-ink-2">Tickets in this group stay where they are, without a group. Nothing else is deleted.</p>
+          <p className="text-ui text-ink-2">Tickets in this group stay where they are, without a group. Nothing else is deleted.</p>
         </Modal>
       )}
     </section>
@@ -216,12 +216,12 @@ function CreateGroupDialog({ workspaceId, onClose, onDone }: { workspaceId: stri
         <Field label="Name">
           <input className={inputClass} value={name} onChange={(e) => setName(e.target.value)} maxLength={60} placeholder="Billing" autoFocus />
         </Field>
-        <label className="flex items-center gap-2 text-[13px] text-ink-2 cursor-pointer">
+        <label className="flex items-center gap-2 text-ui text-ink-2 cursor-pointer">
           <input type="checkbox" className="w-4 h-4 accent-[var(--ds-accent)]" checked={roundRobin} onChange={(e) => setRoundRobin(e.target.checked)} />
           Hand out new tickets round-robin
         </label>
         {error && (
-          <p role="alert" className="text-[12.5px] text-danger">
+          <p role="alert" className="text-xs text-danger">
             {error}
           </p>
         )}
