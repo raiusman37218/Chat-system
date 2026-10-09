@@ -1,5 +1,6 @@
 import { serviceClient } from '@/lib/supabase/service';
 import { getAdapter } from './registry';
+import { loadEmailSendContext } from './email/outbound-context';
 import { loadConnection, recordConnectionError, updateConnection } from './store';
 import type { OutboundContent, OutboundMedia, SendResult } from './types';
 
@@ -100,6 +101,12 @@ async function sendOne(row: QueueRow): Promise<Attempt> {
   }
 
   const what = contentForMessage(msg as MessageRow, replyTo);
+  if (row.channel === 'email') {
+    // Email threads by headers, so the adapter needs the ticket and the Message-IDs so far.
+    const email = await loadEmailSendContext(row);
+    if (what.kind === 'media') what.media.email = email;
+    else if (what.content.type === 'text') what.content.email = email;
+  }
   const result =
     what.kind === 'media'
       ? await adapter.sendMedia(conn, conv.channel_user_id, what.media)

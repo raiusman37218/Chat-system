@@ -69,8 +69,8 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
     keywords: ['whatsapp', 'instagram', 'messenger', 'meta', 'linkedin', 'slack', 'smtp', 'embed', 'install', 'omnichannel'],
     tabs: [
       { id: 'website', label: 'Website widget', description: 'Copy the embed script for your site and check that it is live.', capability: null, keywords: ['install', 'embed', 'script', 'snippet', 'wordpress', 'shopify', 'html', 'nextjs'] },
-      { id: 'email', label: 'Email', description: 'Send and receive email from your own domain through SMTP.', capability: 'manage_settings', keywords: ['smtp', 'email', 'mail', 'gmail', 'outlook', 'zoho', 'unread', 'alerts'] },
-      { id: 'social', label: 'Social & messaging', description: 'Connect WhatsApp, Instagram, Messenger, LinkedIn and Slack alerts.', capability: 'manage_settings', keywords: ['whatsapp', 'instagram', 'facebook', 'messenger', 'meta', 'linkedin', 'slack', 'social'] },
+      { id: 'email', label: 'SMTP', description: 'Your own mail server, used for alerts and for replies to tickets logged by hand. For the email support channel, see Messaging & email channels.', capability: 'manage_settings', keywords: ['smtp', 'email', 'mail', 'gmail', 'outlook', 'zoho', 'unread', 'alerts'] },
+      { id: 'social', label: 'Messaging & email channels', description: 'Email support, WhatsApp, Instagram, Messenger, LinkedIn and Slack alerts.', capability: 'manage_settings', keywords: ['email', 'support address', 'forwarding', 'dns', 'dkim', 'whatsapp', 'instagram', 'facebook', 'messenger', 'meta', 'linkedin', 'slack', 'social'] },
       { id: 'mobile', label: 'Mobile app', description: 'Add Zentry to your phone’s home screen.', capability: null, keywords: ['mobile', 'pwa', 'android', 'iphone', 'ios', 'home screen', 'qr'] },
     ],
   },

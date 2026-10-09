@@ -47,6 +47,7 @@ import type { TicketGroup, TicketPriority, TicketStatus, TicketType } from '@/ty
 import { ChannelIcon, StatusBadge, fullTime, inputClass, timeAgo } from './TicketBits';
 import { roleCan, type Role } from '@/lib/team/permissions';
 import { CollisionBanner, usePresence } from './Presence';
+import { EmailMessageExtras, isEmailMessage } from './EmailBits';
 import { applyMacroAction } from '@/app/actions/automation';
 import { useMacroSlash } from './MacroMenu';
 import { ChannelBanner, DeliveryStatus, StoryContextCard, TemplateComposer, channelNotice, useServiceWindow } from './ChannelBits';
@@ -418,7 +419,8 @@ function Thread({
                 )}
               >
                 {m.content && <ChatMarkdown content={m.content} />}
-                {m.attachment_url && (
+                {isEmailMessage(m.metadata) && <EmailMessageExtras metadata={m.metadata} />}
+                {m.attachment_url && !isEmailMessage(m.metadata) && (
                   <a
                     href={m.attachment_url}
                     target="_blank"

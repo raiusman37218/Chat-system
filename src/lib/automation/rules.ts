@@ -169,6 +169,7 @@ export const ACTION_TYPES: { id: string; label: string; outbound?: boolean }[] =
   { id: 'set_assignee', label: 'Assign to' },
   { id: 'add_tags', label: 'Add tags' },
   { id: 'remove_tags', label: 'Remove tags' },
+  { id: 'notify_requester', label: 'Send a requester notification', outbound: true },
   { id: 'email_requester', label: 'Email the requester', outbound: true },
   { id: 'email_agent', label: 'Email the assignee', outbound: true },
   { id: 'webhook', label: 'Notify a webhook', outbound: true },
@@ -190,6 +191,8 @@ export function blankAction(type = 'set_status'): RuleAction {
     case 'add_tags':
     case 'remove_tags':
       return { type, value: [] };
+    case 'notify_requester':
+      return { type, value: 'received' };
     case 'email_requester':
     case 'email_agent':
       return { type, subject: '', body: '' };
@@ -319,6 +322,8 @@ function actionError(a: RuleAction, kind: 'rule' | 'macro'): string | null {
     case 'add_tags':
     case 'remove_tags':
       return Array.isArray(a.value) && a.value.length >= 1 && a.value.length <= 10 ? null : 'Enter 1 to 10 tags.';
+    case 'notify_requester':
+      return a.value === 'received' || a.value === 'replied' || a.value === 'solved' ? null : 'Choose which notification to send.';
     case 'email_requester':
     case 'email_agent': {
       const subject = (a.subject ?? '').trim();
@@ -390,6 +395,7 @@ export function describeAction(a: { type: string; value?: unknown }, names?: { g
     case 'set_assignee': return v === 'none' ? 'Unassign' : v === 'me' ? 'Assign to me' : `Assign to ${names?.people?.[v] ?? 'selected person'}`;
     case 'add_tags': return `Add tags ${v}`;
     case 'remove_tags': return `Remove tags ${v}`;
+    case 'notify_requester': return `Send the requester a “${v}” notification`;
     case 'email_requester': return `Email the requester: ${v}`;
     case 'email_agent': return `Email the assignee: ${v}`;
     case 'webhook': return `Notify webhook ${v}`;

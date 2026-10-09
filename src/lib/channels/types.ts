@@ -9,9 +9,10 @@
  * the registry and the channel lists in the channels migration.
  */
 import type { ChannelConnection } from '@/types/database';
+import type { EmailSendContext } from './email/types';
 
 /** Channels with an adapter. Add to this union when a new adapter lands. */
-export type ChannelId = 'whatsapp' | 'instagram';
+export type ChannelId = 'whatsapp' | 'instagram' | 'email';
 
 export type MediaKind = 'image' | 'video' | 'audio' | 'document' | 'sticker';
 
@@ -79,6 +80,8 @@ export type OutboundContent =
       replyToExternalId?: string;
       /** Instagram: a person replying after 24 hours (Meta's Human Agent feature). */
       tag?: 'HUMAN_AGENT';
+      /** Email: the ticket thread this reply belongs to. */
+      email?: EmailSendContext;
     }
   | { type: 'template'; template: TemplateRef };
 
@@ -90,6 +93,8 @@ export interface OutboundMedia {
   filename?: string;
   /** Instagram: a person replying after 24 hours (Meta's Human Agent feature). */
   tag?: 'HUMAN_AGENT';
+  /** Email: the ticket thread this reply belongs to. */
+  email?: EmailSendContext;
 }
 
 export type SendResult =
