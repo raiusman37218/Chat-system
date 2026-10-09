@@ -20,6 +20,8 @@ import { isSuppressed, loadBrand, senderSettingsFrom, type EmailSettings } from 
 import type { NotificationTemplate } from '@/lib/channels/email/template';
 import { getConnection } from '@/lib/channels/store';
 
+import { generateCsatToken } from '@/lib/csat/token';
+
 const MAX_ATTEMPTS = 5;
 const CLAIM_MINUTES = 5;
 
@@ -53,15 +55,27 @@ async function sendNotification(row: OutboxRow, to: string): Promise<{ ok: boole
   if (!cfg.tokenSecret || !provider.isConfigured()) return { ok: false, error: 'The email provider is not configured on the server.', permanent: true };
   if (await isSuppressed(row.workspace_id, to)) return { ok: false, error: `${to} is blocked because an earlier email to it bounced.`, permanent: true };
 
+  const ticketId = String(row.payload.ticket_id || (row as unknown as { ticket_id?: string }).ticket_id || '');
+  let csatLinks = undefined;
+  if (template === 'solved' && ticketId) {
+    const appUrl = (process.env.NEXT_PUBLIC_APP_URL || 'https://zen-try.com').replace(/\/$/, '');
+    const token = generateCsatToken(ticketId, row.workspace_id);
+    csatLinks = {
+      goodUrl: `${appUrl}/csat/${ticketId}?rating=good&token=${token}`,
+      badUrl: `${appUrl}/csat/${ticketId}?rating=bad&token=${token}`,
+    };
+  }
+
   const email = composeNotification({
     workspace: await loadBrand(row.workspace_id),
     sender: senderSettingsFrom((connection.settings || {}) as EmailSettings, connection.external_account_id || ''),
     tokenSecret: cfg.tokenSecret,
     to: { email: to, name: String(row.payload.requester_name ?? '') || undefined },
     template,
-    ticket: { number: Number(row.payload.ticket_number), subject: String(row.payload.ticket_subject ?? '') },
+    ticket: { number: Number(row.payload.ticket_number), subject: String(row.payload.ticket_subject ?? ''), id: ticketId || undefined },
     agentName: String(row.payload.agent_name ?? '') || null,
     reply: String(row.payload.reply ?? '') || null,
+    csatLinks,
   });
   const result = await provider.send(email);
   if (result.ok) return { ok: true };

@@ -103,9 +103,10 @@ export interface NotificationEmailInput {
   tokenSecret: string;
   to: { email: string; name?: string };
   template: NotificationTemplate;
-  ticket: { number: number; subject: string };
+  ticket: { number: number; subject: string; id?: string };
   agentName?: string | null;
   reply?: string | null;
+  csatLinks?: { goodUrl: string; badUrl: string } | null;
 }
 
 /** "Received", "replied" or "solved". Automatic: marked so the other side never auto-answers it. */
@@ -128,6 +129,7 @@ export function composeNotification(input: NotificationEmailInput): OutboundEmai
     body: content.body,
     signature: renderSignature(sender.signature, input.agentName || 'The team', workspace.name),
     ticketNumber: input.ticket.number,
+    csatLinks: input.csatLinks,
   });
   return {
     messageId,

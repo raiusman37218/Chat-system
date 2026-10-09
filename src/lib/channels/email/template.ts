@@ -19,6 +19,8 @@ export interface BrandedEmailInput {
   replyAboveLine?: boolean;
   /** One line under the card, e.g. why the customer got this. */
   footerNote?: string | null;
+  /** Links for Good and Bad CSAT rating in solved notifications. */
+  csatLinks?: { goodUrl: string; badUrl: string } | null;
 }
 
 const FALLBACK_COLOR = '#2563eb';
@@ -59,6 +61,16 @@ export function renderBrandedEmail(input: BrandedEmailInput): { html: string; te
   const signature = (input.signature || '').trim();
   const above = input.replyAboveLine !== false;
 
+  const csatBlockHtml = input.csatLinks
+    ? `<div style="margin:22px 0 10px 0;padding:16px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;text-align:center">
+        <p style="margin:0 0 12px 0;font-size:13px;font-weight:600;color:#1f2933">How would you rate our support?</p>
+        <div>
+          <a href="${escapeHtml(input.csatLinks.goodUrl)}" style="display:inline-block;padding:8px 18px;margin:0 6px;background:#10b981;color:#ffffff;text-decoration:none;border-radius:6px;font-size:13px;font-weight:600">👍 Good</a>
+          <a href="${escapeHtml(input.csatLinks.badUrl)}" style="display:inline-block;padding:8px 18px;margin:0 6px;background:#ef4444;color:#ffffff;text-decoration:none;border-radius:6px;font-size:13px;font-weight:600">👎 Bad</a>
+        </div>
+      </div>`
+    : '';
+
   const header = logo
     ? `<img src="${escapeHtml(logo)}" alt="${name}" height="28" style="display:block;max-height:28px;border:0">`
     : `<span style="font-size:16px;font-weight:600;color:#ffffff">${name}</span>`;
@@ -71,6 +83,7 @@ ${above ? '<div style="display:none;max-height:0;overflow:hidden;font-size:1px;c
 <tr><td style="padding:24px;font-size:15px;line-height:1.55;color:#1f2933">
 ${above ? '<p style="margin:0 0 16px 0;font-size:12px;color:#8a94a0">-- Please reply above this line --</p>' : ''}
 ${textToHtml(input.body)}
+${csatBlockHtml}
 ${signature ? `<p style="margin:18px 0 0 0;padding-top:14px;border-top:1px solid #e4e7eb;color:#52606d">${escapeHtml(signature).replace(/\n/g, '<br>')}</p>` : ''}
 </td></tr>
 ${input.ticketNumber ? `<tr><td style="padding:12px 24px;background:#f9fafb;font-size:12px;color:#8a94a0">Ticket #${input.ticketNumber}. Reply to this email to add to it.</td></tr>` : ''}
@@ -81,6 +94,7 @@ ${input.footerNote ? `<p style="max-width:600px;margin:12px 0 0 0;font-family:${
   const text = [
     above ? '-- Please reply above this line --\n' : '',
     input.body.trim(),
+    input.csatLinks ? `\nHow would you rate our support?\nGood: ${input.csatLinks.goodUrl}\nBad: ${input.csatLinks.badUrl}` : '',
     signature ? `\n-- \n${signature}` : '',
     input.ticketNumber ? `\nTicket #${input.ticketNumber}. Reply to this email to add to it.` : '',
     input.footerNote ? `\n${input.footerNote}` : '',

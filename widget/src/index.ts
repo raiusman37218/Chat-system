@@ -1586,14 +1586,31 @@ class ZentryWidget {
   }
 
   // Post-chat CSAT Rating
-  public async submitCSAT(rating: number) {
+  public async submitCSAT(rating: 'good' | 'bad' | number, comment?: string) {
     if (!this.conversationId) return;
     this.csatRated = true;
 
-    await this.supabase
-      .from('conversations')
-      .update({ csat_rating: rating })
-      .eq('id', this.conversationId);
+    const ratingVal = typeof rating === 'number' ? (rating >= 4 ? 'good' : 'bad') : rating;
+    const numRating = ratingVal === 'good' ? 5 : 1;
+
+    try {
+      await fetch('/api/csat/rate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          conversation_id: this.conversationId,
+          rating: ratingVal,
+          comment: comment ? comment.trim() : undefined,
+        }),
+      });
+    } catch {
+      try {
+        await this.supabase
+          .from('conversations')
+          .update({ csat_rating: numRating, csat_feedback: comment ? comment.trim() : null })
+          .eq('id', this.conversationId);
+      } catch {}
+    }
 
     this.renderMessages();
   }
@@ -4206,6 +4223,90 @@ class ZentryWidget {
         background: var(--w-brand-a08);
       }
 
+      .chatify-csat-choices {
+        margin-top: 12px;
+        display: flex;
+        gap: 8px;
+        justify-content: center;
+      }
+
+      .chatify-csat-choice-btn {
+        flex: 1;
+        padding: 8px 12px;
+        border-radius: var(--w-r-sm);
+        border: 1px solid var(--w-line);
+        background: var(--w-surface-2);
+        color: var(--w-ink);
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        transition: all .16s var(--w-ease);
+      }
+
+      .chatify-csat-choice-btn:hover {
+        border-color: var(--w-line-3);
+        background: var(--w-surface-3);
+      }
+
+      .chatify-csat-choice-btn.selected-good {
+        border-color: var(--w-success);
+        background: var(--w-success-soft);
+        color: var(--w-success);
+      }
+
+      .chatify-csat-choice-btn.selected-bad {
+        border-color: var(--w-danger);
+        background: var(--w-danger-soft);
+        color: var(--w-danger);
+      }
+
+      .chatify-csat-comment-wrap {
+        margin-top: 10px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .chatify-csat-comment-input {
+        width: 100%;
+        box-sizing: border-box;
+        border-radius: var(--w-r-sm);
+        border: 1px solid var(--w-line);
+        padding: 8px 10px;
+        font-size: 12px;
+        resize: none;
+        height: 56px;
+        background: var(--w-surface);
+        color: var(--w-ink);
+        font-family: inherit;
+        outline: none;
+      }
+
+      .chatify-csat-comment-input:focus {
+        border-color: var(--w-brand);
+      }
+
+      .chatify-csat-submit-btn {
+        width: 100%;
+        padding: 8px 12px;
+        border-radius: var(--w-r-sm);
+        background: var(--w-brand);
+        color: #ffffff;
+        border: none;
+        cursor: pointer;
+        font-size: 12px;
+        font-weight: 600;
+        transition: opacity .16s var(--w-ease);
+      }
+
+      .chatify-csat-submit-btn:hover {
+        opacity: 0.9;
+      }
+
       /* ── Composer ─────────────────────────────────────────────────── */
 
       .chatify-footer {
@@ -5217,22 +5318,48 @@ class ZentryWidget {
       const csatCard = document.createElement('div');
       csatCard.className = 'chatify-csat-box';
       csatCard.innerHTML = `
-        <div class="chatify-csat-title">How was your conversation?</div>
-        <div class="chatify-csat-sub">Please rate the support you received today:</div>
-        <div class="chatify-csat-emojis">
-          <button class="chatify-csat-btn" data-val="1" title="Terrible">😡</button>
-          <button class="chatify-csat-btn" data-val="2" title="Bad">🙁</button>
-          <button class="chatify-csat-btn" data-val="3" title="Okay">😐</button>
-          <button class="chatify-csat-btn" data-val="4" title="Good">🙂</button>
-          <button class="chatify-csat-btn" data-val="5" title="Amazing!">🤩</button>
+        <div class="chatify-csat-title">How was your support experience?</div>
+        <div class="chatify-csat-sub">Please rate the support you received:</div>
+        <div class="chatify-csat-choices">
+          <button type="button" class="chatify-csat-choice-btn" data-rating="good">
+            <span>👍</span><span>Good</span>
+          </button>
+          <button type="button" class="chatify-csat-choice-btn" data-rating="bad">
+            <span>👎</span><span>Bad</span>
+          </button>
+        </div>
+        <div class="chatify-csat-comment-wrap" style="display: none;">
+          <textarea class="chatify-csat-comment-input" placeholder="Add an optional comment..."></textarea>
+          <button type="button" class="chatify-csat-submit-btn">Submit feedback</button>
         </div>
       `;
-      csatCard.querySelectorAll('.chatify-csat-btn').forEach((btn) => {
+
+      let selectedRating: 'good' | 'bad' | null = null;
+      const choices = csatCard.querySelectorAll('.chatify-csat-choice-btn');
+      const commentWrap = csatCard.querySelector('.chatify-csat-comment-wrap') as HTMLElement;
+      const commentInput = csatCard.querySelector('.chatify-csat-comment-input') as HTMLTextAreaElement;
+      const submitBtn = csatCard.querySelector('.chatify-csat-submit-btn') as HTMLButtonElement;
+
+      choices.forEach((btn) => {
         btn.addEventListener('click', (e) => {
-          const val = parseInt((e.currentTarget as HTMLElement).getAttribute('data-val') || '5', 10);
-          this.submitCSAT(val);
+          const r = (e.currentTarget as HTMLElement).getAttribute('data-rating') as 'good' | 'bad';
+          selectedRating = r;
+          choices.forEach((b) => {
+            b.classList.remove('selected-good', 'selected-bad');
+          });
+          btn.classList.add(r === 'good' ? 'selected-good' : 'selected-bad');
+          if (commentWrap) commentWrap.style.display = 'flex';
         });
       });
+
+      if (submitBtn) {
+        submitBtn.addEventListener('click', () => {
+          if (!selectedRating) return;
+          const commentText = commentInput ? commentInput.value.trim() : '';
+          this.submitCSAT(selectedRating, commentText);
+        });
+      }
+
       body.appendChild(csatCard);
     } else if (this.csatRated) {
       const thankYou = document.createElement('div');

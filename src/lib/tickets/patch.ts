@@ -15,6 +15,8 @@ export interface TicketPatch {
   assignee_id?: string | null;
   group_id?: string | null;
   tags?: string[];
+  csat_rating?: 'good' | 'bad' | null;
+  csat_comment?: string | null;
 }
 
 /**
@@ -34,5 +36,7 @@ export function sanitizeTicketPatch(patch: TicketPatch): TicketPatch {
   if (Array.isArray(patch.tags)) {
     out.tags = Array.from(new Set(patch.tags.map((t) => normalizeTag(String(t))).filter(Boolean))).slice(0, 30);
   }
+  if (patch.csat_rating && ['good', 'bad'].includes(patch.csat_rating)) out.csat_rating = patch.csat_rating;
+  if (typeof patch.csat_comment === 'string') out.csat_comment = patch.csat_comment.trim().slice(0, 1000);
   return out;
 }

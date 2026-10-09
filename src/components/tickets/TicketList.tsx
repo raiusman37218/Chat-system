@@ -18,6 +18,7 @@ import type { TicketListItem } from '@/app/actions/tickets';
 import type { TicketStatus } from '@/types/database';
 import { ChannelIcon, Modal, PriorityLabel, StatusBadge, inputClass, timeAgo } from './TicketBits';
 import { SlaBadge } from './SlaBadge';
+import { CsatBadge } from './CsatBadge';
 
 export const PAGE_SIZE = 50;
 
@@ -166,7 +167,10 @@ export function TicketList(props: Props) {
                     {t.requester?.name || t.requester?.email || 'Unknown'}
                   </td>
                   <td className="px-2 py-2.5 border-b border-line">
-                    <StatusBadge status={t.status} />
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <StatusBadge status={t.status} />
+                      <CsatBadge ticket={t} compact />
+                    </div>
                     <SlaBadge ticket={t} className="mt-1 sm:hidden" />
                   </td>
                   <td className="px-2 py-2.5 border-b border-line hidden sm:table-cell">

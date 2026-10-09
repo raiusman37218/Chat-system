@@ -49,6 +49,7 @@ import { NotificationPreferences } from './NotificationPreferences';
 import { WorkspaceGeneral } from './WorkspaceGeneral';
 import { AutoCloseCard, LinkCard, PlanPanel, RolesMatrix } from './SmallPages';
 import { ComingSoon, DirtyProvider } from './parts';
+import { CsatSettingsCard } from './CsatSettingsCard';
 
 const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   building: Building2,
@@ -428,6 +429,8 @@ function Page({
 
     case 'tickets:views':
       return <LinkCard title="Saved views" description="Create, edit and share views from the Tickets screen, where you can see the filters working on real tickets." actionLabel="Open tickets" onClick={() => onNavigate?.('tickets')} />;
+    case 'tickets:csat':
+      return <CsatSettingsCard workspace={workspace} onWorkspaceUpdated={onWorkspaceUpdated} />;
 
     case 'automation:replies':
       return admin('canned');

@@ -11,7 +11,7 @@ import { ChatThread } from '@/components/dashboard/ChatThread';
 import { VisitorDetailsSidebar } from '@/components/dashboard/VisitorDetailsSidebar';
 import { LiveVisitorsRadar } from '@/components/dashboard/LiveVisitorsRadar';
 import { SettingsHub } from '@/components/dashboard/SettingsHub';
-import { AnalyticsDashboard } from '@/components/admin/AnalyticsDashboard';
+import { ReportsDashboard } from '@/components/reports/ReportsDashboard';
 import { HelpDeskDashboard } from '@/components/dashboard/HelpDeskDashboard';
 import { TicketsView } from '@/components/tickets/TicketsView';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -1805,10 +1805,10 @@ export default function DashboardPage() {
 
       {activeView === 'reports' && currentWorkspace && currentAgent && (
         <div className="flex-1 flex overflow-hidden w-full pb-14 md:pb-0">
-          <AnalyticsDashboard
+          <ReportsDashboard
             workspace={currentWorkspace}
             currentAgent={currentAgent}
-            onOpenInstall={() => handleOpenSettingsSection('install')}
+            onOpenSettings={(sec) => handleOpenSettingsSection(sec as SectionId)}
             onOpenInbox={() => setActiveView('inbox')}
           />
         </div>

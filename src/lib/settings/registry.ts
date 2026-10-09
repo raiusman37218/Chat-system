@@ -91,10 +91,11 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
     label: 'Tickets',
     group: 'Support',
     icon: 'ticket',
-    description: 'Fields, tags and saved views.',
-    keywords: ['custom fields', 'tags', 'views', 'filters', 'priority', 'status'],
+    description: 'Fields, tags, customer satisfaction and saved views.',
+    keywords: ['custom fields', 'tags', 'views', 'filters', 'priority', 'status', 'csat', 'satisfaction'],
     tabs: [
       { id: 'views', label: 'Views', description: 'Saved filters for your ticket list. They are managed from the Tickets screen.', capability: null, keywords: ['view', 'filter', 'saved', 'sort'] },
+      { id: 'csat', label: 'Satisfaction (CSAT)', description: 'Survey customers with a good/bad question and optional comment when their ticket is solved.', capability: 'manage_settings', keywords: ['csat', 'satisfaction', 'survey', 'rating', 'feedback', 'good', 'bad', 'solved'] },
       { id: 'fields', label: 'Ticket fields', description: 'Add your own fields, such as order number or plan, to every ticket.', capability: 'manage_settings', status: 'soon', keywords: ['field', 'custom', 'form'] },
       { id: 'tags', label: 'Tags', description: 'Rename, merge and retire the tags your team uses.', capability: 'manage_settings', status: 'soon', keywords: ['tag', 'label'] },
     ],

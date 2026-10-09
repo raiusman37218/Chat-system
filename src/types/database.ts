@@ -501,8 +501,17 @@ export interface Workspace {
   /** IANA zone and language code; see 20261013090000_settings_hub.sql. */
   timezone?: string | null;
   language?: string | null;
+  csat_settings?: CsatSettingsConfig;
   created_at: string;
 }
+
+export interface CsatSettingsConfig {
+  enabled: boolean;
+  ask_chat: boolean;
+  ask_email: boolean;
+  survey_prompt?: string;
+}
+
 
 export interface WorkspaceIntegration {
   id: string;
@@ -690,6 +699,10 @@ export interface Ticket {
   sla_next_warn_at?: string | null;
   sla_next_metric?: 'first_reply' | 'next_reply' | 'resolution' | null;
   sla_breached_at?: string | null;
+  /** CSAT satisfaction rating and comment. */
+  csat_rating?: 'good' | 'bad' | null;
+  csat_comment?: string | null;
+  csat_rated_at?: string | null;
 }
 
 export interface TicketGroup {
@@ -728,3 +741,32 @@ export interface TicketViewRow {
   created_at: string;
   updated_at: string;
 }
+
+/* ── Reporting ───────────────────────────────────────────────────────── */
+
+export type ReportingEventType =
+  | 'ticket_created'
+  | 'ticket_solved'
+  | 'ticket_reopened'
+  | 'first_reply'
+  | 'csat_rated'
+  | 'bot_resolved'
+  | 'bot_handover';
+
+export interface ReportingEvent {
+  id: number;
+  workspace_id: string;
+  ticket_id: string | null;
+  event_type: ReportingEventType;
+  occurred_at: string;
+  agent_id: string | null;
+  group_id: string | null;
+  channel: string | null;
+  priority: string | null;
+  tags: string[];
+  duration_seconds: number | null;
+  csat_rating: 'good' | 'bad' | null;
+  csat_comment: string | null;
+  metadata: Record<string, unknown>;
+}
+

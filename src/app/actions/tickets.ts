@@ -110,7 +110,7 @@ export interface TicketListItem {
 }
 
 const LIST_COLUMNS =
-  'id, number, subject, status, priority, type, channel, tags, assignee_id, group_id, created_at, updated_at, solved_at, sla_state, sla_next_due_at, sla_next_warn_at, sla_next_metric, sla_breached_at, requester:visitors(id, name, email)';
+  'id, number, subject, status, priority, type, channel, tags, assignee_id, group_id, created_at, updated_at, solved_at, csat_rating, csat_comment, csat_rated_at, sla_state, sla_next_due_at, sla_next_warn_at, sla_next_metric, sla_breached_at, requester:visitors(id, name, email)';
 
 export interface TicketsBootstrap {
   me: { id: string; name: string; isAdmin: boolean; role: Role };

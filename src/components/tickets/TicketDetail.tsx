@@ -47,6 +47,7 @@ import {
 import type { TicketGroup, TicketPriority, TicketStatus, TicketType } from '@/types/database';
 import { ChannelIcon, StatusBadge, fullTime, inputClass, timeAgo } from './TicketBits';
 import { SlaBadge, useNow } from './SlaBadge';
+import { CsatBadge } from './CsatBadge';
 import { METRIC_LABEL, formatMinutes, formatRemaining } from '@/lib/sla/policy';
 import { roleCan, type Role } from '@/lib/team/permissions';
 import { CollisionBanner, usePresence } from './Presence';
@@ -183,6 +184,7 @@ export function TicketDetail({ workspaceId, ticketId, agents, groups, me, onBack
               <span className="tabular-nums">#{ticket.number}</span>
               <StatusBadge status={ticket.status} />
               <SlaBadge ticket={ticket} />
+              <CsatBadge ticket={ticket} />
               <span>· {CHANNEL_LABEL[ticket.channel]} · opened {timeAgo(ticket.created_at)}</span>
             </div>
             <SubjectEditor
@@ -823,6 +825,24 @@ function Properties({
             </React.Fragment>
           ))}
       </dl>
+      {(ticket.csat_rating || ticket.status === 'solved' || ticket.status === 'closed') && (
+        <div className="mt-3 pt-3 border-t border-line">
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-2xs font-bold uppercase tracking-wide text-ink-3">Customer satisfaction</span>
+            <CsatBadge ticket={ticket} />
+          </div>
+          {ticket.csat_comment && (
+            <div className="p-2.5 rounded-lg bg-surface-2 border border-line text-xs text-ink italic mt-2">
+              “{ticket.csat_comment}”
+            </div>
+          )}
+          {ticket.csat_rated_at && (
+            <div className="text-2xs text-ink-3 mt-1.5">
+              Rated {timeAgo(ticket.csat_rated_at)}
+            </div>
+          )}
+        </div>
+      )}
     </section>
   );
 }

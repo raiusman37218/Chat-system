@@ -16,7 +16,7 @@ import {
   type NotificationPrefs,
   type WorkspaceGeneralInput,
 } from '@/lib/settings/validation';
-import type { Workspace } from '@/types/database';
+import type { Workspace, CsatSettingsConfig } from '@/types/database';
 
 export async function updateWorkspaceGeneralAction(workspaceId: string, input: WorkspaceGeneralInput) {
   const { supabase } = await getWorkspaceAccess(workspaceId, 'manage_settings');
@@ -109,3 +109,27 @@ export async function getAuditLogAction(workspaceId: string, before?: string | n
   const rows = (data || []) as AuditEntry[];
   return { success: true as const, entries: rows.slice(0, AUDIT_PAGE), hasMore: rows.length > AUDIT_PAGE };
 }
+
+export async function updateCsatSettingsAction(workspaceId: string, settings: CsatSettingsConfig) {
+  const { supabase } = await getWorkspaceAccess(workspaceId, 'manage_settings');
+  const clean: CsatSettingsConfig = {
+    enabled: Boolean(settings.enabled),
+    ask_chat: Boolean(settings.ask_chat),
+    ask_email: Boolean(settings.ask_email),
+    survey_prompt: (settings.survey_prompt || 'How would you rate the support you received?').trim().slice(0, 300),
+  };
+
+  const { data, error } = await supabase
+    .from('workspaces')
+    .update({ csat_settings: clean })
+    .eq('id', workspaceId)
+    .select()
+    .single();
+
+  if (error) {
+    console.error('[CSAT Settings Error]:', error);
+    return { success: false as const, error: error.message };
+  }
+  return { success: true as const, workspace: data as Workspace };
+}
+

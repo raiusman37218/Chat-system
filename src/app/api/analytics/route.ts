@@ -23,7 +23,7 @@ export async function GET(req: NextRequest) {
     const prevStartDate = new Date(now.getTime() - daysBack * 2 * 24 * 60 * 60 * 1000);
 
     // 1. Fetch conversations in current and previous periods
-    const [{ data: conversations }, { data: prevConversations }, { data: agents }, { data: messages }] =
+    const [{ data: conversations }, { data: prevConversations }, { data: agents }] =
       await Promise.all([
         supabase
           .from('conversations')
@@ -41,14 +41,20 @@ export async function GET(req: NextRequest) {
           .from('agents')
           .select('*')
           .eq('workspace_id', workspaceId),
-        supabase
-          .from('messages')
-          .select('conversation_id, sender_type, sender_id, is_internal, created_at')
-          .gte('created_at', startDate.toISOString())
-          .order('created_at', { ascending: true }),
       ]);
 
     const convList = conversations || [];
+    const convIds = convList.map((c) => c.id);
+
+    const { data: messages } = convIds.length
+      ? await supabase
+          .from('messages')
+          .select('conversation_id, sender_type, sender_id, is_internal, created_at')
+          .in('conversation_id', convIds)
+          .gte('created_at', startDate.toISOString())
+          .order('created_at', { ascending: true })
+      : { data: [] };
+
     const prevConvList = prevConversations || [];
     const agentList = agents || [];
     const msgList = messages || [];
