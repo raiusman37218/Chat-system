@@ -28,9 +28,11 @@ describe('who sees which settings', () => {
     expect(ids('admin')).toContain('team');
   });
 
-  it('agents and light agents only get their own account pages and the shared tools', () => {
+  it('agents get their account pages, the shared tools and their own macros', () => {
+    expect(visibleSections('agent').find((s) => s.id === 'automation')?.tabs.map((t) => t.id)).toEqual(['macros']);
+    expect(ids('light_agent')).not.toContain('automation');
     for (const role of ['agent', 'light_agent'] as const) {
-      const sections = visibleSections(role);
+      const sections = visibleSections(role).filter((s) => s.id !== 'automation');
       expect(sections.map((s) => s.id).sort()).toEqual(['channels', 'notifications', 'security', 'tickets']);
       const security = sections.find((s) => s.id === 'security')!;
       expect(security.tabs.map((t) => t.id)).toEqual(['sessions', 'twofactor']); // no audit log

@@ -107,7 +107,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
     description: 'Macros, triggers, automations, assignment and SLAs.',
     keywords: ['macros', 'canned', 'saved replies', 'shortcuts', 'assignment', 'auto close', 'sla', 'rules'],
     tabs: [
-      { id: 'macros', label: 'Macros', description: 'One-click actions that insert a reply and change status, priority, tags or assignee. Personal and shared.', capability: 'manage_settings', keywords: ['macro', 'one-click', 'action', 'reply template', 'placeholder'] },
+      { id: 'macros', label: 'Macros', description: 'One-click actions that insert a reply and change status, priority, tags or assignee. Shared macros are managed by admins; everyone with reply access keeps their own.', capability: 'reply', keywords: ['macro', 'one-click', 'action', 'reply template', 'placeholder'] },
       { id: 'triggers', label: 'Triggers', description: 'Rules that run instantly when a ticket is created or updated.', capability: 'manage_settings', keywords: ['trigger', 'rule', 'instant', 'condition', 'webhook', 'workflow'] },
       { id: 'automations', label: 'Automations', description: 'Time-based rules that run every hour, such as reminders and escalations.', capability: 'manage_settings', keywords: ['automation', 'hourly', 'reminder', 'escalate', 'pending', 'schedule', 'time'] },
       { id: 'log', label: 'Rule log', description: 'Which triggers and automations fired on which ticket, and what they did.', capability: 'manage_settings', keywords: ['log', 'history', 'fired', 'rule', 'debug'] },
