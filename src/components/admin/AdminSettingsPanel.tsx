@@ -104,6 +104,8 @@ interface AdminSettingsPanelProps {
   initialAgents: Agent[];
   initialCannedResponses: CannedResponse[];
   onWorkspaceUpdated?: (ws: Workspace) => void;
+  /** Tells the Settings hub whether the visible section has unsaved edits. */
+  onDirtyChange?: (dirty: boolean) => void;
   /** Controlled section; when set the internal tab bar is bypassed. */
   tab?: AdminTab;
   /** Hides this panel's own header and tab bar (used by the Settings hub). */
@@ -222,6 +224,7 @@ export function AdminSettingsPanel({
   currentAgent,
   initialCannedResponses,
   onWorkspaceUpdated,
+  onDirtyChange,
   tab,
   embedded = false,
 }: AdminSettingsPanelProps) {
@@ -723,6 +726,17 @@ export function AdminSettingsPanel({
     };
     return JSON.stringify(aiSettings) !== JSON.stringify(orig);
   }, [aiSettings, workspace.ai_settings]);
+
+  const activeSectionDirty =
+    (activeTab === 'widget' && isWidgetDirty) ||
+    (activeTab === 'helpcenter' && isHelpCenterDirty) ||
+    (activeTab === 'hours' && isHoursDirty) ||
+    (activeTab === 'assignment' && isAutoAssignDirty) ||
+    (activeTab === 'ai' && isAiDirty);
+  useEffect(() => {
+    onDirtyChange?.(activeSectionDirty);
+    return () => onDirtyChange?.(false);
+  }, [activeSectionDirty, onDirtyChange]);
 
   const [testingProvider, setTestingProvider] = useState(false);
   const [providerTest, setProviderTest] = useState<{

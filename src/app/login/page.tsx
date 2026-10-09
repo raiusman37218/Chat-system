@@ -20,6 +20,10 @@ function LoginForm() {
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  // Set when the account has an authenticator app and the session is not yet
+  // upgraded with a code (see Settings → Security → Two-factor authentication).
+  const [mfaFactorId, setMfaFactorId] = useState<string | null>(null);
+  const [mfaCode, setMfaCode] = useState('');
 
   // Where to land after signing in. Only same-site paths are honoured.
   const redirectParam = searchParams.get('redirect');
@@ -39,6 +43,39 @@ function LoginForm() {
       setErrorMsg(desc || err);
     }
   }, [searchParams]);
+
+  // The middleware sends a half-signed-in user back here with ?mfa=1.
+  useEffect(() => {
+    if (searchParams.get('mfa') !== '1') return;
+    startMfaIfRequired();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+
+  /** Returns true when a code is needed (and shows the code step). */
+  async function startMfaIfRequired(): Promise<boolean> {
+    const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+    if (aal?.nextLevel !== 'aal2' || aal.currentLevel === 'aal2') return false;
+    const { data: factors } = await supabase.auth.mfa.listFactors();
+    const factor = factors?.totp?.[0];
+    if (!factor) return false;
+    setMfaFactorId(factor.id);
+    return true;
+  }
+
+  const handleVerifyMfa = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!mfaFactorId) return;
+    setLoading(true);
+    setErrorMsg(null);
+    const { error } = await supabase.auth.mfa.challengeAndVerify({ factorId: mfaFactorId, code: mfaCode.trim() });
+    if (error) {
+      setErrorMsg(error.message || 'That code did not work. Check your authenticator app and try again.');
+      setLoading(false);
+      return;
+    }
+    router.push(redirectTo);
+    router.refresh();
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -93,6 +130,11 @@ function LoginForm() {
           setLoading(false);
           return;
         }
+      }
+
+      if (await startMfaIfRequired()) {
+        setLoading(false);
+        return;
       }
 
       router.push(redirectTo);
@@ -153,6 +195,60 @@ function LoginForm() {
     setEmail('agent@zentry.io');
     setPassword('ChatifyDemo2026!');
   };
+
+  if (mfaFactorId) {
+    return (
+      <div>
+        <div className="mb-7">
+          <h1 className="text-3xl leading-tight font-semibold">Two-factor code</h1>
+          <p className="mt-2 text-sm text-ink-2">Enter the 6-digit code from your authenticator app.</p>
+        </div>
+        {errorMsg && (
+          <div
+            role="alert"
+            className="mb-5 flex items-start gap-2.5 rounded-xl border border-danger-line bg-danger-soft px-3.5 py-3 text-xs text-danger animate-pop"
+          >
+            <AlertCircle className="w-4 h-4 shrink-0 mt-px" />
+            <span>{errorMsg}</span>
+          </div>
+        )}
+        <form onSubmit={handleVerifyMfa} className="space-y-4">
+          <div>
+            <label htmlFor="mfa-code" className="field-label">
+              Authentication code
+            </label>
+            <input
+              id="mfa-code"
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              pattern="[0-9]{6}"
+              maxLength={6}
+              required
+              autoFocus
+              value={mfaCode}
+              onChange={(e) => setMfaCode(e.target.value.replace(/\D/g, ''))}
+              className="input"
+            />
+          </div>
+          <button type="submit" disabled={loading || mfaCode.length !== 6} className="btn btn-primary w-full">
+            {loading ? 'Verifying…' : 'Verify and continue'}
+          </button>
+          <button
+            type="button"
+            className="btn btn-ghost w-full"
+            onClick={async () => {
+              await supabase.auth.signOut();
+              setMfaFactorId(null);
+              setMfaCode('');
+              setErrorMsg(null);
+            }}
+          >
+            Use a different account
+          </button>
+        </form>
+      </div>
+    );
+  }
 
   return (
     <div>
