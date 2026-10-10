@@ -21,6 +21,7 @@ import { loadBrand, senderSettingsFrom, type EmailSettings } from '@/lib/channel
 import { validateEmailSettings, type EmailSettingsErrors, type EmailSettingsInput } from '@/lib/channels/email/settings';
 import type { DnsRecord } from '@/lib/channels/email/types';
 import type { ChannelConnection } from '@/types/database';
+import { assertWorkspaceLimit, assertWorkspaceFeature } from '@/lib/plans/enforce';
 
 type Result<T = object> = ({ success: true } & T) | { success: false; error: string; fieldErrors?: EmailSettingsErrors };
 
@@ -120,6 +121,8 @@ export async function getEmailChannelAction(workspaceId: string): Promise<Result
 export async function enableEmailChannelAction(workspaceId: string): Promise<Result<{ overview: EmailChannelOverview }>> {
   try {
     const { supabase, user } = await guard(workspaceId);
+    await assertWorkspaceLimit(workspaceId, 'max_channels_connected');
+    await assertWorkspaceFeature(workspaceId, 'channel_email');
     const cfg = emailConfig();
     if (!cfg.inboundDomain) throw new Error('EMAIL_INBOUND_DOMAIN is not set on the server, so a support address cannot be created.');
 

@@ -12,6 +12,7 @@ import { after } from 'next/server';
 import { invalidateHelpIndex } from '@/lib/ai/help-answer';
 import { getWorkspaceAccess } from '@/lib/team/access';
 import type { Capability } from '@/lib/team/permissions';
+import { assertWorkspaceLimit } from '@/lib/plans/enforce';
 
 /**
  * Brings the assistant's knowledge up to date after a help-centre change.
@@ -603,6 +604,7 @@ export async function createArticleAction(
   }
 ) {
   const { agent } = await assertAgent(workspaceId);
+  await assertWorkspaceLimit(workspaceId, 'max_articles');
   const supabase = await createClient();
 
   const rawSlug = data.slug?.trim() || data.title;

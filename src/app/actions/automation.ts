@@ -13,6 +13,7 @@ import { after } from 'next/server';
 import { getWorkspaceAccess } from '@/lib/team/access';
 import { roleCan } from '@/lib/team/permissions';
 import { processAutomationOutbox } from '@/lib/automation/outbox';
+import { assertWorkspaceFeature, assertWorkspaceLimit } from '@/lib/plans/enforce';
 import {
   hasErrors,
   toStoredAction,
@@ -99,6 +100,10 @@ export async function getAutomationBootstrapAction(workspaceId: string, scope: '
 export async function saveRuleAction(workspaceId: string, draft: RuleDraft): Promise<Result<{ rule: RuleRow }>> {
   try {
     const { supabase, user } = await getWorkspaceAccess(workspaceId, 'manage_settings');
+    await assertWorkspaceFeature(workspaceId, 'automations');
+    if (!draft.id) {
+      await assertWorkspaceLimit(workspaceId, 'max_automations');
+    }
     const errors = validateRuleDraft(draft);
     if (hasErrors(errors)) {
       const first = errors.name || errors.form || Object.values(errors.conditions)[0] || Object.values(errors.actions)[0];
@@ -292,6 +297,7 @@ export async function listMacrosAction(workspaceId: string): Promise<Result<{ ma
 export async function saveMacroAction(workspaceId: string, draft: MacroDraft): Promise<Result<{ macro: MacroRow }>> {
   try {
     const { supabase, user } = await getWorkspaceAccess(workspaceId, 'reply');
+    await assertWorkspaceFeature(workspaceId, 'macros');
     const errors = validateMacroDraft(draft);
     const first = errors.title || errors.content || Object.values(errors.actions)[0];
     if (first) return { success: false, error: first };

@@ -18,8 +18,9 @@ import {
   translateToEnglish,
   translateWithGoogleGtx,
 } from '@/lib/ai/translator';
-import { translateVisitorMessage } from '@/lib/ai/inbound-translation';
 import { getWorkspaceHelpCenterUrl } from '@/lib/domain';
+import { translateVisitorMessage } from '@/lib/ai/inbound-translation';
+import { checkWorkspaceFeature, checkWorkspaceLimit, incrementWorkspaceUsage } from '@/lib/plans/enforce';
 
 /**
  * The language the visitor wrote in. The word-list detector is instant but
@@ -99,7 +100,7 @@ export async function POST(req: NextRequest) {
     // the assistant answers, and after the response so it never slows a reply.
     if (requested_message_id) {
       after(() =>
-        translateVisitorMessage(requested_message_id).catch((err) =>
+        translateVisitorMessage(requested_message_id).catch((err: unknown) =>
           console.warn('[Auto-Respond] Inbound translation failed:', err)
         )
       );
@@ -149,6 +150,15 @@ export async function POST(req: NextRequest) {
         .order('created_at', { ascending: false })
         .limit(40),
     ]);
+
+    const featureCheck = await checkWorkspaceFeature(workspace_id, 'ai_bot');
+    if (!featureCheck.allowed) {
+      return json({ replied: false, reason: featureCheck.upgradeMessage });
+    }
+    const limitCheck = await checkWorkspaceLimit(workspace_id, 'max_ai_bot_replies_per_month');
+    if (!limitCheck.allowed) {
+      return json({ replied: false, reason: limitCheck.upgradeMessage });
+    }
 
     const msgs = (recentMessages || []).reverse();
     const isVisitorLine = (m: (typeof msgs)[number]) =>
@@ -455,6 +465,10 @@ export async function POST(req: NextRequest) {
       })
       .select()
       .single();
+
+    if (!msgErr) {
+      incrementWorkspaceUsage(workspace_id, 'ai_replies', 1).catch(() => {});
+    }
 
     if (msgErr) {
       if ((msgErr as any).code === '23505') {

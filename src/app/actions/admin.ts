@@ -593,6 +593,41 @@ export async function createWorkspaceAction(input: {
     console.warn('Could not seed help blueprints:', seedErr);
   }
 
+  // 6. Initialize default plan trial subscription (Safety Requirement 10)
+  try {
+    const adminClient = serviceClient();
+    const { data: defaultPlan } = await adminClient
+      .from('platform_plans')
+      .select('id, slug, trial_days, version')
+      .eq('is_default', true)
+      .limit(1)
+      .maybeSingle();
+
+    if (defaultPlan) {
+      const trialDays = defaultPlan.trial_days || 14;
+      const now = new Date();
+      const trialEndsAt = new Date(now.getTime() + trialDays * 24 * 60 * 60 * 1000).toISOString();
+      const periodEnd = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString();
+
+      await adminClient.from('workspace_subscriptions').insert({
+        workspace_id: ws.id,
+        plan_id: defaultPlan.id,
+        plan_version: defaultPlan.version,
+        status: 'trialing',
+        billing_period: 'monthly',
+        current_period_start: now.toISOString(),
+        current_period_end: periodEnd,
+        trial_ends_at: trialEndsAt,
+        admin_note: 'Initial 14-day trial of Starter plan.',
+      });
+
+      await adminClient.from('workspaces').update({ plan: defaultPlan.slug }).eq('id', ws.id);
+      ws.plan = defaultPlan.slug;
+    }
+  } catch (subErr) {
+    console.warn('[Workspace Subscription Init Warning]:', subErr);
+  }
+
   return { success: true, workspace: ws as Workspace };
 }
 

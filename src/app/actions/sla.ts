@@ -9,6 +9,7 @@
  */
 
 import { getWorkspaceAccess } from '@/lib/team/access';
+import { assertWorkspaceFeature } from '@/lib/plans/enforce';
 import {
   hasPolicyErrors,
   holidayError,
@@ -86,6 +87,7 @@ export async function getSlaBootstrapAction(workspaceId: string): Promise<Result
 export async function saveSlaPolicyAction(workspaceId: string, draft: SlaPolicyDraft): Promise<Result<{ policy: SlaPolicyRow }>> {
   try {
     const { supabase } = await getWorkspaceAccess(workspaceId, 'manage_settings');
+    await assertWorkspaceFeature(workspaceId, 'sla');
     const clean: SlaPolicyDraft = { ...draft, conditions: normalizeConditions(draft.conditions), targets: normalizeTargets(draft.targets) };
     const errors = validatePolicyDraft(clean);
     if (hasPolicyErrors(errors)) {

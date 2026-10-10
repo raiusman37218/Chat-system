@@ -21,6 +21,7 @@ import { getAdapter } from '@/lib/channels/registry';
 import { processOutboundQueue } from '@/lib/channels/outbound';
 import { audienceOf } from '@/lib/channels/public';
 import { renderTemplate } from '@/lib/channels/templates';
+import { assertWorkspaceLimit, incrementWorkspaceUsage } from '@/lib/plans/enforce';
 import {
   SETTABLE_STATUSES,
   SYSTEM_VIEWS,
@@ -745,6 +746,7 @@ export async function createTicketAction(
   }
 ): Promise<Ticket> {
   const caller = await assertTicketAccess(workspaceId, 'edit_ticket');
+  await assertWorkspaceLimit(workspaceId, 'max_tickets_per_month');
   const { supabase } = caller;
   const email = (input.requesterEmail || '').trim().toLowerCase();
   const subject = (input.subject || '').trim();
@@ -824,6 +826,7 @@ export async function createTicketAction(
     if (error) throw dbError(error, 'Ticket created, but some fields could not be set.');
   }
   const { data: ticket } = await supabase.from('tickets').select('*').eq('id', created.current_ticket_id).single();
+  incrementWorkspaceUsage(workspaceId, 'tickets', 1).catch(() => {});
   return ticket as Ticket;
 }
 

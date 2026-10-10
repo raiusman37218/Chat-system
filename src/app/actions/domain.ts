@@ -18,6 +18,7 @@ import { sendDomainLiveEmail } from '@/lib/email/domain-notifications';
 import { addDomain, removeDomain, getDomainStatus } from '@/lib/vercel-domains';
 import { assertAdminUser } from '@/app/actions/admin';
 import { validateWorkspaceSlug } from '@/lib/slug';
+import { assertWorkspaceFeature } from '@/lib/plans/enforce';
 
 interface ActionResult<T = any> {
   success: boolean;
@@ -50,6 +51,7 @@ export async function connectCustomDomainAction(
 > {
   try {
     await assertAdminUser(workspaceId);
+    await assertWorkspaceFeature(workspaceId, 'custom_help_center_domain');
     const supabase = await createClient();
 
     // 1. Input validation & sanitization (no protocol, no slashes, not an apex domain)

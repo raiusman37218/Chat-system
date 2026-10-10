@@ -15,6 +15,7 @@
 import { getWorkspaceAccess, type WorkspaceAccess } from '@/lib/team/access';
 import { hasServiceRole, serviceClient } from '@/lib/supabase/service';
 import { assignableRoles, isRole, type Role } from '@/lib/team/permissions';
+import { assertWorkspaceLimit } from '@/lib/plans/enforce';
 import type { TicketGroup } from '@/types/database';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -108,6 +109,7 @@ export async function inviteMemberAction(
   input: { name: string; email: string; role: Role; groupIds?: string[] }
 ): Promise<TeamData> {
   const access = await getWorkspaceAccess(workspaceId, 'manage_team');
+  await assertWorkspaceLimit(workspaceId, 'max_agents');
   const email = (input.email || '').trim().toLowerCase();
   const name = (input.name || '').trim().slice(0, 120) || email.split('@')[0];
   if (!EMAIL.test(email)) throw new Error('Enter a valid email address.');

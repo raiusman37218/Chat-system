@@ -24,9 +24,10 @@ import { xAuthorizeUrl } from '@/lib/channels/x/oauth';
 import { threadsAuthorizeUrl } from '@/lib/channels/threads/oauth';
 import { linkedinAuthorizeUrl } from '@/lib/channels/linkedin/oauth';
 import { tiktokAdapter } from '@/lib/channels/tiktok/adapter';
-import type { MessageTemplate } from '@/lib/channels/types';
 import type { Capability } from '@/lib/team/permissions';
 import type { ChannelConnection } from '@/types/database';
+import type { MessageTemplate } from '@/lib/channels/types';
+import { assertWorkspaceLimit, assertWorkspaceFeature } from '@/lib/plans/enforce';
 
 type Result<T = object> = ({ success: true } & T) | { success: false; error: string };
 
@@ -143,6 +144,8 @@ export async function connectWhatsAppManualAction(
 ): Promise<Result<{ connection: ChannelConnection }>> {
   try {
     const { user } = await guard(workspaceId, 'manage_settings');
+    await assertWorkspaceLimit(workspaceId, 'max_channels_connected');
+    await assertWorkspaceFeature(workspaceId, 'channel_whatsapp');
     const appSecret = (input.appSecret || '').trim();
     if (!/^[0-9a-f]{32}$/i.test(appSecret)) {
       throw new Error('The app secret is the 32-character value under App settings → Basic in your Meta app.');
@@ -177,6 +180,8 @@ export async function completeWhatsAppSignupAction(
 ): Promise<Result<{ connection: ChannelConnection }>> {
   try {
     const { user } = await guard(workspaceId, 'manage_settings');
+    await assertWorkspaceLimit(workspaceId, 'max_channels_connected');
+    await assertWorkspaceFeature(workspaceId, 'channel_whatsapp');
     if (!input.code) throw new Error('Meta did not return an authorisation code. Try connecting again.');
     const accessToken = await exchangeSignupCode(input.code);
     // Webhooks for embedded signup arrive at the platform URL, signed with the platform app secret.
@@ -307,6 +312,8 @@ export async function listTestRecipientsAction(workspaceId: string, channel: str
 export async function startInstagramConnectAction(workspaceId: string): Promise<Result<{ url: string }>> {
   try {
     const { user } = await guard(workspaceId, 'manage_settings');
+    await assertWorkspaceLimit(workspaceId, 'max_channels_connected');
+    await assertWorkspaceFeature(workspaceId, 'channel_instagram');
     if (!process.env.INSTAGRAM_APP_ID || !process.env.INSTAGRAM_APP_SECRET) {
       throw new Error('Instagram login is not set up on this server (INSTAGRAM_APP_ID / INSTAGRAM_APP_SECRET). Use manual setup instead.');
     }
@@ -323,6 +330,8 @@ export async function connectInstagramManualAction(
 ): Promise<Result<{ connection: ChannelConnection }>> {
   try {
     const { user } = await guard(workspaceId, 'manage_settings');
+    await assertWorkspaceLimit(workspaceId, 'max_channels_connected');
+    await assertWorkspaceFeature(workspaceId, 'channel_instagram');
     const appSecret = (input.appSecret || '').trim();
     if (!/^[0-9a-f]{32}$/i.test(appSecret)) {
       throw new Error('The app secret is the 32-character Instagram app secret under Instagram → API setup with Instagram login → Business login settings.');
@@ -365,6 +374,8 @@ export async function connectInstagramManualAction(
 export async function startSocialConnectAction(workspaceId: string, channel: string, input: { pageId?: string } = {}): Promise<Result<{ url: string }>> {
   try {
     const { user } = await guard(workspaceId, 'manage_settings');
+    await assertWorkspaceLimit(workspaceId, 'max_channels_connected');
+    await assertWorkspaceFeature(workspaceId, `channel_${channel}` as any);
     if (!isSocialChannel(channel) || channel === 'tiktok') throw new Error('This channel does not use a sign-in.');
     const access = socialAccess(channel, process.env);
     if (access.state === 'requires_approval') throw new Error('This channel needs approval from the platform first. Follow the steps on the card.');
@@ -388,6 +399,8 @@ export async function startSocialConnectAction(workspaceId: string, channel: str
 export async function connectTikTokAction(workspaceId: string, input: { businessId: string; accessToken: string }): Promise<Result<{ connection: ChannelConnection }>> {
   try {
     const { user } = await guard(workspaceId, 'manage_settings');
+    await assertWorkspaceLimit(workspaceId, 'max_channels_connected');
+    await assertWorkspaceFeature(workspaceId, 'channel_tiktok');
     if (socialAccess('tiktok', process.env).state === 'requires_approval') {
       throw new Error('TikTok has to approve your app first. Follow the steps on the card.');
     }
