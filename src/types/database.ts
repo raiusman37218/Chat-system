@@ -882,3 +882,6 @@ export interface PlatformSuperAdminInvitation {
   accepted_at: string | null;
   expires_at: string;
 }
+
+export * from './plans';
+
