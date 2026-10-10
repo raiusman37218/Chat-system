@@ -228,18 +228,11 @@ export async function middleware(request: NextRequest) {
   }
 
   // Platform super admin protection for /admin routes
-  if (request.nextUrl.pathname.startsWith('/admin')) {
+  if (pathname === '/admin' || pathname.startsWith('/admin/')) {
     if (!user) {
-      return new NextResponse(
-        JSON.stringify({
-          error: 'Forbidden',
-          message: 'Authentication required. Platform super admin privileges required.',
-        }),
-        {
-          status: 403,
-          headers: { 'content-type': 'application/json' },
-        }
-      );
+      const loginUrl = new URL('/login', request.url);
+      loginUrl.searchParams.set('redirect', pathname + request.nextUrl.search);
+      return NextResponse.redirect(loginUrl);
     }
 
     const { data: access } = await supabase
@@ -248,31 +241,41 @@ export async function middleware(request: NextRequest) {
       .eq('user_id', user.id)
       .maybeSingle();
 
+    const isApiRequest = request.headers.get('accept')?.includes('application/json') ||
+      request.headers.get('content-type')?.includes('application/json');
+
     if (!access || !['owner', 'admin'].includes(access.role)) {
-      return new NextResponse(
-        JSON.stringify({
-          error: 'Forbidden',
-          message: 'Platform super admin privileges required.',
-        }),
-        {
-          status: 403,
-          headers: { 'content-type': 'application/json' },
-        }
-      );
+      if (isApiRequest) {
+        return new NextResponse(
+          JSON.stringify({
+            error: 'Forbidden',
+            message: 'Platform super admin privileges required.',
+          }),
+          {
+            status: 403,
+            headers: { 'content-type': 'application/json' },
+          }
+        );
+      }
+      // For browser page requests, let it proceed to AdminLayout which renders
+      // the styled 403 view with account details and sign-in switch options.
     }
 
     // Owner-only route: /admin/access
-    if (request.nextUrl.pathname.startsWith('/admin/access') && access.role !== 'owner') {
-      return new NextResponse(
-        JSON.stringify({
-          error: 'Forbidden',
-          message: 'Only the platform owner can access this section.',
-        }),
-        {
-          status: 403,
-          headers: { 'content-type': 'application/json' },
-        }
-      );
+    if (pathname.startsWith('/admin/access') && access?.role !== 'owner') {
+      if (isApiRequest) {
+        return new NextResponse(
+          JSON.stringify({
+            error: 'Forbidden',
+            message: 'Only the platform owner can access this section.',
+          }),
+          {
+            status: 403,
+            headers: { 'content-type': 'application/json' },
+          }
+        );
+      }
+      return NextResponse.redirect(new URL('/admin', request.url));
     }
   }
 

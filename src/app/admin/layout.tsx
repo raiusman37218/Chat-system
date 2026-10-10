@@ -56,12 +56,24 @@ export default async function AdminLayout({
           <p className="text-sm text-ink-3">
             Access denied. Platform super administrator privileges are required to access this system.
           </p>
-          <a
-            href="/dashboard"
-            className="inline-block px-4 py-2 rounded-xl bg-accent text-accent-ink text-xs font-semibold hover:opacity-90 transition-opacity"
-          >
-            Return to Workspace App
-          </a>
+          <div className="p-3 rounded-xl bg-surface-2 border border-border-subtle text-xs text-ink-3 space-y-1">
+            <p>Signed in as: <strong className="text-ink">{user.email}</strong></p>
+            <p className="text-ink-4">Platform owner access is assigned to <strong className="text-ink">zentry385@gmail.com</strong>.</p>
+          </div>
+          <div className="flex flex-col sm:flex-row gap-2 justify-center pt-2">
+            <a
+              href="/dashboard"
+              className="inline-block px-4 py-2 rounded-xl bg-surface-2 border border-border text-ink text-xs font-semibold hover:bg-surface-3 transition-colors"
+            >
+              Return to Workspace
+            </a>
+            <a
+              href="/login?redirect=/admin"
+              className="inline-block px-4 py-2 rounded-xl bg-accent text-accent-ink text-xs font-semibold hover:opacity-90 transition-opacity"
+            >
+              Sign in with Owner Account
+            </a>
+          </div>
         </div>
       </div>
     );
