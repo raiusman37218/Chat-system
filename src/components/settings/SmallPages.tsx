@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Field, Input } from '@/components/ui/Input';
 import { useToast } from '@/components/ui/Toast';
 import { SaveBar, SettingsCard, useReportDirty } from './parts';
+import { WorkspaceBillingView } from './WorkspaceBillingView';
 
 /** A page whose real settings live on another screen: explain, then link. */
 export function LinkCard({ title, description, actionLabel, onClick }: { title: string; description: string; actionLabel: string; onClick: () => void }) {
@@ -89,44 +90,9 @@ export function RolesMatrix() {
   );
 }
 
-/** Settings → Billing. Plan and seat usage are real; payment and invoices are not built yet. */
+/** Settings → Billing. Plan, usage, limits, and coupon redemption. */
 export function PlanPanel({ workspace, agents }: { workspace: Workspace; agents: Agent[] }) {
-  const seats = agents.filter((a) => a.is_active !== false).length;
-  const limits = workspace.plan_limits;
-  return (
-    <div className="space-y-6">
-      <SettingsCard title="Current plan" description="Only the workspace owner sees this page.">
-        <div className="flex flex-wrap items-center gap-3">
-          <span className="text-lg font-semibold text-ink capitalize">{workspace.plan || 'Free'}</span>
-          <Badge tone="accent">Active</Badge>
-        </div>
-        <dl className="grid gap-3 sm:grid-cols-3 text-ui">
-          <div className="card p-4">
-            <dt className="text-xs text-ink-3">Seats in use</dt>
-            <dd className="text-md font-semibold text-ink tabular-nums">
-              {seats}
-              {limits ? ` / ${limits.max_seats}` : ''}
-            </dd>
-          </div>
-          {limits && (
-            <>
-              <div className="card p-4">
-                <dt className="text-xs text-ink-3">Conversations per month</dt>
-                <dd className="text-md font-semibold text-ink tabular-nums">{limits.max_monthly_conversations.toLocaleString()}</dd>
-              </div>
-              <div className="card p-4">
-                <dt className="text-xs text-ink-3">AI replies per month</dt>
-                <dd className="text-md font-semibold text-ink tabular-nums">{limits.max_ai_replies.toLocaleString()}</dd>
-              </div>
-            </>
-          )}
-        </dl>
-      </SettingsCard>
-      <SettingsCard title="Payment method and invoices" description="Self-serve upgrades, payment methods and invoices are coming soon. Until then, contact support to change your plan.">
-        <Badge tone="info">Coming soon</Badge>
-      </SettingsCard>
-    </div>
-  );
+  return <WorkspaceBillingView workspace={workspace} />;
 }
 
 /** Auto-close rule: resolve conversations with no activity for N days. */

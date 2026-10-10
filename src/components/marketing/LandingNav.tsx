@@ -20,6 +20,7 @@ export function LandingNav() {
         <nav className="hidden lg:flex items-center gap-1 text-ui font-medium shrink-0 whitespace-nowrap">
           {[
             ['Product', '#product'],
+            ['Pricing', '/pricing'],
             ['How it works', '#how'],
             ['Install', '#install'],
             ['FAQ', '#faq'],
@@ -86,6 +87,13 @@ export function LandingNav() {
             >
               Product
             </a>
+            <Link
+              href="/pricing"
+              onClick={() => setMobileMenuOpen(false)}
+              className="px-3 py-2 min-h-11 flex items-center rounded-lg text-ink hover:bg-surface-2 transition-colors whitespace-nowrap"
+            >
+              Pricing
+            </Link>
             <a
               href="#how"
               onClick={() => setMobileMenuOpen(false)}

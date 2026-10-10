@@ -7,6 +7,7 @@ import {
   LayoutDashboard,
   Building2,
   Users,
+  CreditCard,
   Activity,
   ShieldAlert,
   Search,
@@ -44,6 +45,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Overview', href: '/admin', icon: LayoutDashboard, exact: true },
   { label: 'Workspaces', href: '/admin/workspaces', icon: Building2 },
   { label: 'Users', href: '/admin/users', icon: Users },
+  { label: 'Plans & Pricing', href: '/admin/plans', icon: CreditCard },
   { label: 'System Health', href: '/admin/health', icon: Activity },
   { label: 'Audit Log', href: '/admin/audit', icon: ShieldAlert },
 ];
