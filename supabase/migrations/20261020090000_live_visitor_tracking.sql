@@ -67,6 +67,8 @@ CREATE POLICY "visitor_page_history_agent_select" ON public.visitor_page_history
 
 -- 3. Function: fn_visitor_heartbeat
 -- Called by widget heartbeat ping every 15-20s. Updates presence, current page & time on page.
+DROP FUNCTION IF EXISTS public.fn_visitor_heartbeat(UUID, TEXT);
+DROP FUNCTION IF EXISTS public.fn_visitor_heartbeat(UUID, TEXT, TEXT, TEXT, INT);
 CREATE OR REPLACE FUNCTION public.fn_visitor_heartbeat(
   p_visitor_id UUID,
   p_current_url TEXT DEFAULT NULL,
@@ -103,6 +105,7 @@ GRANT EXECUTE ON FUNCTION public.fn_visitor_heartbeat(UUID, TEXT, TEXT, TEXT, IN
 -- 4. Function: fn_record_visitor_page
 -- Called on initial page load and on SPA route changes.
 -- Records page visit to visitor_page_history and updates visitor record.
+DROP FUNCTION IF EXISTS public.fn_record_visitor_page(UUID, TEXT, TEXT, TEXT, INT, UUID);
 CREATE OR REPLACE FUNCTION public.fn_record_visitor_page(
   p_visitor_id UUID,
   p_url TEXT,
@@ -167,6 +170,7 @@ GRANT EXECUTE ON FUNCTION public.fn_record_visitor_page(UUID, TEXT, TEXT, TEXT, 
 
 -- 5. Function: fn_visitor_offline
 -- Marks visitor as offline upon pagehide / beforeunload beacon.
+DROP FUNCTION IF EXISTS public.fn_visitor_offline(UUID);
 CREATE OR REPLACE FUNCTION public.fn_visitor_offline(p_visitor_id UUID)
 RETURNS JSONB
 LANGUAGE plpgsql
@@ -186,6 +190,7 @@ GRANT EXECUTE ON FUNCTION public.fn_visitor_offline(UUID) TO anon, authenticated
 
 -- 6. Function: fn_expire_stale_visitors
 -- Explicit utility to expire any visitor inactive for longer than p_stale_seconds (default 90).
+DROP FUNCTION IF EXISTS public.fn_expire_stale_visitors(INT);
 CREATE OR REPLACE FUNCTION public.fn_expire_stale_visitors(p_stale_seconds INT DEFAULT 90)
 RETURNS INT
 LANGUAGE plpgsql
