@@ -228,6 +228,70 @@ CREATE TRIGGER trg_message_reporting
   FOR EACH ROW EXECUTE FUNCTION public.fn_message_emit_reporting_events();
 
 -- ----------------------------------------------------------------------------
+-- 5b. Allow CSAT updates on closed tickets in fn_ticket_before_update
+-- ----------------------------------------------------------------------------
+
+CREATE OR REPLACE FUNCTION public.fn_ticket_before_update()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  v_internal BOOLEAN := coalesce(current_setting('zentry.ticket_internal', true), '') = 'on';
+BEGIN
+  IF coalesce(current_setting('zentry.sla_internal', true), '') = 'on'
+     AND (to_jsonb(NEW) - 'sla_policy_id' - 'sla_state' - 'sla_next_due_at' - 'sla_next_metric' - 'sla_next_warn_at' - 'sla_breached_at' - 'status_rank' - 'priority_rank')
+       = (to_jsonb(OLD) - 'sla_policy_id' - 'sla_state' - 'sla_next_due_at' - 'sla_next_metric' - 'sla_next_warn_at' - 'sla_breached_at' - 'status_rank' - 'priority_rank') THEN
+    RETURN NEW;
+  END IF;
+
+  IF OLD.status = 'closed' THEN
+    -- Allow recording CSAT ratings and comments on closed tickets without reopening
+    IF (to_jsonb(NEW) - 'csat_rating' - 'csat_comment' - 'csat_rated_at' - 'updated_at')
+       = (to_jsonb(OLD) - 'csat_rating' - 'csat_comment' - 'csat_rated_at' - 'updated_at') THEN
+      RETURN NEW;
+    END IF;
+    RAISE EXCEPTION 'Ticket #% is closed and read-only. Reply to create a follow-up ticket.', OLD.number
+      USING ERRCODE = '55000';
+  END IF;
+  IF NEW.workspace_id IS DISTINCT FROM OLD.workspace_id OR NEW.number IS DISTINCT FROM OLD.number THEN
+    RAISE EXCEPTION 'A ticket''s workspace and number cannot change.' USING ERRCODE = '42501';
+  END IF;
+  IF NOT v_internal AND (
+       NEW.conversation_id IS DISTINCT FROM OLD.conversation_id
+    OR NEW.follow_up_of_id IS DISTINCT FROM OLD.follow_up_of_id
+    OR NEW.merged_into_id IS DISTINCT FROM OLD.merged_into_id
+    OR NEW.created_at IS DISTINCT FROM OLD.created_at) THEN
+    RAISE EXCEPTION 'Use the merge or follow-up functions to relink tickets.' USING ERRCODE = '42501';
+  END IF;
+
+  IF NEW.status = 'new' AND OLD.status <> 'new' THEN
+    RAISE EXCEPTION 'A ticket cannot go back to New.' USING ERRCODE = '22023';
+  END IF;
+  -- Assigning a new ticket means someone has picked it up.
+  IF NEW.status = 'new' AND NEW.assignee_id IS NOT NULL THEN
+    NEW.status := 'open';
+  END IF;
+
+  NEW.subject := left(trim(coalesce(NEW.subject, '')), 250);
+  NEW.tags := coalesce(NEW.tags, '{}');
+  IF NEW.status IS DISTINCT FROM OLD.status THEN
+    NEW.status_changed_at := now();
+    IF NEW.status = 'solved' THEN
+      NEW.solved_at := now();
+    ELSIF NEW.status = 'closed' THEN
+      NEW.solved_at := coalesce(OLD.solved_at, now());
+      NEW.closed_at := now();
+    ELSE
+      -- Reopened: it is no longer "recently solved".
+      NEW.solved_at := NULL;
+    END IF;
+  END IF;
+  NEW.updated_at := now();
+  RETURN NEW;
+END;
+$$;
+
+-- ----------------------------------------------------------------------------
 -- 6. Backfill reporting events for existing tickets
 -- ----------------------------------------------------------------------------
 
