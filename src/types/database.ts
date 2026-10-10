@@ -63,6 +63,7 @@ export interface Agent {
   workspace_id?: string | null;
   is_super_admin?: boolean;
   is_platform_owner?: boolean;
+  platform_staff_role?: 'owner' | 'support' | 'finance' | null;
   /** False once an admin has deactivated them: no access, history kept. */
   is_active?: boolean;
   deactivated_at?: string | null;
@@ -884,4 +885,5 @@ export interface PlatformSuperAdminInvitation {
 }
 
 export * from './plans';
+export * from './platform-management';
 
