@@ -47,6 +47,7 @@ import type {
   TicketStatus,
   TicketType,
   Visitor,
+  VisitorPageHistory,
 } from '@/types/database';
 
 export type { TicketPatch };
@@ -280,8 +281,28 @@ export interface TicketDetail {
   channelState: TicketChannelState | null;
   requester: Pick<
     Visitor,
-    'id' | 'name' | 'email' | 'location' | 'ip_location_city' | 'ip_location_country' | 'browser' | 'os' | 'device' | 'current_page_url' | 'last_seen_at' | 'first_seen_at' | 'timezone' | 'language'
+    | 'id'
+    | 'name'
+    | 'email'
+    | 'location'
+    | 'ip_location_city'
+    | 'ip_location_country'
+    | 'browser'
+    | 'os'
+    | 'device'
+    | 'current_page_url'
+    | 'current_page_title'
+    | 'referrer_source'
+    | 'current_page_entered_at'
+    | 'time_on_page_seconds'
+    | 'is_online'
+    | 'last_seen_at'
+    | 'first_seen_at'
+    | 'timezone'
+    | 'language'
   > | null;
+  /** Recent browsing trail of the requester */
+  requesterPageHistory?: VisitorPageHistory[];
   previousTickets: Pick<Ticket, 'id' | 'number' | 'subject' | 'status' | 'created_at'>[];
   /** Follow-ups of this ticket, tickets merged into it, and what it follows up or was merged into. */
   related: Pick<Ticket, 'id' | 'number' | 'subject' | 'status' | 'follow_up_of_id' | 'merged_into_id'>[];
@@ -400,7 +421,16 @@ export async function getTicketAction(workspaceId: string, ticketId: string): Pr
   const t = ticket as Ticket;
 
   const linkIds = [t.follow_up_of_id, t.merged_into_id].filter(Boolean) as string[];
-  const [{ data: messages }, { data: events }, { data: requester }, { data: previous }, { data: related }, { data: slaTimers }, { data: slaPolicy }] = await Promise.all([
+  const [
+    { data: messages },
+    { data: events },
+    { data: requester },
+    { data: pageHistory },
+    { data: previous },
+    { data: related },
+    { data: slaTimers },
+    { data: slaPolicy },
+  ] = await Promise.all([
     supabase
       .from('messages')
       .select('id, conversation_id, sender_type, sender_id, content, attachment_url, created_at, is_internal, metadata, channel_status, channel_error')
@@ -411,11 +441,21 @@ export async function getTicketAction(workspaceId: string, ticketId: string): Pr
     t.requester_id
       ? supabase
           .from('visitors')
-          .select('id, name, email, location, ip_location_city, ip_location_country, browser, os, device, current_page_url, last_seen_at, first_seen_at, timezone, language')
+          .select(
+            'id, name, email, location, ip_location_city, ip_location_country, browser, os, device, current_page_url, current_page_title, referrer_source, current_page_entered_at, time_on_page_seconds, is_online, last_seen_at, first_seen_at, timezone, language'
+          )
           .eq('id', t.requester_id)
           .eq('workspace_id', workspaceId)
           .maybeSingle()
       : Promise.resolve({ data: null }),
+    t.requester_id
+      ? supabase
+          .from('visitor_page_history')
+          .select('*')
+          .eq('visitor_id', t.requester_id)
+          .order('visited_at', { ascending: false })
+          .limit(20)
+      : Promise.resolve({ data: [] }),
     t.requester_id
       ? supabase
           .from('tickets')
@@ -465,6 +505,7 @@ export async function getTicketAction(workspaceId: string, ticketId: string): Pr
     events: (events as TicketEvent[]) || [],
     channelState: await channelStateFor(supabase, workspaceId, t),
     requester: (requester as TicketDetail['requester']) || null,
+    requesterPageHistory: (pageHistory as VisitorPageHistory[]) || [],
     previousTickets: (previous as TicketDetail['previousTickets']) || [],
     related: (related as TicketDetail['related']) || [],
     people,

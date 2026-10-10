@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Clock,
   ExternalLink,
@@ -14,8 +14,12 @@ import {
   Users,
   LayoutList,
   LayoutGrid,
+  History,
+  Ticket as TicketIcon,
+  X,
+  Compass,
 } from 'lucide-react';
-import { Visitor, Workspace } from '@/types/database';
+import { Visitor, Workspace, VisitorPageHistory } from '@/types/database';
 import { formatTimeAgo, cn } from '@/lib/utils';
 import { Avatar } from '@/components/ui/Avatar';
 import {
@@ -31,33 +35,147 @@ import {
   timezoneFrom,
 } from '@/lib/visitor-meta';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { createClient } from '@/lib/supabase/client';
+import {
+  isVisitorOnline,
+  formatTimeOnPage,
+  calculateTimeOnPage,
+  formatPageDisplay,
+  ONLINE_PRESENCE_WINDOW_SECONDS,
+} from '@/lib/tracking/visitor-tracking';
 
 interface LiveVisitorsRadarProps {
   visitors: Visitor[];
   workspace?: Workspace | null;
   onOpenConversationForVisitor: (visitorId: string) => void;
+  onOpenTicket?: (ticketId: string) => void;
   onRefresh: () => void;
 }
 
-/** A visitor counts as "live" while their heartbeat is under 90s old. */
-const LIVE_WINDOW_SECONDS = 90;
+interface OpenTicketSummary {
+  id: string;
+  number: number;
+  subject: string;
+  status: string;
+}
 
 export function LiveVisitorsRadar({
   visitors,
   workspace,
   onOpenConversationForVisitor,
+  onOpenTicket,
   onRefresh,
 }: LiveVisitorsRadarProps) {
   const [viewMode, setViewMode] = useState<'rows' | 'grid'>('rows');
+  const [now, setNow] = useState<number>(Date.now());
+  const [pageHistoryMap, setPageHistoryMap] = useState<Record<string, VisitorPageHistory[]>>({});
+  const [openTicketsMap, setOpenTicketsMap] = useState<Record<string, OpenTicketSummary[]>>({});
+  const [expandedHistoryVisitorId, setExpandedHistoryVisitorId] = useState<string | null>(null);
 
-  const activeVisitors = visitors.filter(
-    (v) => (Date.now() - new Date(v.last_seen).getTime()) / 1000 < LIVE_WINDOW_SECONDS
+  // Live presence ticker: updates every 3 seconds so time-on-page ticks
+  // and visitors who exceed 90 seconds expire automatically without manual refresh.
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setNow(Date.now());
+    }, 3000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const activeVisitors = useMemo(
+    () => visitors.filter((v) => isVisitorOnline(v, now, ONLINE_PRESENCE_WINDOW_SECONDS)),
+    [visitors, now]
   );
 
   const desktopCount = activeVisitors.filter(
     (v) => !/mobile|android|iphone|ipad/i.test(v.user_agent || '')
   ).length;
   const mobileCount = activeVisitors.length - desktopCount;
+
+  // Real-time metadata loading: fetches page histories & open tickets for online visitors
+  useEffect(() => {
+    const wsId = workspace?.id;
+    if (!wsId || activeVisitors.length === 0) {
+      return;
+    }
+
+    const visitorIds = activeVisitors.map((v) => v.id);
+    const supabase = createClient();
+    let cancelled = false;
+
+    async function loadMeta() {
+      try {
+        const [historyRes, ticketsRes] = await Promise.all([
+          supabase
+            .from('visitor_page_history')
+            .select('*')
+            .in('visitor_id', visitorIds)
+            .order('visited_at', { ascending: false })
+            .limit(100),
+          supabase
+            .from('tickets')
+            .select('id, number, subject, status, requester_id')
+            .eq('workspace_id', wsId)
+            .in('status', ['new', 'open', 'pending', 'on_hold'])
+            .in('requester_id', visitorIds),
+        ]);
+
+        if (cancelled) return;
+
+        if (historyRes.data) {
+          const hMap: Record<string, VisitorPageHistory[]> = {};
+          for (const row of historyRes.data) {
+            if (!hMap[row.visitor_id]) hMap[row.visitor_id] = [];
+            hMap[row.visitor_id].push(row as VisitorPageHistory);
+          }
+          setPageHistoryMap(hMap);
+        }
+
+        if (ticketsRes.data) {
+          const tMap: Record<string, OpenTicketSummary[]> = {};
+          for (const row of ticketsRes.data) {
+            if (!row.requester_id) continue;
+            if (!tMap[row.requester_id]) tMap[row.requester_id] = [];
+            tMap[row.requester_id].push({
+              id: row.id,
+              number: row.number,
+              subject: row.subject,
+              status: row.status,
+            });
+          }
+          setOpenTicketsMap(tMap);
+        }
+      } catch (err) {
+        console.error('Failed to load live visitor metadata:', err);
+      }
+    }
+
+    loadMeta();
+
+    // Subscribe to realtime updates for page history and tickets in this workspace
+    const channel = supabase
+      .channel(`radar-meta-${wsId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'visitor_page_history' }, () => {
+        loadMeta();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tickets' }, () => {
+        loadMeta();
+      })
+      .subscribe();
+
+    return () => {
+      cancelled = true;
+      supabase.removeChannel(channel);
+    };
+  }, [workspace?.id, activeVisitors.map((v) => v.id).sort().join(',')]);
+
+  const activeHistoryVisitor = activeVisitors.find((v) => v.id === expandedHistoryVisitorId);
+  const activeHistoryItems = expandedHistoryVisitorId ? (pageHistoryMap[expandedHistoryVisitorId] || []) : [];
+  const activeHistoryVisitorName = activeHistoryVisitor
+    ? activeHistoryVisitor.name ||
+      (activeHistoryVisitor.email
+        ? activeHistoryVisitor.email.split('@')[0]
+        : `Visitor ${activeHistoryVisitor.id.slice(0, 6)}`)
+    : '';
 
   return (
     <div className="flex-1 min-w-0 h-screen flex flex-col bg-canvas">
@@ -156,23 +274,20 @@ export function LiveVisitorsRadar({
               Top Active URL
             </span>
             <div className="text-xs font-mono text-accent truncate">
-              {activeVisitors[0]?.current_url || '/'}
+              {activeVisitors[0]?.current_page_url || activeVisitors[0]?.current_url || '/'}
             </div>
           </div>
         </div>
       )}
 
-      {/* Grid of live visitors */}
+      {/* Grid or Rows of live visitors */}
       <div className="flex-1 overflow-y-auto p-7">
         {activeVisitors.length === 0 ? (
           <div className="h-full flex items-center justify-center p-8">
             <EmptyState
               type="no-visitors"
               title="Radar Scanning for Live Visitors"
-              description="Nobody is browsing your site right now. As soon as someone visits, their page URL, location, and device appear here live. If you have just installed the widget, open a test page to check it is reporting."
-              // "Demo Simulator" read like it would fabricate visitors. It
-              // opens a real page carrying this workspace's widget, which is
-              // how an owner checks the widget works — worth saying plainly.
+              description="Nobody is browsing your site right now. As soon as someone visits, their page URL, page title, location, and device appear here live. If you have just installed the widget, open a test page to check it is reporting."
               actionLabel="Open a test page"
               onAction={() => {
                 const targetUrl = workspace?.id
@@ -185,14 +300,14 @@ export function LiveVisitorsRadar({
             />
           </div>
         ) : viewMode === 'rows' ? (
-          /* Compact Row-Wise Table View (Many visitors visible in a single screen) */
+          /* Compact Row-Wise Table View */
           <div className="rounded-2xl border border-line bg-surface overflow-hidden shadow-xs">
             {/* Table Header */}
             <div className="hidden lg:grid grid-cols-12 px-5 py-2.5 bg-surface-2/80 border-b border-line text-2xs font-bold text-ink-3 uppercase tracking-wider items-center gap-3">
-              <div className="col-span-3">Visitor</div>
-              <div className="col-span-4">Viewing Page</div>
-              <div className="col-span-2">Location &amp; Time</div>
-              <div className="col-span-2">Device &amp; OS</div>
+              <div className="col-span-3">Visitor &amp; Tickets</div>
+              <div className="col-span-4">Current Page &amp; Time</div>
+              <div className="col-span-2">Session Pages</div>
+              <div className="col-span-2">Location &amp; Device</div>
               <div className="col-span-1 text-right">Action</div>
             </div>
 
@@ -214,13 +329,23 @@ export function LiveVisitorsRadar({
                     ? visitor.email.split('@')[0]
                     : `Visitor ${visitor.id.slice(0, 6)}`);
 
+                const rawUrl = visitor.current_page_url || visitor.current_url || '/';
+                const pageDisplay = formatPageDisplay(rawUrl, visitor.current_page_title);
+                const timeOnPageSeconds =
+                  visitor.time_on_page_seconds ??
+                  calculateTimeOnPage(visitor.current_page_entered_at, undefined, now);
+
+                const visitorHistory = pageHistoryMap[visitor.id] || [];
+                const historyCount = Math.max(1, visitorHistory.length);
+                const openTickets = openTicketsMap[visitor.id] || [];
+
                 return (
                   <div
                     key={visitor.id}
                     onClick={() => onOpenConversationForVisitor(visitor.id)}
-                    className="grid grid-cols-1 lg:grid-cols-12 px-5 py-2.5 items-center gap-2.5 lg:gap-3 hover:bg-surface-2/70 transition-colors cursor-pointer group"
+                    className="grid grid-cols-1 lg:grid-cols-12 px-5 py-3 items-center gap-2.5 lg:gap-3 hover:bg-surface-2/70 transition-colors cursor-pointer group"
                   >
-                    {/* 1. Visitor Info */}
+                    {/* 1. Visitor Info & Ticket Status */}
                     <div className="lg:col-span-3 flex items-center gap-2.5 min-w-0">
                       <Avatar
                         name={displayName}
@@ -237,61 +362,90 @@ export function LiveVisitorsRadar({
                         <div className="text-2xs text-ink-3 truncate">
                           {visitor.email || 'Anonymous visitor'}
                         </div>
+                        {/* Open Ticket Indicator */}
+                        <div className="mt-1 flex items-center gap-1.5">
+                          {openTickets.length > 0 ? (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onOpenTicket?.(openTickets[0].id);
+                              }}
+                              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-2xs font-semibold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 hover:bg-amber-500/20 transition-colors"
+                              title={`Open Ticket #${openTickets[0].number}: ${openTickets[0].subject}`}
+                            >
+                              <TicketIcon className="w-2.5 h-2.5" />
+                              <span>Ticket #{openTickets[0].number}</span>
+                              {openTickets.length > 1 && (
+                                <span className="text-2xs opacity-75">+{openTickets.length - 1}</span>
+                              )}
+                            </button>
+                          ) : (
+                            <span className="text-2xs text-ink-4">No open ticket</span>
+                          )}
+                        </div>
                       </div>
                     </div>
 
-                    {/* 2. Viewing Page URL */}
+                    {/* 2. Current Page, Title, and Time on Page */}
                     <div className="lg:col-span-4 min-w-0">
-                      <a
-                        href={visitor.current_url}
-                        target="_blank"
-                        rel="noreferrer"
-                        onClick={(e) => e.stopPropagation()}
-                        className="inline-flex items-center gap-1.5 max-w-full text-accent hover:underline text-xs font-mono group/link truncate"
-                        title={visitor.current_url}
-                      >
-                        <Globe className="w-3.5 h-3.5 shrink-0 text-accent/80" />
-                        <span className="truncate">{visitor.current_url}</span>
-                        <ExternalLink className="w-3 h-3 shrink-0 text-ink-3 group-hover/link:text-accent" />
-                      </a>
+                      <div className="font-semibold text-xs text-ink truncate flex items-center gap-1.5" title={pageDisplay.title}>
+                        <Globe className="w-3.5 h-3.5 shrink-0 text-accent" />
+                        <span className="truncate">{pageDisplay.title}</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-2xs mt-0.5 min-w-0">
+                        <a
+                          href={pageDisplay.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          className="inline-flex items-center gap-1 text-ink-3 hover:text-accent font-mono truncate max-w-[200px]"
+                          title={pageDisplay.url}
+                        >
+                          <span className="truncate">{pageDisplay.path}</span>
+                          <ExternalLink className="w-2.5 h-2.5 shrink-0 opacity-60" />
+                        </a>
+                        <span className="text-ink-4">•</span>
+                        <span className="text-ink-2 font-medium shrink-0 flex items-center gap-0.5">
+                          <Clock className="w-2.5 h-2.5 text-ink-3" />
+                          {formatTimeOnPage(timeOnPageSeconds)}
+                        </span>
+                      </div>
+                      {visitor.referrer_source && (
+                        <div className="text-2xs text-ink-3 truncate mt-0.5" title={`Referrer: ${visitor.referrer_source}`}>
+                          via {visitor.referrer_source}
+                        </div>
+                      )}
                     </div>
 
-                    {/* 3. Location & Local Time */}
+                    {/* 3. Session Pages Visited */}
+                    <div className="lg:col-span-2 min-w-0">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setExpandedHistoryVisitorId(visitor.id);
+                        }}
+                        className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium bg-surface-2 hover:bg-surface-3 text-ink-2 hover:text-ink border border-line transition-colors"
+                        title="Click to view visited pages this session"
+                      >
+                        <History className="w-3 h-3 text-ink-3" />
+                        <span>{historyCount} {historyCount === 1 ? 'page' : 'pages'}</span>
+                      </button>
+                    </div>
+
+                    {/* 4. Location & Device */}
                     <div className="lg:col-span-2 min-w-0 text-xs text-ink-2">
                       <div className="flex items-center gap-1.5 truncate font-medium">
                         <CountryFlag flag={place.flag} countryCode={place.countryCode} className="w-4 h-3 shrink-0" />
-                        <span className="truncate">
-                          {place.label || 'Location undetected'}
-                        </span>
+                        <span className="truncate">{place.label || 'Location undetected'}</span>
                       </div>
-                      <div className="text-2xs text-ink-3 flex items-center gap-1 mt-0.5">
-                        <Clock className="w-3 h-3 text-ink-3 shrink-0" />
-                        <span>{localTime || `Since ${formatTimeAgo(visitor.first_seen)}`}</span>
-                      </div>
-                    </div>
-
-                    {/* 4. Device & Browser */}
-                    <div className="lg:col-span-2 min-w-0 text-xs text-ink-2">
-                      <div className="flex items-center gap-1.5 truncate font-medium">
-                        <BrowserIcon
-                          browser={ua.browser}
-                          className="w-3.5 h-3.5 shrink-0"
-                          title={ua.browserName}
-                        />
-                        <span className="truncate">
-                          {ua.browserName} {ua.browserVersion ? ua.browserVersion.split('.')[0] : ''}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-1.5 text-2xs text-ink-3 mt-0.5">
-                        <span className="flex items-center gap-1">
-                          <OsIcon os={ua.os} className="w-3 h-3 shrink-0" title={ua.osName} />
-                          <span>{ua.osName}</span>
-                        </span>
+                      <div className="text-2xs text-ink-3 flex items-center gap-1.5 mt-0.5 truncate">
+                        <BrowserIcon browser={ua.browser} className="w-3 h-3 shrink-0" title={ua.browserName} />
+                        <span className="truncate">{ua.browserName}</span>
                         <span>•</span>
-                        <span className="flex items-center gap-1 capitalize">
-                          <DeviceIcon device={ua.device} className="w-3 h-3 shrink-0" />
-                          <span>{ua.device}</span>
-                        </span>
+                        <DeviceIcon device={ua.device} className="w-3 h-3 shrink-0" />
+                        <span className="capitalize">{ua.device}</span>
                       </div>
                     </div>
 
@@ -333,6 +487,16 @@ export function LiveVisitorsRadar({
                   ? visitor.email.split('@')[0]
                   : `Visitor ${visitor.id.slice(0, 6)}`);
 
+              const rawUrl = visitor.current_page_url || visitor.current_url || '/';
+              const pageDisplay = formatPageDisplay(rawUrl, visitor.current_page_title);
+              const timeOnPageSeconds =
+                visitor.time_on_page_seconds ??
+                calculateTimeOnPage(visitor.current_page_entered_at, undefined, now);
+
+              const visitorHistory = pageHistoryMap[visitor.id] || [];
+              const historyCount = Math.max(1, visitorHistory.length);
+              const openTickets = openTicketsMap[visitor.id] || [];
+
               return (
                 <div
                   key={visitor.id}
@@ -357,32 +521,75 @@ export function LiveVisitorsRadar({
                       </div>
                     </div>
 
-                    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-2xs font-bold bg-success/10 text-success border border-success/20 shrink-0">
-                      <span className="live-dot" />
-                      Live
-                    </span>
+                    <div className="flex flex-col items-end gap-1.5 shrink-0">
+                      <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-2xs font-bold bg-success/10 text-success border border-success/20">
+                        <span className="live-dot" />
+                        Live
+                      </span>
+                      {openTickets.length > 0 ? (
+                        <button
+                          type="button"
+                          onClick={() => onOpenTicket?.(openTickets[0].id)}
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-2xs font-semibold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 hover:bg-amber-500/20 transition-colors"
+                          title={`Ticket #${openTickets[0].number}: ${openTickets[0].subject}`}
+                        >
+                          <TicketIcon className="w-2.5 h-2.5" />
+                          <span>Ticket #{openTickets[0].number}</span>
+                        </button>
+                      ) : (
+                        <span className="text-2xs text-ink-4">No open ticket</span>
+                      )}
+                    </div>
                   </div>
 
-                  {/* Current URL Card */}
-                  <a
-                    href={visitor.current_url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="p-2.5 rounded-xl bg-surface-2 border border-line/70 hover:border-accent/50 transition-all group/link"
-                  >
-                    <div className="flex items-center gap-1.5 mb-1 text-2xs font-bold text-ink-3 uppercase tracking-wider">
-                      <Globe className="w-3 h-3 text-accent" />
-                      <span>Viewing Page</span>
+                  {/* Current URL & Title Card */}
+                  <div className="p-3 rounded-xl bg-surface-2 border border-line/70">
+                    <div className="flex items-center justify-between gap-2 mb-1 text-2xs font-bold text-ink-3 uppercase tracking-wider">
+                      <span className="flex items-center gap-1.5">
+                        <Globe className="w-3 h-3 text-accent" />
+                        <span>Current Page</span>
+                      </span>
+                      <span className="text-ink-2 font-medium flex items-center gap-1 font-mono">
+                        <Clock className="w-3 h-3 text-ink-3" />
+                        {formatTimeOnPage(timeOnPageSeconds)}
+                      </span>
+                    </div>
+                    <div className="font-semibold text-xs text-ink truncate mb-0.5" title={pageDisplay.title}>
+                      {pageDisplay.title}
                     </div>
                     <div className="flex items-center gap-1.5">
-                      <span className="font-mono text-xs text-accent truncate group-hover/link:underline underline-offset-2">
-                        {visitor.current_url}
-                      </span>
+                      <a
+                        href={pageDisplay.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="font-mono text-xs text-accent truncate hover:underline"
+                        title={pageDisplay.url}
+                      >
+                        {pageDisplay.path}
+                      </a>
                       <ExternalLink className="w-3 h-3 text-ink-3 shrink-0" />
                     </div>
-                  </a>
+                    {visitor.referrer_source && (
+                      <div className="text-2xs text-ink-3 truncate mt-1 pt-1 border-t border-line/40">
+                        Referred by: {visitor.referrer_source}
+                      </div>
+                    )}
+                  </div>
 
-                  {/* Device & location telemetry, same marks as the visitor panel */}
+                  {/* Pages visited this session trigger */}
+                  <div className="flex items-center justify-between text-xs px-1">
+                    <span className="text-ink-3 text-2xs font-semibold uppercase tracking-wider">Session Trail</span>
+                    <button
+                      type="button"
+                      onClick={() => setExpandedHistoryVisitorId(visitor.id)}
+                      className="inline-flex items-center gap-1 text-accent hover:underline text-xs font-medium"
+                    >
+                      <History className="w-3 h-3" />
+                      <span>{historyCount} {historyCount === 1 ? 'page visited' : 'pages visited'}</span>
+                    </button>
+                  </div>
+
+                  {/* Device & location telemetry */}
                   <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs text-ink-2 bg-surface-2/40 p-3 rounded-xl border border-line/40">
                     <span className="flex items-center gap-1.5 truncate">
                       <CountryFlag flag={place.flag} countryCode={place.countryCode} className="w-4 h-3" />
@@ -398,7 +605,7 @@ export function LiveVisitorsRadar({
                       />
                       <span className="truncate font-medium">
                         {ua.browserName}
-                        {ua.browserVersion ? ` ${ua.browserVersion}` : ''}
+                        {ua.browserVersion ? ` ${ua.browserVersion.split('.')[0]}` : ''}
                       </span>
                     </span>
                     <span className="flex items-center gap-1.5 truncate">
@@ -411,25 +618,15 @@ export function LiveVisitorsRadar({
                         {ua.device}
                       </span>
                     </span>
-                    {localTime && (
-                      <span className="flex items-center gap-1.5 truncate">
-                        <Clock className="w-3.5 h-3.5 text-ink-3 shrink-0" />
-                        <span className="truncate font-medium">{localTime}</span>
-                      </span>
-                    )}
-                    <span className="flex items-center gap-1.5 truncate text-2xs text-ink-3">
-                      <Clock className="w-3 h-3 shrink-0" />
-                      Since {formatTimeAgo(visitor.first_seen)}
-                    </span>
                   </div>
 
                   {/* Action CTA */}
                   <button
                     onClick={() => onOpenConversationForVisitor(visitor.id)}
-                    className="btn btn-primary w-full shadow-xs hover:shadow transition-all"
+                    className="btn btn-primary w-full shadow-xs hover:shadow transition-all gap-1.5"
                   >
                     <MessageSquare className="w-3.5 h-3.5" />
-                    Open Conversation
+                    <span>Start Chat</span>
                   </button>
                 </div>
               );
@@ -437,6 +634,164 @@ export function LiveVisitorsRadar({
           </div>
         )}
       </div>
+
+      {/* Session Page History Modal / Drawer */}
+      {activeHistoryVisitor && (
+        <div
+          className="fixed inset-0 z-50 bg-ink/40 backdrop-blur-xs flex items-center justify-center p-4"
+          onClick={() => setExpandedHistoryVisitorId(null)}
+        >
+          <div
+            className="bg-surface border border-line rounded-2xl shadow-xl max-w-lg w-full max-h-[85vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="px-5 py-4 border-b border-line flex items-center justify-between bg-surface-2/40">
+              <div className="flex items-center gap-3 min-w-0">
+                <Avatar
+                  name={activeHistoryVisitorName}
+                  seed={activeHistoryVisitor.id}
+                  size="md"
+                  online={true}
+                />
+                <div className="min-w-0">
+                  <h3 className="text-ui font-bold text-ink truncate">
+                    {activeHistoryVisitorName}
+                  </h3>
+                  <p className="text-2xs text-ink-3 truncate">
+                    Session Page Trail ({Math.max(1, activeHistoryItems.length)} pages)
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setExpandedHistoryVisitorId(null)}
+                className="p-1.5 rounded-lg text-ink-3 hover:text-ink hover:bg-surface-2 transition-colors"
+                title="Close"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div className="p-5 overflow-y-auto space-y-4">
+              {/* Current Active Page */}
+              <div>
+                <span className="text-2xs font-bold uppercase tracking-wider text-ink-3 block mb-2">
+                  Current Page (Online now)
+                </span>
+                <div className="p-3 rounded-xl bg-success/5 border border-success/20">
+                  <div className="flex items-center justify-between gap-2 mb-1">
+                    <span className="font-semibold text-xs text-ink truncate flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-success animate-pulse shrink-0" />
+                      {activeHistoryVisitor.current_page_title || formatPageDisplay(activeHistoryVisitor.current_page_url || activeHistoryVisitor.current_url).title}
+                    </span>
+                    <span className="text-2xs font-medium text-ink-2 shrink-0 flex items-center gap-0.5">
+                      <Clock className="w-3 h-3 text-ink-3" />
+                      {formatTimeOnPage(
+                        activeHistoryVisitor.time_on_page_seconds ??
+                        calculateTimeOnPage(activeHistoryVisitor.current_page_entered_at, undefined, now)
+                      )}
+                    </span>
+                  </div>
+                  <a
+                    href={activeHistoryVisitor.current_page_url || activeHistoryVisitor.current_url || '/'}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="font-mono text-2xs text-accent hover:underline flex items-center gap-1 truncate"
+                  >
+                    <span className="truncate">{activeHistoryVisitor.current_page_url || activeHistoryVisitor.current_url || '/'}</span>
+                    <ExternalLink className="w-2.5 h-2.5 shrink-0" />
+                  </a>
+                  {activeHistoryVisitor.referrer_source && (
+                    <div className="text-2xs text-ink-3 mt-1.5 pt-1.5 border-t border-success/15">
+                      Initial Referrer: {activeHistoryVisitor.referrer_source}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* History Timeline */}
+              <div>
+                <span className="text-2xs font-bold uppercase tracking-wider text-ink-3 block mb-2">
+                  Session Page History
+                </span>
+                {activeHistoryItems.length === 0 ? (
+                  <p className="text-xs text-ink-3 p-3 bg-surface-2/40 rounded-xl border border-line/60">
+                    This visitor just arrived on their first page. Subsequent client-side route changes and visited pages will appear here.
+                  </p>
+                ) : (
+                  <ul className="space-y-2">
+                    {activeHistoryItems.map((item, idx) => {
+                      const display = formatPageDisplay(item.url, item.title);
+                      return (
+                        <li
+                          key={item.id || idx}
+                          className="p-3 rounded-xl bg-surface-2/50 border border-line/60 text-xs hover:bg-surface-2 transition-colors"
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="font-semibold text-ink truncate" title={display.title}>
+                              {display.title}
+                            </span>
+                            <span className="text-2xs text-ink-3 shrink-0 tabular-nums">
+                              {formatTimeAgo(item.visited_at)}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between gap-2 mt-1 text-2xs">
+                            <a
+                              href={display.url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="font-mono text-ink-3 hover:text-accent truncate flex items-center gap-1"
+                            >
+                              <span className="truncate">{display.path}</span>
+                              <ExternalLink className="w-2.5 h-2.5 shrink-0 opacity-60" />
+                            </a>
+                            {item.duration_seconds !== undefined && item.duration_seconds !== null && item.duration_seconds > 0 ? (
+                              <span className="font-medium text-ink-2 shrink-0 flex items-center gap-0.5">
+                                <Clock className="w-2.5 h-2.5 text-ink-3" />
+                                {formatTimeOnPage(item.duration_seconds)}
+                              </span>
+                            ) : null}
+                          </div>
+                          {item.referrer && (
+                            <div className="text-2xs text-ink-3 mt-1 pt-1 border-t border-line/40">
+                              Referrer: {item.referrer}
+                            </div>
+                          )}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="px-5 py-3 border-t border-line bg-surface-2/40 flex items-center justify-between gap-3">
+              <button
+                type="button"
+                onClick={() => setExpandedHistoryVisitorId(null)}
+                className="btn btn-sm btn-secondary"
+              >
+                Close
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const id = activeHistoryVisitor.id;
+                  setExpandedHistoryVisitorId(null);
+                  onOpenConversationForVisitor(id);
+                }}
+                className="btn btn-sm btn-primary gap-1.5 shadow-xs"
+              >
+                <MessageSquare className="w-3.5 h-3.5" />
+                <span>Start Chat</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
