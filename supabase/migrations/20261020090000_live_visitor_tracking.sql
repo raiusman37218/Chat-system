@@ -56,11 +56,11 @@ DROP POLICY IF EXISTS "visitor_page_history_agent_select" ON public.visitor_page
 CREATE POLICY "visitor_page_history_agent_select" ON public.visitor_page_history
   FOR SELECT TO authenticated
   USING (
-    workspace_id = ANY(public.current_user_workspace_ids())
+    workspace_id IN (SELECT public.current_user_workspace_ids())
     OR EXISTS (
       SELECT 1 FROM public.visitors v
       WHERE v.id = visitor_page_history.visitor_id
-        AND (v.workspace_id = ANY(public.current_user_workspace_ids()) OR public.is_current_user_super_admin())
+        AND (v.workspace_id IN (SELECT public.current_user_workspace_ids()) OR public.is_current_user_super_admin())
     )
     OR public.is_current_user_super_admin()
   );
