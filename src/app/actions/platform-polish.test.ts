@@ -241,6 +241,8 @@ import {
   getPlatformOverviewMetricsAction,
   getPlatformWorkspacesTableAction,
   getPlatformWorkspaceDetailAction,
+  suspendWorkspaceAction,
+  reactivateWorkspaceAction,
   getWorkspaceNotesAction,
   saveWorkspaceNotesAction,
   getPlatformUsersAction,
@@ -300,6 +302,8 @@ describe('Phase 2: Super Admin Platform Polish Suite', () => {
       await expect(getPlatformOverviewMetricsAction()).rejects.toThrow(/403 Forbidden/);
       await expect(getPlatformWorkspacesTableAction()).rejects.toThrow(/403 Forbidden/);
       await expect(getPlatformWorkspaceDetailAction(WS_ID)).rejects.toThrow(/403 Forbidden/);
+      await expect(suspendWorkspaceAction(WS_ID, 'Violation')).rejects.toThrow(/403 Forbidden/);
+      await expect(reactivateWorkspaceAction(WS_ID)).rejects.toThrow(/403 Forbidden/);
       await expect(getWorkspaceNotesAction(WS_ID)).rejects.toThrow(/403 Forbidden/);
       await expect(saveWorkspaceNotesAction(WS_ID, 'Confidential note')).rejects.toThrow(/403 Forbidden/);
       await expect(getPlatformUsersAction()).rejects.toThrow(/403 Forbidden/);
@@ -322,6 +326,8 @@ describe('Phase 2: Super Admin Platform Polish Suite', () => {
 
       await expect(getPlatformOverviewMetricsAction()).rejects.toThrow(/403 Forbidden/);
       await expect(getPlatformWorkspacesTableAction()).rejects.toThrow(/403 Forbidden/);
+      await expect(suspendWorkspaceAction(WS_ID, 'Violation')).rejects.toThrow(/403 Forbidden/);
+      await expect(reactivateWorkspaceAction(WS_ID)).rejects.toThrow(/403 Forbidden/);
       await expect(getPlatformUsersAction()).rejects.toThrow(/403 Forbidden/);
       await expect(getPlatformSystemHealthAction()).rejects.toThrow(/403 Forbidden/);
     });

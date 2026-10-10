@@ -46,8 +46,6 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Overview', href: '/admin', icon: LayoutDashboard, exact: true },
   { label: 'Workspaces', href: '/admin/workspaces', icon: Building2 },
   { label: 'Users', href: '/admin/users', icon: Users },
-  { label: 'Plans & Pricing', href: '/admin/plans', icon: CreditCard },
-  { label: 'Platform Ops', href: '/admin/platform', icon: Sliders },
   { label: 'System Health', href: '/admin/health', icon: Activity },
   { label: 'Audit Log', href: '/admin/audit', icon: ShieldAlert },
 ];
@@ -229,7 +227,8 @@ export function SuperAdminShell({ currentAgent, children }: SuperAdminShellProps
             <div className="min-w-0">
               <h1 className="text-sm sm:text-base font-semibold text-ink tracking-tight truncate">
                 {pathname === '/admin' && 'Platform Overview'}
-                {pathname.startsWith('/admin/workspaces') && 'Workspaces Management'}
+                {pathname === '/admin/workspaces' && 'Workspaces Directory'}
+                {pathname.startsWith('/admin/workspaces/') && 'Workspace Detail'}
                 {pathname.startsWith('/admin/users') && 'All Platform Users'}
                 {pathname.startsWith('/admin/health') && 'System Health & Diagnostics'}
                 {pathname.startsWith('/admin/audit') && 'Super Admin Audit Log'}

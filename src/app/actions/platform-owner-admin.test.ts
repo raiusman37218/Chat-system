@@ -284,8 +284,8 @@ vi.mock('next/navigation', () => ({
   }),
 }));
 
-vi.mock('@/components/admin/WorkspaceDetailPage', () => ({
-  WorkspaceDetailPage: vi.fn((props: any) => ({ type: 'WorkspaceDetailPage', props })),
+vi.mock('@/components/admin/WorkspaceDetailView', () => ({
+  WorkspaceDetailView: vi.fn((props: any) => ({ type: 'WorkspaceDetailView', props })),
 }));
 
 vi.mock('@/lib/supabase/server', () => ({
@@ -563,8 +563,8 @@ describe('Platform Owner Admin: Server-Side Authorization', () => {
 
       const result = await WorkspacePage({ params: Promise.resolve({ id: WS_ID }) });
       expect(result).toBeDefined();
-      // Verify 403 error page is returned instead of WorkspaceDetailPage
-      expect((result as any).type).not.toBe('WorkspaceDetailPage');
+      // Verify 403 error page is returned instead of WorkspaceDetailView
+      expect((result as any).type).not.toBe('WorkspaceDetailView');
       // Verify forbidden content rendered in JSX structure
       const renderedJson = JSON.stringify(result);
       expect(renderedJson).toContain('403 - Forbidden');
