@@ -49,10 +49,7 @@ export async function getPlatformPlansAction(): Promise<{
     throw new Error(`Failed to load platform plans: ${error.message}`);
   }
 
-  const callerIsOwner = Boolean(
-    agent.is_platform_owner ||
-    ['musmanrai372@gmail.com', 'raiusman37218@gmail.com', 'agent@zentry.io'].includes((agent.email || '').toLowerCase())
-  );
+  const callerIsOwner = Boolean(agent.is_platform_owner);
 
   return {
     plans: (data || []) as PlatformPlan[],

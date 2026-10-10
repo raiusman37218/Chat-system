@@ -13,6 +13,8 @@ import {
   Sun,
   Moon,
   ArrowRight,
+  KeyRound,
+  Sliders,
 } from 'lucide-react';
 import { getPlatformGlobalSearchAction } from '@/app/actions/platform';
 import { Badge } from '@/components/ui/Badge';
@@ -161,6 +163,26 @@ export function SuperAdminCommandPalette({ open, onClose }: SuperAdminCommandPal
                   <span>Platform Users</span>
                 </span>
                 <span className="text-2xs text-ink-3 font-mono">/admin/users</span>
+              </button>
+              <button
+                onClick={() => navigateTo('/admin/defaults')}
+                className="w-full px-3 py-2 rounded-lg flex items-center justify-between text-left hover:bg-surface-3 transition-colors text-ink"
+              >
+                <span className="flex items-center gap-2.5">
+                  <Sliders className="w-4 h-4 text-accent" />
+                  <span>Global Defaults & Policies</span>
+                </span>
+                <span className="text-2xs text-ink-3 font-mono">/admin/defaults</span>
+              </button>
+              <button
+                onClick={() => navigateTo('/admin/access')}
+                className="w-full px-3 py-2 rounded-lg flex items-center justify-between text-left hover:bg-surface-3 transition-colors text-ink"
+              >
+                <span className="flex items-center gap-2.5">
+                  <KeyRound className="w-4 h-4 text-accent" />
+                  <span>Admin Access Control</span>
+                </span>
+                <span className="text-2xs text-ink-3 font-mono">/admin/access</span>
               </button>
               <button
                 onClick={() => navigateTo('/admin/health')}

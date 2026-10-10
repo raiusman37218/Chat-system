@@ -10,6 +10,7 @@
  */
 
 import { getWorkspaceAccess } from '@/lib/team/access';
+import { assertSettingNotLocked } from '@/lib/settings/precedence';
 import {
   normalizeNotificationPrefs,
   validateWorkspaceGeneral,
@@ -19,6 +20,7 @@ import {
 import type { Workspace, CsatSettingsConfig } from '@/types/database';
 
 export async function updateWorkspaceGeneralAction(workspaceId: string, input: WorkspaceGeneralInput) {
+  await assertSettingNotLocked(workspaceId, 'workspace_general');
   const { supabase } = await getWorkspaceAccess(workspaceId, 'manage_settings');
 
   const errors = validateWorkspaceGeneral(input);
@@ -111,6 +113,7 @@ export async function getAuditLogAction(workspaceId: string, before?: string | n
 }
 
 export async function updateCsatSettingsAction(workspaceId: string, settings: CsatSettingsConfig) {
+  await assertSettingNotLocked(workspaceId, 'csat');
   const { supabase } = await getWorkspaceAccess(workspaceId, 'manage_settings');
   const clean: CsatSettingsConfig = {
     enabled: Boolean(settings.enabled),

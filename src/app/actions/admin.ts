@@ -16,6 +16,7 @@ import {
 import { generateUniqueWorkspaceSlug } from '@/lib/slug';
 import { getIndustryPreset } from '@/lib/onboarding-presets';
 import { getWorkspaceAccess } from '@/lib/team/access';
+import { assertSettingNotLocked } from '@/lib/settings/precedence';
 
 /**
  * Ensures the caller is an active owner or admin of the workspace (the
@@ -73,6 +74,7 @@ export async function updateWidgetSettingsAction(
     proactive_delay_seconds?: number;
   }
 ) {
+  await assertSettingNotLocked(workspaceId, 'widget_appearance');
   await assertAdminUser(workspaceId);
   const supabase = await createClient();
 
@@ -144,6 +146,7 @@ export async function updateBusinessHoursAction(
   workspaceId: string,
   businessHours: BusinessHoursConfig
 ) {
+  await assertSettingNotLocked(workspaceId, 'business_hours');
   await assertAdminUser(workspaceId);
   const supabase = await createClient();
 
@@ -258,6 +261,7 @@ export async function updateAutoAssignmentRulesAction(
   workspaceId: string,
   rules: AutoAssignmentConfig
 ) {
+  await assertSettingNotLocked(workspaceId, 'auto_assignment');
   await assertAdminUser(workspaceId);
   const supabase = await createClient();
 
@@ -281,6 +285,7 @@ export async function updateAISettingsAction(
   workspaceId: string,
   settings: AISettingsConfig
 ) {
+  await assertSettingNotLocked(workspaceId, 'ai_settings');
   await assertAdminUser(workspaceId);
   const supabase = await createClient();
 
@@ -343,6 +348,7 @@ export async function updateHelpCenterBrandingAction(
     help_center_layout?: 'grid-2' | 'grid-3' | 'grid-4' | 'list' | null;
   }
 ) {
+  await assertSettingNotLocked(workspaceId, 'help_center');
   await assertAdminUser(workspaceId);
   const supabase = await createClient();
 
@@ -436,6 +442,7 @@ export async function updateSMTPSettingsAction(
   workspaceId: string,
   settings: SMTPSettingsConfig
 ) {
+  await assertSettingNotLocked(workspaceId, 'smtp_settings');
   await assertAdminUser(workspaceId);
   const supabase = await createClient();
 

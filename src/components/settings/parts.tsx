@@ -24,26 +24,35 @@ export function useReportDirty(dirty: boolean) {
   }, [dirty, report]);
 }
 
+import { ManagedByZentry } from '@/components/ui/ManagedByZentry';
+
 export function SettingsCard({
   title,
   description,
   children,
   className,
+  isLocked,
 }: {
   title?: string;
   description?: string;
   children: React.ReactNode;
   className?: string;
+  isLocked?: boolean;
 }) {
   return (
-    <section className={cn('card p-5 md:p-6 space-y-4', className)}>
-      {(title || description) && (
-        <header>
-          {title && <h3 className="text-md font-semibold text-ink">{title}</h3>}
-          {description && <p className="mt-0.5 text-ui text-ink-2">{description}</p>}
+    <section className={cn('card p-5 md:p-6 space-y-4 relative', className)}>
+      {(title || description || isLocked) && (
+        <header className="flex items-start justify-between gap-4">
+          <div>
+            {title && <h3 className="text-md font-semibold text-ink">{title}</h3>}
+            {description && <p className="mt-0.5 text-ui text-ink-2">{description}</p>}
+          </div>
+          {isLocked && <ManagedByZentry />}
         </header>
       )}
-      {children}
+      <div className={cn(isLocked && 'pointer-events-none opacity-80 select-none')}>
+        {children}
+      </div>
     </section>
   );
 }

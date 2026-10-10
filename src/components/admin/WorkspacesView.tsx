@@ -17,6 +17,12 @@ import {
   ChevronLeft,
   ChevronRight,
   ExternalLink,
+  Layers,
+  Megaphone,
+  Sliders,
+  CreditCard,
+  CheckSquare,
+  Square,
 } from 'lucide-react';
 import {
   getPlatformWorkspacesTableAction,
@@ -24,6 +30,15 @@ import {
   reactivateWorkspaceAction,
   PlatformWorkspaceItem,
 } from '@/app/actions/platform';
+import {
+  adminBulkChangePlanAction,
+  adminBulkSuspendAction,
+  adminBulkToggleFeatureAction,
+  adminBulkSendAnnouncementAction,
+} from '@/app/actions/platform-control';
+import { getPlatformPlansAction } from '@/app/actions/plans';
+import { PLAN_FEATURES, PlanFeatureKey } from '@/lib/plans/features';
+import { PlatformPlan } from '@/types/plans';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Modal } from '@/components/ui/Modal';
@@ -57,8 +72,29 @@ export function WorkspacesView() {
   const [showSuspendModal, setShowSuspendModal] = useState(false);
   const [suspendReason, setSuspendReason] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
-
   const [showReactivateModal, setShowReactivateModal] = useState(false);
+
+  // Bulk Selection & Actions (Requirement E)
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [availablePlans, setAvailablePlans] = useState<PlatformPlan[]>([]);
+
+  const [bulkPlanModalOpen, setBulkPlanModalOpen] = useState(false);
+  const [bulkTargetPlan, setBulkTargetPlan] = useState('');
+
+  const [bulkSuspendModalOpen, setBulkSuspendModalOpen] = useState(false);
+  const [bulkSuspendReason, setBulkSuspendReason] = useState('');
+  const [bulkSuspendActionType, setBulkSuspendActionType] = useState<'suspend' | 'reactivate'>('suspend');
+
+  const [bulkFeatureModalOpen, setBulkFeatureModalOpen] = useState(false);
+  const [bulkFeatureKey, setBulkFeatureKey] = useState<PlanFeatureKey>('ai_bot');
+  const [bulkFeatureEnabled, setBulkFeatureEnabled] = useState(true);
+
+  const [bulkAnnounceModalOpen, setBulkAnnounceModalOpen] = useState(false);
+  const [bulkAnnounceTitle, setBulkAnnounceTitle] = useState('');
+  const [bulkAnnounceMessage, setBulkAnnounceMessage] = useState('');
+  const [bulkAnnounceTone, setBulkAnnounceTone] = useState<'info' | 'warning' | 'success' | 'urgent'>('info');
+
+  const [bulkLoading, setBulkLoading] = useState(false);
 
   const loadData = async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
@@ -92,7 +128,13 @@ export function WorkspacesView() {
     loadData();
   }, [page, statusFilter, channelFilter, planFilter, sortField, sortOrder]);
 
-  // Handle Search submit
+  useEffect(() => {
+    getPlatformPlansAction().then((res) => {
+      setAvailablePlans(res.plans);
+      if (res.plans.length > 0) setBulkTargetPlan(res.plans[0].id);
+    });
+  }, []);
+
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setPage(1);
@@ -113,13 +155,13 @@ export function WorkspacesView() {
     setActionLoading(true);
     try {
       await suspendWorkspaceAction(targetWorkspace.id, suspendReason);
-      toast.success(`Workspace "${targetWorkspace.name}" suspended.`);
+      toast.success(`Suspended ${targetWorkspace.name}`);
       setShowSuspendModal(false);
-      setSuspendReason('');
       setTargetWorkspace(null);
-      await loadData(true);
+      setSuspendReason('');
+      loadData(true);
     } catch (err: any) {
-      toast.error(err.message || 'Failed to suspend workspace.');
+      toast.error(err.message || 'Failed to suspend workspace');
     } finally {
       setActionLoading(false);
     }
@@ -130,25 +172,111 @@ export function WorkspacesView() {
     setActionLoading(true);
     try {
       await reactivateWorkspaceAction(targetWorkspace.id);
-      toast.success(`Workspace "${targetWorkspace.name}" reactivated.`);
+      toast.success(`Reactivated ${targetWorkspace.name}`);
       setShowReactivateModal(false);
       setTargetWorkspace(null);
-      await loadData(true);
+      loadData(true);
     } catch (err: any) {
-      toast.error(err.message || 'Failed to reactivate workspace.');
+      toast.error(err.message || 'Failed to reactivate workspace');
     } finally {
       setActionLoading(false);
     }
   };
 
+  // Bulk Actions
+  const handleBulkChangePlan = async () => {
+    if (selectedIds.length === 0 || !bulkTargetPlan) return;
+    setBulkLoading(true);
+    try {
+      const res = await adminBulkChangePlanAction(selectedIds, bulkTargetPlan);
+      if (res.success) {
+        toast.success(`Changed plan for ${res.count} workspaces.`);
+        setBulkPlanModalOpen(false);
+        setSelectedIds([]);
+        loadData(true);
+      } else toast.error(res.error || 'Failed.');
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to bulk change plans.');
+    } finally {
+      setBulkLoading(false);
+    }
+  };
+
+  const handleBulkSuspend = async () => {
+    if (selectedIds.length === 0) return;
+    setBulkLoading(true);
+    try {
+      const suspend = bulkSuspendActionType === 'suspend';
+      const res = await adminBulkSuspendAction(selectedIds, suspend, bulkSuspendReason || 'Bulk action');
+      if (res.success) {
+        toast.success(`${suspend ? 'Suspended' : 'Reactivated'} ${res.count} workspaces.`);
+        setBulkSuspendModalOpen(false);
+        setSelectedIds([]);
+        loadData(true);
+      } else toast.error(res.error || 'Failed.');
+    } catch (err: any) {
+      toast.error(err.message || 'Failed.');
+    } finally {
+      setBulkLoading(false);
+    }
+  };
+
+  const handleBulkToggleFeature = async () => {
+    if (selectedIds.length === 0) return;
+    setBulkLoading(true);
+    try {
+      const res = await adminBulkToggleFeatureAction(selectedIds, bulkFeatureKey, bulkFeatureEnabled);
+      if (res.success) {
+        toast.success(`Updated feature for ${res.count} workspaces.`);
+        setBulkFeatureModalOpen(false);
+        setSelectedIds([]);
+        loadData(true);
+      } else toast.error(res.error || 'Failed.');
+    } catch (err: any) {
+      toast.error(err.message || 'Failed.');
+    } finally {
+      setBulkLoading(false);
+    }
+  };
+
+  const handleBulkSendAnnouncement = async () => {
+    if (selectedIds.length === 0 || !bulkAnnounceTitle.trim() || !bulkAnnounceMessage.trim()) return;
+    setBulkLoading(true);
+    try {
+      const res = await adminBulkSendAnnouncementAction(selectedIds, {
+        title: bulkAnnounceTitle.trim(),
+        message: bulkAnnounceMessage.trim(),
+        tone: bulkAnnounceTone,
+      });
+      if (res.success) {
+        toast.success(`Announcement broadcasted to ${selectedIds.length} workspaces.`);
+        setBulkAnnounceModalOpen(false);
+        setSelectedIds([]);
+        setBulkAnnounceTitle('');
+        setBulkAnnounceMessage('');
+      } else toast.error(res.error || 'Failed.');
+    } catch (err: any) {
+      toast.error(err.message || 'Failed.');
+    } finally {
+      setBulkLoading(false);
+    }
+  };
+
+  const allSelected = workspaces.length > 0 && selectedIds.length === workspaces.length;
+
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      {/* Top Header Card */}
+      <div className="bg-surface border border-line rounded-2xl p-6 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h2 className="text-lg sm:text-xl font-bold text-ink tracking-tight">Workspaces Directory</h2>
-          <p className="text-xs text-ink-3 mt-0.5">
-            Manage all tenant workspaces, monitor capacity, and control suspension status.
+          <div className="flex items-center gap-2.5">
+            <h2 className="text-lg font-bold text-ink tracking-tight flex items-center gap-2">
+              <span>Workspaces Directory</span>
+              <Badge tone="accent" className="text-2xs font-mono">{totalCount}</Badge>
+            </h2>
+          </div>
+          <p className="text-xs text-ink-3 mt-1">
+            Browse, inspect, and manage workspaces, team rosters, limits, and customer communications.
           </p>
         </div>
 
@@ -157,7 +285,7 @@ export function WorkspacesView() {
             variant="secondary"
             size="sm"
             onClick={() => loadData(true)}
-            loading={refreshing}
+            disabled={loading || refreshing}
           >
             <RefreshCw className={cn('w-3.5 h-3.5', refreshing && 'animate-spin')} />
             <span>Refresh</span>
@@ -165,89 +293,81 @@ export function WorkspacesView() {
         </div>
       </div>
 
-      {/* Filter and Search Bar */}
-      <div className="card p-4 border border-line bg-surface shadow-xs space-y-3">
-        <form onSubmit={handleSearchSubmit} className="flex flex-col md:flex-row items-stretch md:items-center gap-3">
-          {/* Search Input */}
-          <div className="relative flex-1">
-            <Search className="w-4 h-4 text-ink-3 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search by workspace name, domain, owner email, or ID..."
-              className="w-full h-9 pl-9 pr-4 rounded-md border border-line bg-surface-2/40 text-xs text-ink placeholder:text-ink-3 focus:outline-none focus:border-accent transition-colors"
-            />
+      {/* Bulk Action Sticky Bar (Requirement E) */}
+      {selectedIds.length > 0 && (
+        <div className="bg-accent/10 border border-accent/20 rounded-xl p-3 flex flex-wrap items-center justify-between gap-3 animate-in fade-in">
+          <div className="flex items-center gap-2">
+            <Badge tone="accent">{selectedIds.length} Workspaces Selected</Badge>
+            <span className="text-xs text-ink-2 font-medium">Bulk Operations:</span>
           </div>
 
-          {/* Status Filter */}
-          <select
-            value={statusFilter}
-            onChange={(e) => {
-              setStatusFilter(e.target.value as any);
-              setPage(1);
-            }}
-            className="h-9 px-3 rounded-md border border-line bg-surface text-xs text-ink focus:outline-none focus:border-accent"
-          >
-            <option value="all">All Statuses</option>
-            <option value="active">Active Only</option>
-            <option value="suspended">Suspended Only</option>
-          </select>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button size="xs" variant="secondary" onClick={() => setBulkPlanModalOpen(true)}>
+              <CreditCard className="w-3 h-3 mr-1 text-accent" />
+              <span>Change Plan</span>
+            </Button>
+            <Button size="xs" variant="secondary" onClick={() => setBulkSuspendModalOpen(true)}>
+              <PauseCircle className="w-3 h-3 mr-1 text-warn" />
+              <span>Suspend / Reactivate</span>
+            </Button>
+            <Button size="xs" variant="secondary" onClick={() => setBulkFeatureModalOpen(true)}>
+              <Sliders className="w-3 h-3 mr-1 text-accent" />
+              <span>Toggle Feature</span>
+            </Button>
+            <Button size="xs" variant="secondary" onClick={() => setBulkAnnounceModalOpen(true)}>
+              <Megaphone className="w-3 h-3 mr-1 text-accent" />
+              <span>Broadcast Announcement</span>
+            </Button>
+            <Button size="xs" variant="ghost" onClick={() => setSelectedIds([])}>
+              Deselect
+            </Button>
+          </div>
+        </div>
+      )}
 
-          {/* Channel Filter */}
-          <select
-            value={channelFilter}
-            onChange={(e) => {
-              setChannelFilter(e.target.value);
-              setPage(1);
-            }}
-            className="h-9 px-3 rounded-md border border-line bg-surface text-xs text-ink focus:outline-none focus:border-accent"
-          >
-            <option value="all">All Channels</option>
-            <option value="chat">Web Chat</option>
-            <option value="whatsapp">WhatsApp</option>
-            <option value="instagram">Instagram</option>
-            <option value="email">Email</option>
-          </select>
+      {/* Filters Toolbar */}
+      <div className="card p-4 border border-line bg-surface shadow-xs space-y-4">
+        <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
+          <form onSubmit={handleSearchSubmit} className="flex-1 max-w-md relative">
+            <Search className="w-4 h-4 text-ink-3 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <input
+              type="search"
+              className="input input-sm w-full pl-9 pr-4 text-xs"
+              placeholder="Search workspaces by name, domain, or owner email..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </form>
 
-          {/* Plan Filter */}
-          <select
-            value={planFilter}
-            onChange={(e) => {
-              setPlanFilter(e.target.value);
-              setPage(1);
-            }}
-            className="h-9 px-3 rounded-md border border-line bg-surface text-xs text-ink focus:outline-none focus:border-accent"
-          >
-            <option value="all">All Plans</option>
-            <option value="free">Free</option>
-            <option value="starter">Starter</option>
-            <option value="pro">Pro</option>
-            <option value="enterprise">Enterprise</option>
-          </select>
-
-          <Button type="submit" variant="primary" size="sm">
-            <span>Filter</span>
-          </Button>
-        </form>
-
-        <div className="flex items-center justify-between text-2xs text-ink-3 pt-1 border-t border-line/40">
-          <span>
-            Showing <strong className="text-ink">{workspaces.length}</strong> of{' '}
-            <strong className="text-ink">{totalCount}</strong> workspaces
-          </span>
-          {search && (
-            <button
-              onClick={() => {
-                setSearch('');
+          <div className="flex flex-wrap items-center gap-2 text-xs">
+            <select
+              className="input input-sm text-xs py-1"
+              value={statusFilter}
+              onChange={(e) => {
+                setStatusFilter(e.target.value as any);
                 setPage(1);
-                loadData();
               }}
-              className="text-accent hover:underline"
             >
-              Clear search filter
-            </button>
-          )}
+              <option value="all">All Statuses</option>
+              <option value="active">Active Only</option>
+              <option value="suspended">Suspended Only</option>
+            </select>
+
+            <select
+              className="input input-sm text-xs py-1"
+              value={planFilter}
+              onChange={(e) => {
+                setPlanFilter(e.target.value);
+                setPage(1);
+              }}
+            >
+              <option value="all">All Plans</option>
+              <option value="starter">Starter</option>
+              <option value="pro">Pro</option>
+              <option value="enterprise">Enterprise</option>
+              <option value="legacy">Legacy</option>
+            </select>
+          </div>
         </div>
       </div>
 
@@ -277,6 +397,17 @@ export function WorkspacesView() {
           <Table>
             <thead>
               <tr className="border-b border-line bg-surface-2/60 text-2xs uppercase text-ink-3 font-semibold">
+                <th className="p-3 text-left w-10">
+                  <input
+                    type="checkbox"
+                    className="rounded border-line text-accent focus:ring-accent"
+                    checked={allSelected}
+                    onChange={(e) => {
+                      if (e.target.checked) setSelectedIds(workspaces.map((w) => w.id));
+                      else setSelectedIds([]);
+                    }}
+                  />
+                </th>
                 <SortHeader
                   label="Workspace"
                   active={sortField === 'name'}
@@ -297,269 +428,279 @@ export function WorkspacesView() {
                   direction={sortOrder}
                   onSort={() => handleSort('tickets_30d_count')}
                 />
-                <th className="p-3 text-left">Channels</th>
                 <SortHeader
                   label="Created"
                   active={sortField === 'created_at'}
                   direction={sortOrder}
                   onSort={() => handleSort('created_at')}
                 />
-                <SortHeader
-                  label="Last Activity"
-                  active={sortField === 'last_activity_at'}
-                  direction={sortOrder}
-                  onSort={() => handleSort('last_activity_at')}
-                />
                 <th className="p-3 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-line text-ui">
-              {workspaces.map((w) => (
-                <tr key={w.id} className="hover:bg-surface-3/50 transition-colors">
-                  {/* Name */}
-                  <td className="p-3">
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <div
-                        className="w-7 h-7 rounded-lg flex items-center justify-center text-white font-bold text-xs shrink-0"
-                        style={{ backgroundColor: w.brand_color }}
-                      >
-                        {w.name.charAt(0).toUpperCase()}
+              {workspaces.map((w) => {
+                const isSelected = selectedIds.includes(w.id);
+                return (
+                  <tr key={w.id} className={cn('hover:bg-surface-3/50 transition-colors', isSelected && 'bg-accent/5')}>
+                    <td className="p-3">
+                      <input
+                        type="checkbox"
+                        className="rounded border-line text-accent focus:ring-accent"
+                        checked={isSelected}
+                        onChange={(e) => {
+                          if (e.target.checked) setSelectedIds([...selectedIds, w.id]);
+                          else setSelectedIds(selectedIds.filter((id) => id !== w.id));
+                        }}
+                      />
+                    </td>
+
+                    {/* Name */}
+                    <td className="p-3">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div
+                          className="w-7 h-7 rounded-lg flex items-center justify-center text-white font-bold text-xs shrink-0"
+                          style={{ backgroundColor: w.brand_color }}
+                        >
+                          {w.name.charAt(0).toUpperCase()}
+                        </div>
+                        <div className="min-w-0">
+                          <Link
+                            href={`/admin/workspaces/${w.id}`}
+                            className="font-semibold text-ink hover:text-accent truncate block"
+                          >
+                            {w.name}
+                          </Link>
+                          {w.website_url ? (
+                            <span className="text-2xs text-ink-3 truncate block">
+                              {w.website_url.replace(/^https?:\/\//, '')}
+                            </span>
+                          ) : (
+                            <span className="text-2xs text-ink-3 italic block">No domain</span>
+                          )}
+                        </div>
                       </div>
-                      <div className="min-w-0">
+                    </td>
+
+                    {/* Owner */}
+                    <td className="p-3 text-ink-2 truncate max-w-xs">
+                      {w.owner_email || <span className="italic text-ink-3">None</span>}
+                    </td>
+
+                    {/* Status & Plan */}
+                    <td className="p-3">
+                      <div className="flex items-center gap-1.5">
+                        <Badge tone={w.is_suspended ? 'danger' : 'success'} className="text-2xs capitalize">
+                          {w.is_suspended ? 'Suspended' : 'Active'}
+                        </Badge>
+                        <Badge tone="neutral" className="text-2xs capitalize font-mono">
+                          {w.plan || 'starter'}
+                        </Badge>
+                      </div>
+                    </td>
+
+                    {/* Agents */}
+                    <td className="p-3 font-medium text-ink">
+                      {w.agents_count}
+                    </td>
+
+                    {/* Tickets */}
+                    <td className="p-3 font-medium text-ink">
+                      {w.tickets_30d_count}
+                    </td>
+
+                    {/* Created */}
+                    <td className="p-3 text-ink-3 text-2xs">
+                      {new Date(w.created_at).toLocaleDateString()}
+                    </td>
+
+                    {/* Actions */}
+                    <td className="p-3 text-right">
+                      <div className="flex items-center justify-end gap-1.5">
                         <Link
                           href={`/admin/workspaces/${w.id}`}
-                          className="font-semibold text-ink hover:text-accent truncate block"
+                          className="btn btn-secondary btn-xs inline-flex items-center gap-1"
                         >
-                          {w.name}
-                        </Link>
-                        {w.website_url ? (
-                          <span className="text-2xs text-ink-3 truncate block">
-                            {w.website_url.replace(/^https?:\/\//, '')}
-                          </span>
-                        ) : (
-                          <span className="text-2xs text-ink-3 italic block">No domain</span>
-                        )}
-                      </div>
-                    </div>
-                  </td>
-
-                  {/* Owner */}
-                  <td className="p-3 text-ink-2 truncate max-w-xs">
-                    {w.owner_email || <span className="italic text-ink-3">None</span>}
-                  </td>
-
-                  {/* Status */}
-                  <td className="p-3">
-                    <Badge tone={w.is_suspended ? 'warn' : 'success'}>
-                      {w.is_suspended ? 'Suspended' : 'Active'}
-                    </Badge>
-                  </td>
-
-                  {/* Agents */}
-                  <td className="p-3 tabular-nums text-ink">{w.agents_count}</td>
-
-                  {/* Tickets (30d) */}
-                  <td className="p-3 tabular-nums font-semibold text-ink">
-                    {w.tickets_30d_count.toLocaleString()}
-                  </td>
-
-                  {/* Channels */}
-                  <td className="p-3">
-                    <div className="flex flex-wrap gap-1 max-w-xs">
-                      {w.connected_channels.map((ch) => (
-                        <span
-                          key={ch}
-                          className="px-1.5 py-0.5 rounded text-2xs font-mono uppercase bg-surface-2 text-ink-2 border border-line"
-                        >
-                          {ch}
-                        </span>
-                      ))}
-                    </div>
-                  </td>
-
-                  {/* Created */}
-                  <td className="p-3 text-2xs text-ink-3 whitespace-nowrap">
-                    {new Date(w.created_at).toLocaleDateString()}
-                  </td>
-
-                  {/* Last Activity */}
-                  <td className="p-3 text-2xs text-ink-3 whitespace-nowrap">
-                    {w.last_activity_at ? (
-                      new Date(w.last_activity_at).toLocaleDateString()
-                    ) : (
-                      <span className="italic">Never</span>
-                    )}
-                  </td>
-
-                  {/* Actions */}
-                  <td className="p-3 text-right">
-                    <div className="inline-flex items-center gap-1.5 justify-end">
-                      <Link href={`/admin/workspaces/${w.id}`}>
-                        <Button variant="ghost" size="xs" title="View workspace detail">
                           <Eye className="w-3.5 h-3.5" />
-                          <span className="text-2xs">View</span>
-                        </Button>
-                      </Link>
-
-                      {w.is_suspended ? (
-                        <Button
-                          variant="secondary"
-                          size="xs"
-                          onClick={() => {
-                            setTargetWorkspace(w);
-                            setShowReactivateModal(true);
-                          }}
-                          title="Reactivate workspace"
-                        >
-                          <PlayCircle className="w-3.5 h-3.5 text-success" />
-                          <span className="text-2xs">Reactivate</span>
-                        </Button>
-                      ) : (
-                        <Button
-                          variant="danger"
-                          size="xs"
-                          onClick={() => {
-                            setTargetWorkspace(w);
-                            setShowSuspendModal(true);
-                          }}
-                          title="Suspend workspace"
-                        >
-                          <PauseCircle className="w-3.5 h-3.5" />
-                          <span className="text-2xs">Suspend</span>
-                        </Button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                          <span>Control</span>
+                        </Link>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </Table>
         )}
-
-        {/* Pagination Bar */}
-        {totalPages > 1 && (
-          <div className="p-3 border-t border-line bg-surface flex items-center justify-between text-xs text-ink-3">
-            <div>
-              Page <strong className="text-ink">{page}</strong> of{' '}
-              <strong className="text-ink">{totalPages}</strong>
-            </div>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="secondary"
-                size="sm"
-                disabled={page <= 1}
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-              >
-                <ChevronLeft className="w-3.5 h-3.5" />
-                <span>Previous</span>
-              </Button>
-              <Button
-                variant="secondary"
-                size="sm"
-                disabled={page >= totalPages}
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-              >
-                <span>Next</span>
-                <ChevronRight className="w-3.5 h-3.5" />
-              </Button>
-            </div>
-          </div>
-        )}
       </div>
 
-      {/* Confirmation Modal: Suspend Workspace */}
-      <Modal
-        open={showSuspendModal}
-        onClose={() => {
-          if (!actionLoading) {
-            setShowSuspendModal(false);
-            setTargetWorkspace(null);
-            setSuspendReason('');
-          }
-        }}
-        title={`Suspend Workspace: ${targetWorkspace?.name || ''}`}
-      >
-        <div className="space-y-4 text-ui">
-          <div className="p-3.5 rounded-lg border border-warn/30 bg-warn/10 text-ink flex items-start gap-2.5">
-            <AlertTriangle className="w-4 h-4 text-warn shrink-0 mt-0.5" />
-            <p className="text-xs text-ink-2">
-              Suspending this workspace prevents its agents and visitors from sending new messages or modifying settings until reactivated.
-            </p>
-          </div>
-
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-ink">Reason for Suspension</label>
-            <textarea
-              value={suspendReason}
-              onChange={(e) => setSuspendReason(e.target.value)}
-              placeholder="e.g. Non-payment, Terms of Service violation, or customer request..."
-              rows={3}
-              className="w-full p-2.5 rounded-md border border-line bg-surface text-xs text-ink placeholder:text-ink-3 focus:outline-none focus:border-accent"
-            />
-          </div>
-
-          <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-line">
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between text-xs text-ink-3 pt-2">
+          <span>Page {page} of {totalPages}</span>
+          <div className="flex items-center gap-2">
             <Button
-              variant="ghost"
-              size="sm"
-              disabled={actionLoading}
-              onClick={() => {
-                setShowSuspendModal(false);
-                setTargetWorkspace(null);
-              }}
+              variant="secondary"
+              size="xs"
+              disabled={page <= 1}
+              onClick={() => setPage((p) => p - 1)}
             >
-              Cancel
+              Previous
             </Button>
             <Button
-              variant="danger"
-              size="sm"
-              loading={actionLoading}
-              onClick={handleConfirmSuspend}
+              variant="secondary"
+              size="xs"
+              disabled={page >= totalPages}
+              onClick={() => setPage((p) => p + 1)}
             >
-              <PauseCircle className="w-4 h-4" />
-              <span>Confirm Suspension</span>
+              Next
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Bulk Change Plan */}
+      <Modal open={bulkPlanModalOpen} onClose={() => setBulkPlanModalOpen(false)} title="Bulk Change Plan">
+        <div className="space-y-4">
+          <p className="text-xs text-ink-3">
+            Change subscription plan for <strong className="text-ink">{selectedIds.length}</strong> selected workspaces.
+          </p>
+          <div>
+            <label className="text-xs font-medium text-ink-2">Select Target Plan</label>
+            <select
+              className="input input-sm w-full mt-1.5"
+              value={bulkTargetPlan}
+              onChange={(e) => setBulkTargetPlan(e.target.value)}
+            >
+              {availablePlans.map((p) => (
+                <option key={p.id} value={p.id}>{p.name} (${p.monthly_price}/mo)</option>
+              ))}
+            </select>
+          </div>
+          <div className="flex justify-end gap-2 pt-3 border-t border-line">
+            <Button variant="secondary" size="sm" onClick={() => setBulkPlanModalOpen(false)}>Cancel</Button>
+            <Button variant="primary" size="sm" loading={bulkLoading} onClick={handleBulkChangePlan}>Apply to Selected</Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Modal: Bulk Suspend / Reactivate */}
+      <Modal open={bulkSuspendModalOpen} onClose={() => setBulkSuspendModalOpen(false)} title="Bulk Suspend / Reactivate">
+        <div className="space-y-4">
+          <p className="text-xs text-ink-3">
+            Modify status for <strong className="text-ink">{selectedIds.length}</strong> selected workspaces.
+          </p>
+          <div>
+            <label className="text-xs font-medium text-ink-2">Action Type</label>
+            <select
+              className="input input-sm w-full mt-1.5"
+              value={bulkSuspendActionType}
+              onChange={(e) => setBulkSuspendActionType(e.target.value as any)}
+            >
+              <option value="suspend">Suspend Workspaces</option>
+              <option value="reactivate">Reactivate Workspaces</option>
+            </select>
+          </div>
+          <div>
+            <label className="text-xs font-medium text-ink-2">Reason</label>
+            <input
+              type="text"
+              className="input input-sm w-full mt-1.5"
+              placeholder="e.g. Terms update, payment verification"
+              value={bulkSuspendReason}
+              onChange={(e) => setBulkSuspendReason(e.target.value)}
+            />
+          </div>
+          <div className="flex justify-end gap-2 pt-3 border-t border-line">
+            <Button variant="secondary" size="sm" onClick={() => setBulkSuspendModalOpen(false)}>Cancel</Button>
+            <Button
+              variant={bulkSuspendActionType === 'suspend' ? 'danger' : 'primary'}
+              size="sm"
+              loading={bulkLoading}
+              onClick={handleBulkSuspend}
+            >
+              Confirm Bulk Action
             </Button>
           </div>
         </div>
       </Modal>
 
-      {/* Confirmation Modal: Reactivate Workspace */}
-      <Modal
-        open={showReactivateModal}
-        onClose={() => {
-          if (!actionLoading) {
-            setShowReactivateModal(false);
-            setTargetWorkspace(null);
-          }
-        }}
-        title={`Reactivate Workspace: ${targetWorkspace?.name || ''}`}
-      >
-        <div className="space-y-4 text-ui">
-          <p className="text-xs text-ink-2">
-            Are you sure you want to reactivate <strong className="text-ink">{targetWorkspace?.name}</strong>? All agent and visitor communication access will be restored immediately.
+      {/* Modal: Bulk Feature Toggle */}
+      <Modal open={bulkFeatureModalOpen} onClose={() => setBulkFeatureModalOpen(false)} title="Bulk Toggle Feature">
+        <div className="space-y-4">
+          <p className="text-xs text-ink-3">
+            Enable or disable a feature for <strong className="text-ink">{selectedIds.length}</strong> selected workspaces.
           </p>
+          <div>
+            <label className="text-xs font-medium text-ink-2">Feature</label>
+            <select
+              className="input input-sm w-full mt-1.5"
+              value={bulkFeatureKey}
+              onChange={(e) => setBulkFeatureKey(e.target.value as any)}
+            >
+              {PLAN_FEATURES.map((f) => (
+                <option key={f.id} value={f.id}>{f.name}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="text-xs font-medium text-ink-2">New State</label>
+            <select
+              className="input input-sm w-full mt-1.5"
+              value={bulkFeatureEnabled ? 'enable' : 'disable'}
+              onChange={(e) => setBulkFeatureEnabled(e.target.value === 'enable')}
+            >
+              <option value="enable">Force Enable</option>
+              <option value="disable">Force Disable</option>
+            </select>
+          </div>
+          <div className="flex justify-end gap-2 pt-3 border-t border-line">
+            <Button variant="secondary" size="sm" onClick={() => setBulkFeatureModalOpen(false)}>Cancel</Button>
+            <Button variant="primary" size="sm" loading={bulkLoading} onClick={handleBulkToggleFeature}>Apply Feature Override</Button>
+          </div>
+        </div>
+      </Modal>
 
-          <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-line">
-            <Button
-              variant="ghost"
-              size="sm"
-              disabled={actionLoading}
-              onClick={() => {
-                setShowReactivateModal(false);
-                setTargetWorkspace(null);
-              }}
+      {/* Modal: Bulk Send Announcement */}
+      <Modal open={bulkAnnounceModalOpen} onClose={() => setBulkAnnounceModalOpen(false)} title="Broadcast Announcement">
+        <div className="space-y-4">
+          <p className="text-xs text-ink-3">
+            Broadcast banner announcement to <strong className="text-ink">{selectedIds.length}</strong> selected workspaces.
+          </p>
+          <div>
+            <label className="text-xs font-medium text-ink-2">Title</label>
+            <input
+              type="text"
+              className="input input-sm w-full mt-1.5"
+              placeholder="e.g. Scheduled Platform Maintenance"
+              value={bulkAnnounceTitle}
+              onChange={(e) => setBulkAnnounceTitle(e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-ink-2">Message</label>
+            <textarea
+              className="input input-sm w-full mt-1.5 h-20 py-2"
+              placeholder="Write announcement message..."
+              value={bulkAnnounceMessage}
+              onChange={(e) => setBulkAnnounceMessage(e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-ink-2">Tone</label>
+            <select
+              className="input input-sm w-full mt-1.5"
+              value={bulkAnnounceTone}
+              onChange={(e) => setBulkAnnounceTone(e.target.value as any)}
             >
-              Cancel
-            </Button>
-            <Button
-              variant="primary"
-              size="sm"
-              loading={actionLoading}
-              onClick={handleConfirmReactivate}
-            >
-              <PlayCircle className="w-4 h-4" />
-              <span>Confirm Reactivation</span>
-            </Button>
+              <option value="info">Info (Blue)</option>
+              <option value="warning">Warning (Amber)</option>
+              <option value="success">Success (Green)</option>
+              <option value="urgent">Urgent (Red)</option>
+            </select>
+          </div>
+          <div className="flex justify-end gap-2 pt-3 border-t border-line">
+            <Button variant="secondary" size="sm" onClick={() => setBulkAnnounceModalOpen(false)}>Cancel</Button>
+            <Button variant="primary" size="sm" loading={bulkLoading} onClick={handleBulkSendAnnouncement}>Send Announcement</Button>
           </div>
         </div>
       </Modal>

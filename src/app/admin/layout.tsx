@@ -17,17 +17,35 @@ export default async function AdminLayout({
   } = await supabase.auth.getUser();
 
   if (!user) {
-    redirect('/login?redirect=/admin');
+    return (
+      <div className="flex h-screen w-screen flex-col items-center justify-center bg-canvas text-ink p-6">
+        <div className="max-w-md w-full p-8 rounded-2xl border border-danger/30 bg-surface text-center space-y-4 shadow-lg">
+          <div className="w-12 h-12 rounded-xl bg-danger/10 text-danger flex items-center justify-center mx-auto text-xl font-bold">
+            403
+          </div>
+          <h1 className="text-xl font-bold text-ink tracking-tight">403 - Forbidden</h1>
+          <p className="text-sm text-ink-3">
+            Authentication required. Platform super administrator privileges are required to access this system.
+          </p>
+          <a
+            href="/login?redirect=/admin"
+            className="inline-block px-4 py-2 rounded-xl bg-accent text-accent-ink text-xs font-semibold hover:opacity-90 transition-opacity"
+          >
+            Sign in to Zentry
+          </a>
+        </div>
+      </div>
+    );
   }
 
-  // Server-side database verification of platform super admin privilege
-  const { data: agent, error } = await supabase
-    .from('agents')
-    .select('*')
-    .eq('id', user.id)
-    .single();
+  // Server-side database verification of platform super admin privilege from platform_access table
+  const { data: access } = await supabase
+    .from('platform_access')
+    .select('role')
+    .eq('user_id', user.id)
+    .maybeSingle();
 
-  if (error || !agent?.is_super_admin) {
+  if (!access || !['owner', 'admin'].includes(access.role)) {
     return (
       <div className="flex h-screen w-screen flex-col items-center justify-center bg-canvas text-ink p-6">
         <div className="max-w-md w-full p-8 rounded-2xl border border-danger/30 bg-surface text-center space-y-4 shadow-lg">
@@ -49,9 +67,27 @@ export default async function AdminLayout({
     );
   }
 
+  const { data: agent } = await supabase
+    .from('agents')
+    .select('*')
+    .eq('id', user.id)
+    .maybeSingle();
+
+  const currentAgent: Agent = agent || ({
+    id: user.id,
+    name: user.user_metadata?.name || user.email?.split('@')[0] || 'Admin',
+    email: user.email || '',
+    role: 'owner',
+    status: 'online',
+    is_active: true,
+  } as Agent);
+
+  currentAgent.is_super_admin = true;
+  currentAgent.is_platform_owner = access.role === 'owner';
+
   return (
     <ToastProvider>
-      <SuperAdminShell currentAgent={agent as Agent}>
+      <SuperAdminShell currentAgent={currentAgent}>
         {children}
       </SuperAdminShell>
     </ToastProvider>

@@ -250,6 +250,17 @@ function getDataset(table: string): any[] {
       return fakeDb.automations;
     case 'tickets':
       return fakeDb.tickets;
+    case 'platform_access':
+      if (fakeDb.currentAgent && fakeDb.currentAgent.is_super_admin) {
+        return [{
+          id: `pa-${fakeDb.currentAgent.id}`,
+          user_id: fakeDb.currentAgent.id,
+          role: fakeDb.currentAgent.is_platform_owner ? 'owner' : 'admin',
+          granted_by: null,
+          granted_at: new Date().toISOString(),
+        }];
+      }
+      return [];
     default:
       return [];
   }
