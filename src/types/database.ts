@@ -532,7 +532,30 @@ export interface Workspace {
   timezone?: string | null;
   language?: string | null;
   csat_settings?: CsatSettingsConfig;
+  widget_disabled?: boolean | null;
+  force_powered_by?: 'inherited' | 'force_on' | 'force_off' | null;
+  help_center_enabled?: boolean | null;
+  require_2fa?: boolean | null;
+  data_retention_days?: number | null;
+  ai_monthly_reply_cap?: number | null;
+  ai_monthly_cost_cap_usd?: number | null;
+  channel_disabled_overrides?: Record<string, boolean> | null;
+  is_outbound_blocked?: boolean | null;
+  scheduled_deletion_at?: string | null;
+  deletion_requested_by?: string | null;
   created_at: string;
+}
+
+export interface WorkspaceSettingLock {
+  id: string;
+  workspace_id: string;
+  setting_key: string;
+  is_locked: boolean;
+  locked_by?: string | null;
+  locked_at: string;
+  reason?: string | null;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface CsatSettingsConfig {

@@ -19,6 +19,7 @@ import { addDomain, removeDomain, getDomainStatus } from '@/lib/vercel-domains';
 import { assertAdminUser } from '@/app/actions/admin';
 import { validateWorkspaceSlug } from '@/lib/slug';
 import { assertWorkspaceFeature } from '@/lib/plans/enforce';
+import { assertSettingNotLocked } from '@/lib/settings/precedence';
 
 interface ActionResult<T = any> {
   success: boolean;
@@ -50,6 +51,7 @@ export async function connectCustomDomainAction(
   }>
 > {
   try {
+    await assertSettingNotLocked(workspaceId, 'help_center');
     await assertAdminUser(workspaceId);
     await assertWorkspaceFeature(workspaceId, 'custom_help_center_domain');
     const supabase = await createClient();
@@ -475,6 +477,7 @@ export async function updateWorkspaceSlugAction(
   rawSlug: string
 ): Promise<ActionResult<{ workspace: Workspace; slug: string }>> {
   try {
+    await assertSettingNotLocked(workspaceId, 'help_center');
     const { user, agent } = await assertAdminUser(workspaceId);
     if (agent.role !== 'owner') {
       return { success: false, error: 'Only the workspace owner can customize the subdomain slug.' };

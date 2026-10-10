@@ -82,6 +82,13 @@ export interface PlatformSettings {
   is_maintenance_mode: boolean;
   maintenance_message: string;
   maintenance_bypass_emails: string[];
+  default_limits?: Record<string, number | null>;
+  default_features?: Record<string, boolean>;
+  default_ai_settings?: Record<string, any>;
+  default_allowed_channels?: string[];
+  default_require_2fa?: boolean;
+  default_data_retention_days?: number | null;
+  default_widget_settings?: Record<string, any>;
   updated_at: string;
 }
 
