@@ -547,12 +547,12 @@ export async function getPlatformSettingsAction(): Promise<PlatformSettings> {
   const { data } = await adminClient
     .from('platform_settings')
     .select('*')
-    .eq('id', '00000000-0000-4000-b000-000000000000')
+    .eq('id', 'default')
     .maybeSingle();
 
   if (!data) {
     return {
-      id: '00000000-0000-4000-b000-000000000000',
+      id: 'default',
       default_plan_slug: 'starter',
       default_trial_days: 14,
       signup_mode: 'open',
@@ -586,7 +586,7 @@ export async function savePlatformSettingsAction(
 
   const { error } = await adminClient
     .from('platform_settings')
-    .upsert({ id: '00000000-0000-4000-b000-000000000000', ...payload });
+    .upsert({ id: 'default', ...payload });
 
   if (error) return { success: false, error: error.message };
   return { success: true };

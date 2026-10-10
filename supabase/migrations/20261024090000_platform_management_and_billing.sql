@@ -132,30 +132,39 @@ CREATE TABLE IF NOT EXISTS public.platform_announcements (
 );
 
 -- ----------------------------------------------------------------------------
--- 7. Platform Settings (Single Row Config)
+-- 7. Platform Settings (Single Row Config & Extensions)
 -- ----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS public.platform_settings (
-  id UUID PRIMARY KEY DEFAULT '00000000-0000-4000-b000-000000000000'::uuid,
-  default_plan_slug TEXT NOT NULL DEFAULT 'starter',
-  default_trial_days INTEGER NOT NULL DEFAULT 14,
-  signup_mode TEXT NOT NULL DEFAULT 'open' CHECK (signup_mode IN ('open', 'invite_only')),
-  default_ai_model TEXT NOT NULL DEFAULT 'claude-3-5-sonnet',
-  default_ai_monthly_token_limit INTEGER NOT NULL DEFAULT 500000,
-  email_sender_name TEXT NOT NULL DEFAULT 'ZenTry Support',
-  email_sender_address TEXT NOT NULL DEFAULT 'support@zentry.io',
-  email_brand_color TEXT NOT NULL DEFAULT '#2E5BFF',
-  email_logo_url TEXT,
-  email_footer_text TEXT NOT NULL DEFAULT '© 2026 ZenTry Inc. All rights reserved.',
-  is_maintenance_mode BOOLEAN NOT NULL DEFAULT FALSE,
-  maintenance_message TEXT NOT NULL DEFAULT 'ZenTry is currently undergoing scheduled platform upgrades. We will be back online shortly.',
-  maintenance_bypass_emails JSONB NOT NULL DEFAULT '["musmanrai372@gmail.com", "raiusman37218@gmail.com", "agent@zentry.io"]'::jsonb,
+  id TEXT PRIMARY KEY DEFAULT 'default',
+  platform_name TEXT DEFAULT 'ZenTry',
+  platform_url TEXT DEFAULT 'https://zen-try.site',
+  support_email TEXT DEFAULT 'support@zen-try.site',
+  smtp_settings JSONB,
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- Ensure all platform governance, AI defaults, and email branding columns exist
+ALTER TABLE public.platform_settings
+  ADD COLUMN IF NOT EXISTS default_plan_slug TEXT NOT NULL DEFAULT 'starter',
+  ADD COLUMN IF NOT EXISTS default_trial_days INTEGER NOT NULL DEFAULT 14,
+  ADD COLUMN IF NOT EXISTS signup_mode TEXT NOT NULL DEFAULT 'open',
+  ADD COLUMN IF NOT EXISTS default_ai_model TEXT NOT NULL DEFAULT 'claude-3-5-sonnet',
+  ADD COLUMN IF NOT EXISTS default_ai_monthly_token_limit INTEGER NOT NULL DEFAULT 500000,
+  ADD COLUMN IF NOT EXISTS email_sender_name TEXT NOT NULL DEFAULT 'ZenTry Support',
+  ADD COLUMN IF NOT EXISTS email_sender_address TEXT NOT NULL DEFAULT 'support@zentry.io',
+  ADD COLUMN IF NOT EXISTS email_brand_color TEXT NOT NULL DEFAULT '#2E5BFF',
+  ADD COLUMN IF NOT EXISTS email_logo_url TEXT,
+  ADD COLUMN IF NOT EXISTS email_footer_text TEXT NOT NULL DEFAULT '© 2026 ZenTry Inc. All rights reserved.',
+  ADD COLUMN IF NOT EXISTS is_maintenance_mode BOOLEAN NOT NULL DEFAULT FALSE,
+  ADD COLUMN IF NOT EXISTS maintenance_message TEXT NOT NULL DEFAULT 'ZenTry is currently undergoing scheduled platform upgrades. We will be back online shortly.',
+  ADD COLUMN IF NOT EXISTS maintenance_bypass_emails JSONB NOT NULL DEFAULT '["musmanrai372@gmail.com", "raiusman37218@gmail.com", "agent@zentry.io"]'::jsonb;
+
 -- Ensure default settings record exists
 INSERT INTO public.platform_settings (id, default_plan_slug, default_trial_days)
-VALUES ('00000000-0000-4000-b000-000000000000'::uuid, 'starter', 14)
-ON CONFLICT (id) DO NOTHING;
+VALUES ('default', 'starter', 14)
+ON CONFLICT (id) DO UPDATE SET
+  default_plan_slug = COALESCE(public.platform_settings.default_plan_slug, EXCLUDED.default_plan_slug),
+  default_trial_days = COALESCE(public.platform_settings.default_trial_days, EXCLUDED.default_trial_days);
 
 -- ----------------------------------------------------------------------------
 -- 8. System Email Templates
