@@ -222,6 +222,18 @@ function createMockSupabaseClient() {
               sourceData = fakeState.messages;
             } else if (table === 'super_admin_audit_logs') {
               sourceData = fakeState.auditLogs;
+            } else if (table === 'platform_access') {
+              if (fakeState.agent && fakeState.agent.is_super_admin) {
+                sourceData = [{
+                  id: `pa-${fakeState.agent.id}`,
+                  user_id: fakeState.agent.id,
+                  role: fakeState.agent.is_platform_owner || fakeState.agent.role === 'owner' ? 'owner' : 'admin',
+                  granted_by: null,
+                  granted_at: new Date().toISOString(),
+                }];
+              } else {
+                sourceData = [];
+              }
             }
 
             // Apply basic filters

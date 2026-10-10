@@ -175,6 +175,18 @@ function createMockSupabaseClient() {
               sourceData = fakeState.notes;
             } else if (table === 'super_admin_audit_logs') {
               sourceData = fakeState.auditLogs;
+            } else if (table === 'platform_access') {
+              if (fakeState.agent && fakeState.agent.is_super_admin) {
+                sourceData = [{
+                  id: `pa-${fakeState.USER_ID}`,
+                  user_id: fakeState.USER_ID,
+                  role: fakeState.agent.is_platform_owner || fakeState.agent.role === 'owner' ? 'owner' : 'admin',
+                  granted_by: null,
+                  granted_at: new Date().toISOString(),
+                }];
+              } else {
+                sourceData = [];
+              }
             }
 
             if (table === 'agents') {

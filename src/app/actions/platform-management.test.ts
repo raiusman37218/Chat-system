@@ -160,6 +160,19 @@ function createMockSupabaseClient() {
             rows = fakeState.blockedDomains;
           } else if (table === 'super_admin_audit_logs') {
             rows = fakeState.auditLogs;
+          } else if (table === 'platform_access') {
+            const uid = filters.find((f) => f.args[0] === 'user_id')?.args[1];
+            if (uid === fakeState.currentUser?.id && fakeState.currentAgent?.is_super_admin) {
+              const accessRow = {
+                id: `pa-${uid}`,
+                user_id: uid,
+                role: fakeState.currentAgent.is_platform_owner ? 'owner' : 'admin',
+                granted_by: null,
+                granted_at: new Date().toISOString(),
+              };
+              return resolve({ data: isSingle ? accessRow : [accessRow], error: null });
+            }
+            return resolve({ data: isSingle ? null : [], error: null });
           }
 
           if (insertPayload) {

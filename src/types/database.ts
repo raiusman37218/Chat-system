@@ -83,6 +83,27 @@ export interface SuperAdminAuditLog {
   created_at: string;
 }
 
+export type PlatformAccessRole = 'owner' | 'admin';
+
+export interface PlatformAccess {
+  id: string;
+  user_id: string;
+  role: PlatformAccessRole;
+  granted_by: string | null;
+  granted_at: string;
+}
+
+export interface PlatformAccessMember {
+  id: string;
+  user_id: string;
+  email: string;
+  name: string;
+  role: PlatformAccessRole;
+  granted_by: string | null;
+  granted_by_email: string | null;
+  granted_at: string;
+}
+
 export type AgentInsert = Partial<Agent>;
 
 // ============================================================================

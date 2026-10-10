@@ -230,22 +230,43 @@ export async function middleware(request: NextRequest) {
   // Platform super admin protection for /admin routes
   if (request.nextUrl.pathname.startsWith('/admin')) {
     if (!user) {
-      const loginUrl = new URL('/login', request.url);
-      loginUrl.searchParams.set('redirect', request.nextUrl.pathname);
-      return NextResponse.redirect(loginUrl);
+      return new NextResponse(
+        JSON.stringify({
+          error: 'Forbidden',
+          message: 'Authentication required. Platform super admin privileges required.',
+        }),
+        {
+          status: 403,
+          headers: { 'content-type': 'application/json' },
+        }
+      );
     }
 
-    const { data: agent } = await supabase
-      .from('agents')
-      .select('is_super_admin')
-      .eq('id', user.id)
-      .single();
+    const { data: access } = await supabase
+      .from('platform_access')
+      .select('role')
+      .eq('user_id', user.id)
+      .maybeSingle();
 
-    if (!agent?.is_super_admin) {
+    if (!access || !['owner', 'admin'].includes(access.role)) {
       return new NextResponse(
         JSON.stringify({
           error: 'Forbidden',
           message: 'Platform super admin privileges required.',
+        }),
+        {
+          status: 403,
+          headers: { 'content-type': 'application/json' },
+        }
+      );
+    }
+
+    // Owner-only route: /admin/access
+    if (request.nextUrl.pathname.startsWith('/admin/access') && access.role !== 'owner') {
+      return new NextResponse(
+        JSON.stringify({
+          error: 'Forbidden',
+          message: 'Only the platform owner can access this section.',
         }),
         {
           status: 403,

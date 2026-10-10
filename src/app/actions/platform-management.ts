@@ -30,12 +30,7 @@ export async function assertStaffCapability(
 ): Promise<{ user: any; agent: any; role: PlatformStaffRole }> {
   const { user, agent } = await assertSuperAdmin();
 
-  const isOwner = Boolean(
-    agent.is_platform_owner ||
-    ['musmanrai372@gmail.com', 'raiusman37218@gmail.com', 'agent@zentry.io'].includes(
-      (agent.email || '').toLowerCase()
-    )
-  );
+  const isOwner = Boolean(agent.is_platform_owner);
 
   const role: PlatformStaffRole = isOwner ? 'owner' : (agent.platform_staff_role as PlatformStaffRole) || 'support';
 
@@ -565,7 +560,7 @@ export async function getPlatformSettingsAction(): Promise<PlatformSettings> {
       email_footer_text: '© 2026 ZenTry Inc. All rights reserved.',
       is_maintenance_mode: false,
       maintenance_message: 'ZenTry is currently undergoing maintenance.',
-      maintenance_bypass_emails: ['musmanrai372@gmail.com', 'raiusman37218@gmail.com'],
+      maintenance_bypass_emails: ['zentry385@gmail.com'],
       updated_at: new Date().toISOString(),
     };
   }
@@ -962,17 +957,15 @@ export async function getPlatformStaffListAction(): Promise<PlatformStaffMember[
 
   if (error) return [];
 
-  const ownerEmails = ['musmanrai372@gmail.com', 'raiusman37218@gmail.com', 'agent@zentry.io'];
-
   return (data || []).map((a: any) => ({
     id: a.id,
     name: a.name,
     email: a.email,
-    role: ownerEmails.includes((a.email || '').toLowerCase()) || a.is_platform_owner
+    role: a.is_platform_owner
       ? 'owner'
       : (a.platform_staff_role as PlatformStaffRole) || 'support',
     is_active: a.is_active !== false,
-    is_platform_owner: Boolean(a.is_platform_owner || ownerEmails.includes((a.email || '').toLowerCase())),
+    is_platform_owner: Boolean(a.is_platform_owner),
     created_at: a.created_at,
   }));
 }

@@ -22,6 +22,7 @@ import {
   ArrowRight,
   LogOut,
   Sliders,
+  KeyRound,
 } from 'lucide-react';
 import { Agent } from '@/types/database';
 import { Badge } from '@/components/ui/Badge';
@@ -40,12 +41,14 @@ interface NavItem {
   href: string;
   icon: React.ComponentType<{ className?: string }>;
   exact?: boolean;
+  ownerOnly?: boolean;
 }
 
 const NAV_ITEMS: NavItem[] = [
   { label: 'Overview', href: '/admin', icon: LayoutDashboard, exact: true },
   { label: 'Workspaces', href: '/admin/workspaces', icon: Building2 },
   { label: 'Users', href: '/admin/users', icon: Users },
+  { label: 'Admin Access', href: '/admin/access', icon: KeyRound, ownerOnly: true },
   { label: 'System Health', href: '/admin/health', icon: Activity },
   { label: 'Audit Log', href: '/admin/audit', icon: ShieldAlert },
 ];
@@ -150,7 +153,7 @@ export function SuperAdminShell({ currentAgent, children }: SuperAdminShellProps
 
           {/* Navigation Items */}
           <nav className="p-3 space-y-1">
-            {NAV_ITEMS.map((item) => {
+            {NAV_ITEMS.filter((item) => !item.ownerOnly || currentAgent.is_platform_owner).map((item) => {
               const active = isNavActive(item);
               const Icon = item.icon;
               return (
@@ -230,6 +233,7 @@ export function SuperAdminShell({ currentAgent, children }: SuperAdminShellProps
                 {pathname === '/admin/workspaces' && 'Workspaces Directory'}
                 {pathname.startsWith('/admin/workspaces/') && 'Workspace Detail'}
                 {pathname.startsWith('/admin/users') && 'All Platform Users'}
+                {pathname.startsWith('/admin/access') && 'Admin Access Control'}
                 {pathname.startsWith('/admin/health') && 'System Health & Diagnostics'}
                 {pathname.startsWith('/admin/audit') && 'Super Admin Audit Log'}
               </h1>
@@ -387,7 +391,7 @@ export function SuperAdminShell({ currentAgent, children }: SuperAdminShellProps
               </div>
 
               <nav className="space-y-1">
-                {NAV_ITEMS.map((item) => {
+                {NAV_ITEMS.filter((item) => !item.ownerOnly || currentAgent.is_platform_owner).map((item) => {
                   const active = isNavActive(item);
                   const Icon = item.icon;
                   return (
