@@ -4,6 +4,7 @@ import { PwaRegistrar } from "@/components/pwa/PwaRegistrar";
 import { ToastProvider } from "@/components/ui/Toast";
 import { SupportSessionBanner } from "@/components/support/SupportSessionBanner";
 import { AnnouncementsBanner } from "@/components/announcements/AnnouncementsBanner";
+import { ZenTryChatSupport } from "@/components/marketing/ZenTryChatSupport";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -98,6 +99,8 @@ export default function RootLayout({
           <AnnouncementsBanner />
           {children}
         </ToastProvider>
+        {/* Zen-try Live Chat Support */}
+        <ZenTryChatSupport />
       </body>
     </html>
   );

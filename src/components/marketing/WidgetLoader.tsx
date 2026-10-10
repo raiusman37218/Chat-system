@@ -64,8 +64,10 @@ export function WidgetLoader({ workspaceId, src = '/widget.js' }: { workspaceId:
       if (!window.__zentryLoaderInjected) {
         window.__zentryLoaderInjected = true;
         const script = document.createElement('script');
+        script.id = 'zentry-chat-widget-script';
         script.src = src;
         script.async = true;
+        script.defer = true;
         script.setAttribute('data-workspace-id', workspaceId);
         script.onerror = () => setPhase('gone');
         document.body.appendChild(script);

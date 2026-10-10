@@ -17,7 +17,6 @@ import {
 } from 'lucide-react';
 import { ProductShowcase } from '@/components/marketing/ProductShowcase';
 import { LandingNav } from '@/components/marketing/LandingNav';
-import { WidgetLoader } from '@/components/marketing/WidgetLoader';
 import { FaqSection } from '@/components/marketing/FaqSection';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { Logo } from '@/components/ui/Logo';
@@ -588,9 +587,6 @@ export default function HomePage() {
           </div>
         </div>
       </footer>
-
-      {/* The real widget, running on our own site */}
-      <WidgetLoader workspaceId="c0000000-0000-0000-0000-000000000001" />
     </div>
   );
 }
