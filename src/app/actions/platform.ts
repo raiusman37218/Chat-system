@@ -3,6 +3,7 @@
 import { cookies } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 import { serviceClient } from '@/lib/supabase/service';
+import crypto from 'node:crypto';
 import {
   Workspace,
   Agent,
@@ -13,9 +14,15 @@ import {
   PlatformUserItem,
   SystemHealthReport,
   SuperAdminWorkspaceNote,
+  PlatformSuperAdminInvitation,
 } from '@/types/database';
 import { generateUniqueWorkspaceSlug } from '@/lib/slug';
-import { testSmtpConnection, sendSmtpEmail, isValidEmail } from '@/lib/email/smtp';
+import {
+  testSmtpConnection,
+  sendSmtpEmail,
+  isValidEmail,
+  generateSuperAdminInviteEmailHtml,
+} from '@/lib/email/smtp';
 import { addDomain } from '@/lib/vercel-domains';
 import { cleanDomain } from '@/lib/domain';
 
@@ -24,6 +31,7 @@ export type {
   PlatformOverviewMetrics,
   SystemHealthReport,
   SuperAdminWorkspaceNote,
+  PlatformSuperAdminInvitation,
 };
 
 export interface CompanyPlanLimits {
@@ -363,6 +371,25 @@ export async function assertSuperAdmin(): Promise<{ user: any; agent: Agent }> {
   }
 
   return { user, agent: agent as Agent };
+}
+
+/**
+ * Server-side guard: Ensures caller is the authenticated ZenTry platform owner.
+ * Only the owner can invite or revoke platform super admin access.
+ */
+export async function assertPlatformOwner(): Promise<{ user: any; agent: Agent }> {
+  const { user, agent } = await assertSuperAdmin();
+  const ownerEmails = ['musmanrai372@gmail.com', 'raiusman37218@gmail.com', 'agent@zentry.io'];
+  const isOwner = Boolean(
+    agent.is_platform_owner ||
+    ownerEmails.includes((agent.email || '').toLowerCase())
+  );
+
+  if (!isOwner) {
+    throw new Error('403 Forbidden: Only the ZenTry platform owner can manage super admin access.');
+  }
+
+  return { user, agent };
 }
 
 /**
@@ -2772,5 +2799,309 @@ export async function getPlatformGlobalSearchAction(query: string): Promise<{
   }));
 
   return { workspaces, users };
+}
+
+/**
+ * 8. Retrieves all active Super Admins and pending Super Admin invitations
+ */
+export async function getPlatformSuperAdminsListAction(): Promise<{
+  admins: Agent[];
+  invitations: PlatformSuperAdminInvitation[];
+  isCurrentCallerOwner: boolean;
+}> {
+  const { agent } = await assertSuperAdmin();
+  const adminClient = serviceClient();
+
+  const ownerEmails = ['musmanrai372@gmail.com', 'raiusman37218@gmail.com', 'agent@zentry.io'];
+  const isCurrentCallerOwner = Boolean(
+    agent.is_platform_owner ||
+    ownerEmails.includes((agent.email || '').toLowerCase())
+  );
+
+  const [{ data: adminsData }, { data: invitesData }] = await Promise.all([
+    adminClient.from('agents').select('*').eq('is_super_admin', true).order('created_at', { ascending: true }),
+    adminClient.from('platform_super_admin_invitations').select('*').order('created_at', { ascending: false }),
+  ]);
+
+  return {
+    admins: (adminsData || []) as Agent[],
+    invitations: (invitesData || []) as PlatformSuperAdminInvitation[],
+    isCurrentCallerOwner,
+  };
+}
+
+/**
+ * 9. Invites a new Platform Super Admin with password defined by the owner
+ */
+export async function inviteSuperAdminAction(params: {
+  name: string;
+  email: string;
+  password: string;
+}): Promise<{ success: boolean; error?: string; invitationId?: string; token?: string }> {
+  const { agent: ownerAgent } = await assertPlatformOwner();
+  const email = (params.email || '').trim().toLowerCase();
+  const name = (params.name || '').trim();
+  const password = (params.password || '').trim();
+
+  if (!isValidEmail(email)) {
+    return { success: false, error: 'Please enter a valid email address.' };
+  }
+  if (!name) {
+    return { success: false, error: 'Please enter the administrator name.' };
+  }
+  if (!password || password.length < 8) {
+    return { success: false, error: 'Password must be at least 8 characters long.' };
+  }
+
+  const adminClient = serviceClient();
+
+  // 1. Check if user is already a super admin
+  const { data: existingAgent } = await adminClient
+    .from('agents')
+    .select('id, email, is_super_admin')
+    .eq('email', email)
+    .maybeSingle();
+
+  if (existingAgent?.is_super_admin) {
+    return { success: false, error: `${email} is already a platform super admin.` };
+  }
+
+  // 2. Create or update user in Supabase Auth with the password set by the owner
+  let targetUserId: string | null = null;
+  const { data: listData } = await adminClient.auth.admin.listUsers();
+  const existingAuthUser = (listData?.users || []).find(
+    (u) => u.email?.toLowerCase() === email
+  );
+
+  if (existingAuthUser) {
+    targetUserId = existingAuthUser.id;
+    const { error: updateAuthErr } = await adminClient.auth.admin.updateUserById(targetUserId, {
+      password,
+      user_metadata: { name },
+      email_confirm: true,
+    });
+    if (updateAuthErr) {
+      console.error('[SuperAdminInvite] Error updating auth user:', updateAuthErr);
+      return { success: false, error: updateAuthErr.message };
+    }
+  } else {
+    const { data: createdAuth, error: createAuthErr } = await adminClient.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true,
+      user_metadata: { name },
+    });
+    if (createAuthErr || !createdAuth?.user) {
+      console.error('[SuperAdminInvite] Error creating auth user:', createAuthErr);
+      return { success: false, error: createAuthErr?.message || 'Failed to create user account.' };
+    }
+    targetUserId = createdAuth.user.id;
+  }
+
+  // 3. Upsert agent record (initial super admin status stays false until invitation accepted)
+  await adminClient.from('agents').upsert(
+    {
+      id: targetUserId,
+      name,
+      email,
+      role: 'owner',
+      status: 'offline',
+      is_active: true,
+      is_super_admin: false,
+    },
+    { onConflict: 'id' }
+  );
+
+  // 4. Generate unique invitation token and save invitation
+  const token = crypto.randomBytes(32).toString('hex');
+  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(); // 7 days
+
+  const { data: invitationRow, error: inviteDbErr } = await adminClient
+    .from('platform_super_admin_invitations')
+    .insert({
+      email,
+      name,
+      invited_by: ownerAgent.id,
+      invited_by_email: ownerAgent.email,
+      token,
+      status: 'pending',
+      expires_at: expiresAt,
+    })
+    .select('id')
+    .single();
+
+  if (inviteDbErr) {
+    console.error('[SuperAdminInvite] Error saving invitation:', inviteDbErr);
+  }
+
+  // 5. Send invitation email via Platform SMTP
+  const { data: platformData } = await adminClient
+    .from('platform_settings')
+    .select('*')
+    .eq('id', 'default')
+    .maybeSingle();
+
+  const platformName = platformData?.platform_name || 'ZenTry';
+  const platformUrl = (platformData?.platform_url || 'https://zen-try.site').replace(/\/$/, '');
+  const acceptUrl = `${platformUrl}/accept-super-admin-invite?token=${token}`;
+  const smtpConfig = platformData?.smtp_settings as SMTPSettingsConfig | null;
+
+  if (smtpConfig && smtpConfig.user && smtpConfig.pass && smtpConfig.enabled) {
+    const emailHtml = generateSuperAdminInviteEmailHtml({
+      recipientName: name,
+      recipientEmail: email,
+      temporaryPassword: password,
+      acceptUrl,
+      ownerName: ownerAgent.name || ownerAgent.email,
+      platformName,
+      platformUrl,
+    });
+
+    await sendSmtpEmail(smtpConfig, {
+      to: email,
+      subject: `Platform Super Admin Invitation - ${platformName}`,
+      html: emailHtml,
+    });
+  }
+
+  // 6. Record super admin audit
+  await recordSuperAdminAudit({
+    admin: ownerAgent,
+    action: 'super_admin_invited',
+    details: {
+      invited_email: email,
+      invited_name: name,
+      invitation_id: invitationRow?.id,
+    },
+  });
+
+  return {
+    success: true,
+    invitationId: invitationRow?.id,
+    token,
+  };
+}
+
+/**
+ * 10. Accepts a Super Admin invitation using the secure token
+ */
+export async function acceptSuperAdminInviteAction(token: string): Promise<{
+  success: boolean;
+  error?: string;
+  email?: string;
+}> {
+  if (!token || token.trim().length < 16) {
+    return { success: false, error: 'Invalid or missing invitation token.' };
+  }
+
+  const adminClient = serviceClient();
+
+  // Find invitation
+  const { data: invitation, error: findErr } = await adminClient
+    .from('platform_super_admin_invitations')
+    .select('*')
+    .eq('token', token.trim())
+    .maybeSingle();
+
+  if (findErr || !invitation) {
+    return { success: false, error: 'Invitation not found or link has expired.' };
+  }
+
+  if (invitation.status === 'accepted') {
+    return { success: true, email: invitation.email };
+  }
+
+  if (invitation.status === 'revoked') {
+    return { success: false, error: 'This invitation was revoked by the platform owner.' };
+  }
+
+  if (new Date(invitation.expires_at) < new Date()) {
+    return { success: false, error: 'This invitation has expired. Please ask the platform owner for a new one.' };
+  }
+
+  // Update invitation status
+  await adminClient
+    .from('platform_super_admin_invitations')
+    .update({
+      status: 'accepted',
+      accepted_at: new Date().toISOString(),
+    })
+    .eq('id', invitation.id);
+
+  // Activate super admin privileges on agent
+  await adminClient
+    .from('agents')
+    .update({
+      is_super_admin: true,
+      is_active: true,
+    })
+    .eq('email', invitation.email);
+
+  return { success: true, email: invitation.email };
+}
+
+/**
+ * 11. Revokes a pending Super Admin invitation
+ */
+export async function revokeSuperAdminInviteAction(invitationId: string): Promise<{ success: boolean; error?: string }> {
+  const { agent: ownerAgent } = await assertPlatformOwner();
+  const adminClient = serviceClient();
+
+  const { error } = await adminClient
+    .from('platform_super_admin_invitations')
+    .update({ status: 'revoked' })
+    .eq('id', invitationId);
+
+  if (error) {
+    return { success: false, error: error.message };
+  }
+
+  await recordSuperAdminAudit({
+    admin: ownerAgent,
+    action: 'super_admin_invite_revoked',
+    details: { invitation_id: invitationId },
+  });
+
+  return { success: true };
+}
+
+/**
+ * 12. Revokes an active Super Admin's access
+ */
+export async function revokeSuperAdminAccessAction(adminAgentId: string): Promise<{ success: boolean; error?: string }> {
+  const { agent: ownerAgent } = await assertPlatformOwner();
+
+  if (adminAgentId === ownerAgent.id) {
+    return { success: false, error: 'You cannot revoke your own platform owner access.' };
+  }
+
+  const adminClient = serviceClient();
+
+  const { data: targetAgent } = await adminClient
+    .from('agents')
+    .select('id, email, is_platform_owner')
+    .eq('id', adminAgentId)
+    .maybeSingle();
+
+  if (targetAgent?.is_platform_owner) {
+    return { success: false, error: 'Cannot revoke another platform owner.' };
+  }
+
+  const { error } = await adminClient
+    .from('agents')
+    .update({ is_super_admin: false })
+    .eq('id', adminAgentId);
+
+  if (error) {
+    return { success: false, error: error.message };
+  }
+
+  await recordSuperAdminAudit({
+    admin: ownerAgent,
+    action: 'super_admin_access_revoked',
+    details: { revoked_agent_id: adminAgentId, revoked_email: targetAgent?.email },
+  });
+
+  return { success: true };
 }
 

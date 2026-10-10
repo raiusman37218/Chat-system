@@ -320,3 +320,99 @@ export function generateVerificationCodeEmailHtml(props: VerificationCodeEmailPr
 </body>
 </html>`;
 }
+
+export interface SuperAdminInviteEmailProps {
+  recipientName: string;
+  recipientEmail: string;
+  temporaryPassword: string;
+  acceptUrl: string;
+  ownerName?: string;
+  platformName?: string;
+  platformUrl?: string;
+}
+
+export function generateSuperAdminInviteEmailHtml(props: SuperAdminInviteEmailProps): string {
+  const brand = '#6366f1';
+  const name = props.recipientName || 'Administrator';
+  const platform = props.platformName || 'ZenTry';
+  const owner = props.ownerName || 'The Platform Owner';
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Platform Super Admin Invitation - ${platform}</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #1e293b;">
+  <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #f8fafc; padding: 40px 12px;">
+    <tr>
+      <td align="center">
+        <table width="100%" border="0" cellspacing="0" cellpadding="0" style="max-width: 540px; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,0.06); border: 1px solid #e2e8f0;">
+          <tr>
+            <td style="padding: 28px 32px 20px; border-bottom: 1px solid #f1f5f9; background: #ffffff;">
+              <table width="100%" border="0" cellspacing="0" cellpadding="0">
+                <tr>
+                  <td align="left">
+                    <span style="display: inline-block; padding: 6px 12px; background-color: #eef2ff; color: ${brand}; border-radius: 8px; font-weight: 700; font-size: 13px; letter-spacing: 0.5px;">
+                      ${platform} &bull; PLATFORM OWNER INVITATION
+                    </span>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 32px 32px 24px;">
+              <h1 style="margin: 0 0 16px; font-size: 22px; font-weight: 700; color: #0f172a; line-height: 1.3;">
+                You've been granted Platform Super Admin access
+              </h1>
+              <p style="margin: 0 0 20px; font-size: 15px; line-height: 1.6; color: #475569;">
+                Hello <strong>${name}</strong>,<br/>
+                ${owner} of <strong>${platform}</strong> has granted you full Platform Super Admin privileges to manage all platform workspaces, users, and system infrastructure.
+              </p>
+              
+              <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; margin-bottom: 24px;">
+                <p style="margin: 0 0 10px; font-size: 12px; font-weight: 700; text-transform: uppercase; color: #64748b; letter-spacing: 0.5px;">
+                  Your Login Credentials
+                </p>
+                <p style="margin: 0 0 8px; font-size: 14px; color: #1e293b;">
+                  <strong>Email:</strong> <span style="font-family: monospace; color: #4338ca;">${props.recipientEmail}</span>
+                </p>
+                <p style="margin: 0; font-size: 14px; color: #1e293b;">
+                  <strong>Temporary Password:</strong> <span style="font-family: monospace; background: #e0e7ff; padding: 3px 8px; border-radius: 4px; color: #3730a3; font-weight: 600;">${props.temporaryPassword}</span>
+                </p>
+                <p style="margin: 12px 0 0; font-size: 12px; color: #94a3b8;">
+                  * This password was created for you by the platform owner. Please keep it safe.
+                </p>
+              </div>
+
+              <div style="text-align: center; margin: 28px 0 24px;">
+                <a href="${props.acceptUrl}" style="display: inline-block; background-color: ${brand}; color: #ffffff; padding: 14px 32px; border-radius: 10px; font-weight: 600; font-size: 15px; text-decoration: none; box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);">
+                  Accept Invitation & Activate Super Admin Access
+                </a>
+              </div>
+
+              <p style="margin: 0; font-size: 13px; line-height: 1.5; color: #94a3b8; text-align: center;">
+                Or copy and paste this URL into your browser:<br/>
+                <a href="${props.acceptUrl}" style="color: ${brand}; word-break: break-all; font-size: 12px;">${props.acceptUrl}</a>
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 20px 32px 24px; background-color: #fafaf9; border-top: 1px solid #f1f5f9; text-align: center;">
+              <p style="margin: 0 0 4px; font-size: 12px; color: #94a3b8;">
+                This invitation link is valid for 7 days.
+              </p>
+              <p style="margin: 0; font-size: 12px; color: #cbd5e1;">
+                ${platform} Platform Administration &bull; Confidential
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+}

@@ -62,6 +62,7 @@ export interface Agent {
   created_at: string;
   workspace_id?: string | null;
   is_super_admin?: boolean;
+  is_platform_owner?: boolean;
   /** False once an admin has deactivated them: no access, history kept. */
   is_active?: boolean;
   deactivated_at?: string | null;
@@ -868,3 +869,15 @@ export interface SystemHealthReport {
   checked_at: string;
 }
 
+export interface PlatformSuperAdminInvitation {
+  id: string;
+  email: string;
+  name: string;
+  invited_by: string;
+  invited_by_email: string;
+  token: string;
+  status: 'pending' | 'accepted' | 'revoked' | 'expired';
+  created_at: string;
+  accepted_at: string | null;
+  expires_at: string;
+}
