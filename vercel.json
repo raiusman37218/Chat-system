@@ -7,18 +7,6 @@
     {
       "path": "/api/cron/channel-outbound",
       "schedule": "23 4 * * *"
-    },
-    {
-      "path": "/api/cron/run-automations",
-      "schedule": "7 * * * *"
-    },
-    {
-      "path": "/api/cron/sla",
-      "schedule": "*/5 * * * *"
-    },
-    {
-      "path": "/api/cron/channel-poll",
-      "schedule": "*/5 * * * *"
     }
   ]
 }
