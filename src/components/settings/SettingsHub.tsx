@@ -300,9 +300,20 @@ function SettingsNav({
       <nav aria-label="Settings" className="flex-1 overflow-y-auto p-3 space-y-5">
         {searching ? (
           results.length === 0 ? (
-            <p className="text-ui text-ink-2 px-2" role="status">
-              No settings match “{query}”.
-            </p>
+            <div className="px-2 py-1 space-y-2 text-ui text-ink-2" role="status">
+              <p>No settings match “{query}”.</p>
+              <p className="text-xs text-ink-3 leading-relaxed">
+                Looking for team accounts or email? Check{' '}
+                <button
+                  type="button"
+                  onClick={() => onGo('team:members')}
+                  className="text-accent underline font-medium hover:text-accent/80"
+                >
+                  Team Members
+                </button>{' '}
+                or your agent profile at the bottom left.
+              </p>
+            </div>
           ) : (
             <ul className="space-y-1" aria-label="Search results">
               {results.map(({ section, tab }) => {

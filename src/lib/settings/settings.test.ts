@@ -99,6 +99,13 @@ describe('searching settings', () => {
     expect(searchSettings('invoice', 'admin')).toEqual([]);
     expect(searchSettings('invoice', 'owner').length).toBeGreaterThan(0);
   });
+
+  it('matches email-related pages when searching an email address', () => {
+    const matches = searchSettings('nexthorne@gmail.com', 'owner');
+    const matchedTabs = matches.map((m) => `${m.section.id}:${m.tab.id}`);
+    expect(matchedTabs).toContain('team:members');
+    expect(matchedTabs).toContain('channels:email');
+  });
 });
 
 describe('workspace general validation', () => {

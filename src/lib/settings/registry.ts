@@ -41,9 +41,9 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
     group: 'General',
     icon: 'building',
     description: 'Name, logo, timezone, language and business hours.',
-    keywords: ['company', 'organisation', 'organization', 'name', 'logo', 'timezone', 'language', 'hours', 'schedule'],
+    keywords: ['company', 'organisation', 'organization', 'name', 'logo', 'timezone', 'language', 'hours', 'schedule', 'profile'],
     tabs: [
-      { id: 'general', label: 'General', description: 'How your workspace is named and what defaults it uses.', capability: 'manage_settings', keywords: ['name', 'logo', 'timezone', 'language', 'locale'] },
+      { id: 'general', label: 'General', description: 'How your workspace is named and what defaults it uses.', capability: 'manage_settings', keywords: ['name', 'logo', 'timezone', 'language', 'locale', 'profile', 'company'] },
       { id: 'hours', label: 'Business hours', description: 'When your team is available. Outside these hours the widget shows you as away.', capability: 'manage_settings', keywords: ['hours', 'schedule', 'availability', 'offline', 'open'] },
     ],
   },
@@ -53,9 +53,9 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
     group: 'General',
     icon: 'users',
     description: 'Members, roles and groups.',
-    keywords: ['agents', 'invite', 'permissions', 'teammates', 'capacity', 'round robin'],
+    keywords: ['agents', 'invite', 'permissions', 'teammates', 'capacity', 'round robin', 'user', 'profile', 'account', 'email', 'owner'],
     tabs: [
-      { id: 'members', label: 'Members', description: 'Invite people, set what they can do and deactivate access.', capability: 'manage_team', keywords: ['invite', 'member', 'agent', 'deactivate', 'capacity'] },
+      { id: 'members', label: 'Members', description: 'Invite people, set what they can do and deactivate access.', capability: 'manage_team', keywords: ['invite', 'member', 'agent', 'deactivate', 'capacity', 'email', 'user', 'profile', 'account', 'owner'] },
       { id: 'roles', label: 'Roles', description: 'What each role can do in this workspace.', capability: 'manage_team', keywords: ['role', 'permission', 'admin', 'light agent', 'owner'] },
       { id: 'groups', label: 'Groups', description: 'Billing, Technical and other groups, and who is in them.', capability: 'manage_groups', keywords: ['group', 'queue', 'routing', 'round robin', 'billing', 'technical'] },
     ],
@@ -160,10 +160,10 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
     group: 'Account',
     icon: 'shield',
     description: 'Sign-in protection and workspace activity history.',
-    keywords: ['password', '2fa', 'mfa', 'authenticator', 'sessions', 'sign out'],
+    keywords: ['password', '2fa', 'mfa', 'authenticator', 'sessions', 'sign out', 'account', 'profile', 'login'],
     tabs: [
-      { id: 'sessions', label: 'Sessions', description: 'Where you are signed in, and a way to sign out everywhere else.', capability: null, keywords: ['session', 'sign out', 'devices', 'logout'] },
-      { id: 'twofactor', label: 'Two-factor authentication', description: 'Protect your sign-in with an authenticator app.', capability: null, keywords: ['2fa', 'mfa', 'totp', 'authenticator', 'two factor'] },
+      { id: 'sessions', label: 'Sessions', description: 'Where you are signed in, and a way to sign out everywhere else.', capability: null, keywords: ['session', 'sign out', 'devices', 'logout', 'account', 'profile', 'login'] },
+      { id: 'twofactor', label: 'Two-factor authentication', description: 'Protect your sign-in with an authenticator app.', capability: null, keywords: ['2fa', 'mfa', 'totp', 'authenticator', 'two factor', 'security'] },
       { id: 'audit', label: 'Audit log', description: 'Who changed workspace settings and roles, and when.', capability: 'manage_settings', keywords: ['audit', 'log', 'history', 'changes', 'activity'] },
     ],
   },
@@ -266,7 +266,8 @@ function words(text: string): string[] {
  * ever returned.
  */
 export function searchSettings(query: string, role: Role | null | undefined): SettingsMatch[] {
-  const terms = words(query);
+  const isEmail = query.includes('@');
+  const terms = isEmail ? ['email'] : words(query);
   if (terms.length === 0) return [];
   const out: SettingsMatch[] = [];
   for (const section of visibleSections(role)) {
