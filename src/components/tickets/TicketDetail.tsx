@@ -4,7 +4,9 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ArrowLeft,
   Bot,
+  Clock,
   CornerDownRight,
+  ExternalLink,
   History,
   Lock,
   Mail,
@@ -23,6 +25,7 @@ import { ErrorState, LoadingState } from '@/components/ui/States';
 import { createClient } from '@/lib/supabase/client';
 import { Avatar } from '@/components/ui/Avatar';
 import { ChatMarkdown } from '@/components/ui/ChatMarkdown';
+import { isVisitorOnline, formatTimeOnPage, calculateTimeOnPage, formatPageDisplay } from '@/lib/tracking/visitor-tracking';
 import { Menu } from '@/components/ui/Menu';
 import {
   getTicketAction,
@@ -829,11 +832,29 @@ function Properties({
 
 function Requester({ detail, onOpenTicket }: { detail: Detail; onOpenTicket: (id: string) => void }) {
   const r = detail.requester;
+  const history = detail.requesterPageHistory || [];
   const location = r?.location || [r?.ip_location_city, r?.ip_location_country].filter(Boolean).join(', ');
+  const online = isVisitorOnline(r);
+  const currentPage = r?.current_page_url ? formatPageDisplay(r.current_page_url, r.current_page_title) : null;
+  const timeOnPage = r ? (r.time_on_page_seconds ?? calculateTimeOnPage(r.current_page_entered_at)) : 0;
+
   return (
     <>
       <section className="p-4 border-b border-line">
-        <h3 className="text-2xs font-bold uppercase tracking-wide text-ink-3 mb-2">Requester</h3>
+        <div className="flex items-center justify-between mb-2">
+          <h3 className="text-2xs font-bold uppercase tracking-wide text-ink-3">Requester</h3>
+          {r && (
+            <span
+              className={cn(
+                'inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-2xs font-medium',
+                online ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' : 'bg-surface-2 text-ink-3'
+              )}
+            >
+              <span className={cn('w-1.5 h-1.5 rounded-full', online ? 'bg-emerald-500 animate-pulse' : 'bg-ink-4')} />
+              {online ? 'Online now' : 'Offline'}
+            </span>
+          )}
+        </div>
         {r ? (
           <div className="space-y-2">
             <div className="flex items-center gap-2.5">
@@ -867,6 +888,104 @@ function Requester({ detail, onOpenTicket }: { detail: Detail; onOpenTicket: (id
           <p className="text-xs text-ink-3">No requester on this ticket.</p>
         )}
       </section>
+
+      {/* Live / Current Page */}
+      {r && (
+        <section className="p-4 border-b border-line">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-2xs font-bold uppercase tracking-wide text-ink-3">Current Page</h3>
+            {online && <span className="text-2xs text-emerald-600 dark:text-emerald-400 font-medium">Active</span>}
+          </div>
+          {currentPage ? (
+            <div className="space-y-2">
+              <div className="bg-surface-2/60 border border-line rounded-lg p-2.5 text-xs">
+                <div className="font-medium text-ink truncate flex items-center gap-1.5 mb-1" title={currentPage.title}>
+                  <Globe className="w-3.5 h-3.5 text-accent shrink-0" />
+                  <span className="truncate">{currentPage.title}</span>
+                </div>
+                <div className="flex items-center justify-between gap-2 text-ink-3 text-2xs">
+                  <a
+                    href={currentPage.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="truncate hover:text-accent flex items-center gap-1 group"
+                    title={currentPage.url}
+                  >
+                    <span className="truncate">{currentPage.path}</span>
+                    <ExternalLink className="w-3 h-3 opacity-60 group-hover:opacity-100 shrink-0" />
+                  </a>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 text-2xs">
+                <div className="bg-surface-2/40 border border-line/60 rounded px-2 py-1.5">
+                  <span className="text-ink-3 block">Time on page</span>
+                  <span className="font-semibold text-ink flex items-center gap-1 mt-0.5">
+                    <Clock className="w-3 h-3 text-ink-3" />
+                    {formatTimeOnPage(timeOnPage)}
+                  </span>
+                </div>
+                <div className="bg-surface-2/40 border border-line/60 rounded px-2 py-1.5">
+                  <span className="text-ink-3 block">Referrer</span>
+                  <span className="text-ink truncate block mt-0.5" title={r.referrer_source || 'Direct'}>
+                    {r.referrer_source || 'Direct'}
+                  </span>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <p className="text-xs text-ink-3">No page recorded yet.</p>
+          )}
+        </section>
+      )}
+
+      {/* Recent Page History */}
+      {r && (
+        <section className="p-4 border-b border-line">
+          <h3 className="text-2xs font-bold uppercase tracking-wide text-ink-3 mb-2 flex items-center gap-1.5">
+            <History className="w-3.5 h-3.5 text-ink-3" />
+            <span>Recent Page History ({history.length})</span>
+          </h3>
+          {history.length === 0 ? (
+            <p className="text-xs text-ink-3">No previous pages recorded this session.</p>
+          ) : (
+            <ul className="space-y-1.5 max-h-56 overflow-y-auto pr-1">
+              {history.map((h) => {
+                const page = formatPageDisplay(h.url, h.title);
+                return (
+                  <li key={h.id} className="text-xs bg-surface-2/40 border border-line/50 rounded-lg p-2 hover:bg-surface-2 transition-colors">
+                    <div className="flex items-center justify-between gap-2">
+                      <a
+                        href={page.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-medium text-ink hover:text-accent truncate flex items-center gap-1"
+                        title={page.title}
+                      >
+                        <span className="truncate">{page.title}</span>
+                        <ExternalLink className="w-2.5 h-2.5 opacity-50 shrink-0" />
+                      </a>
+                      <span className="text-2xs text-ink-3 shrink-0 tabular-nums">
+                        {timeAgo(h.visited_at)}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between text-2xs text-ink-3 mt-1 pt-1 border-t border-line/40">
+                      <span className="truncate font-mono">{page.path}</span>
+                      {h.duration_seconds !== undefined && h.duration_seconds !== null && h.duration_seconds > 0 ? (
+                        <span className="shrink-0 flex items-center gap-0.5 font-medium text-ink-2">
+                          <Clock className="w-2.5 h-2.5 text-ink-3" />
+                          {formatTimeOnPage(h.duration_seconds)}
+                        </span>
+                      ) : null}
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </section>
+      )}
+
       <section className="p-4">
         <h3 className="text-2xs font-bold uppercase tracking-wide text-ink-3 mb-2">
           Previous tickets ({detail.previousTickets.length})

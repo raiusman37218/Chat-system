@@ -163,6 +163,16 @@ class ZentryWidget {
     last_message?: { content?: string; sender_type?: string; attachment_url?: string | null; created_at?: string } | null;
   }> = [];
 
+  // Live Visitor Telemetry & SPA Tracking
+  private pageEnteredAt: number = Date.now();
+  private lastReportedUrl: string = typeof window !== 'undefined' ? window.location.href : '';
+  private referrerSource: string = typeof document !== 'undefined' ? (document.referrer || '') : '';
+  private routeChangeDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+  private getTimeOnPage(): number {
+    return Math.max(0, Math.round((Date.now() - this.pageEnteredAt) / 1000));
+  }
+
   private isImageAttachment(url: string | null | undefined): boolean {
     if (!url) return false;
     if (url.includes('cloudinary.com') && (url.includes('/image/upload/') || !url.includes('/raw/upload/'))) {
@@ -995,6 +1005,9 @@ class ZentryWidget {
 
   // 4. Visitor Tracking
   private async initVisitorTracking() {
+    this.pageEnteredAt = Date.now();
+    this.lastReportedUrl = window.location.href;
+    this.referrerSource = document.referrer || '';
     let locationStr = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Unknown';
 
     // 1. Immediately upsert visitor (0ms block) so conversations/messages can send right away
@@ -1009,6 +1022,18 @@ class ZentryWidget {
         p_location: locationStr,
         p_workspace_id: this.config.workspaceId || null,
       });
+
+      // Record first page visit into visitor_page_history
+      try {
+        await this.supabase.rpc('fn_record_visitor_page', {
+          p_visitor_id: this.visitorId,
+          p_url: window.location.href,
+          p_title: document.title || null,
+          p_referrer: this.referrerSource || null,
+          p_duration_seconds: 0,
+          p_workspace_id: this.config.workspaceId || null,
+        });
+      } catch {}
 
       try {
         await this.supabase.rpc('fn_update_visitor_meta', {
@@ -1050,12 +1075,28 @@ class ZentryWidget {
       } catch {}
     })();
 
+    // 3. Throttle periodic heartbeats to 20 seconds to minimize overhead
     setInterval(() => {
       this.sendHeartbeat();
-    }, 15000);
+    }, 20000);
 
     const notifyOffline = () => {
       try {
+        const payload = JSON.stringify({
+          event: 'offline',
+          visitor_id: this.visitorId,
+        });
+        if (navigator.sendBeacon) {
+          navigator.sendBeacon(`${this.config.apiUrl || ''}/api/tracking`, payload);
+        } else {
+          fetch(`${this.config.apiUrl || ''}/api/tracking`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: payload,
+            keepalive: true,
+          }).catch(() => {});
+        }
+
         fetch(`${this.config.supabaseUrl}/rest/v1/rpc/fn_visitor_offline`, {
           method: 'POST',
           headers: {
@@ -1075,34 +1116,99 @@ class ZentryWidget {
 
   private async sendHeartbeat() {
     try {
+      const timeOnPage = this.getTimeOnPage();
       await this.supabase.rpc('fn_visitor_heartbeat', {
         p_visitor_id: this.visitorId,
         p_current_url: window.location.href,
+        p_page_title: document.title || null,
+        p_referrer: this.referrerSource || null,
+        p_time_on_page: timeOnPage,
       });
+
+      fetch(`${this.config.apiUrl || ''}/api/tracking`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          event: 'heartbeat',
+          visitor_id: this.visitorId,
+          current_page_url: window.location.href,
+          current_page_title: document.title || null,
+          referrer_source: this.referrerSource || null,
+          time_on_page: timeOnPage,
+        }),
+      }).catch(() => {});
     } catch {}
   }
 
-  // 5. SPA Navigation Tracking
+  // 5. SPA Navigation Tracking: monitors client-side route changes with 500ms debounce
   private initSPANavigationTracking() {
-    const notifyURLChange = () => {
-      setTimeout(() => this.sendHeartbeat(), 200);
+    const handleRouteChange = () => {
+      const currentUrl = window.location.href;
+      if (currentUrl === this.lastReportedUrl) return;
+
+      if (this.routeChangeDebounceTimer) {
+        clearTimeout(this.routeChangeDebounceTimer);
+      }
+
+      // Throttle updates: wait 500ms for SPA framework to update document.title
+      this.routeChangeDebounceTimer = setTimeout(async () => {
+        const newUrl = window.location.href;
+        if (newUrl === this.lastReportedUrl) return;
+
+        const previousDuration = this.getTimeOnPage();
+        const previousUrl = this.lastReportedUrl;
+
+        // Reset page timer for the newly navigated page
+        this.pageEnteredAt = Date.now();
+        this.referrerSource = previousUrl || this.referrerSource;
+        this.lastReportedUrl = newUrl;
+        const title = document.title || null;
+
+        try {
+          await this.supabase.rpc('fn_record_visitor_page', {
+            p_visitor_id: this.visitorId,
+            p_url: newUrl,
+            p_title: title,
+            p_referrer: this.referrerSource || null,
+            p_duration_seconds: previousDuration,
+            p_workspace_id: this.config.workspaceId || null,
+          });
+        } catch {}
+
+        try {
+          fetch(`${this.config.apiUrl || ''}/api/tracking`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              event: 'pageview',
+              visitor_id: this.visitorId,
+              url: newUrl,
+              title: title,
+              referrer: this.referrerSource || null,
+              duration_seconds: previousDuration,
+              workspace_id: this.config.workspaceId || null,
+            }),
+          }).catch(() => {});
+        } catch {}
+      }, 500);
     };
 
     const originalPushState = history.pushState;
     history.pushState = function (...args) {
       const result = originalPushState.apply(this, args);
-      notifyURLChange();
+      handleRouteChange();
       return result;
     };
 
     const originalReplaceState = history.replaceState;
     history.replaceState = function (...args) {
       const result = originalReplaceState.apply(this, args);
-      notifyURLChange();
+      handleRouteChange();
       return result;
     };
 
-    window.addEventListener('popstate', notifyURLChange);
+    window.addEventListener('popstate', handleRouteChange);
+    window.addEventListener('hashchange', handleRouteChange);
   }
 
   // 6. Sound chime

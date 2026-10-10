@@ -23,6 +23,7 @@ import { sound } from '@/lib/sound';
 import { sendBrowserNotification, cn } from '@/lib/utils';
 import { updateFaviconBadge } from '@/lib/favicon';
 import { SetupChecklist } from '@/components/dashboard/SetupChecklist';
+import { isVisitorOnline } from '@/lib/tracking/visitor-tracking';
 import type { SectionId } from '@/components/dashboard/SettingsHub';
 import { BarChart2, BookOpen, Inbox, Radio, Settings, Smartphone, ShieldAlert, LogOut, Sparkles, Ticket } from 'lucide-react';
 import { exitSuperAdminWorkspaceViewAction } from '@/app/actions/platform';
@@ -1518,9 +1519,7 @@ export default function DashboardPage() {
 
   const counts = {
     open: conversations.filter((c) => c.status === 'open').length,
-    liveVisitors: visitors.filter(
-      (v) => (Date.now() - new Date(v.last_seen).getTime()) / 1000 < 90
-    ).length,
+    liveVisitors: visitors.filter((v) => isVisitorOnline(v)).length,
     articles: articlesCount,
   };
 
@@ -1798,6 +1797,7 @@ export default function DashboardPage() {
             visitors={visitors}
             workspace={currentWorkspace}
             onOpenConversationForVisitor={handleOpenConversationForVisitor}
+            onOpenTicket={(ticketId) => handleOpenTickets({ ticketId })}
             onRefresh={() => refreshVisitors()}
           />
         </div>

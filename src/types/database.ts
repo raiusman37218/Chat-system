@@ -23,6 +23,10 @@ export interface Visitor {
   browser: string | null;
   os: string | null;
   referrer_source: string | null;
+  /** When the visitor landed on the current page. */
+  current_page_entered_at?: string | null;
+  /** Time spent on current page in seconds, updated during heartbeats. */
+  time_on_page_seconds?: number;
   /** IANA zone, populated once the visitor timezone/language migration runs. */
   timezone?: string | null;
   /** BCP-47 tag from the visitor's browser, e.g. "en-IN". */
@@ -229,8 +233,11 @@ export type CannedResponseInsert = Partial<CannedResponse>;
 export interface VisitorPageHistory {
   id: string;
   visitor_id: string;
+  workspace_id?: string | null;
   url: string;
   title: string | null;
+  referrer?: string | null;
+  duration_seconds?: number;
   visited_at: string;
 }
 
