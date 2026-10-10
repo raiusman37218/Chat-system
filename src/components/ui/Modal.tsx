@@ -70,6 +70,7 @@ const WIDTH = { sm: 'max-w-sm', md: 'max-w-md', lg: 'max-w-2xl', xl: 'max-w-4xl'
  * closes on Esc and backdrop click, and becomes a bottom sheet on phones.
  */
 export function Modal({
+  open = true,
   title,
   description,
   onClose,
@@ -79,6 +80,7 @@ export function Modal({
   size,
   className,
 }: {
+  open?: boolean;
   title: string;
   description?: string;
   onClose: () => void;
@@ -93,9 +95,9 @@ export function Modal({
   const titleId = useId();
   const descId = useId();
   const mounted = useIsClient();
-  useFocusTrap(ref, mounted, onClose);
+  useFocusTrap(ref, mounted && open, onClose);
 
-  if (!mounted) return null;
+  if (!mounted || !open) return null;
   return createPortal(
     <div
       className="fixed inset-0 flex items-end sm:items-center justify-center sm:p-4 bg-overlay animate-fade"

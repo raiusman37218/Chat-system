@@ -3,11 +3,28 @@
 import { cookies } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 import { serviceClient } from '@/lib/supabase/service';
-import { Workspace, Agent, SuperAdminAuditLog, SMTPSettingsConfig, PlatformSettings } from '@/types/database';
+import {
+  Workspace,
+  Agent,
+  SuperAdminAuditLog,
+  SMTPSettingsConfig,
+  PlatformSettings,
+  PlatformOverviewMetrics,
+  PlatformUserItem,
+  SystemHealthReport,
+  SuperAdminWorkspaceNote,
+} from '@/types/database';
 import { generateUniqueWorkspaceSlug } from '@/lib/slug';
 import { testSmtpConnection, sendSmtpEmail, isValidEmail } from '@/lib/email/smtp';
 import { addDomain } from '@/lib/vercel-domains';
 import { cleanDomain } from '@/lib/domain';
+
+export type {
+  PlatformUserItem,
+  PlatformOverviewMetrics,
+  SystemHealthReport,
+  SuperAdminWorkspaceNote,
+};
 
 export interface CompanyPlanLimits {
   max_seats: number;
@@ -1888,5 +1905,872 @@ export async function resyncCustomDomainsAction(): Promise<{
     synced,
     results,
   };
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   POLISHED SUPER ADMIN SUITE ACTIONS (PHASE 2)
+   Strictly guarded with assertSuperAdmin() and audit logged.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/**
+ * 1. Overview Key Numbers & Trends
+ */
+export async function getPlatformOverviewMetricsAction(): Promise<PlatformOverviewMetrics> {
+  const { agent } = await assertSuperAdmin();
+  const supabase = await createClient();
+
+  // Try RPC first
+  try {
+    const { data: rpcData, error: rpcError } = await supabase.rpc('fn_get_platform_overview_metrics');
+    if (!rpcError && rpcData && typeof rpcData === 'object' && 'total_workspaces' in rpcData) {
+      return rpcData as PlatformOverviewMetrics;
+    }
+  } catch {
+    // Fallback below
+  }
+
+  // Graceful fallback querying service role directly
+  const adminClient = serviceClient();
+  const startOfDay = new Date();
+  startOfDay.setHours(0, 0, 0, 0);
+  const startOfMonth = new Date();
+  startOfMonth.setDate(1);
+  startOfMonth.setHours(0, 0, 0, 0);
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+
+  const [
+    { count: totalWorkspaces },
+    { count: activeWorkspaces },
+    { count: suspendedWorkspaces },
+    { count: totalAgents },
+    { count: activeAgents },
+    { count: ticketsToday },
+    { count: ticketsMonth },
+    { count: totalMessages },
+    { data: newestWorkspacesData },
+    { data: recentTickets },
+    { data: suspendedList },
+    { data: failedQueue },
+  ] = await Promise.all([
+    adminClient.from('workspaces').select('id', { count: 'exact', head: true }).is('deleted_at', null),
+    adminClient.from('workspaces').select('id', { count: 'exact', head: true }).is('deleted_at', null).or('is_suspended.is.null,is_suspended.eq.false'),
+    adminClient.from('workspaces').select('id', { count: 'exact', head: true }).is('deleted_at', null).eq('is_suspended', true),
+    adminClient.from('agents').select('id', { count: 'exact', head: true }),
+    adminClient.from('agents').select('id', { count: 'exact', head: true }).or('is_active.is.null,is_active.eq.true').in('status', ['online', 'away']),
+    adminClient.from('tickets').select('id', { count: 'exact', head: true }).gte('created_at', startOfDay.toISOString()),
+    adminClient.from('tickets').select('id', { count: 'exact', head: true }).gte('created_at', startOfMonth.toISOString()),
+    adminClient.from('messages').select('id', { count: 'exact', head: true }),
+    adminClient.from('workspaces').select('id, name, brand_color, created_at, is_suspended, plan, owner_id').is('deleted_at', null).order('created_at', { ascending: false }).limit(5),
+    adminClient.from('tickets').select('created_at, status').gte('created_at', thirtyDaysAgo.toISOString()),
+    adminClient.from('workspaces').select('id, name, suspended_at').is('deleted_at', null).eq('is_suspended', true).limit(5),
+    adminClient.from('channel_outbound_queue').select('id, workspace_id, channel, created_at').or('status.eq.failed,attempts.gte.3').order('created_at', { ascending: false }).limit(5),
+  ]);
+
+  // Compute bot resolution rate if conversations table has autopilot rows
+  let botResolutionRate: number | null = null;
+  let botResolvedCount = 0;
+  let botHandoverCount = 0;
+  try {
+    const { data: convs } = await adminClient
+      .from('conversations')
+      .select('ai_mode, status, assigned_agent_id')
+      .eq('ai_mode', 'autopilot');
+    if (convs && convs.length > 0) {
+      for (const c of convs) {
+        if (c.status === 'closed' || c.status === 'solved') botResolvedCount++;
+        if (c.assigned_agent_id) botHandoverCount++;
+      }
+      if (botResolvedCount + botHandoverCount > 0) {
+        botResolutionRate = Math.round((botResolvedCount / (botResolvedCount + botHandoverCount)) * 100);
+      }
+    }
+  } catch {
+    // leave as null ("Not available yet")
+  }
+
+  // 30-day ticket daily trend
+  const trendMap = new Map<string, { created: number; solved: number }>();
+  for (let i = 29; i >= 0; i--) {
+    const d = new Date(Date.now() - i * 24 * 60 * 60 * 1000);
+    const key = d.toISOString().slice(0, 10);
+    trendMap.set(key, { created: 0, solved: 0 });
+  }
+
+  for (const t of recentTickets || []) {
+    const key = t.created_at ? t.created_at.slice(0, 10) : '';
+    if (trendMap.has(key)) {
+      const entry = trendMap.get(key)!;
+      entry.created++;
+      if (t.status === 'solved' || t.status === 'closed') {
+        entry.solved++;
+      }
+    }
+  }
+
+  const trendTickets = Array.from(trendMap.entries()).map(([date, counts]) => {
+    const d = new Date(date + 'T00:00:00Z');
+    const formatted = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
+    return {
+      date,
+      formatted_date: formatted,
+      created: counts.created,
+      solved: counts.solved,
+    };
+  });
+
+  // Owner emails for newest workspaces
+  const ownerIds = (newestWorkspacesData || []).map((w) => w.owner_id).filter(Boolean);
+  const ownerEmailMap = new Map<string, string>();
+  if (ownerIds.length > 0) {
+    try {
+      const { data: users } = await adminClient.from('agents').select('id, email').in('id', ownerIds);
+      for (const u of users || []) {
+        if (u.email) ownerEmailMap.set(u.id, u.email);
+      }
+    } catch {}
+  }
+
+  const newestWorkspaces = (newestWorkspacesData || []).map((w) => ({
+    id: w.id,
+    name: w.name,
+    brand_color: w.brand_color || '#2563eb',
+    created_at: w.created_at,
+    is_suspended: !!w.is_suspended,
+    plan: w.plan || 'free',
+    owner_email: ownerEmailMap.get(w.owner_id) || null,
+  }));
+
+  // Build alerts
+  const alerts: PlatformOverviewMetrics['alerts'] = [];
+  for (const s of suspendedList || []) {
+    alerts.push({
+      alert_type: 'workspace_suspended',
+      severity: 'high',
+      message: `Workspace "${s.name}" is suspended`,
+      workspace_id: s.id,
+      workspace_name: s.name,
+      created_at: s.suspended_at || new Date().toISOString(),
+    });
+  }
+  for (const q of failedQueue || []) {
+    alerts.push({
+      alert_type: 'channel_error',
+      severity: 'medium',
+      message: `Outbound queue failure on channel: ${q.channel}`,
+      workspace_id: q.workspace_id,
+      workspace_name: 'Workspace ' + q.workspace_id.slice(0, 8),
+      created_at: q.created_at,
+    });
+  }
+
+  return {
+    total_workspaces: totalWorkspaces ?? 0,
+    active_workspaces: activeWorkspaces ?? 0,
+    suspended_workspaces: suspendedWorkspaces ?? 0,
+    total_agents: totalAgents ?? 0,
+    active_agents: activeAgents ?? 0,
+    tickets_today: ticketsToday ?? 0,
+    tickets_this_month: ticketsMonth ?? 0,
+    total_messages: totalMessages ?? 0,
+    bot_resolution_rate: botResolutionRate,
+    bot_resolved_count: botResolvedCount,
+    bot_handover_count: botHandoverCount,
+    trend_tickets: trendTickets,
+    newest_workspaces: newestWorkspaces,
+    alerts,
+  };
+}
+
+/**
+ * 2. Workspaces Table with Search, Filter, Sort & Pagination
+ */
+export interface PlatformWorkspacesQuery {
+  search?: string;
+  status?: 'all' | 'active' | 'suspended';
+  channel?: string;
+  plan?: string;
+  sort?: 'name' | 'created_at' | 'tickets_30d_count' | 'agents_count' | 'last_activity_at';
+  order?: 'asc' | 'desc';
+  page?: number;
+  pageSize?: number;
+}
+
+export interface PlatformWorkspacesResponse {
+  workspaces: PlatformWorkspaceItem[];
+  totalCount: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+}
+
+export async function getPlatformWorkspacesTableAction(
+  query: PlatformWorkspacesQuery = {}
+): Promise<PlatformWorkspacesResponse> {
+  await assertSuperAdmin();
+  const adminClient = serviceClient();
+
+  const {
+    search = '',
+    status = 'all',
+    channel = 'all',
+    plan = 'all',
+    sort = 'created_at',
+    order = 'desc',
+    page = 1,
+    pageSize = 15,
+  } = query;
+
+  // Fetch all workspaces and join stats
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+  const [
+    { data: workspacesRaw },
+    { data: ticketsRaw },
+    { data: agentsRaw },
+    { data: channelConns },
+  ] = await Promise.all([
+    adminClient.from('workspaces').select('*').is('deleted_at', null),
+    adminClient.from('tickets').select('workspace_id, created_at').gte('created_at', thirtyDaysAgo),
+    adminClient.from('agents').select('id, workspace_id, email, is_active'),
+    adminClient.from('channel_connections').select('workspace_id, channel, status').neq('status', 'disconnected'),
+  ]);
+
+  const ticketCounts = new Map<string, number>();
+  for (const t of ticketsRaw || []) {
+    if (t.workspace_id) ticketCounts.set(t.workspace_id, (ticketCounts.get(t.workspace_id) || 0) + 1);
+  }
+
+  const agentCounts = new Map<string, number>();
+  const ownerMap = new Map<string, string>();
+  for (const a of agentsRaw || []) {
+    if (a.workspace_id) {
+      agentCounts.set(a.workspace_id, (agentCounts.get(a.workspace_id) || 0) + 1);
+    }
+    if (a.email) {
+      ownerMap.set(a.id, a.email);
+    }
+  }
+
+  const channelMap = new Map<string, Set<string>>();
+  for (const c of channelConns || []) {
+    if (c.workspace_id) {
+      if (!channelMap.has(c.workspace_id)) channelMap.set(c.workspace_id, new Set());
+      channelMap.get(c.workspace_id)!.add(c.channel);
+    }
+  }
+
+  let items: PlatformWorkspaceItem[] = (workspacesRaw || []).map((w) => {
+    const channels = Array.from(channelMap.get(w.id) || []);
+    if (!channels.includes('chat')) channels.push('chat');
+
+    return {
+      id: w.id,
+      name: w.name,
+      website_url: w.website_url || null,
+      status: w.is_suspended ? 'suspended' : 'active',
+      is_suspended: !!w.is_suspended,
+      suspended_at: w.suspended_at || null,
+      suspension_reason: w.suspension_reason || null,
+      deleted_at: w.deleted_at || null,
+      plan: w.plan || 'free',
+      brand_color: w.brand_color || '#2563eb',
+      logo_url: w.logo_url || null,
+      agents_count: agentCounts.get(w.id) ?? 0,
+      tickets_30d_count: ticketCounts.get(w.id) ?? 0,
+      connected_channels: channels,
+      last_activity_at: w.updated_at || w.created_at,
+      created_at: w.created_at,
+      owner_email: ownerMap.get(w.owner_id) || null,
+    };
+  });
+
+  // Filter
+  if (search.trim()) {
+    const q = search.toLowerCase().trim();
+    items = items.filter(
+      (w) =>
+        w.name.toLowerCase().includes(q) ||
+        (w.website_url && w.website_url.toLowerCase().includes(q)) ||
+        (w.owner_email && w.owner_email.toLowerCase().includes(q)) ||
+        w.id.toLowerCase().includes(q)
+    );
+  }
+
+  if (status !== 'all') {
+    items = items.filter((w) => w.status === status);
+  }
+
+  if (plan !== 'all') {
+    items = items.filter((w) => w.plan.toLowerCase() === plan.toLowerCase());
+  }
+
+  if (channel !== 'all') {
+    items = items.filter((w) => w.connected_channels.includes(channel));
+  }
+
+  // Sort
+  items.sort((a, b) => {
+    let cmp = 0;
+    if (sort === 'name') cmp = a.name.localeCompare(b.name);
+    else if (sort === 'tickets_30d_count') cmp = a.tickets_30d_count - b.tickets_30d_count;
+    else if (sort === 'agents_count') cmp = a.agents_count - b.agents_count;
+    else if (sort === 'last_activity_at') cmp = (a.last_activity_at || '').localeCompare(b.last_activity_at || '');
+    else cmp = a.created_at.localeCompare(b.created_at);
+
+    return order === 'asc' ? cmp : -cmp;
+  });
+
+  const totalCount = items.length;
+  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+  const currentPage = Math.min(Math.max(1, page), totalPages);
+  const startIdx = (currentPage - 1) * pageSize;
+  const paginated = items.slice(startIdx, startIdx + pageSize);
+
+  return {
+    workspaces: paginated,
+    totalCount,
+    page: currentPage,
+    pageSize,
+    totalPages,
+  };
+}
+
+/**
+ * 3. Workspace Detail Action with Tabs Support & Notes
+ */
+export interface PolishedWorkspaceDetailData {
+  workspace: PlatformWorkspaceItem;
+  metrics: {
+    tickets_30d_count: number;
+    total_tickets: number;
+    agents_count: number;
+    avg_first_reply_seconds: number | null;
+    resolution_rate_percent: number;
+    bot_resolved_count: number;
+    bot_handover_count: number;
+  };
+  tickets_per_day: Array<{
+    date: string;
+    formatted_date: string;
+    tickets: number;
+    solved: number;
+  }>;
+  top_articles: Array<{
+    id: string;
+    title: string;
+    slug: string;
+    views_count: number;
+    helpful_count: number;
+  }>;
+  members: Array<{
+    id: string;
+    name: string;
+    email: string;
+    role: string;
+    status: string;
+    avatar_url: string | null;
+    created_at: string;
+    is_active: boolean;
+    max_open_tickets: number | null;
+  }>;
+  channels: Array<{
+    channel: string;
+    status: 'connected' | 'error' | 'disconnected';
+    details: string;
+  }>;
+  usage: {
+    conversations_count: number;
+    messages_count: number;
+    articles_count: number;
+    visitors_count: number;
+  };
+  recent_activity: Array<{
+    id: string;
+    type: 'ticket' | 'message';
+    title: string;
+    created_at: string;
+    status: string;
+  }>;
+  notes: SuperAdminWorkspaceNote[];
+}
+
+export async function getPlatformWorkspaceDetailAction(
+  workspaceId: string
+): Promise<PolishedWorkspaceDetailData> {
+  const { agent } = await assertSuperAdmin();
+  const adminClient = serviceClient();
+
+  const [
+    { data: ws, error: wsError },
+    { data: agents },
+    { data: tickets },
+    { data: articles },
+    { data: convs },
+    { data: channelConns },
+  ] = await Promise.all([
+    adminClient.from('workspaces').select('*').eq('id', workspaceId).maybeSingle(),
+    adminClient.from('agents').select('*').eq('workspace_id', workspaceId).order('name'),
+    adminClient.from('tickets').select('*').eq('workspace_id', workspaceId).order('created_at', { ascending: false }).limit(200),
+    adminClient.from('articles').select('*').eq('workspace_id', workspaceId).order('views_count', { ascending: false }).limit(10),
+    adminClient.from('conversations').select('id, status, ai_mode, assigned_agent_id, created_at').eq('workspace_id', workspaceId).limit(200),
+    adminClient.from('channel_connections').select('*').eq('workspace_id', workspaceId),
+  ]);
+
+  if (wsError || !ws) {
+    throw new Error('Workspace not found or inaccessible.');
+  }
+
+  // Owner email
+  let ownerEmail: string | null = null;
+  if (ws.owner_id) {
+    const ownerAgent = (agents || []).find((a) => a.id === ws.owner_id);
+    ownerEmail = ownerAgent?.email || null;
+  }
+
+  // Tickets trend (30d)
+  const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
+  const trendMap = new Map<string, { tickets: number; solved: number }>();
+  for (let i = 29; i >= 0; i--) {
+    const d = new Date(Date.now() - i * 24 * 60 * 60 * 1000);
+    trendMap.set(d.toISOString().slice(0, 10), { tickets: 0, solved: 0 });
+  }
+
+  let tickets30dCount = 0;
+  let solvedTicketsCount = 0;
+  for (const t of tickets || []) {
+    const createdTime = new Date(t.created_at).getTime();
+    if (createdTime >= thirtyDaysAgo) {
+      tickets30dCount++;
+      const key = t.created_at.slice(0, 10);
+      if (trendMap.has(key)) {
+        trendMap.get(key)!.tickets++;
+        if (t.status === 'solved' || t.status === 'closed') {
+          trendMap.get(key)!.solved++;
+        }
+      }
+    }
+    if (t.status === 'solved' || t.status === 'closed') {
+      solvedTicketsCount++;
+    }
+  }
+
+  const ticketsPerDay = Array.from(trendMap.entries()).map(([date, counts]) => {
+    const d = new Date(date + 'T00:00:00Z');
+    return {
+      date,
+      formatted_date: d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' }),
+      tickets: counts.tickets,
+      solved: counts.solved,
+    };
+  });
+
+  const totalTickets = tickets?.length || 0;
+  const resolutionRatePercent = totalTickets > 0 ? Math.round((solvedTicketsCount / totalTickets) * 100) : 0;
+
+  // Bot resolution stats
+  let botResolved = 0;
+  let botHandover = 0;
+  for (const c of convs || []) {
+    if (c.ai_mode === 'autopilot') {
+      if (c.status === 'closed' || c.status === 'solved') botResolved++;
+      if (c.assigned_agent_id) botHandover++;
+    }
+  }
+
+  // Channels
+  const channelsList: PolishedWorkspaceDetailData['channels'] = [
+    {
+      channel: 'Web Chat Widget',
+      status: 'connected',
+      details: 'Embedded customer chat widget active',
+    },
+  ];
+  for (const c of channelConns || []) {
+    channelsList.push({
+      channel: c.channel,
+      status: c.status === 'connected' ? 'connected' : 'error',
+      details: `Provider connection: ${c.channel}`,
+    });
+  }
+
+  // Recent activity
+  const recentActivity: PolishedWorkspaceDetailData['recent_activity'] = (tickets || []).slice(0, 10).map((t) => ({
+    id: t.id,
+    type: 'ticket',
+    title: t.subject || `Ticket #${t.number || t.id.slice(0, 6)}`,
+    created_at: t.created_at,
+    status: t.status,
+  }));
+
+  // Notes
+  let notes: SuperAdminWorkspaceNote[] = [];
+  try {
+    const { data: notesData } = await adminClient
+      .from('super_admin_workspace_notes')
+      .select('*')
+      .eq('workspace_id', workspaceId)
+      .order('created_at', { ascending: false });
+    notes = (notesData as SuperAdminWorkspaceNote[]) || [];
+  } catch {
+    // Table not migrated yet; gracefully empty
+  }
+
+  await recordSuperAdminAudit({
+    admin: agent,
+    action: 'view_workspace_detail',
+    workspaceId: ws.id,
+    workspaceName: ws.name,
+  });
+
+  return {
+    workspace: {
+      id: ws.id,
+      name: ws.name,
+      website_url: ws.website_url || null,
+      status: ws.is_suspended ? 'suspended' : 'active',
+      is_suspended: !!ws.is_suspended,
+      suspended_at: ws.suspended_at || null,
+      suspension_reason: ws.suspension_reason || null,
+      deleted_at: ws.deleted_at || null,
+      plan: ws.plan || 'free',
+      brand_color: ws.brand_color || '#2563eb',
+      logo_url: ws.logo_url || null,
+      agents_count: agents?.length || 0,
+      tickets_30d_count: tickets30dCount,
+      connected_channels: channelsList.map((c) => c.channel),
+      last_activity_at: ws.updated_at || ws.created_at,
+      created_at: ws.created_at,
+      owner_email: ownerEmail,
+    },
+    metrics: {
+      tickets_30d_count: tickets30dCount,
+      total_tickets: totalTickets,
+      agents_count: agents?.length || 0,
+      avg_first_reply_seconds: null,
+      resolution_rate_percent: resolutionRatePercent,
+      bot_resolved_count: botResolved,
+      bot_handover_count: botHandover,
+    },
+    tickets_per_day: ticketsPerDay,
+    top_articles: (articles || []).map((a) => ({
+      id: a.id,
+      title: a.title,
+      slug: a.slug || a.id,
+      views_count: a.views_count || 0,
+      helpful_count: a.helpful_count || 0,
+    })),
+    members: (agents || []).map((a) => ({
+      id: a.id,
+      name: a.name,
+      email: a.email,
+      role: a.role,
+      status: a.status,
+      avatar_url: a.avatar_url || null,
+      created_at: a.created_at,
+      is_active: a.is_active ?? true,
+      max_open_tickets: a.max_open_tickets ?? null,
+    })),
+    channels: channelsList,
+    usage: {
+      conversations_count: convs?.length || 0,
+      messages_count: 0,
+      articles_count: articles?.length || 0,
+      visitors_count: 0,
+    },
+    recent_activity: recentActivity,
+    notes,
+  };
+}
+
+/**
+ * 4. Workspace Notes CRUD (Platform Owner Private Notes)
+ */
+export async function getWorkspaceNotesAction(workspaceId: string): Promise<SuperAdminWorkspaceNote[]> {
+  await assertSuperAdmin();
+  const adminClient = serviceClient();
+
+  try {
+    const { data, error } = await adminClient
+      .from('super_admin_workspace_notes')
+      .select('*')
+      .eq('workspace_id', workspaceId)
+      .order('created_at', { ascending: false });
+
+    if (error) return [];
+    return (data as SuperAdminWorkspaceNote[]) || [];
+  } catch {
+    return [];
+  }
+}
+
+export async function saveWorkspaceNotesAction(
+  workspaceId: string,
+  content: string
+): Promise<{ success: boolean; note?: SuperAdminWorkspaceNote; error?: string }> {
+  const { agent } = await assertSuperAdmin();
+  const adminClient = serviceClient();
+
+  if (!content.trim()) {
+    return { success: false, error: 'Note content cannot be empty.' };
+  }
+
+  try {
+    const { data, error } = await adminClient
+      .from('super_admin_workspace_notes')
+      .insert({
+        workspace_id: workspaceId,
+        admin_id: agent.id,
+        admin_email: agent.email,
+        content: content.trim(),
+      })
+      .select()
+      .single();
+
+    if (error) {
+      throw error;
+    }
+
+    await recordSuperAdminAudit({
+      admin: agent,
+      action: 'add_workspace_note',
+      workspaceId,
+      details: { length: content.length },
+    });
+
+    return { success: true, note: data as SuperAdminWorkspaceNote };
+  } catch (err: any) {
+    return { success: false, error: err.message || 'Failed to save note.' };
+  }
+}
+
+/**
+ * 5. Users Section Action (All users across workspaces)
+ */
+export interface PlatformUsersQuery {
+  search?: string;
+  role?: string;
+  status?: string;
+  page?: number;
+  pageSize?: number;
+}
+
+export async function getPlatformUsersAction(query: PlatformUsersQuery = {}): Promise<{
+  users: PlatformUserItem[];
+  totalCount: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+}> {
+  await assertSuperAdmin();
+  const adminClient = serviceClient();
+
+  const { search = '', role = 'all', status = 'all', page = 1, pageSize = 20 } = query;
+
+  const [{ data: agentsRaw }, { data: workspacesRaw }] = await Promise.all([
+    adminClient.from('agents').select('*').order('created_at', { ascending: false }),
+    adminClient.from('workspaces').select('id, name'),
+  ]);
+
+  const wsNameMap = new Map<string, string>();
+  for (const w of workspacesRaw || []) {
+    wsNameMap.set(w.id, w.name);
+  }
+
+  let users: PlatformUserItem[] = (agentsRaw || []).map((a) => ({
+    id: a.id,
+    name: a.name || 'Unnamed Agent',
+    email: a.email || 'No email',
+    role: a.role || 'agent',
+    status: a.status || 'offline',
+    is_active: a.is_active ?? true,
+    is_super_admin: !!a.is_super_admin,
+    workspace_id: a.workspace_id || null,
+    workspace_name: a.workspace_id ? wsNameMap.get(a.workspace_id) || 'Unknown Workspace' : 'None',
+    created_at: a.created_at,
+  }));
+
+  if (search.trim()) {
+    const q = search.toLowerCase().trim();
+    users = users.filter(
+      (u) =>
+        u.name.toLowerCase().includes(q) ||
+        u.email.toLowerCase().includes(q) ||
+        (u.workspace_name && u.workspace_name.toLowerCase().includes(q))
+    );
+  }
+
+  if (role !== 'all') {
+    users = users.filter((u) => u.role.toLowerCase() === role.toLowerCase());
+  }
+
+  if (status !== 'all') {
+    if (status === 'active') users = users.filter((u) => u.is_active);
+    else if (status === 'deactivated') users = users.filter((u) => !u.is_active);
+    else users = users.filter((u) => u.status.toLowerCase() === status.toLowerCase());
+  }
+
+  const totalCount = users.length;
+  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+  const currentPage = Math.min(Math.max(1, page), totalPages);
+  const startIdx = (currentPage - 1) * pageSize;
+  const paginated = users.slice(startIdx, startIdx + pageSize);
+
+  return {
+    users: paginated,
+    totalCount,
+    page: currentPage,
+    pageSize,
+    totalPages,
+  };
+}
+
+export async function deactivateUserAction(userId: string): Promise<{ success: boolean; error?: string }> {
+  const { agent } = await assertSuperAdmin();
+  const adminClient = serviceClient();
+
+  if (userId === agent.id) {
+    return { success: false, error: 'Cannot deactivate your own platform super admin account.' };
+  }
+
+  try {
+    const { error } = await adminClient
+      .from('agents')
+      .update({ is_active: false, deactivated_at: new Date().toISOString() })
+      .eq('id', userId);
+
+    if (error) throw error;
+
+    await recordSuperAdminAudit({
+      admin: agent,
+      action: 'deactivate_user',
+      details: { target_user_id: userId },
+    });
+
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message || 'Failed to deactivate user.' };
+  }
+}
+
+export async function reactivateUserAction(userId: string): Promise<{ success: boolean; error?: string }> {
+  const { agent } = await assertSuperAdmin();
+  const adminClient = serviceClient();
+
+  try {
+    const { error } = await adminClient
+      .from('agents')
+      .update({ is_active: true, deactivated_at: null })
+      .eq('id', userId);
+
+    if (error) throw error;
+
+    await recordSuperAdminAudit({
+      admin: agent,
+      action: 'reactivate_user',
+      details: { target_user_id: userId },
+    });
+
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message || 'Failed to reactivate user.' };
+  }
+}
+
+/**
+ * 6. System Health Monitoring Action
+ */
+export async function getPlatformSystemHealthAction(): Promise<SystemHealthReport> {
+  await assertSuperAdmin();
+  const adminClient = serviceClient();
+
+  const [
+    { data: workspaces },
+    { data: failedChannels },
+    { data: failedAutomation },
+    { data: pendingVerifications },
+  ] = await Promise.all([
+    adminClient.from('workspaces').select('id, name'),
+    adminClient.from('channel_outbound_queue').select('*').or('status.eq.failed,attempts.gte.3').order('created_at', { ascending: false }).limit(50),
+    adminClient.from('automation_outbox').select('*').eq('status', 'failed').order('created_at', { ascending: false }).limit(50),
+    adminClient.from('email_verifications').select('*').is('verified_at', null).order('created_at', { ascending: false }).limit(50),
+  ]);
+
+  const wsMap = new Map<string, string>();
+  for (const w of workspaces || []) {
+    wsMap.set(w.id, w.name);
+  }
+
+  const channelFailures = (failedChannels || []).map((q) => ({
+    id: q.id,
+    workspace_id: q.workspace_id,
+    workspace_name: wsMap.get(q.workspace_id) || 'Unknown Workspace',
+    channel: q.channel,
+    error: q.error || 'Outbound dispatch failed',
+    attempts: q.attempts || 1,
+    created_at: q.created_at,
+  }));
+
+  const backgroundErrors = (failedAutomation || []).map((a) => ({
+    id: a.id,
+    workspace_id: a.workspace_id,
+    workspace_name: wsMap.get(a.workspace_id) || 'Unknown Workspace',
+    action_type: a.action_type || 'automation',
+    status: a.status || 'failed',
+    error: a.error || 'Job failed',
+    created_at: a.created_at,
+  }));
+
+  const emailIssues = (pendingVerifications || []).map((e) => ({
+    id: e.id,
+    workspace_id: e.workspace_id,
+    workspace_name: wsMap.get(e.workspace_id) || 'Unknown Workspace',
+    error_type: 'Pending verification',
+    created_at: e.created_at,
+  }));
+
+  return {
+    channel_failures: channelFailures,
+    email_issues: emailIssues,
+    background_errors: backgroundErrors,
+    checked_at: new Date().toISOString(),
+  };
+}
+
+/**
+ * 7. Global Search Action across Workspaces and Users
+ */
+export async function getPlatformGlobalSearchAction(query: string): Promise<{
+  workspaces: Array<{ id: string; name: string; brand_color: string; plan: string; status: string }>;
+  users: Array<{ id: string; name: string; email: string; role: string; workspace_name: string | null }>;
+}> {
+  await assertSuperAdmin();
+  if (!query || query.trim().length < 2) {
+    return { workspaces: [], users: [] };
+  }
+
+  const adminClient = serviceClient();
+  const q = query.toLowerCase().trim();
+
+  const [{ data: wsData }, { data: agentsData }] = await Promise.all([
+    adminClient.from('workspaces').select('id, name, brand_color, plan, is_suspended').is('deleted_at', null).ilike('name', `%${q}%`).limit(8),
+    adminClient.from('agents').select('id, name, email, role, workspace_id').or(`name.ilike.%${q}%,email.ilike.%${q}%`).limit(8),
+  ]);
+
+  const workspaces = (wsData || []).map((w) => ({
+    id: w.id,
+    name: w.name,
+    brand_color: w.brand_color || '#2563eb',
+    plan: w.plan || 'free',
+    status: w.is_suspended ? 'suspended' : 'active',
+  }));
+
+  const users = (agentsData || []).map((a) => ({
+    id: a.id,
+    name: a.name || 'Agent',
+    email: a.email || '',
+    role: a.role || 'agent',
+    workspace_name: a.workspace_id ? 'Workspace ' + a.workspace_id.slice(0, 6) : null,
+  }));
+
+  return { workspaces, users };
 }
 

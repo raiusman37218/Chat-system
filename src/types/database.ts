@@ -777,3 +777,94 @@ export interface ReportingEvent {
   metadata: Record<string, unknown>;
 }
 
+/* ── Platform Super Admin ────────────────────────────────────────────── */
+
+export interface SuperAdminWorkspaceNote {
+  id: string;
+  workspace_id: string;
+  admin_id: string;
+  admin_email: string | null;
+  content: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PlatformOverviewMetrics {
+  total_workspaces: number;
+  active_workspaces: number;
+  suspended_workspaces: number;
+  total_agents: number;
+  active_agents: number;
+  tickets_today: number;
+  tickets_this_month: number;
+  total_messages: number;
+  bot_resolution_rate: number | null;
+  bot_resolved_count: number;
+  bot_handover_count: number;
+  trend_tickets: Array<{
+    date: string;
+    formatted_date: string;
+    created: number;
+    solved: number;
+  }>;
+  newest_workspaces: Array<{
+    id: string;
+    name: string;
+    brand_color: string;
+    created_at: string;
+    is_suspended: boolean;
+    plan: string;
+    owner_email: string | null;
+  }>;
+  alerts: Array<{
+    alert_type: string;
+    severity: 'high' | 'medium' | 'low';
+    message: string;
+    workspace_id: string | null;
+    workspace_name: string;
+    created_at: string;
+  }>;
+}
+
+export interface PlatformUserItem {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  status: string;
+  is_active: boolean;
+  is_super_admin: boolean;
+  workspace_id: string | null;
+  workspace_name: string | null;
+  created_at: string;
+}
+
+export interface SystemHealthReport {
+  channel_failures: Array<{
+    id: string | number;
+    workspace_id: string;
+    workspace_name: string;
+    channel: string;
+    error: string | null;
+    attempts: number;
+    created_at: string;
+  }>;
+  email_issues: Array<{
+    id: string;
+    workspace_id: string;
+    workspace_name: string;
+    error_type: string;
+    created_at: string;
+  }>;
+  background_errors: Array<{
+    id: string | number;
+    workspace_id: string;
+    workspace_name: string;
+    action_type: string;
+    status: string;
+    error: string | null;
+    created_at: string;
+  }>;
+  checked_at: string;
+}
+

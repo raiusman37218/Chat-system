@@ -1,12 +1,16 @@
 import React from 'react';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
-import { getWorkspaceDetailAction } from '@/app/actions/platform';
 import { WorkspaceDetailPage } from '@/components/admin/WorkspaceDetailPage';
 
 interface PageProps {
   params: Promise<{ id: string }>;
 }
+
+export const metadata = {
+  title: 'Workspace Detail — Zentry Super Admin',
+  description: 'Inspect workspace metrics, members, channels, and private platform owner notes.',
+};
 
 export default async function WorkspacePage({ params }: PageProps) {
   const { id } = await params;
@@ -49,12 +53,5 @@ export default async function WorkspacePage({ params }: PageProps) {
     );
   }
 
-  let initialData = null;
-  try {
-    initialData = await getWorkspaceDetailAction(id);
-  } catch {
-    // If not found or load failed, client component handles error state
-  }
-
-  return <WorkspaceDetailPage workspaceId={id} initialData={initialData} />;
+  return <WorkspaceDetailPage workspaceId={id} />;
 }
