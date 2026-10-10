@@ -17,6 +17,10 @@ import {
   ChevronLeft,
   ChevronRight,
   ExternalLink,
+  LogIn,
+  Download,
+  Trash2,
+  ShieldAlert,
 } from 'lucide-react';
 import {
   getPlatformWorkspacesTableAction,
@@ -24,6 +28,12 @@ import {
   reactivateWorkspaceAction,
   PlatformWorkspaceItem,
 } from '@/app/actions/platform';
+import {
+  startSupportSessionAction,
+  exportWorkspaceDataAction,
+  scheduleWorkspaceDeletionAction,
+  cancelWorkspaceDeletionAction,
+} from '@/app/actions/platform-management';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Modal } from '@/components/ui/Modal';
@@ -59,6 +69,20 @@ export function WorkspacesView() {
   const [actionLoading, setActionLoading] = useState(false);
 
   const [showReactivateModal, setShowReactivateModal] = useState(false);
+
+  // Support Session Impersonation Modal
+  const [showSupportModal, setShowSupportModal] = useState(false);
+  const [supportReason, setSupportReason] = useState('');
+  const [supportLoading, setSupportLoading] = useState(false);
+
+  // Data Export Loading
+  const [exportingId, setExportingId] = useState<string | null>(null);
+
+  // Deletion Modal
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteConfirmName, setDeleteConfirmName] = useState('');
+  const [deleteReason, setDeleteReason] = useState('');
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   const loadData = async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
@@ -138,6 +162,84 @@ export function WorkspacesView() {
       toast.error(err.message || 'Failed to reactivate workspace.');
     } finally {
       setActionLoading(false);
+    }
+  };
+
+  const handleStartSupportSession = async () => {
+    if (!targetWorkspace) return;
+    setSupportLoading(true);
+    try {
+      const res = await startSupportSessionAction({
+        workspaceId: targetWorkspace.id,
+        reason: supportReason.trim() || 'Platform staff support investigation',
+      });
+      if (res.success) {
+        toast.success(`Support session established for ${targetWorkspace.name}. Redirecting...`);
+        setShowSupportModal(false);
+        setSupportReason('');
+        window.location.href = `/dashboard?workspace=${targetWorkspace.id}`;
+      } else {
+        toast.error(res.error || 'Failed to start support session.');
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to start support session.');
+    } finally {
+      setSupportLoading(false);
+    }
+  };
+
+  const handleExportData = async (w: PlatformWorkspaceItem) => {
+    setExportingId(w.id);
+    try {
+      const res = await exportWorkspaceDataAction(w.id);
+      if (res.success && res.data) {
+        const blob = new Blob([JSON.stringify(res.data, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `workspace-export-${w.name.toLowerCase().replace(/[^a-z0-9]/g, '-')}-${w.id.slice(0, 8)}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        toast.success(`Complete data package exported for ${w.name}`);
+      } else {
+        toast.error(res.error || 'Failed to export workspace data.');
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to export data.');
+    } finally {
+      setExportingId(null);
+    }
+  };
+
+  const handleConfirmScheduleDeletion = async () => {
+    if (!targetWorkspace) return;
+    if (deleteConfirmName.trim() !== targetWorkspace.name.trim()) {
+      toast.error(`Please type "${targetWorkspace.name}" exactly to confirm.`);
+      return;
+    }
+    setDeleteLoading(true);
+    try {
+      const res = await scheduleWorkspaceDeletionAction({
+        workspaceId: targetWorkspace.id,
+        confirmName: deleteConfirmName,
+        reason: deleteReason.trim() || 'Super admin requested workspace deletion',
+      });
+      if (res.success) {
+        toast.success(`Workspace scheduled for permanent deletion in 30 days.`);
+        setShowDeleteModal(false);
+        setDeleteConfirmName('');
+        setDeleteReason('');
+        setTargetWorkspace(null);
+        await loadData(true);
+      } else {
+        toast.error(res.error || 'Failed to schedule deletion.');
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to schedule deletion.');
+    } finally {
+      setDeleteLoading(false);
     }
   };
 
@@ -379,6 +481,31 @@ export function WorkspacesView() {
                   {/* Actions */}
                   <td className="p-3 text-right">
                     <div className="inline-flex items-center gap-1.5">
+                      <Button
+                        variant="ghost"
+                        size="xs"
+                        onClick={() => {
+                          setTargetWorkspace(w);
+                          setShowSupportModal(true);
+                        }}
+                        title="Login as workspace (Support session)"
+                        className="text-accent hover:text-accent hover:bg-accent/10"
+                      >
+                        <LogIn className="w-3.5 h-3.5" />
+                        <span className="sr-only">Support Login</span>
+                      </Button>
+
+                      <Button
+                        variant="ghost"
+                        size="xs"
+                        disabled={exportingId === w.id}
+                        onClick={() => handleExportData(w)}
+                        title="Export complete workspace JSON"
+                      >
+                        <Download className={`w-3.5 h-3.5 ${exportingId === w.id ? 'animate-bounce text-accent' : ''}`} />
+                        <span className="sr-only">Export</span>
+                      </Button>
+
                       <Link href={`/admin/workspaces/${w.id}`}>
                         <Button variant="ghost" size="xs" title="View workspace detail">
                           <Eye className="w-3.5 h-3.5" />
@@ -413,6 +540,20 @@ export function WorkspacesView() {
                           <span className="hidden sm:inline text-2xs">Suspend</span>
                         </Button>
                       )}
+
+                      <Button
+                        variant="ghost"
+                        size="xs"
+                        onClick={() => {
+                          setTargetWorkspace(w);
+                          setShowDeleteModal(true);
+                        }}
+                        title="Schedule 30-day workspace deletion"
+                        className="text-rose-500 hover:text-rose-600 hover:bg-rose-500/10"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span className="sr-only">Delete</span>
+                      </Button>
                     </div>
                   </td>
                 </tr>
@@ -544,6 +685,141 @@ export function WorkspacesView() {
             >
               <PlayCircle className="w-4 h-4" />
               <span>Confirm Reactivation</span>
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Support Session Impersonation Modal */}
+      <Modal
+        open={showSupportModal}
+        onClose={() => {
+          if (!supportLoading) {
+            setShowSupportModal(false);
+            setTargetWorkspace(null);
+          }
+        }}
+        title={`Support Login: ${targetWorkspace?.name || ''}`}
+        description="Open this workspace with an active support session. Customer passwords are never exposed."
+      >
+        <div className="space-y-4">
+          <div className="p-3 rounded-lg border border-line bg-surface-2 text-xs text-ink-2 space-y-1.5">
+            <div className="flex items-center gap-2 font-semibold text-ink">
+              <ShieldAlert className="w-4 h-4 text-accent" />
+              <span>Strict Support Session Safeguards</span>
+            </div>
+            <p>
+              • A floating orange notification banner with an exit button and 60-minute countdown will appear.
+            </p>
+            <p>• Your platform identity and this reason will be recorded to the immutable audit log.</p>
+            <p>• Zero customer passwords or credential secrets are ever accessed or decrypted.</p>
+          </div>
+
+          <div>
+            <label className="block text-2xs font-semibold text-ink-2 mb-1">
+              Audit Reason for Support Session *
+            </label>
+            <textarea
+              rows={2}
+              value={supportReason}
+              onChange={(e) => setSupportReason(e.target.value)}
+              placeholder="e.g. Assisting customer with inbox configuration and billing audit..."
+              className="input input-sm w-full py-2"
+            />
+          </div>
+
+          <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-line">
+            <Button
+              variant="secondary"
+              size="sm"
+              disabled={supportLoading}
+              onClick={() => {
+                setShowSupportModal(false);
+                setTargetWorkspace(null);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              loading={supportLoading}
+              onClick={handleStartSupportSession}
+            >
+              <LogIn className="w-3.5 h-3.5 mr-1" />
+              <span>Launch Support Session</span>
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Schedule Workspace Deletion Modal */}
+      <Modal
+        open={showDeleteModal}
+        onClose={() => {
+          if (!deleteLoading) {
+            setShowDeleteModal(false);
+            setTargetWorkspace(null);
+          }
+        }}
+        title={`Schedule Deletion: ${targetWorkspace?.name || ''}`}
+        description="Workspaces enter a mandatory 30-day waiting period before permanent destruction."
+      >
+        <div className="space-y-4">
+          <div className="p-3 rounded-lg border border-rose-500/20 bg-rose-500/10 text-xs text-rose-700 dark:text-rose-300 space-y-1">
+            <div className="flex items-center gap-2 font-bold text-rose-600">
+              <AlertTriangle className="w-4 h-4" />
+              <span>30-Day Waiting Period & Immediate Suspension</span>
+            </div>
+            <p>
+              Upon scheduling, this workspace will be suspended immediately. All data (tickets, agents, knowledge base) will be permanently purged after 30 days unless cancelled.
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-2xs font-semibold text-ink-2 mb-1">Reason for Deletion</label>
+            <input
+              type="text"
+              value={deleteReason}
+              onChange={(e) => setDeleteReason(e.target.value)}
+              placeholder="e.g. Customer request or permanent account closure"
+              className="input input-sm w-full"
+            />
+          </div>
+
+          <div>
+            <label className="block text-2xs font-semibold text-ink-2 mb-1">
+              Type <strong className="text-ink font-mono">{targetWorkspace?.name}</strong> to confirm:
+            </label>
+            <input
+              type="text"
+              value={deleteConfirmName}
+              onChange={(e) => setDeleteConfirmName(e.target.value)}
+              placeholder="Type exact workspace name..."
+              className="input input-sm w-full font-mono text-2xs"
+            />
+          </div>
+
+          <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-line">
+            <Button
+              variant="secondary"
+              size="sm"
+              disabled={deleteLoading}
+              onClick={() => {
+                setShowDeleteModal(false);
+                setTargetWorkspace(null);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="danger"
+              size="sm"
+              loading={deleteLoading}
+              disabled={deleteConfirmName.trim() !== (targetWorkspace?.name || '').trim()}
+              onClick={handleConfirmScheduleDeletion}
+            >
+              <Trash2 className="w-3.5 h-3.5 mr-1" />
+              <span>Schedule 30-Day Deletion</span>
             </Button>
           </div>
         </div>

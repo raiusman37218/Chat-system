@@ -21,6 +21,7 @@ import {
   Shield,
   ArrowRight,
   LogOut,
+  Sliders,
 } from 'lucide-react';
 import { Agent } from '@/types/database';
 import { Badge } from '@/components/ui/Badge';
@@ -46,6 +47,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Workspaces', href: '/admin/workspaces', icon: Building2 },
   { label: 'Users', href: '/admin/users', icon: Users },
   { label: 'Plans & Pricing', href: '/admin/plans', icon: CreditCard },
+  { label: 'Platform Ops', href: '/admin/platform', icon: Sliders },
   { label: 'System Health', href: '/admin/health', icon: Activity },
   { label: 'Audit Log', href: '/admin/audit', icon: ShieldAlert },
 ];

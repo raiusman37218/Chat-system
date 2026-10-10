@@ -25,6 +25,13 @@ import {
   Shield,
   Layers,
   HelpCircle,
+  DollarSign,
+  TrendingUp,
+  Receipt,
+  FileText,
+  CheckCircle2,
+  AlertCircle,
+  ExternalLink,
 } from 'lucide-react';
 import {
   PlatformPlan,
@@ -53,6 +60,12 @@ import {
   updateWorkspaceSubscriptionAction,
 } from '@/app/actions/plans';
 import { getPlatformCompaniesAction, PlatformCompaniesData } from '@/app/actions/platform';
+import {
+  getPlatformRevenueMetricsAction,
+  getWorkspaceInvoicesAction,
+  recordManualPaymentAction,
+} from '@/app/actions/platform-management';
+import { RevenueMetrics, WorkspaceInvoice } from '@/types/platform-management';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Modal } from '@/components/ui/Modal';
@@ -60,7 +73,7 @@ import { Table } from '@/components/ui/Table';
 import { SkeletonBlock } from '@/components/ui/States';
 import { useToast } from '@/components/ui/Toast';
 
-type ActiveTab = 'plans' | 'subscriptions' | 'coupons';
+type ActiveTab = 'plans' | 'subscriptions' | 'revenue' | 'invoices' | 'coupons';
 
 export function PlansManagementView() {
   const toast = useToast();
@@ -70,6 +83,26 @@ export function PlansManagementView() {
   const [coupons, setCoupons] = useState<PlatformCoupon[]>([]);
   const [workspaces, setWorkspaces] = useState<PlatformCompaniesData['companies']>([]);
   const [callerIsOwner, setCallerIsOwner] = useState(false);
+
+  // --- Revenue Metrics State ---
+  const [revenueMetrics, setRevenueMetrics] = useState<RevenueMetrics | null>(null);
+  const [loadingRevenue, setLoadingRevenue] = useState(false);
+
+  // --- Invoices State ---
+  const [invoices, setInvoices] = useState<(WorkspaceInvoice & { workspace?: { id: string; name: string } })[]>([]);
+  const [loadingInvoices, setLoadingInvoices] = useState(false);
+  const [invoiceFilterWs, setInvoiceFilterWs] = useState<string>('all');
+
+  // --- Manual Payment Modal State ---
+  const [showManualPayModal, setShowManualPayModal] = useState(false);
+  const [savingManualPay, setSavingManualPay] = useState(false);
+  const [manualWsId, setManualWsId] = useState('');
+  const [manualAmount, setManualAmount] = useState(49);
+  const [manualCurrency, setManualCurrency] = useState('USD');
+  const [manualMethod, setManualMethod] = useState<'manual_bank_transfer' | 'manual_crypto' | 'manual_check' | 'manual_other'>('manual_bank_transfer');
+  const [manualRef, setManualRef] = useState('');
+  const [manualDays, setManualDays] = useState(30);
+  const [manualNotes, setManualNotes] = useState('');
 
   // --- Plan Modal State ---
   const [showPlanModal, setShowPlanModal] = useState(false);
@@ -126,6 +159,30 @@ export function PlansManagementView() {
   const [wsSearch, setWsSearch] = useState('');
 
   // Initial Data Load
+  const loadRevenue = async () => {
+    setLoadingRevenue(true);
+    try {
+      const rev = await getPlatformRevenueMetricsAction();
+      setRevenueMetrics(rev);
+    } catch (err: any) {
+      console.warn('Revenue metrics query note:', err.message);
+    } finally {
+      setLoadingRevenue(false);
+    }
+  };
+
+  const loadInvoices = async (wsId?: string) => {
+    setLoadingInvoices(true);
+    try {
+      const res = await getWorkspaceInvoicesAction(wsId && wsId !== 'all' ? { workspaceId: wsId } : undefined);
+      setInvoices(res.invoices);
+    } catch (err: any) {
+      console.warn('Invoices query note:', err.message);
+    } finally {
+      setLoadingInvoices(false);
+    }
+  };
+
   const loadData = async () => {
     setLoading(true);
     try {
@@ -139,10 +196,49 @@ export function PlansManagementView() {
       setCallerIsOwner(plansRes.callerIsOwner);
       setCoupons(couponsRes);
       setWorkspaces(compRes.companies || []);
+
+      loadRevenue();
+      loadInvoices();
     } catch (err: any) {
       toast.error(err.message || 'Failed to load plans data.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleRecordManualPayment = async () => {
+    if (!manualWsId) {
+      toast.error('Please select a workspace.');
+      return;
+    }
+    if (!manualRef.trim()) {
+      toast.error('Please provide a payment reference (e.g. wire reference, crypto tx hash).');
+      return;
+    }
+    setSavingManualPay(true);
+    try {
+      const res = await recordManualPaymentAction({
+        workspaceId: manualWsId,
+        amount: Number(manualAmount),
+        currency: manualCurrency,
+        paymentMethod: manualMethod,
+        paymentReference: manualRef,
+        notes: manualNotes,
+        extendDays: Number(manualDays),
+      });
+      if (res.success) {
+        toast.success('Manual payment recorded and workspace subscription updated.');
+        setShowManualPayModal(false);
+        setManualRef('');
+        setManualNotes('');
+        await Promise.all([loadInvoices(invoiceFilterWs), loadRevenue(), loadData()]);
+      } else {
+        toast.error(res.error || 'Failed to record manual payment.');
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to record payment.');
+    } finally {
+      setSavingManualPay(false);
     }
   };
 
@@ -422,6 +518,13 @@ export function PlansManagementView() {
             </Button>
           )}
 
+          {activeTab === 'invoices' && callerIsOwner && (
+            <Button size="sm" onClick={() => setShowManualPayModal(true)}>
+              <Plus className="w-3.5 h-3.5 mr-1" />
+              <span>Record Manual Payment</span>
+            </Button>
+          )}
+
           <Button variant="secondary" size="sm" onClick={loadData}>
             <RefreshCw className="w-3.5 h-3.5 mr-1" />
             <span>Refresh</span>
@@ -430,10 +533,10 @@ export function PlansManagementView() {
       </div>
 
       {/* Tabs */}
-      <div className="flex items-center gap-2 border-b border-line pb-px">
+      <div className="flex items-center gap-2 border-b border-line pb-px overflow-x-auto">
         <button
           onClick={() => setActiveTab('plans')}
-          className={`flex items-center gap-2 px-3.5 py-2 text-xs font-semibold border-b-2 transition-colors ${
+          className={`flex items-center gap-2 px-3.5 py-2 text-xs font-semibold border-b-2 transition-colors whitespace-nowrap ${
             activeTab === 'plans'
               ? 'border-accent text-accent'
               : 'border-transparent text-ink-3 hover:text-ink'
@@ -445,7 +548,7 @@ export function PlansManagementView() {
 
         <button
           onClick={() => setActiveTab('subscriptions')}
-          className={`flex items-center gap-2 px-3.5 py-2 text-xs font-semibold border-b-2 transition-colors ${
+          className={`flex items-center gap-2 px-3.5 py-2 text-xs font-semibold border-b-2 transition-colors whitespace-nowrap ${
             activeTab === 'subscriptions'
               ? 'border-accent text-accent'
               : 'border-transparent text-ink-3 hover:text-ink'
@@ -456,8 +559,38 @@ export function PlansManagementView() {
         </button>
 
         <button
+          onClick={() => {
+            setActiveTab('revenue');
+            loadRevenue();
+          }}
+          className={`flex items-center gap-2 px-3.5 py-2 text-xs font-semibold border-b-2 transition-colors whitespace-nowrap ${
+            activeTab === 'revenue'
+              ? 'border-accent text-accent'
+              : 'border-transparent text-ink-3 hover:text-ink'
+          }`}
+        >
+          <TrendingUp className="w-4 h-4" />
+          <span>Revenue & MRR</span>
+        </button>
+
+        <button
+          onClick={() => {
+            setActiveTab('invoices');
+            loadInvoices(invoiceFilterWs);
+          }}
+          className={`flex items-center gap-2 px-3.5 py-2 text-xs font-semibold border-b-2 transition-colors whitespace-nowrap ${
+            activeTab === 'invoices'
+              ? 'border-accent text-accent'
+              : 'border-transparent text-ink-3 hover:text-ink'
+          }`}
+        >
+          <Receipt className="w-4 h-4" />
+          <span>Invoices & Payments ({invoices.length})</span>
+        </button>
+
+        <button
           onClick={() => setActiveTab('coupons')}
-          className={`flex items-center gap-2 px-3.5 py-2 text-xs font-semibold border-b-2 transition-colors ${
+          className={`flex items-center gap-2 px-3.5 py-2 text-xs font-semibold border-b-2 transition-colors whitespace-nowrap ${
             activeTab === 'coupons'
               ? 'border-accent text-accent'
               : 'border-transparent text-ink-3 hover:text-ink'
@@ -766,6 +899,244 @@ export function PlansManagementView() {
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </Button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </Table>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* TAB 4: REVENUE & MRR */}
+      {activeTab === 'revenue' && (
+        <div className="space-y-6">
+          {loadingRevenue && !revenueMetrics ? (
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <SkeletonBlock className="h-28" />
+              <SkeletonBlock className="h-28" />
+              <SkeletonBlock className="h-28" />
+              <SkeletonBlock className="h-28" />
+            </div>
+          ) : (
+            <>
+              {/* Stat Cards */}
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="card p-4 border border-line bg-surface shadow-xs">
+                  <div className="flex items-center justify-between text-ink-3 mb-1.5">
+                    <span className="text-2xs font-semibold uppercase tracking-wider">MRR</span>
+                    <DollarSign className="w-4 h-4 text-accent" />
+                  </div>
+                  <div className="text-2xl font-bold text-ink">
+                    ${(revenueMetrics?.mrr || 0).toLocaleString()}
+                  </div>
+                  <p className="text-2xs text-ink-3 mt-1">Monthly Recurring Revenue</p>
+                </div>
+
+                <div className="card p-4 border border-line bg-surface shadow-xs">
+                  <div className="flex items-center justify-between text-ink-3 mb-1.5">
+                    <span className="text-2xs font-semibold uppercase tracking-wider">ARR</span>
+                    <TrendingUp className="w-4 h-4 text-emerald-500" />
+                  </div>
+                  <div className="text-2xl font-bold text-ink">
+                    ${(revenueMetrics?.arr || 0).toLocaleString()}
+                  </div>
+                  <p className="text-2xs text-ink-3 mt-1">Annual Run Rate (MRR × 12)</p>
+                </div>
+
+                <div className="card p-4 border border-line bg-surface shadow-xs">
+                  <div className="flex items-center justify-between text-ink-3 mb-1.5">
+                    <span className="text-2xs font-semibold uppercase tracking-wider">New MRR (30d)</span>
+                    <Plus className="w-4 h-4 text-accent" />
+                  </div>
+                  <div className="text-2xl font-bold text-emerald-600">
+                    +${(revenueMetrics?.newMrr30d || 0).toLocaleString()}
+                  </div>
+                  <p className="text-2xs text-ink-3 mt-1">Added in the last 30 days</p>
+                </div>
+
+                <div className="card p-4 border border-line bg-surface shadow-xs">
+                  <div className="flex items-center justify-between text-ink-3 mb-1.5">
+                    <span className="text-2xs font-semibold uppercase tracking-wider">Churned MRR (30d)</span>
+                    <AlertTriangle className="w-4 h-4 text-rose-500" />
+                  </div>
+                  <div className="text-2xl font-bold text-rose-600">
+                    -${(revenueMetrics?.churnedMrr30d || 0).toLocaleString()}
+                  </div>
+                  <p className="text-2xs text-ink-3 mt-1">Lost in the last 30 days</p>
+                </div>
+              </div>
+
+              {/* Revenue Breakdown by Plan */}
+              <div className="card border border-line bg-surface shadow-xs overflow-hidden">
+                <div className="p-4 border-b border-line flex items-center justify-between">
+                  <div>
+                    <h3 className="text-sm font-bold text-ink">Revenue Breakdown by Plan</h3>
+                    <p className="text-2xs text-ink-3">Subscriber counts and monthly revenue contribution by tier</p>
+                  </div>
+                  <Button variant="secondary" size="xs" onClick={loadRevenue} loading={loadingRevenue}>
+                    <RefreshCw className="w-3.5 h-3.5 mr-1" />
+                    <span>Refresh</span>
+                  </Button>
+                </div>
+
+                <Table>
+                  <thead>
+                    <tr className="border-b border-line bg-surface-2/40 text-2xs font-semibold text-ink-2 uppercase tracking-wider text-left">
+                      <th className="p-3">Plan Tier</th>
+                      <th className="p-3">Active Subscribers</th>
+                      <th className="p-3">Monthly Revenue (MRR)</th>
+                      <th className="p-3">% of Total MRR</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-line text-xs">
+                    {(revenueMetrics?.planBreakdown || []).length === 0 ? (
+                      <tr>
+                        <td colSpan={4} className="p-8 text-center text-ink-3 text-xs">
+                          No active subscriptions to calculate breakdown.
+                        </td>
+                      </tr>
+                    ) : (
+                      revenueMetrics?.planBreakdown.map((item) => {
+                        const total = revenueMetrics.mrr || 1;
+                        const pct = Math.round((item.mrr / (total || 1)) * 100);
+                        return (
+                          <tr key={item.planId} className="hover:bg-surface-2/30 transition-colors">
+                            <td className="p-3 font-semibold text-ink">{item.planName}</td>
+                            <td className="p-3 text-ink-2">
+                              <Badge tone="neutral">{item.subscriberCount} workspaces</Badge>
+                            </td>
+                            <td className="p-3 font-mono font-semibold text-ink">
+                              ${item.mrr.toLocaleString()} /mo
+                            </td>
+                            <td className="p-3">
+                              <div className="flex items-center gap-2">
+                                <div className="w-24 bg-surface-3 rounded-full h-2 overflow-hidden">
+                                  <div
+                                    className="bg-accent h-2 rounded-full"
+                                    style={{ width: `${Math.min(100, pct)}%` }}
+                                  />
+                                </div>
+                                <span className="text-2xs text-ink-3 font-mono">{pct}%</span>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </Table>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* TAB 5: INVOICES & MANUAL PAYMENTS */}
+      {activeTab === 'invoices' && (
+        <div className="space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <label className="text-xs font-semibold text-ink-2">Filter by Workspace:</label>
+              <select
+                value={invoiceFilterWs}
+                onChange={(e) => {
+                  setInvoiceFilterWs(e.target.value);
+                  loadInvoices(e.target.value);
+                }}
+                className="input input-sm text-xs py-1"
+              >
+                <option value="all">All Workspaces</option>
+                {workspaces.map((w) => (
+                  <option key={w.id} value={w.id}>
+                    {w.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {callerIsOwner && (
+              <Button size="sm" onClick={() => setShowManualPayModal(true)}>
+                <Plus className="w-3.5 h-3.5 mr-1" />
+                <span>Record Manual Payment</span>
+              </Button>
+            )}
+          </div>
+
+          <div className="card border border-line bg-surface shadow-xs overflow-hidden">
+            {loadingInvoices ? (
+              <div className="p-6 space-y-3">
+                <SkeletonBlock className="h-10" />
+                <SkeletonBlock className="h-10" />
+                <SkeletonBlock className="h-10" />
+              </div>
+            ) : invoices.length === 0 ? (
+              <div className="p-12 text-center text-xs text-ink-3">
+                No invoices recorded yet. Manual payments or Lemon Squeezy subscription webhooks will populate here.
+              </div>
+            ) : (
+              <Table>
+                <thead>
+                  <tr className="border-b border-line bg-surface-2/40 text-2xs font-semibold text-ink-2 uppercase tracking-wider text-left">
+                    <th className="p-3">Invoice #</th>
+                    <th className="p-3">Workspace</th>
+                    <th className="p-3">Amount</th>
+                    <th className="p-3">Status</th>
+                    <th className="p-3">Payment Method</th>
+                    <th className="p-3">Reference / Tx</th>
+                    <th className="p-3">Date</th>
+                    <th className="p-3 text-right">Receipt</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-line text-xs">
+                  {invoices.map((inv) => (
+                    <tr key={inv.id} className="hover:bg-surface-2/30 transition-colors">
+                      <td className="p-3 font-mono font-medium text-ink">{inv.invoice_number}</td>
+                      <td className="p-3 font-medium text-ink">{inv.workspace?.name || inv.workspace_id}</td>
+                      <td className="p-3 font-semibold text-ink">
+                        {inv.currency.toUpperCase()} ${inv.amount.toLocaleString()}
+                      </td>
+                      <td className="p-3">
+                        <Badge
+                          tone={
+                            inv.status === 'paid'
+                              ? 'success'
+                              : inv.status === 'open'
+                              ? 'warn'
+                              : 'neutral'
+                          }
+                        >
+                          {inv.status}
+                        </Badge>
+                      </td>
+                      <td className="p-3 text-ink-2">
+                        {inv.payment_method === 'lemonsqueezy' && 'Lemon Squeezy'}
+                        {inv.payment_method === 'manual_bank_transfer' && 'Bank Transfer'}
+                        {inv.payment_method === 'manual_crypto' && 'Cryptocurrency'}
+                        {inv.payment_method === 'manual_check' && 'Check'}
+                        {inv.payment_method === 'manual_other' && 'Manual / Other'}
+                      </td>
+                      <td className="p-3 font-mono text-2xs text-ink-3">
+                        {inv.payment_reference || '—'}
+                      </td>
+                      <td className="p-3 text-2xs text-ink-3">
+                        {inv.paid_at ? new Date(inv.paid_at).toLocaleDateString() : new Date(inv.created_at).toLocaleDateString()}
+                      </td>
+                      <td className="p-3 text-right">
+                        {inv.hosted_invoice_url ? (
+                          <a
+                            href={inv.hosted_invoice_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 text-2xs text-accent hover:underline font-semibold"
+                          >
+                            <span>View</span>
+                            <ExternalLink className="w-3 h-3" />
+                          </a>
+                        ) : (
+                          <span className="text-2xs text-ink-4">Internal</span>
                         )}
                       </td>
                     </tr>
@@ -1197,6 +1568,118 @@ export function PlansManagementView() {
             </Button>
             <Button size="sm" loading={savingSub} onClick={handleSaveSubscription}>
               Save Subscription
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* ===================================================================== */}
+      {/* MODAL 4: RECORD MANUAL PAYMENT */}
+      {/* ===================================================================== */}
+      <Modal
+        open={showManualPayModal}
+        onClose={() => setShowManualPayModal(false)}
+        title="Record Manual Payment"
+        description="Register an offline bank wire, crypto transfer, or check, generate an invoice receipt, and extend subscription."
+      >
+        <div className="p-5 space-y-4">
+          <div>
+            <label className="block text-2xs font-semibold text-ink-2 mb-1">Target Workspace *</label>
+            <select
+              value={manualWsId}
+              onChange={(e) => setManualWsId(e.target.value)}
+              className="input input-sm w-full"
+            >
+              <option value="">Select workspace...</option>
+              {workspaces.map((w) => (
+                <option key={w.id} value={w.id}>
+                  {w.name} (Current: {w.plan})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <label className="block text-2xs font-semibold text-ink-2 mb-1">Amount ($) *</label>
+              <input
+                type="number"
+                min={0}
+                value={manualAmount}
+                onChange={(e) => setManualAmount(Number(e.target.value))}
+                className="input input-sm w-full"
+              />
+            </div>
+
+            <div>
+              <label className="block text-2xs font-semibold text-ink-2 mb-1">Currency</label>
+              <select
+                value={manualCurrency}
+                onChange={(e) => setManualCurrency(e.target.value)}
+                className="input input-sm w-full"
+              >
+                <option value="USD">USD ($)</option>
+                <option value="EUR">EUR (€)</option>
+                <option value="GBP">GBP (£)</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <label className="block text-2xs font-semibold text-ink-2 mb-1">Payment Method *</label>
+              <select
+                value={manualMethod}
+                onChange={(e) => setManualMethod(e.target.value as any)}
+                className="input input-sm w-full"
+              >
+                <option value="manual_bank_transfer">Bank Wire / ACH</option>
+                <option value="manual_crypto">Cryptocurrency (BTC/ETH/USDT)</option>
+                <option value="manual_check">Corporate Check</option>
+                <option value="manual_other">Other Offline Method</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-2xs font-semibold text-ink-2 mb-1">Extension Days *</label>
+              <input
+                type="number"
+                min={1}
+                value={manualDays}
+                onChange={(e) => setManualDays(Number(e.target.value))}
+                className="input input-sm w-full"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-2xs font-semibold text-ink-2 mb-1">Payment Reference / Tx Hash *</label>
+            <input
+              type="text"
+              placeholder="e.g. WIRE-894721 or 0x9b3f... or Check #1042"
+              value={manualRef}
+              onChange={(e) => setManualRef(e.target.value)}
+              className="input input-sm w-full font-mono text-2xs"
+            />
+          </div>
+
+          <div>
+            <label className="block text-2xs font-semibold text-ink-2 mb-1">Internal Note</label>
+            <textarea
+              rows={2}
+              placeholder="Add details on bank account received, date verified, or customer contact..."
+              value={manualNotes}
+              onChange={(e) => setManualNotes(e.target.value)}
+              className="input input-sm w-full py-2"
+            />
+          </div>
+
+          <div className="flex items-center justify-end gap-2.5 pt-3">
+            <Button variant="secondary" size="sm" onClick={() => setShowManualPayModal(false)}>
+              Cancel
+            </Button>
+            <Button size="sm" loading={savingManualPay} onClick={handleRecordManualPayment}>
+              Record & Activate Subscription
             </Button>
           </div>
         </div>

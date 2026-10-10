@@ -2,6 +2,8 @@ import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { PwaRegistrar } from "@/components/pwa/PwaRegistrar";
 import { ToastProvider } from "@/components/ui/Toast";
+import { SupportSessionBanner } from "@/components/support/SupportSessionBanner";
+import { AnnouncementsBanner } from "@/components/announcements/AnnouncementsBanner";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -91,7 +93,11 @@ export default function RootLayout({
       </head>
       <body className="min-h-full bg-canvas text-ink">
         <PwaRegistrar />
-        <ToastProvider>{children}</ToastProvider>
+        <ToastProvider>
+          <SupportSessionBanner />
+          <AnnouncementsBanner />
+          {children}
+        </ToastProvider>
       </body>
     </html>
   );
