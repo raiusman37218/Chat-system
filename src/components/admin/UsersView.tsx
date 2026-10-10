@@ -32,7 +32,10 @@ import {
   getPlatformSuperAdminsListAction,
   inviteSuperAdminAction,
   revokeSuperAdminInviteAction,
+  deleteSuperAdminInviteAction,
   revokeSuperAdminAccessAction,
+  deleteSuperAdminAccessAction,
+  deleteSuperAdminUserCompletelyAction,
   PlatformUserItem,
   PlatformSuperAdminInvitation,
 } from '@/app/actions/platform';
@@ -86,10 +89,11 @@ export function UsersView() {
   const [copiedPassword, setCopiedPassword] = useState(false);
   const [inviteLoading, setInviteLoading] = useState(false);
 
-  // Revoke Admin State
+  // Revoke / Delete Admin State
   const [targetAdminToRevoke, setTargetAdminToRevoke] = useState<Agent | null>(null);
   const [showRevokeAdminModal, setShowRevokeAdminModal] = useState(false);
   const [revokeLoading, setRevokeLoading] = useState(false);
+  const [deleteAccountLoading, setDeleteAccountLoading] = useState(false);
 
   const loadTenantUsers = async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
@@ -249,23 +253,57 @@ export function UsersView() {
     }
   };
 
+  const handleDeleteInvite = async (invitationId: string) => {
+    try {
+      const res = await deleteSuperAdminInviteAction(invitationId);
+      if (res.success) {
+        toast.success('Invitation deleted permanently.');
+        await loadSuperAdmins();
+      } else {
+        toast.error(res.error || 'Failed to delete invitation.');
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to delete invitation.');
+    }
+  };
+
   const handleConfirmRevokeAccess = async () => {
     if (!targetAdminToRevoke) return;
     setRevokeLoading(true);
     try {
-      const res = await revokeSuperAdminAccessAction(targetAdminToRevoke.id);
+      const res = await deleteSuperAdminAccessAction(targetAdminToRevoke.id);
       if (res.success) {
         toast.success(`Super admin access revoked for ${targetAdminToRevoke.email}.`);
         setShowRevokeAdminModal(false);
         setTargetAdminToRevoke(null);
-        await loadSuperAdmins();
+        await Promise.all([loadSuperAdmins(), loadTenantUsers()]);
       } else {
-        toast.error(res.error || 'Failed to revoke super admin access.');
+        toast.error(res.error || 'Failed to remove super admin access.');
       }
     } catch (err: any) {
-      toast.error(err.message || 'Failed to revoke super admin access.');
+      toast.error(err.message || 'Failed to remove super admin access.');
     } finally {
       setRevokeLoading(false);
+    }
+  };
+
+  const handleConfirmDeleteUserCompletely = async () => {
+    if (!targetAdminToRevoke) return;
+    setDeleteAccountLoading(true);
+    try {
+      const res = await deleteSuperAdminUserCompletelyAction(targetAdminToRevoke.id);
+      if (res.success) {
+        toast.success(`User ${targetAdminToRevoke.email} permanently deleted.`);
+        setShowRevokeAdminModal(false);
+        setTargetAdminToRevoke(null);
+        await Promise.all([loadSuperAdmins(), loadTenantUsers()]);
+      } else {
+        toast.error(res.error || 'Failed to delete super admin account.');
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to delete super admin account.');
+    } finally {
+      setDeleteAccountLoading(false);
     }
   };
 
@@ -505,7 +543,22 @@ export function UsersView() {
 
                       <td className="p-3 text-right">
                         {u.is_super_admin ? (
-                          <span className="text-2xs text-ink-3 font-medium">Protected Admin</span>
+                          isCurrentCallerOwner && !u.is_platform_owner && !['musmanrai372@gmail.com', 'raiusman37218@gmail.com', 'agent@zentry.io'].includes(u.email.toLowerCase()) ? (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-danger hover:text-danger hover:bg-danger/10"
+                              onClick={() => {
+                                setTargetAdminToRevoke(u as any);
+                                setShowRevokeAdminModal(true);
+                              }}
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                              <span>Delete Access</span>
+                            </Button>
+                          ) : (
+                            <span className="text-2xs text-ink-3 font-medium">Platform Owner</span>
+                          )
                         ) : u.is_active ? (
                           <Button
                             variant="ghost"
@@ -664,7 +717,7 @@ export function UsersView() {
                             }}
                           >
                             <Trash2 className="w-3.5 h-3.5" />
-                            <span>Revoke Access</span>
+                            <span>Delete Access</span>
                           </Button>
                         ) : (
                           <span className="text-2xs text-ink-3">Owner Managed</span>
@@ -751,13 +804,26 @@ export function UsersView() {
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                className="text-danger hover:text-danger"
+                                className="text-ink-3 hover:text-ink"
                                 onClick={() => handleRevokeInvite(inv.id)}
                               >
                                 <span>Revoke</span>
                               </Button>
                             )}
                           </>
+                        )}
+
+                        {isCurrentCallerOwner && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-danger hover:text-danger hover:bg-danger/10"
+                            onClick={() => handleDeleteInvite(inv.id)}
+                            title="Delete invitation permanently"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            <span>Delete</span>
+                          </Button>
                         )}
                       </td>
                     </tr>
@@ -890,40 +956,82 @@ export function UsersView() {
       </Modal>
 
       {/* ========================================================================= */}
-      {/* MODAL 2: REVOKE SUPER ADMIN ACCESS CONFIRMATION */}
+      {/* MODAL 2: DELETE / REVOKE SUPER ADMIN ACCESS */}
       {/* ========================================================================= */}
       <Modal
         open={showRevokeAdminModal}
-        onClose={() => setShowRevokeAdminModal(false)}
-        title="Revoke Super Admin Access"
-        description="Are you sure you want to remove super admin privileges from this account?"
+        onClose={() => {
+          if (!revokeLoading && !deleteAccountLoading) {
+            setShowRevokeAdminModal(false);
+            setTargetAdminToRevoke(null);
+          }
+        }}
+        title="Delete Super Admin Access"
+        description="Choose whether to revoke privileges or permanently delete this admin account."
       >
         <div className="p-5 space-y-4">
           <div className="p-4 rounded-xl border border-danger/20 bg-danger/5 flex items-start gap-3">
             <ShieldAlert className="w-5 h-5 text-danger shrink-0 mt-0.5" />
             <div className="text-xs space-y-1">
-              <strong className="text-danger font-semibold">Immediate Privileges Removal</strong>
+              <strong className="text-danger font-semibold">Administrator Access Control</strong>
               <p className="text-ink-3">
-                {targetAdminToRevoke?.name} ({targetAdminToRevoke?.email}) will immediately lose all platform super admin access.
+                Target User: <span className="font-semibold text-ink">{targetAdminToRevoke?.name}</span> ({targetAdminToRevoke?.email})
               </p>
             </div>
           </div>
 
-          <div className="flex items-center justify-end gap-2.5 pt-2">
+          <div className="space-y-3 pt-1">
+            <div className="p-3.5 rounded-xl border border-line bg-surface-2/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <div className="text-xs font-semibold text-ink">Revoke Access Only</div>
+                <p className="text-2xs text-ink-3 mt-0.5">
+                  Immediately removes Super Admin privileges and restricts platform administration.
+                </p>
+              </div>
+              <Button
+                variant="secondary"
+                size="sm"
+                loading={revokeLoading}
+                disabled={deleteAccountLoading}
+                onClick={handleConfirmRevokeAccess}
+                className="shrink-0"
+              >
+                Revoke Privileges
+              </Button>
+            </div>
+
+            <div className="p-3.5 rounded-xl border border-danger/30 bg-danger/5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <div className="text-xs font-semibold text-danger">Permanently Delete Account</div>
+                <p className="text-2xs text-ink-3 mt-0.5">
+                  Completely erases this account, Supabase authentication login, and invitations.
+                </p>
+              </div>
+              <Button
+                variant="danger"
+                size="sm"
+                loading={deleteAccountLoading}
+                disabled={revokeLoading}
+                onClick={handleConfirmDeleteUserCompletely}
+                className="shrink-0"
+              >
+                <Trash2 className="w-3.5 h-3.5 mr-1" />
+                Delete Completely
+              </Button>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-end pt-2">
             <Button
-              variant="secondary"
+              variant="ghost"
               size="sm"
-              onClick={() => setShowRevokeAdminModal(false)}
+              disabled={revokeLoading || deleteAccountLoading}
+              onClick={() => {
+                setShowRevokeAdminModal(false);
+                setTargetAdminToRevoke(null);
+              }}
             >
               Cancel
-            </Button>
-            <Button
-              variant="danger"
-              size="sm"
-              loading={revokeLoading}
-              onClick={handleConfirmRevokeAccess}
-            >
-              Confirm Revoke
             </Button>
           </div>
         </div>

@@ -835,6 +835,7 @@ export interface PlatformUserItem {
   status: string;
   is_active: boolean;
   is_super_admin: boolean;
+  is_platform_owner?: boolean;
   workspace_id: string | null;
   workspace_name: string | null;
   created_at: string;

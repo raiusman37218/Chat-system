@@ -2610,6 +2610,7 @@ export async function getPlatformUsersAction(query: PlatformUsersQuery = {}): Pr
     status: a.status || 'offline',
     is_active: a.is_active ?? true,
     is_super_admin: !!a.is_super_admin,
+    is_platform_owner: !!a.is_platform_owner || ['musmanrai372@gmail.com', 'raiusman37218@gmail.com', 'agent@zentry.io'].includes((a.email || '').toLowerCase()),
     workspace_id: a.workspace_id || null,
     workspace_name: a.workspace_id ? wsNameMap.get(a.workspace_id) || 'Unknown Workspace' : 'None',
     created_at: a.created_at,
@@ -3066,13 +3067,95 @@ export async function revokeSuperAdminInviteAction(invitationId: string): Promis
 }
 
 /**
- * 12. Revokes an active Super Admin's access
+ * 12. Permanently deletes a Super Admin invitation record
  */
-export async function revokeSuperAdminAccessAction(adminAgentId: string): Promise<{ success: boolean; error?: string }> {
+export async function deleteSuperAdminInviteAction(invitationId: string): Promise<{ success: boolean; error?: string }> {
+  const { agent: ownerAgent } = await assertPlatformOwner();
+  const adminClient = serviceClient();
+
+  const { error } = await adminClient
+    .from('platform_super_admin_invitations')
+    .delete()
+    .eq('id', invitationId);
+
+  if (error) {
+    return { success: false, error: error.message };
+  }
+
+  await recordSuperAdminAudit({
+    admin: ownerAgent,
+    action: 'super_admin_invite_deleted',
+    details: { invitation_id: invitationId },
+  });
+
+  return { success: true };
+}
+
+/**
+ * 13. Removes / Revokes Super Admin privileges from an account
+ */
+export async function deleteSuperAdminAccessAction(adminAgentId: string): Promise<{ success: boolean; error?: string }> {
   const { agent: ownerAgent } = await assertPlatformOwner();
 
   if (adminAgentId === ownerAgent.id) {
-    return { success: false, error: 'You cannot revoke your own platform owner access.' };
+    return { success: false, error: 'You cannot revoke or delete your own platform owner access.' };
+  }
+
+  const adminClient = serviceClient();
+
+  const { data: targetAgent } = await adminClient
+    .from('agents')
+    .select('id, email, is_platform_owner, workspace_id')
+    .eq('id', adminAgentId)
+    .maybeSingle();
+
+  if (!targetAgent) {
+    return { success: false, error: 'Target user not found.' };
+  }
+
+  if (targetAgent.is_platform_owner || ['musmanrai372@gmail.com', 'raiusman37218@gmail.com', 'agent@zentry.io'].includes(targetAgent.email.toLowerCase())) {
+    return { success: false, error: 'Cannot remove access of a designated platform owner.' };
+  }
+
+  const updatePayload: Record<string, any> = {
+    is_super_admin: false,
+    role: 'agent',
+  };
+  if (!targetAgent.workspace_id) {
+    updatePayload.is_active = false;
+  }
+
+  const { error } = await adminClient
+    .from('agents')
+    .update(updatePayload)
+    .eq('id', adminAgentId);
+
+  if (error) {
+    return { success: false, error: error.message };
+  }
+
+  await recordSuperAdminAudit({
+    admin: ownerAgent,
+    action: 'super_admin_access_deleted',
+    details: { deleted_agent_id: adminAgentId, deleted_email: targetAgent.email },
+  });
+
+  return { success: true };
+}
+
+/**
+ * Backwards compatibility alias
+ */
+export const revokeSuperAdminAccessAction = deleteSuperAdminAccessAction;
+
+/**
+ * 14. Permanently deletes a Super Admin user completely (Auth, Agent row, Invitations)
+ */
+export async function deleteSuperAdminUserCompletelyAction(adminAgentId: string): Promise<{ success: boolean; error?: string }> {
+  const { agent: ownerAgent } = await assertPlatformOwner();
+
+  if (adminAgentId === ownerAgent.id) {
+    return { success: false, error: 'You cannot delete your own platform owner account.' };
   }
 
   const adminClient = serviceClient();
@@ -3083,25 +3166,44 @@ export async function revokeSuperAdminAccessAction(adminAgentId: string): Promis
     .eq('id', adminAgentId)
     .maybeSingle();
 
-  if (targetAgent?.is_platform_owner) {
-    return { success: false, error: 'Cannot revoke another platform owner.' };
+  if (!targetAgent) {
+    return { success: false, error: 'Target user not found.' };
   }
 
-  const { error } = await adminClient
+  if (targetAgent.is_platform_owner || ['musmanrai372@gmail.com', 'raiusman37218@gmail.com', 'agent@zentry.io'].includes(targetAgent.email.toLowerCase())) {
+    return { success: false, error: 'Cannot delete a designated platform owner account.' };
+  }
+
+  // 1. Delete associated invitations
+  await adminClient
+    .from('platform_super_admin_invitations')
+    .delete()
+    .eq('email', targetAgent.email);
+
+  // 2. Delete agent record
+  const { error: agentErr } = await adminClient
     .from('agents')
-    .update({ is_super_admin: false })
+    .delete()
     .eq('id', adminAgentId);
 
-  if (error) {
-    return { success: false, error: error.message };
+  if (agentErr) {
+    return { success: false, error: agentErr.message };
+  }
+
+  // 3. Delete Supabase auth user
+  try {
+    await adminClient.auth.admin.deleteUser(adminAgentId);
+  } catch (authErr: any) {
+    console.warn('Could not delete auth user from auth.users:', authErr?.message);
   }
 
   await recordSuperAdminAudit({
     admin: ownerAgent,
-    action: 'super_admin_access_revoked',
-    details: { revoked_agent_id: adminAgentId, revoked_email: targetAgent?.email },
+    action: 'super_admin_user_deleted',
+    details: { deleted_agent_id: adminAgentId, deleted_email: targetAgent.email },
   });
 
   return { success: true };
 }
+
 

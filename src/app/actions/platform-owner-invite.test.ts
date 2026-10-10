@@ -88,6 +88,7 @@ function createMockSupabaseClient() {
           return { data: { user: { id, email, user_metadata } }, error: null };
         }),
         updateUserById: vi.fn(async () => ({ error: null })),
+        deleteUser: vi.fn(async () => ({ error: null })),
       },
     },
     rpc: vi.fn(async () => ({ data: null, error: { message: 'RPC not in unit test DB' } })),
@@ -97,9 +98,14 @@ function createMockSupabaseClient() {
       const filters: Array<{ op: string; args: any[] }> = [];
       let updatePayload: any = null;
       let insertPayload: any = null;
+      let isDelete = false;
 
       const builder: any = {
         select: vi.fn(() => builder),
+        delete: vi.fn(() => {
+          isDelete = true;
+          return builder;
+        }),
         eq: vi.fn((col: string, val: any) => {
           filters.push({ op: 'eq', args: [col, val] });
           return builder;
@@ -158,6 +164,18 @@ function createMockSupabaseClient() {
                 if (target) Object.assign(target, updatePayload);
               }
               return resolve({ data: updatePayload, error: null });
+            }
+
+            if (isDelete) {
+              const eqId = filters.find((f) => f.op === 'eq' && f.args[0] === 'id')?.args[1];
+              const eqEmail = filters.find((f) => f.op === 'eq' && f.args[0] === 'email')?.args[1];
+              if (table === 'agents') {
+                fakeState.agents = fakeState.agents.filter((a: any) => a.id !== eqId && a.email !== eqEmail);
+              }
+              if (table === 'platform_super_admin_invitations') {
+                fakeState.invitations = fakeState.invitations.filter((i: any) => i.id !== eqId && i.email !== eqEmail);
+              }
+              return resolve({ data: null, error: null });
             }
 
             let sourceData: any[] = [];
@@ -230,7 +248,10 @@ import {
   inviteSuperAdminAction,
   acceptSuperAdminInviteAction,
   revokeSuperAdminInviteAction,
+  deleteSuperAdminInviteAction,
   revokeSuperAdminAccessAction,
+  deleteSuperAdminAccessAction,
+  deleteSuperAdminUserCompletelyAction,
 } from './platform';
 
 describe('Platform Owner Super Admin Access Control Suite', () => {
@@ -360,7 +381,7 @@ describe('Platform Owner Super Admin Access Control Suite', () => {
     it('revokeSuperAdminAccessAction prevents owner from self-revoking', async () => {
       const res = await revokeSuperAdminAccessAction(fakeState.OWNER_ID);
       expect(res.success).toBe(false);
-      expect(res.error).toMatch(/cannot revoke your own platform owner access/);
+      expect(res.error).toMatch(/cannot (revoke|delete) (or delete )?your own platform owner access/i);
     });
 
     it('allows owner to revoke super admin privileges from another admin', async () => {
@@ -369,6 +390,43 @@ describe('Platform Owner Super Admin Access Control Suite', () => {
 
       const revoked = fakeState.agents.find((a: any) => a.id === fakeState.ADMIN_ID);
       expect(revoked.is_super_admin).toBe(false);
+      expect(revoked.is_active).toBe(false); // Standalone admin with no workspace is deactivated
+    });
+
+    it('deleteSuperAdminInviteAction permanently removes an invitation from the database', async () => {
+      const inviteRes = await inviteSuperAdminAction({
+        name: 'Delete Me',
+        email: 'deleteme@platform.test',
+        password: 'DeletePassword123!',
+      });
+      const invId = inviteRes.invitationId!;
+      expect(fakeState.invitations.some((i: any) => i.id === invId)).toBe(true);
+
+      const delRes = await deleteSuperAdminInviteAction(invId);
+      expect(delRes.success).toBe(true);
+      expect(fakeState.invitations.some((i: any) => i.id === invId)).toBe(false);
+    });
+
+    it('deleteSuperAdminUserCompletelyAction removes user from agents and auth permanently', async () => {
+      const inviteRes = await inviteSuperAdminAction({
+        name: 'Ephemeral Admin',
+        email: 'ephemeral@platform.test',
+        password: 'EphemeralPassword123!',
+      });
+      await acceptSuperAdminInviteAction(inviteRes.token!);
+
+      const created = fakeState.agents.find((a: any) => a.email === 'ephemeral@platform.test');
+      expect(created).toBeDefined();
+
+      const delRes = await deleteSuperAdminUserCompletelyAction(created.id);
+      expect(delRes.success).toBe(true);
+      expect(fakeState.agents.some((a: any) => a.email === 'ephemeral@platform.test')).toBe(false);
+    });
+
+    it('deleteSuperAdminUserCompletelyAction prevents owner from deleting self or other owners', async () => {
+      const res = await deleteSuperAdminUserCompletelyAction(fakeState.OWNER_ID);
+      expect(res.success).toBe(false);
+      expect(res.error).toMatch(/cannot delete your own platform owner account/);
     });
   });
 });
