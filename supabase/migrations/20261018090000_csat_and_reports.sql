@@ -370,6 +370,7 @@ BEGIN
   FROM public.conversations c
   WHERE t.conversation_id = c.id
     AND c.csat_rating IS NOT NULL
-    AND t.csat_rating IS NULL;
+    AND t.csat_rating IS NULL
+    AND t.status <> 'closed';
 
 END $$;
